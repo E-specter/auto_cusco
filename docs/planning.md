@@ -14,7 +14,7 @@
 - [x] Disparador de procesamiento decidido: **bajo demanda desde el frontend** (sin cron)
 - [x] Primeras plataformas objetivo decididas: **SMS y WhatsApp** (digitales) y **Cisvox / Kontactus** (VoIP)
 - [x] Backend Python: esqueleto real implementado con **uv** — proyecto FastAPI, arquitectura de puertos/adaptadores, `ruff`/`pytest` en verde (ver `backend/`)
-- [ ] Base de datos PostgreSQL real creada (falta ejecutar `backend/scripts/init_db.sql`, paso manual del usuario)
+- [x] Base de datos PostgreSQL real creada (PostgreSQL 18, base `auto_cusco`, rol `auto_cusco_app`); `GET /health` reporta `database: true`
 - [x] Commit inicial del repositorio, publicado en GitHub (`E-specter/auto_cusco`, rama `main`)
 
 Este roadmap reemplaza la versión anterior (orientada a un modelo genérico de "gestiones de cobranza") y se organiza en base a los requerimientos atómicos de `docs/atomics-requirements.md`, que es ahora la fuente de verdad funcional del proyecto.
@@ -30,10 +30,10 @@ Decisiones y piezas base de las que dependen todas las fases funcionales siguien
 - [x] Entorno Python gestionado con **uv** (`backend/pyproject.toml`, `backend/uv.lock`, `backend/.venv/`) — no `pip`/`venv` directo.
 - [x] `ruff` y `pytest` configurados y en verde (`uv run ruff check .`, `uv run pytest`).
 - [x] API FastAPI mínima funcionando: `GET /health` verificado end-to-end (`uv run fastapi dev app/main.py`).
-- [ ] Crear el rol y la base de datos PostgreSQL reales: ejecutar `backend/scripts/init_db.sql` como superusuario (paso manual, requiere la contraseña de `postgres` que solo el usuario tiene) y completar `DB_PASSWORD` en `/.env`.
+- [x] Crear el rol y la base de datos PostgreSQL reales con `backend/scripts/init_db.sql` y completar `DB_PASSWORD` en `/.env` — hecho; conexión del backend verificada end-to-end.
 - [x] Formalizar el esquema exacto de "sábana" a partir de las muestras reales disponibles en `data/sabanas/` (RF-02) — ver `docs/sabana-schema.md`.
 
-Con esto, la Fase 0 está prácticamente resuelta: solo queda crear la base de datos real (paso manual del usuario). Las preguntas abiertas de la sección 8 de `docs/sabana-schema.md` no bloquean el arranque de la Fase 1, pero sí las reglas que dependen de ellas (significado de `" Días Cierre Mes Anterior"`, campos de interés interno, motivo de salida de productos).
+**La Fase 0 está cerrada.** El siguiente paso es la Fase 1 (ingesta y cartera). Las preguntas abiertas de la sección 8 de `docs/sabana-schema.md` no bloquean el arranque de la Fase 1, pero sí las reglas que dependen de ellas (significado de `" Días Cierre Mes Anterior"`, campos de interés interno, motivo de salida de productos).
 
 ## Fase 1 — Ingesta y cartera (RF-01 – RF-03)
 
