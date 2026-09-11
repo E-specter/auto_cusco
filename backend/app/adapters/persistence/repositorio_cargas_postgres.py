@@ -15,7 +15,7 @@ from enum import Enum
 from typing import Any
 
 from psycopg import sql
-from sqlalchemy import Connection, Engine, func, insert, select, text, update
+from sqlalchemy import Connection, Engine, delete, func, insert, select, text, update
 from sqlalchemy.engine import Row
 
 from app.adapters.persistence.modelos import (
@@ -26,6 +26,7 @@ from app.adapters.persistence.modelos import (
     CargaIncidencia,
 )
 from app.core.entities.carga import (
+    CargaDetalle,
     DatosCarga,
     EstadoCarga,
     EventoAuditoria,
@@ -34,12 +35,13 @@ from app.core.entities.carga import (
     NuevaCarga,
     ResumenProcesamiento,
 )
-from app.core.entities.sabana import Incidencia
+from app.core.entities.sabana import Incidencia, Severidad
 from app.core.ports.repositorio_cargas_port import RepositorioCargasPort, SesionCargasPort
 
 _CARGA = Carga.__table__
 _ARCHIVO = CargaArchivo.__table__
 _AUDITORIA = CargaAuditoria.__table__
+_INCIDENCIA = CargaIncidencia.__table__
 
 # Primer entero de pg_advisory_xact_lock: separa estos bloqueos de otros futuros.
 _ESPACIO_BLOQUEO_FECHA = 7201
@@ -84,6 +86,29 @@ def _datos(fila: Row) -> DatosCarga:
         nombre_archivo=fila.nombre_archivo,
         huella_archivo=fila.huella_archivo,
         hoja=fila.hoja,
+    )
+
+
+def _detalle(fila: Row) -> CargaDetalle:
+    return CargaDetalle(
+        id=fila.id,
+        fecha_corte=fila.fecha_corte,
+        version=fila.version,
+        estado=EstadoCarga(fila.estado),
+        vigente=fila.vigente,
+        nombre_archivo=fila.nombre_archivo,
+        huella_archivo=fila.huella_archivo,
+        tamano_bytes=fila.tamano_bytes,
+        hoja=fila.hoja,
+        creado_en=fila.creado_en,
+        procesado_en=fila.procesado_en,
+        huella_formato=fila.huella_formato,
+        filas_total=fila.filas_total,
+        filas_ingestadas=fila.filas_ingestadas,
+        incidencias_error=fila.incidencias_error,
+        incidencias_advertencia=fila.incidencias_advertencia,
+        incidencias_info=fila.incidencias_info,
+        motivo_fallo=fila.motivo_fallo,
     )
 
 
@@ -256,6 +281,68 @@ class SesionCargasPostgres(SesionCargasPort):
                 filas_total=filas_total,
                 detalle=detalle,
             )
+        )
+
+    def obtener_detalle(self, carga_id: int) -> CargaDetalle | None:
+        fila = self._cx.execute(select(_CARGA).where(_CARGA.c.id == carga_id)).one_or_none()
+        return _detalle(fila) if fila else None
+
+    def listar(
+        self, fecha_corte: date | None = None, limite: int = 50, desplazamiento: int = 0
+    ) -> list[CargaDetalle]:
+        consulta = select(_CARGA)
+        if fecha_corte is not None:
+            consulta = consulta.where(_CARGA.c.fecha_corte == fecha_corte)
+        consulta = (
+            consulta.order_by(_CARGA.c.fecha_corte.desc(), _CARGA.c.version.desc())
+            .limit(limite)
+            .offset(desplazamiento)
+        )
+        return [_detalle(fila) for fila in self._cx.execute(consulta).all()]
+
+    def listar_incidencias(
+        self,
+        carga_id: int,
+        severidad: Severidad | None = None,
+        limite: int = 100,
+        desplazamiento: int = 0,
+    ) -> list[Incidencia]:
+        consulta = select(_INCIDENCIA).where(_INCIDENCIA.c.carga_id == carga_id)
+        if severidad is not None:
+            consulta = consulta.where(_INCIDENCIA.c.severidad == severidad.value)
+        # Por id: primero las de cabecera y luego las filas en el orden del archivo.
+        consulta = consulta.order_by(_INCIDENCIA.c.id).limit(limite).offset(desplazamiento)
+        return [
+            Incidencia(
+                fila=f.fila,
+                columna=f.columna,
+                codigo=f.codigo,
+                severidad=Severidad(f.severidad),
+                detalle=f.detalle,
+                valor_original=f.valor_original,
+            )
+            for f in self._cx.execute(consulta).all()
+        ]
+
+    def contar_incidencias(self, carga_id: int, severidad: Severidad | None = None) -> int:
+        consulta = (
+            select(func.count()).select_from(_INCIDENCIA).where(_INCIDENCIA.c.carga_id == carga_id)
+        )
+        if severidad is not None:
+            consulta = consulta.where(_INCIDENCIA.c.severidad == severidad.value)
+        return self._cx.execute(consulta).scalar_one()
+
+    def eliminar_carga(self, carga_id: int) -> None:
+        self._cx.execute(delete(_CARGA).where(_CARGA.c.id == carga_id))
+
+    def reencolar_interrumpidas(self) -> list[int]:
+        return list(
+            self._cx.execute(
+                update(_CARGA)
+                .where(_CARGA.c.estado == EstadoCarga.PROCESANDO.value)
+                .values(estado=EstadoCarga.EN_COLA.value, motivo_fallo=None)
+                .returning(_CARGA.c.id)
+            ).scalars()
         )
 
 

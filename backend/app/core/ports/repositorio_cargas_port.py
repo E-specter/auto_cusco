@@ -6,6 +6,7 @@ from datetime import date
 from typing import Any, Protocol
 
 from app.core.entities.carga import (
+    CargaDetalle,
     DatosCarga,
     EstadoCarga,
     EventoAuditoria,
@@ -14,7 +15,7 @@ from app.core.entities.carga import (
     NuevaCarga,
     ResumenProcesamiento,
 )
-from app.core.entities.sabana import Incidencia
+from app.core.entities.sabana import Incidencia, Severidad
 
 
 class SesionCargasPort(Protocol):
@@ -39,6 +40,14 @@ class SesionCargasPort(Protocol):
 
     def obtener_carga(self, carga_id: int) -> DatosCarga | None: ...
 
+    def obtener_detalle(self, carga_id: int) -> CargaDetalle | None: ...
+
+    def listar(
+        self, fecha_corte: date | None = None, limite: int = 50, desplazamiento: int = 0
+    ) -> list[CargaDetalle]:
+        """Versiones ordenadas de la mas reciente a la mas antigua."""
+        ...
+
     def tomar_para_procesar(self, carga_id: int) -> DatosCarga | None:
         """Pasa la version de en_cola a procesando. None si no estaba en cola."""
         ...
@@ -50,6 +59,16 @@ class SesionCargasPort(Protocol):
         ...
 
     def guardar_incidencias(self, carga_id: int, incidencias: Iterable[Incidencia]) -> int: ...
+
+    def listar_incidencias(
+        self,
+        carga_id: int,
+        severidad: Severidad | None = None,
+        limite: int = 100,
+        desplazamiento: int = 0,
+    ) -> list[Incidencia]: ...
+
+    def contar_incidencias(self, carga_id: int, severidad: Severidad | None = None) -> int: ...
 
     def finalizar_carga(
         self,
@@ -63,6 +82,14 @@ class SesionCargasPort(Protocol):
     def id_vigente(self, fecha_corte: date) -> int | None: ...
 
     def marcar_vigente(self, carga_id: int, vigente: bool) -> None: ...
+
+    def eliminar_carga(self, carga_id: int) -> None:
+        """Borra la version con sus filas, incidencias y archivo. La auditoria sobrevive (V-8)."""
+        ...
+
+    def reencolar_interrumpidas(self) -> list[int]:
+        """Devuelve a la cola las versiones que quedaron en procesando y devuelve sus ids."""
+        ...
 
     def auditar(
         self,

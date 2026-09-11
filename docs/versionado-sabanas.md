@@ -123,7 +123,19 @@ Restricciones e índices clave (implementados en `backend/app/adapters/persisten
 - **Adaptador PostgreSQL:** `backend/app/adapters/persistence/repositorio_cargas_postgres.py`. Filas e incidencias se escriben con `COPY` dentro de la misma transacción. El número de versión y la vigencia se serializan por fecha con un bloqueo consultivo de PostgreSQL (`pg_advisory_xact_lock`), así dos cargas simultáneas de la misma fecha no chocan.
 - **Todo o nada:** si falla cualquier paso del guardado, la transacción se revierte completa y la versión queda `fallida` con un motivo que no incluye datos de la sábana.
 - **Medición con volumen real (2026-09-11):** corte 10.09 con nombres, documentos y teléfonos reemplazados en memoria. Registrar la versión con un archivo de 11.7 MB tomó 0.26 s. Procesarla, es decir normalizar 45,989 filas, guardarlas junto a sus 3,495 incidencias y cerrar la versión, tomó 3.88 s. Los conteos guardados coinciden con `docs/sabana-schema.md`.
-- **Pendiente:** ejecutar el procesamiento en segundo plano desde un endpoint, eliminar versiones (V-8) y recuperar versiones que queden en `procesando` si el proceso se interrumpe.
+- **API:** `backend/app/api/cargas.py`. Subir responde de inmediato y el procesamiento sigue en segundo plano dentro del mismo proceso.
+
+  | Endpoint | Para qué |
+  |---|---|
+  | `POST /cargas` | Sube el archivo con su fecha de corte, crea la versión y lanza el procesamiento. Avisa si el archivo es idéntico a otra versión de la fecha (V-6) |
+  | `GET /cargas` | Lista versiones, con filtro por fecha de corte |
+  | `GET /cargas/{id}` | Estado, resumen de filas e incidencias de una versión |
+  | `GET /cargas/{id}/incidencias` | Incidencias con filtro por severidad y paginación |
+  | `POST /cargas/{id}/vigente` | Elige la versión vigente de su fecha (V-7) |
+  | `DELETE /cargas/{id}` | Elimina una versión. Para eliminar la vigente hay que confirmarlo (V-8) |
+
+- **Recuperación de interrupciones:** al arrancar la aplicación, las versiones que quedaron en `procesando` vuelven a la cola. Es seguro porque el guardado es una sola transacción y una versión interrumpida no dejó filas a medias. Asume un solo proceso de la aplicación; con varios haría falta un sistema de colas.
+- **Pendiente:** las pantallas del frontend.
 
 ## 5. Costos y riesgos
 

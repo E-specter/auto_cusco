@@ -45,8 +45,8 @@ Avance:
 - [x] Evaluación del versionado de sábanas por fecha de corte: viable y rentable (~27 MB por versión, operaciones en milisegundos). Diseño en `docs/versionado-sabanas.md`, con C-1 a C-3 confirmados.
 - [x] Modelo de persistencia con Alembic según `docs/versionado-sabanas.md`: tablas `carga`, `carga_archivo`, `carga_fila`, `carga_incidencia` y `carga_auditoria` creadas en la base local con la migración inicial. Reglas verificadas en PostgreSQL: una vigente por día, solo versiones terminadas pueden ser vigentes, pagaré único por versión y borrado en cascada con auditoría conservada.
 - [x] Caso de uso de guardado: registrar versión, procesarla (normalización y `COPY` en una sola transacción, vigencia automática de la primera versión de cada fecha, pagaré repetido según V-10) y asignar vigente. Probado con repositorio en memoria, con PostgreSQL real y con volumen real sanitizado (45,989 filas procesadas en ~4 s).
-- [ ] Ejecución en segundo plano y endpoints REST: subir archivo, consultar estado, listar versiones por fecha, cambiar vigente, eliminar versión.
-- [ ] Recuperar versiones que queden en `procesando` si el proceso se interrumpe.
+- [x] Ejecución en segundo plano y endpoints REST (`backend/app/api/cargas.py`): subir archivo, listar versiones por fecha, consultar estado, ver incidencias, cambiar la vigente y eliminar versión. Verificado de punta a punta contra PostgreSQL.
+- [x] Recuperar versiones que queden en `procesando`: al arrancar la aplicación vuelven a la cola.
 - [ ] Pantallas del frontend: subir sábana con fecha de corte, resumen de incidencias, pregunta de versión vigente y gestión de versiones.
 
 Alcance:

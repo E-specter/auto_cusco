@@ -4,7 +4,7 @@ Diseno y reglas V-1 a V-10 en docs/versionado-sabanas.md.
 """
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -55,6 +55,10 @@ class VigenciaNoPermitida(CargaError):
     """Solo una version terminada puede ser vigente (V-5)."""
 
 
+class EliminacionNoPermitida(CargaError):
+    """Para eliminar la version vigente hay que elegir otra o confirmarlo (V-8)."""
+
+
 @dataclass(frozen=True)
 class NuevaCarga:
     fecha_corte: date
@@ -77,6 +81,30 @@ class DatosCarga:
     nombre_archivo: str
     huella_archivo: str
     hoja: str
+
+
+@dataclass(frozen=True)
+class CargaDetalle:
+    """Vista completa de una version, para listados y consultas de estado."""
+
+    id: int
+    fecha_corte: date
+    version: int
+    estado: EstadoCarga
+    vigente: bool
+    nombre_archivo: str
+    huella_archivo: str
+    tamano_bytes: int
+    hoja: str
+    creado_en: datetime
+    procesado_en: datetime | None = None
+    huella_formato: str | None = None
+    filas_total: int | None = None
+    filas_ingestadas: int | None = None
+    incidencias_error: int = 0
+    incidencias_advertencia: int = 0
+    incidencias_info: int = 0
+    motivo_fallo: str | None = None
 
 
 @dataclass(frozen=True)

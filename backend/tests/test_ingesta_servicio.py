@@ -8,12 +8,13 @@ versiones terminadas como vigentes. Solo datos sinteticos.
 import copy
 from collections.abc import Iterable
 from contextlib import contextmanager
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 import pytest
 
 from app.core.entities.carga import (
+    CargaDetalle,
     CargaNoEncontrada,
     CargaNoProcesable,
     DatosCarga,
@@ -156,6 +157,66 @@ class RepositorioEnMemoria:
             otra = self.id_vigente(carga["fecha_corte"])
             assert otra in (None, carga_id), "indice unico de vigente por fecha"
         carga["vigente"] = vigente
+
+    def obtener_detalle(self, carga_id: int):
+        if carga_id not in self.cargas:
+            return None
+        c = self.cargas[carga_id]
+        resumen = c.get("resumen") or ResumenProcesamiento()
+        return CargaDetalle(
+            id=c["id"],
+            fecha_corte=c["fecha_corte"],
+            version=c["version"],
+            estado=c["estado"],
+            vigente=c["vigente"],
+            nombre_archivo=c["nombre_archivo"],
+            huella_archivo=c["huella_archivo"],
+            tamano_bytes=c["tamano_bytes"],
+            hoja=c["hoja"],
+            creado_en=datetime(2026, 9, 10, 8, 0),
+            filas_total=resumen.filas_total,
+            filas_ingestadas=resumen.filas_ingestadas,
+            incidencias_error=resumen.incidencias_error,
+            incidencias_advertencia=resumen.incidencias_advertencia,
+            incidencias_info=resumen.incidencias_info,
+            motivo_fallo=c.get("motivo_fallo"),
+        )
+
+    def listar(self, fecha_corte=None, limite=50, desplazamiento=0) -> list[CargaDetalle]:
+        ids = [
+            c["id"]
+            for c in self.cargas.values()
+            if fecha_corte is None or c["fecha_corte"] == fecha_corte
+        ]
+        ids.sort(reverse=True)
+        return [self.obtener_detalle(i) for i in ids[desplazamiento : desplazamiento + limite]]
+
+    def listar_incidencias(
+        self, carga_id, severidad=None, limite=100, desplazamiento=0
+    ) -> list[Incidencia]:
+        incidencias = [
+            i
+            for i in self.incidencias.get(carga_id, [])
+            if severidad is None or i.severidad is severidad
+        ]
+        return incidencias[desplazamiento : desplazamiento + limite]
+
+    def contar_incidencias(self, carga_id, severidad=None) -> int:
+        return len(self.listar_incidencias(carga_id, severidad, limite=10**6))
+
+    def eliminar_carga(self, carga_id: int) -> None:
+        self.cargas.pop(carga_id, None)
+        self.archivos.pop(carga_id, None)
+        self.filas.pop(carga_id, None)
+        self.incidencias.pop(carga_id, None)
+
+    def reencolar_interrumpidas(self) -> list[int]:
+        reencoladas = []
+        for carga in self.cargas.values():
+            if carga["estado"] is EstadoCarga.PROCESANDO:
+                carga["estado"] = EstadoCarga.EN_COLA
+                reencoladas.append(carga["id"])
+        return sorted(reencoladas)
 
     def auditar(self, carga, evento, filas_total=None, detalle=None) -> None:
         self.auditoria.append((carga.id, evento, detalle))

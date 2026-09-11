@@ -20,10 +20,12 @@ from datetime import date
 from typing import Any
 
 from app.core.entities.carga import (
+    CargaDetalle,
     CargaNoEncontrada,
     CargaNoProcesable,
     CargaRegistrada,
     DatosCarga,
+    EliminacionNoPermitida,
     EstadoCarga,
     EventoAuditoria,
     FilaParaGuardar,
@@ -307,3 +309,70 @@ class IngestaSabanaService:
             sesion.marcar_vigente(carga.id, True)
             sesion.auditar(carga, EventoAuditoria.VIGENTE_ASIGNADA, detalle={"reemplaza_a": actual})
         return replace(carga, vigente=True)
+
+    # ---------- 4. consultar ----------
+
+    def listar_versiones(
+        self, fecha_corte: date | None = None, limite: int = 50, desplazamiento: int = 0
+    ) -> list[CargaDetalle]:
+        with self._repositorio.transaccion() as sesion:
+            return sesion.listar(fecha_corte, limite, desplazamiento)
+
+    def obtener(self, carga_id: int) -> CargaDetalle:
+        with self._repositorio.transaccion() as sesion:
+            detalle = sesion.obtener_detalle(carga_id)
+            if detalle is None:
+                raise CargaNoEncontrada(carga_id)
+            return detalle
+
+    def incidencias(
+        self,
+        carga_id: int,
+        severidad: Severidad | None = None,
+        limite: int = 100,
+        desplazamiento: int = 0,
+    ) -> tuple[int, list[Incidencia]]:
+        """Total de incidencias y la pagina pedida, en el orden en que se detectaron."""
+        with self._repositorio.transaccion() as sesion:
+            if sesion.obtener_carga(carga_id) is None:
+                raise CargaNoEncontrada(carga_id)
+            total = sesion.contar_incidencias(carga_id, severidad)
+            return total, sesion.listar_incidencias(carga_id, severidad, limite, desplazamiento)
+
+    # ---------- 5. eliminar y recuperar ----------
+
+    def eliminar_version(self, carga_id: int, dejar_fecha_sin_vigente: bool = False) -> None:
+        """Regla V-8: la version vigente solo se elimina confirmandolo explicitamente."""
+        with self._repositorio.transaccion() as sesion:
+            carga = sesion.obtener_carga(carga_id)
+            if carga is None:
+                raise CargaNoEncontrada(carga_id)
+            sesion.bloquear_fecha(carga.fecha_corte)
+            carga = sesion.obtener_carga(carga_id)  # releer tras obtener el bloqueo
+            if carga is None:
+                raise CargaNoEncontrada(carga_id)
+            if carga.vigente and not dejar_fecha_sin_vigente:
+                raise EliminacionNoPermitida(
+                    f"La carga {carga_id} es la version vigente del {carga.fecha_corte}; "
+                    "elige otra version vigente antes de eliminarla o confirma que la "
+                    "fecha quede sin version vigente"
+                )
+            sesion.auditar(
+                carga,
+                EventoAuditoria.CARGA_ELIMINADA,
+                detalle={"era_vigente": carga.vigente, "estado": carga.estado.value},
+            )
+            sesion.eliminar_carga(carga_id)
+
+    def recuperar_interrumpidas(self) -> list[int]:
+        """Devuelve a la cola las versiones que quedaron en procesando.
+
+        El guardado es una sola transaccion, asi que una version interrumpida no
+        dejo filas a medias y puede procesarse otra vez desde cero. Pensado para
+        el arranque de la aplicacion, cuando no hay otro proceso trabajando.
+        """
+        with self._repositorio.transaccion() as sesion:
+            reencoladas = sesion.reencolar_interrumpidas()
+        if reencoladas:
+            logger.warning("Versiones devueltas a la cola tras una interrupcion: %s", reencoladas)
+        return reencoladas

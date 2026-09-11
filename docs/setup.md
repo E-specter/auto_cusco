@@ -100,6 +100,15 @@ uv run fastapi dev app/main.py
 # En otra terminal: probar el health-check
 curl http://127.0.0.1:8000/health
 
+# Documentación interactiva de la API, con la carga de sábanas incluida
+Start-Process http://127.0.0.1:8000/docs
+
+# Subir una sábana: responde de inmediato y el procesamiento sigue en segundo plano
+curl.exe -F "fecha_corte=2026-09-10" -F "archivo=@..\data\sabanas\mi-sabana.xlsb" http://127.0.0.1:8000/cargas
+
+# Consultar cómo va esa carga (usa el id que devolvió el comando anterior)
+curl http://127.0.0.1:8000/cargas/1
+
 # Tests (no requieren PostgreSQL real)
 uv run pytest
 
