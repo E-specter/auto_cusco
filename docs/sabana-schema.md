@@ -27,7 +27,7 @@ Especificación formal de la sábana que llega cada día, levantada a partir de 
 
 ## 3. Claves
 
-- **Clave de producto: `Pagare`.** Única en ambos cortes (45,989 valores distintos en 45,989 filas). Texto de 18 caracteres con dos formas: 18 dígitos (33,928) o 3 dígitos + 1 letra + 14 dígitos (12,061). **Debe tratarse siempre como texto.**
+- **Clave de producto: `Pagare`.** Única en ambos cortes (45,989 valores distintos en 45,989 filas). Texto de 18 caracteres con dos formas: 18 dígitos (33,928) o 3 dígitos + 1 letra + 14 dígitos (12,061). **Debe tratarse siempre como texto.** Si un archivo trae un pagaré repetido, se guarda la primera aparición y las siguientes se reportan como error (regla V-10 de `docs/versionado-sabanas.md`).
 - **Clave de cliente: `DniRuc`.** Un documento puede tener varios productos en la sábana (1 producto: 40,686 documentos; 2: 2,602; 3: 33). `Cant.Paralelos` llega hasta 8, así que cuenta créditos del cliente en toda la entidad, no solo los presentes en la sábana.
 
 ## 4. Columnas de la hoja `VENCIDA`
@@ -45,7 +45,7 @@ Cabecera original tal como llega (entre comillas si trae espacios sobrantes). No
 | 6 | `Pagare` | `pagare` | texto (18) | **Clave de producto.** |
 | 7 | `SaldoSoles 03/09` | `saldo_soles_corte` | financiero | **La cabecera incluye una fecha** (`dd/mm`). Idéntico en ambos cortes: foto del saldo a esa fecha. Mapear por prefijo `SaldoSoles`. |
 | 8 | `TIPO DE REPROGRAMACIÓN` | `tipo_reprogramacion` | texto (catálogo) | Valor literal `NULL` = sin reprogramación (45,954). Otros: `Conflictos Sociales`, `COVID 19`, y un valor libre con número. **Vacía por completo el 09.09.** |
-| 9 | `Vencimientos Operativo` | `vence_operativo` + `fecha_vencimiento_operativo` | booleano + fecha | Columna mixta: texto `NO` (36,501) o fecha como serial de Excel (9,488; rango 10.09 – 25.09). |
+| 9 | `Vencimientos Operativo` | `vencimiento_operativo_aplica` + `vencimiento_operativo_fecha` | booleano + fecha | Columna mixta: texto `NO` (36,501) o fecha como serial de Excel (9,488; rango 10.09 – 25.09). |
 | 10 | `Dias Atraso Hoy` | `dias_atraso` | entero | Rango −8 a 71. **Negativo = días que faltan para vencer** (28,569 filas); 0 en 4,036. Aumenta en 1 por día salvo pagos. |
 | 11 | `Analista Actual` | `analista_actual` | texto | Mismo formato que `Analista`. Puede cambiar día a día. |
 | 12 | `Saldo Capital Pendiente` | `saldo_capital_pendiente` | financiero | Rango 50.74 – 2,521,280.36. |
@@ -89,7 +89,7 @@ Basada en la comparación 09.09 → 10.09 sobre los 42,767 pagarés presentes en
 | Clase | Columnas | Criterio |
 |---|---|---|
 | **Variable** (cambia a diario) | `dias_atraso`, `dias_atraso_entidad`, `monto_cuota` | Cambian en casi todos o en una fracción grande de productos. |
-| **Variable** (cambia ocasionalmente) | `telefono`, `vence_operativo`/`fecha_vencimiento_operativo`, `analista_actual`, `saldo_capital_pendiente`, `estado_credito`, `fecha_vencimiento_cuota`, `cuotas_aprobadas`, `cuotas_pagadas`, `cuotas_pendientes`, `segmento_actual`, `segmento_financiero`, `segmento_atraso`, `tramo_actual`, `provision_actual`, `mora_impacto_actual`, `tramo_proyectado`, `provision_proyectada`, `mora_impacto_proyectada` | Cambian en menos del 11% de productos entre días. |
+| **Variable** (cambia ocasionalmente) | `telefono`, `vencimiento_operativo_aplica`/`vencimiento_operativo_fecha`, `analista_actual`, `saldo_capital_pendiente`, `estado_credito`, `fecha_vencimiento_cuota`, `cuotas_aprobadas`, `cuotas_pagadas`, `cuotas_pendientes`, `segmento_actual`, `segmento_financiero`, `segmento_atraso`, `tramo_actual`, `provision_actual`, `mora_impacto_actual`, `tramo_proyectado`, `provision_proyectada`, `mora_impacto_proyectada` | Cambian en menos del 11% de productos entre días. |
 | **Invariable** (observado) | `region`, `agencia`, `analista_asignacion`, `titular`, `documento_numero`, `pagare`, `saldo_soles_corte`, `cliente_fallecido`, `tipo_producto`, `segmento_saldo`, `moneda`, `valor_cierre_mes_anterior`, `saldo_cierre_actual`, `cartera_tag`, `descuento_planilla`, `cantidad_paralelos`, `celular_analista` | 0 cambios en dos días. Confirmar con más cortes (p. ej. `cliente_fallecido` o `cantidad_paralelos` podrían cambiar dentro del mes). |
 | **Llenado intermitente** | `tipo_reprogramacion`, `tipo_basilea` | Vacías el 09.09 y llenas el 10.09. Un vacío **no debe registrarse como cambio de valor** en el historial (RF-22). |
 | **Metadato del lote** | `bpo`, `mes_gestion` | Constantes por archivo: guardar una vez por carga, no por producto. |
@@ -97,16 +97,20 @@ Basada en la comparación 09.09 → 10.09 sobre los 42,767 pagarés presentes en
 
 **Candidatos a "campos de interés interno de la entidad"** (RF-21): `tramo_actual`, `tramo_proyectado`, `provision_actual`, `provision_proyectada`, `mora_impacto_actual`, `mora_impacto_proyectada`. Parecen ser el seguimiento propio de la entidad (provisiones y mora proyectada), pero **debe confirmarlo el usuario** (P-5).
 
-## 6. Reglas de normalización propuestas
+## 6. Reglas de normalización
 
-- **N-1 — Mapeo por nombre, no por posición.** Normalizar cabeceras (recortar espacios, mayúsculas/minúsculas, tildes) y mapear contra una lista de alias. Alias ya observados: `PAGARE` / `PAGARE2`; `SaldoSoles dd/mm` (prefijo). Una cabecera desconocida o faltante debe reportarse, no romper la carga.
+**Implementación:** las reglas N-1 a N-6 y N-8 están implementadas en `backend/app/core/services/ingesta_sabana/` (catálogo de columnas en `catalogo.py`), con tests sobre datos sintéticos. Validadas contra ambos cortes reales: los conteos de documentos, teléfonos y consistencia coinciden con las tablas de este documento. N-7 corresponde al módulo de métricas y N-9 al adaptador de persistencia (pendientes).
+
+**Severidades de las incidencias:** `error` (la clave `pagare` falta o es inválida, o el documento es inválido), `advertencia` (dato inválido que no impide registrar el producto, p. ej. teléfono) e `info` (corrección prevista por las reglas, p. ej. DNI completado con ceros).
+
+- **N-1 — Mapeo por nombre, no por posición.** Normalizar cabeceras (recortar espacios, mayúsculas/minúsculas, tildes) y mapear contra una lista de alias. Alias ya observados: `PAGARE` / `PAGARE2`; `SaldoSoles dd/mm` (prefijo). Una cabecera desconocida o faltante debe reportarse, no romper la carga. **Solo la columna `Pagare` es requerida:** si falta, el archivo se rechaza; cualquier otra columna faltante genera una advertencia.
 - **N-2 — Texto.** Recortar espacios iniciales/finales y colapsar espacios dobles en catálogos (`TAG`, `TipoProducto`, `MES DE GESTIÓN`). El literal `NULL` se convierte en nulo. Unificar variantes con puntos finales de `TipoProducto` solo mediante una tabla de equivalencias configurable (RF-32), no con reglas fijas en código.
 - **N-3 — Documento de identidad** (confirmado, decisión D-1). La columna `DniRuc` puede contener DNI, RUC o documentos de identidad extranjeros. La sábana no trae el tipo; se infiere en este orden:
 
   1. **RUC:** 11 dígitos, prefijo `10`, `15`, `16`, `17` o `20`, y dígito verificador válido (módulo 11 de SUNAT: pesos `5,4,3,2,7,6,5,4,3,2` sobre los 10 primeros dígitos; `r = 11 − (suma mod 11)`, con `10 → 0` y `11 → 1`; `r` debe igualar al dígito 11). Un valor de 11 dígitos que falle el prefijo o el verificador es **inválido**.
   2. **DNI:** solo dígitos y hasta 8 de largo. Si tiene menos de 8, **se completa con ceros a la izquierda** hasta 8. El DNI es siempre una cadena de 8 dígitos.
   3. **Documento extranjero:** cualquier otro valor no vacío (9, 10, 12 caracteres, o alfanumérico). Se conserva tal cual, recortando espacios.
-  4. **Vacío:** inválido, se reporta.
+  4. **Vacío o solo ceros:** inválido, se reporta.
 
   | Forma recibida | 09.09 | 10.09 | Resultado |
   |---|---|---|---|
@@ -118,7 +122,8 @@ Basada en la comparación 09.09 → 10.09 sobre los 42,767 pagarés presentes en
   | 9 dígitos | 1 | 1 | Documento extranjero |
   | Inválidos o vacíos | 0 | 0 | — |
 
-- **N-4 — Teléfono del cliente.** Regla de RF-02: 9 dígitos que empiezan con 9. Convertir número a texto sin decimales. No corregir automáticamente valores inválidos; reportarlos.
+- **N-4 — Teléfono del cliente** (regla de RF-02, confirmada por el usuario el 2026-09-11). Válido solo si es numérico, tiene 9 dígitos y empieza con 9 (celular). Puede llegar como número o como texto de solo dígitos; se guarda como texto sin decimales. Los inválidos no se corrigen automáticamente: se reportan como advertencia y el producto se ingesta igual, con teléfono nulo. La misma regla se aplica a `Celular Analista`.
+  - **Posible implementación futura: teléfonos fijos.** Hoy no se usan en la gestión, así que un número fijo cuenta como teléfono inválido. Si más adelante se necesitan, habrá que definir su formato (código de área y longitud por provincia) y clasificarlos aparte de los números mal escritos.
 
   | Resultado (10.09) | Filas |
   |---|---|

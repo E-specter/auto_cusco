@@ -103,13 +103,16 @@ curl http://127.0.0.1:8000/health
 # Tests (no requieren PostgreSQL real)
 uv run pytest
 
+# Integración opcional contra la base de /.env (requiere el paso 6; usa la fecha 2099 y borra lo que crea)
+$env:AUTO_CUSCO_DB_TESTS = "1"; uv run pytest -m postgres; Remove-Item Env:AUTO_CUSCO_DB_TESTS
+
 # Lint
 uv run ruff check .
 ```
 
 Deberías ver `{"api":true,"database":false,"ok":false}` hasta que completes el paso 6 (crear la base de datos real) — `database:false` es el comportamiento esperado, no un error.
 
-El workspace ya está preconfigurado para apuntar a `backend\.venv\Scripts\python.exe` como intérprete y usar `ruff` como linter/formateador automático al guardar. Más detalle de convenciones en `backend/AGENTS.md`.
+El workspace ya está preconfigurado para apuntar a `backend\.venv\Scripts\python.exe` como intérprete y usar `ruff` como linter/formateador automático al guardar. Más detalle de convenciones en `backend/AGENTS.md`, y el protocolo de pruebas y corrección de errores en [testing.md](testing.md).
 
 ## 6. Base de datos (PostgreSQL)
 
@@ -121,8 +124,42 @@ El motor es **PostgreSQL** (ver `architecture.md`). Si ya tienes PostgreSQL corr
 
 Esto crea el rol `auto_cusco_app` (contraseña por defecto `changeme`) y la base de datos `auto_cusco`. Luego:
 
-1. Cambia la contraseña por defecto: `ALTER ROLE auto_cusco_app WITH PASSWORD '<tu-contraseña>';` (desde `psql`, como superusuario).
-2. Copia `.env.example` a `.env` (si no existe todavía) y ajusta `DB_PASSWORD` con esa misma contraseña.
+1. Cambia la contraseña por defecto. Lo más seguro es `\password auto_cusco_app` desde `psql` como superusuario: la pide por teclado sin mostrarla y no tiene problemas con comillas. Alternativa: `ALTER ROLE auto_cusco_app WITH PASSWORD '<tu-contraseña>';` (si la contraseña lleva una comilla simple `'`, hay que escribirla duplicada `''`).
+2. Copia `.env.example` a `.env` (si no existe todavía) y ajusta `DB_PASSWORD` con esa misma contraseña. **Antes de elegirla, revisa la sección 6.1.**
+3. Crea o actualiza las tablas aplicando las migraciones, desde `backend/`:
+
+   ```powershell
+   uv run alembic upgrade head
+   ```
+
+   Es seguro repetirlo: solo aplica las migraciones pendientes. Para ver en qué versión está tu base usa `uv run alembic current`. El diseño de las tablas está en `docs/versionado-sabanas.md`.
+
+### 6.1 Caracteres especiales en la contraseña
+
+La contraseña de `DB_PASSWORD` pasa por dos etapas antes de llegar a PostgreSQL, y cada una interpreta ciertos caracteres. Si alguno se malinterpreta, el backend envía una contraseña distinta a la real y `GET /health` responde `database: false` (en el log del servidor aparece *la autentificación password falló para el usuario «auto_cusco_app»*), aunque la contraseña sea correcta en `psql`.
+
+**Etapa 1 — lectura de `/.env`** (`pydantic-settings`):
+
+| Contenido en `.env` | Qué pasa | Cómo evitarlo |
+|---|---|---|
+| Un espacio seguido de `#` (p. ej. `abc #123`) | Todo desde ` #` se toma como comentario; la contraseña queda `abc`. | Encerrar el valor entre comillas dobles: `DB_PASSWORD="abc #123"`. |
+| `${ALGO}` | Se reemplaza por la variable de entorno `ALGO` del sistema, **incluso entre comillas simples o dobles**. | No usar la secuencia `${` en la contraseña. |
+| Espacios al inicio o al final | Se eliminan. | Encerrar entre comillas dobles, o no usar espacios en los extremos. |
+
+**Etapa 2 — armado de la URL de conexión** (`backend/app/core/config.py`, propiedad `database_url`): la contraseña se inserta **tal cual, sin codificar**, dentro de `postgresql+psycopg://usuario:CONTRASEÑA@host:puerto/base`, y SQLAlchemy la vuelve a separar al conectar.
+
+| Carácter en la contraseña | Qué pasa | Ejemplo |
+|---|---|---|
+| `@` | Rompe la URL: la contraseña se corta en la primera `@` y el resto se toma como parte del host. | `abc@123` se interpreta como contraseña `abc` y host `123@localhost`. |
+| `%` seguido de dos caracteres hexadecimales (`0-9`, `a-f`) | Se decodifica como carácter codificado en URL, así que la contraseña cambia. | `abc%40x` se envía como `abc@x`. |
+
+Caracteres verificados **sin problema** en esta etapa: `:` `/` `#` `?` `&` `+` `=` `[` `]` `\` `"`, espacios, y `%` cuando no va seguido de dos hexadecimales (p. ej. `abc%zz`).
+
+> Verificado con SQLAlchemy 2.0.52 y pydantic-settings 2.15.0 (versiones de `backend/uv.lock` al 2026-09-11). Si se actualizan estas librerías, conviene volver a comprobarlo.
+
+**Recomendación práctica:** usa una contraseña larga solo con letras y números (p. ej. 24 o más caracteres generados al azar). Es igual de segura que una con símbolos y evita todos los casos anteriores.
+
+**Solución de fondo (pendiente, no aplicada):** construir la URL con `sqlalchemy.engine.URL.create(...)` en lugar de un f-string elimina los problemas de la etapa 2, porque pasa la contraseña como campo separado sin codificarla en texto. Los problemas de la etapa 1 (`${` y ` #`) no dependen del código del backend y seguirían aplicando.
 
 `auto_cusco.code-workspace` trae dos conexiones SQLTools de ejemplo (`Local PostgreSQL (admin)` y `Local PostgreSQL (auto_cusco)`) apuntando a `localhost`, listas para completar con las credenciales reales.
 
@@ -139,3 +176,4 @@ Una vez exista la ingesta real de sábanas (Fase 1 de `planning.md`), este paso 
 | `npm install` falla por versión de Node | Node < 22.12.0 | actualizar Node (recomendado: usar `nvm` o instalar la LTS más reciente) |
 | El puerto 4321 ya está en uso | otra instancia de `astro dev` corriendo | `astro dev stop` (si se inició en background) o cerrar el proceso manualmente |
 | VS Code no aplica el formateo automático | se abrió la carpeta suelta en vez del `.code-workspace` | reabrir con `File > Open Workspace from File...` |
+| `GET /health` devuelve `database: false` aunque la contraseña funciona en `psql` | `DB_PASSWORD` contiene `@`, `%` + dos hexadecimales, `${` o ` #` | ver sección 6.1; cambiar la contraseña a una solo con letras y números |

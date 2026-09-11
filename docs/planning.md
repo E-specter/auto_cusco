@@ -37,6 +37,20 @@ Decisiones y piezas base de las que dependen todas las fases funcionales siguien
 
 ## Fase 1 — Ingesta y cartera (RF-01 – RF-03)
 
+Avance:
+
+- [x] Núcleo de normalización (reglas N-1 a N-6 y N-8 de `docs/sabana-schema.md`) en `backend/app/core/services/ingesta_sabana/`, con tests sintéticos y validado contra los cortes reales.
+- [x] Decisiones técnicas: lector `python-calamine` (medido contra `pyxlsb`), migraciones con Alembic, ingesta en segundo plano, cargas de fechas pasadas permitidas.
+- [x] Adaptador de entrada que lee el `.xlsb` (hoja `VENCIDA`, configurable) y entrega filas al normalizador: `backend/app/adapters/input/lector_calamine.py`.
+- [x] Evaluación del versionado de sábanas por fecha de corte: viable y rentable (~27 MB por versión, operaciones en milisegundos). Diseño en `docs/versionado-sabanas.md`, con C-1 a C-3 confirmados.
+- [x] Modelo de persistencia con Alembic según `docs/versionado-sabanas.md`: tablas `carga`, `carga_archivo`, `carga_fila`, `carga_incidencia` y `carga_auditoria` creadas en la base local con la migración inicial. Reglas verificadas en PostgreSQL: una vigente por día, solo versiones terminadas pueden ser vigentes, pagaré único por versión y borrado en cascada con auditoría conservada.
+- [x] Caso de uso de guardado: registrar versión, procesarla (normalización y `COPY` en una sola transacción, vigencia automática de la primera versión de cada fecha, pagaré repetido según V-10) y asignar vigente. Probado con repositorio en memoria, con PostgreSQL real y con volumen real sanitizado (45,989 filas procesadas en ~4 s).
+- [ ] Ejecución en segundo plano y endpoints REST: subir archivo, consultar estado, listar versiones por fecha, cambiar vigente, eliminar versión.
+- [ ] Recuperar versiones que queden en `procesando` si el proceso se interrumpe.
+- [ ] Pantallas del frontend: subir sábana con fecha de corte, resumen de incidencias, pregunta de versión vigente y gestión de versiones.
+
+Alcance:
+
 - Carga de sábanas diarias mediante archivos estructurados (incluyendo el formato `.xlsb` ya presente en `data/sabanas/`).
 - Validación y normalización automática al cargar: formatos de documento de identidad (DNI, RUC, extranjero, etc.) y de teléfono (9 dígitos, inicia con 9).
 - Detección y reporte de inconsistencias/registros inválidos.
@@ -98,6 +112,7 @@ Ya satisfecho como práctica continua, no como fase cerrada:
 - `docs/` se mantiene como repositorio central de documentación técnica (especificaciones, arquitectura, módulos, reglas de negocio).
 - `docs/agents/` se mantiene como espacio de trabajo compartido para agentes de IA de distintos proveedores (ver `docs/agents/README.md`).
 - Cada fase completada o con cambio de alcance debe reflejarse en este documento y, si corresponde, en `docs/modules.md` y `docs/architecture.md`.
+- `docs/testing.md` define el protocolo de pruebas y de corrección de errores por módulo. `backend/scripts/verificar.ps1` corre la verificación local y `.github/workflows/backend.yml` la repite en cada subida.
 
 ## Notas
 

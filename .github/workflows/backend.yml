@@ -1,0 +1,61 @@
+name: backend
+
+# Protocolo completo en docs/testing.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  calidad:
+    name: Formato, lint y pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff format --check app tests migrations
+      - run: uv run ruff check .
+      - run: uv run pytest -q
+
+  base_de_datos:
+    name: Migraciones e integracion con PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Base desechable que vive solo durante la ejecucion: la contrasena no es un secreto.
+        image: postgres:18
+        env:
+          POSTGRES_USER: auto_cusco_app
+          POSTGRES_PASSWORD: contrasena_de_prueba
+          POSTGRES_DB: auto_cusco
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U auto_cusco_app -d auto_cusco"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: auto_cusco
+      DB_USER: auto_cusco_app
+      DB_PASSWORD: contrasena_de_prueba
+      AUTO_CUSCO_DB_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run alembic upgrade head
+      - run: uv run alembic check
+      - run: uv run pytest -m postgres -q

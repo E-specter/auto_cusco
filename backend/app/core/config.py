@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
+        # La contrasena se inserta sin codificar: `@` y `%XX` la corrompen.
+        # Ver docs/setup.md, seccion 6.1 (solucion de fondo: URL.create).
         return (
             f"postgresql+psycopg://{self.db_user}:{self.db_password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"

@@ -16,6 +16,8 @@ No edites `uv.lock` a mano; se regenera con `uv sync` / `uv add` / `uv lock`. Co
 ```powershell
 uv run fastapi dev app/main.py   # servidor de desarrollo con recarga automatica
 uv run pytest                    # tests (no requieren PostgreSQL real, ver tests/)
+$env:AUTO_CUSCO_DB_TESTS = "1"; uv run pytest -m postgres   # integracion opcional con la base de /.env (fecha 2099, se limpia sola)
+.\scripts\verificar.ps1          # verificacion antes de cerrar una tarea (-ConBase agrega migraciones e integracion)
 uv run ruff check .              # lint
 uv run ruff format .             # formateo
 ```
@@ -23,6 +25,21 @@ uv run ruff format .             # formateo
 ## Base de datos
 
 El motor es PostgreSQL (ver `docs/architecture.md`). La primera vez, crea el rol y la base de datos ejecutando `backend/scripts/init_db.sql` como superusuario (instrucciones en el propio script) y completa `DB_PASSWORD` en tu `/.env` local. La configuracion se lee en `app/core/config.py`.
+
+Cuidado con la contrasena: `database_url` inserta `DB_PASSWORD` sin codificar dentro de la URL, asi que `@` y `%` seguido de dos hexadecimales la corrompen; ademas, al leer `.env`, `${...}` se expande y ` #` corta el valor. Detalle y pruebas en `docs/setup.md`, seccion 6.1. Si cambias como se arma la URL, usa `sqlalchemy.engine.URL.create(...)` y actualiza esa seccion.
+
+### Migraciones (Alembic)
+
+Los modelos viven en `app/adapters/persistence/modelos.py` y las migraciones en `migrations/versions/`. La URL se toma de `/.env` en `migrations/env.py`; no la pongas en `alembic.ini`.
+
+```powershell
+uv run alembic upgrade head                        # aplicar migraciones pendientes
+uv run alembic revision --autogenerate -m "..."    # nueva migracion a partir de los modelos
+uv run alembic check                               # falla si hay cambios en modelos sin migrar
+uv run alembic downgrade -1                        # revertir la ultima migracion
+```
+
+Revisa siempre la migracion autogenerada antes de aplicarla: autogenerate no detecta atributos como `SET STORAGE` ni cambios en el texto de restricciones `CHECK`. Si cambias las columnas que produce el normalizador, actualiza `CargaFila`; `tests/test_modelos_persistencia.py` falla si no coinciden.
 
 ## Convencion de codigo: puertos/adaptadores con vertical slicing (RF-30)
 
