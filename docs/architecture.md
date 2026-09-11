@@ -88,6 +88,6 @@ La configuración (reglas de transformación, formatos, criterios de filtrado) s
 - Estructura exacta de cabeceras/campos que exige Cisvox y las cargas SMS/WhatsApp elegidas — se levanta al implementar cada adaptador (RF-18, RF-10).
 - Proveedores concretos de SMS y WhatsApp (pasarela/API específica de cada canal) — aún no se han elegido, solo el canal.
 
-El esquema exacto de la "sábana" (antes `TBD`) ya cuenta con muestras reales en `data/sabanas/` (formato `.xlsb`, entidad IMPULSE) — pendiente formalizarlo como parte de la Fase 0 de `docs/planning.md`.
+El esquema exacto de la "sábana" (antes `TBD`) está formalizado en `docs/sabana-schema.md`, a partir de las muestras reales de `data/sabanas/` (formato `.xlsb`, BPO IMPULSE).
 
 Las decisiones restantes deben resolverse con el usuario antes de iniciar la implementación del backend (ver [planning.md](planning.md)).

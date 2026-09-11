@@ -8,8 +8,8 @@ El esqueleto real de este enfoque ya existe en `backend/app/` (`core/{entities,p
 
 - Responsabilidad: cargar sábanas diarias (RF-01), validar y normalizar datos (documentos de identidad, teléfonos, RF-02), detectar inconsistencias, y gestionar la cartera de productos — alta, actualización, omisión (RF-03).
 - Cubre: RF-01, RF-02, RF-03.
-- Estado: no implementado. Existen muestras reales de sábanas (`.xlsb`, entidad IMPULSE) en `data/sabanas/` como insumo para formalizar el esquema.
-- Depende de: formalización del esquema de sábana (Fase 0 de `docs/planning.md`).
+- Estado: no implementado. El esquema de la sábana ya está formalizado en `docs/sabana-schema.md` (hojas, clave `Pagare`, columnas, reglas de normalización N-1 a N-9).
+- Depende de: `docs/sabana-schema.md` y de confirmar las preguntas abiertas de su sección 8 antes de fijar las reglas afectadas.
 
 ## 2. Selección, filtrado y segmentación (`backend/seleccion/`, TBD)
 

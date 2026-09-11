@@ -1,20 +1,21 @@
 # Planificación
 
-## Estado actual (2026-09-10)
+## Estado actual (2026-09-11)
 
 - [x] Scaffold del frontend Astro (`frontend/`)
 - [x] Estructura de carpetas de datos (`data/sabanas/`, `data/output/gestiones/`, `data/output/reportes/`)
 - [x] `.gitignore` protegiendo datos sensibles
 - [x] Requerimientos funcionales detallados y atomizados (`docs/atomics-requirements.md`, RF-01 a RF-36)
-- [x] Configuración multiagente (`docs/agents/`, `AGENTS.md`, `CLAUDE.md`)
-- [x] Muestras reales de sábanas diarias en `data/sabanas/` (formato `.xlsb`, entidad "IMPULSE") — no versionadas, sirven como insumo para formalizar el esquema (RF-02)
+- [x] Configuración multiagente (`docs/agents/README.md`, `/AGENTS.md` y `/CLAUDE.md` en la raíz del repo)
+- [x] Muestras reales de sábanas diarias en `data/sabanas/` (formato `.xlsb`, BPO "IMPULSE") — no versionadas, sirven como insumo para formalizar el esquema (RF-02)
+- [x] Esquema de la sábana formalizado en `docs/sabana-schema.md` (cortes 09.09 y 10.09). Confirmados: documentos de identidad (D-1) y moneda PEN como supuesto (S-1); quedan preguntas abiertas en la sección 8
 - [x] Motor de base de datos decidido: **PostgreSQL**
 - [x] Mecanismo de comunicación frontend-backend decidido: **API REST separada con FastAPI**
 - [x] Disparador de procesamiento decidido: **bajo demanda desde el frontend** (sin cron)
 - [x] Primeras plataformas objetivo decididas: **SMS y WhatsApp** (digitales) y **Cisvox / Kontactus** (VoIP)
 - [x] Backend Python: esqueleto real implementado con **uv** — proyecto FastAPI, arquitectura de puertos/adaptadores, `ruff`/`pytest` en verde (ver `backend/`)
 - [ ] Base de datos PostgreSQL real creada (falta ejecutar `backend/scripts/init_db.sql`, paso manual del usuario)
-- [ ] Commit inicial del repositorio (pendiente — aún no hay commits)
+- [x] Commit inicial del repositorio, publicado en GitHub (`E-specter/auto_cusco`, rama `main`)
 
 Este roadmap reemplaza la versión anterior (orientada a un modelo genérico de "gestiones de cobranza") y se organiza en base a los requerimientos atómicos de `docs/atomics-requirements.md`, que es ahora la fuente de verdad funcional del proyecto.
 
@@ -30,9 +31,9 @@ Decisiones y piezas base de las que dependen todas las fases funcionales siguien
 - [x] `ruff` y `pytest` configurados y en verde (`uv run ruff check .`, `uv run pytest`).
 - [x] API FastAPI mínima funcionando: `GET /health` verificado end-to-end (`uv run fastapi dev app/main.py`).
 - [ ] Crear el rol y la base de datos PostgreSQL reales: ejecutar `backend/scripts/init_db.sql` como superusuario (paso manual, requiere la contraseña de `postgres` que solo el usuario tiene) y completar `DB_PASSWORD` en `/.env`.
-- [ ] Formalizar el esquema exacto de "sábana" a partir de las muestras reales ya disponibles en `data/sabanas/` (RF-02).
+- [x] Formalizar el esquema exacto de "sábana" a partir de las muestras reales disponibles en `data/sabanas/` (RF-02) — ver `docs/sabana-schema.md`.
 
-Con esto, la Fase 0 está prácticamente resuelta: solo quedan dos pasos manuales/de levantamiento — crear la base de datos real y formalizar el esquema de sábana — antes de empezar la Fase 1 (ingesta y cartera).
+Con esto, la Fase 0 está prácticamente resuelta: solo queda crear la base de datos real (paso manual del usuario). Las preguntas abiertas de la sección 8 de `docs/sabana-schema.md` no bloquean el arranque de la Fase 1, pero sí las reglas que dependen de ellas (significado de `" Días Cierre Mes Anterior"`, campos de interés interno, motivo de salida de productos).
 
 ## Fase 1 — Ingesta y cartera (RF-01 – RF-03)
 

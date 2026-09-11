@@ -38,6 +38,7 @@ El backend (Python) tiene ya un esqueleto real funcionando end-to-end (arquitect
 
 - Nunca commitear contenido real de `data/sabanas/` ni `data/output/**` — son datos de cobranza (sensibles). El `.gitignore` ya bloquea el contenido y solo permite `.gitkeep` y la estructura de carpetas.
 - Si generas datos de prueba, usa datos sintéticos, nunca reales.
+- El esquema de la sábana (hojas, clave `Pagare`, columnas, reglas de normalización y preguntas abiertas) está en `docs/sabana-schema.md`. Consúltalo antes de tocar la ingesta, y nunca copies valores personales reales (nombres, documentos, teléfonos) a la documentación, tests o conversaciones.
 
 ## Convenciones de trabajo
 

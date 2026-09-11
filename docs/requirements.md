@@ -24,7 +24,7 @@ La numeración `RF-1`…`RF-10` usada anteriormente en este documento queda **su
 
 - RNF-1: Los datos de cobranza son sensibles — nunca deben versionarse en git (ya aplicado vía `.gitignore`).
 - RNF-2: El entorno de desarrollo es Windows con PowerShell.
-- RNF-3 (TBD): Volumen esperado de datos (número de registros por sábana, frecuencia de carga) — afecta decisiones de rendimiento y elección de BD. Ya existen muestras reales de sábanas diarias en `data/sabanas/` (formato `.xlsb`) que pueden usarse como referencia de volumen, pero el volumen total esperado en producción sigue sin confirmar.
+- RNF-3 (TBD): Volumen esperado de datos (número de registros por sábana, frecuencia de carga) — afecta decisiones de rendimiento y elección de BD. Referencia medida en las muestras reales (ver `docs/sabana-schema.md`): ~46 mil productos por sábana diaria, archivos `.xlsb` de ~11 MB, con ~7% de rotación de productos entre días consecutivos. El volumen total esperado en producción (histórico acumulado, otras carteras o BPO) sigue sin confirmar.
 - RNF-4 (TBD): Requisitos de auditoría/trazabilidad sobre cambios en gestiones/cargas.
 
 ## Próximo paso
