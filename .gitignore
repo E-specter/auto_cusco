@@ -1,0 +1,34 @@
+# Datos: no versionar contenido real, solo la estructura de carpetas
+data/sabanas/**
+!data/sabanas/.gitkeep
+!data/sabanas/**/
+data/output/**
+!data/output/.gitkeep
+!data/output/**/.gitkeep
+!data/output/**/
+data/*.db
+data/*.db-journal
+data/*.sqlite3
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node / Astro
+node_modules/
+dist/
+.astro/
+
+# Entorno
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+Thumbs.db

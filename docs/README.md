@@ -1,0 +1,17 @@
+# Documentación — auto_cusco
+
+Índice de la documentación conceptual del proyecto.
+
+| Documento | Contenido |
+|---|---|
+| [atomics-requirements.md](atomics-requirements.md) | Requerimientos funcionales atomizados y detallados (RF-01 a RF-36) — fuente de verdad funcional |
+| [architecture.md](architecture.md) | Mapa conceptual, principio de puertos/adaptadores con vertical slicing, stack tecnológico, flujo de datos |
+| [setup.md](setup.md) | Instalación y ejecución del proyecto, paso a paso |
+| [requirements.md](requirements.md) | Resumen de contexto y requerimientos no funcionales (remite a atomics-requirements.md para el detalle funcional) |
+| [modules.md](modules.md) | Módulos del sistema, requerimientos que cubren y responsabilidades |
+| [planning.md](planning.md) | Fases, roadmap y estado actual, organizados en base a atomics-requirements.md |
+| [agents/README.md](agents/README.md) | Cómo está organizada la configuración para trabajo multiagente |
+
+## Estado del proyecto
+
+Fase de arranque avanzada: existe el scaffold del frontend (Astro), la estructura de carpetas de datos, muestras reales de sábanas diarias en `data/sabanas/`, y un esqueleto real de backend (FastAPI + PostgreSQL, gestionado con `uv`) en `backend/`, con la arquitectura de puertos/adaptadores funcionando de extremo a extremo (`GET /health`). Los requerimientos funcionales ya están atomizados en `atomics-requirements.md`, y todas las decisiones bloqueantes de la Fase 0 ya están tomadas y aplicadas: **PostgreSQL**, **API REST con FastAPI**, procesamiento **bajo demanda desde el frontend** (sin cron), y **SMS/WhatsApp** (digital) más **Cisvox/Kontactus** (VoIP) como primeras plataformas objetivo. Falta un paso manual del usuario — crear la base de datos real con `backend/scripts/init_db.sql` — y formalizar el esquema de sábana antes de empezar la Fase 1 (módulos de negocio).

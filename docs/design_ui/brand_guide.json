@@ -1,0 +1,319 @@
+{
+  "meta": {
+    "document_type": "brand_guide_development_prompt",
+    "document_purpose": "Self-contained specification. Feeding this JSON back to a design/dev agent (human or AI) must be enough to rebuild the exact visual system without re-explaining anything.",
+    "version": "1.0.0",
+    "created": "2026-09-08",
+    "language_of_this_document": "en",
+    "product_language_default": "es",
+    "source_mockups": {
+      "flecto": "Rental-business SaaS landing. Deep forest green + mint accents, cream/off-white sections, rounded blob shapes, soft organic illustration, friendly fintech tone, rounded pill CTAs.",
+      "orderful": "EDI trading-platform landing. White canvas, black type, one vivid red-orange accent, thin-line node/dotted network diagrams, sharp edges, dense data grids, monospace-flavored numerals, technical/engineering tone."
+    },
+    "assumptions_not_specified_by_user": [
+      "Exact product name/domain of the target web app was not given; tokens below are product-agnostic and ready to receive real copy.",
+      "Exact hex values were not dictated by the user beyond 'max 2 predominant colors + black/white tints of them' — the two hues below are derived from the fused mockups (Flecto green + Orderful red-orange) and are tunable without breaking the system.",
+      "Underline (<u>) is included per the user's explicit accessibility/native-HTML request, but is restricted to non-link emphasis to avoid conflicting with the browser-native meaning of underline = link."
+    ]
+  },
+  "concept": {
+    "style_name": "Technobrutalism (organic-fused)",
+    "definition": "Raw, high-contrast, grid-exposed, monospace-inflected interface language (from Orderful) softened by exactly one inherited gesture from Flecto: fully-rounded pill shapes reserved ONLY for interactive/status elements (buttons, tags, badges, dots). Everything structural stays sharp (0 radius).",
+    "fusion_rules": {
+      "inherit_from_orderful": [
+        "visible hairline borders/grid lines as decoration",
+        "dotted/dashed node-link diagram motif",
+        "large oversized numerals for stats",
+        "asymmetric dense layout",
+        "high-contrast single accent-on-neutral",
+        "uppercase tracked eyebrow labels"
+      ],
+      "inherit_from_flecto": [
+        "fully-rounded pill shape reserved for buttons/badges/tags/status-dots only",
+        "warm off-white ('paper') as the light-mode base instead of pure white",
+        "friendly, generous section padding despite the brutalist grid"
+      ],
+      "discard": [
+        "Flecto's blob/organic illustration shapes",
+        "Flecto's soft drop shadows",
+        "Orderful's dense multi-column text-heavy sections (not compatible with no-scroll constraint)"
+      ]
+    },
+    "page_behavior": {
+      "scroll": "none — the welcome page is a single viewport screen (100dvh), not a scrolling composition",
+      "viewport_strategy": "All typography and spacing are fluid (clamp()) so the hero content always fits 100dvh at every breakpoint instead of being scaled by fixed breakpoints",
+      "animation_character": "Subtle, functional, on-load only (staggered fade/translate + drawing dotted connector lines) plus micro-interactions on hover/focus. No scroll-triggered or parallax effects — there is no scroll to trigger from.",
+      "signature_motif": "A node-link diagram (dotted/dashed lines connecting small square or circular nodes, labeled with JetBrains Mono micro-text) as the hero's visual centerpiece — fusion of Flecto's flow-connector boxes and Orderful's dotted network diagram."
+    }
+  },
+  "color": {
+    "rule": "Exactly 2 predominant hues. Every other color (backgrounds, borders, disabled states, 'black', 'white') is a tint or shade generated from these same 2 hues — never a neutral gray.",
+    "primary": {
+      "name": "Signal Green",
+      "role": "Brand identity, primary CTA, success/positive state, links",
+      "hue": 155,
+      "base_hsl": "hsl(155 72% 45%)",
+      "base_hex_approx": "#16C97A",
+      "ramp": {
+        "50": "hsl(155 70% 96%)",
+        "100": "hsl(155 65% 90%)",
+        "200": "hsl(155 65% 80%)",
+        "300": "hsl(155 65% 68%)",
+        "400": "hsl(155 68% 55%)",
+        "500": "hsl(155 72% 45%)",
+        "600": "hsl(155 75% 37%)",
+        "700": "hsl(155 75% 29%)",
+        "800": "hsl(155 70% 21%)",
+        "900": "hsl(155 65% 14%)",
+        "950": "hsl(155 60% 8%)"
+      }
+    },
+    "secondary": {
+      "name": "Signal Red-Orange",
+      "role": "Accent, urgency/highlight, secondary CTA, data emphasis, focus/alert state",
+      "hue": 14,
+      "base_hsl": "hsl(14 92% 52%)",
+      "base_hex_approx": "#FA4A22",
+      "ramp": {
+        "50": "hsl(14 90% 96%)",
+        "100": "hsl(14 88% 91%)",
+        "200": "hsl(14 88% 82%)",
+        "300": "hsl(14 88% 71%)",
+        "400": "hsl(14 90% 60%)",
+        "500": "hsl(14 92% 52%)",
+        "600": "hsl(14 90% 44%)",
+        "700": "hsl(14 88% 36%)",
+        "800": "hsl(14 82% 27%)",
+        "900": "hsl(14 75% 18%)",
+        "950": "hsl(14 70% 10%)"
+      }
+    },
+    "derived_neutrals": {
+      "rule": "'White' and 'black' are NOT pure grayscale — they are heavily desaturated tints of the two brand hues, alternating by mode.",
+      "paper": {
+        "description": "Near-white neutral, warm tint of secondary hue (nods to Flecto's cream + Orderful's white)",
+        "50": "hsl(14 25% 98%)",
+        "100": "hsl(14 20% 95%)",
+        "200": "hsl(14 15% 90%)"
+      },
+      "ink": {
+        "description": "Near-black neutral, cool tint of primary hue (technobrutalist dark canvas)",
+        "900": "hsl(155 20% 10%)",
+        "950": "hsl(155 25% 6%)",
+        "1000": "hsl(155 30% 3%)"
+      }
+    },
+    "semantic_tokens": {
+      "--color-bg": "var(--paper-50)",
+      "--color-bg-inverse": "var(--ink-950)",
+      "--color-surface": "var(--paper-100)",
+      "--color-text": "var(--ink-950)",
+      "--color-text-muted": "var(--ink-900)",
+      "--color-text-inverse": "var(--paper-50)",
+      "--color-border": "var(--ink-950)",
+      "--color-border-subtle": "hsl(14 20% 85%)",
+      "--color-accent": "var(--primary-500)",
+      "--color-accent-hover": "var(--primary-600)",
+      "--color-signal": "var(--secondary-500)",
+      "--color-signal-hover": "var(--secondary-600)",
+      "--color-focus-ring": "var(--secondary-500)",
+      "--color-success": "var(--primary-500)",
+      "--color-danger": "var(--secondary-600)"
+    },
+    "usage_rule": "Never use both primary and secondary at full saturation in the same component at the same visual weight — one always leads, the other is a single accent touch (a dot, an underline, one CTA)."
+  },
+  "typography": {
+    "font_primary": {
+      "family": "Inter",
+      "usage": "UI chrome, headings, nav, buttons, labels, eyebrow tags",
+      "weights_used": [
+        400,
+        500,
+        600,
+        800
+      ],
+      "fallback_stack": "Inter, 'Inter Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "source": "self-hosted variable font recommended (woff2), font-display: swap"
+    },
+    "font_secondary": {
+      "family": "JetBrains Mono",
+      "usage": "Body paragraphs, stat numerals, data readouts, code-like microcopy, eyebrow badges, form inputs — deliberate technical voice",
+      "weights_used": [
+        400,
+        500,
+        700
+      ],
+      "fallback_stack": "'JetBrains Mono', 'JetBrains Mono Fallback', ui-monospace, SFMono-Regular, Menlo, monospace",
+      "source": "self-hosted static weights (woff2), font-display: swap"
+    },
+    "scale": {
+      "method": "Geometric progression using the golden ratio (phi = 1.618, phi^-1 = 0.618)",
+      "base": "1rem (16px)",
+      "steps": {
+        "--text-xs": "0.618rem",
+        "--text-sm": "0.786rem",
+        "--text-base": "1rem",
+        "--text-md": "1.272rem",
+        "--text-lg": "1.618rem",
+        "--text-xl": "2.058rem",
+        "--text-2xl": "2.618rem",
+        "--text-3xl": "4.236rem",
+        "--text-4xl": "clamp(2.618rem, 5vw + 1rem, 6.854rem)"
+      },
+      "fluid_note": "--text-4xl (hero headline) MUST use clamp() since the page has no scroll — it must never overflow 100dvh on short viewports."
+    },
+    "line_height": {
+      "headings": 1.05,
+      "body": 1.5,
+      "mono_data": 1.3
+    },
+    "letter_spacing": {
+      "headings": "-0.02em",
+      "body": "0",
+      "eyebrow_uppercase_labels": "0.12em"
+    },
+    "native_emphasis_rules": {
+      "bold": "Use <strong> for genuine importance, never <b> or font-weight alone — screen readers announce <strong>.",
+      "italic": "Use <em> for stressed emphasis, never <i> alone.",
+      "underline": "Reserve real <a> underlines for links only. For non-link emphasis, wrap in <u> AND add a visual differentiator (color or dotted style) so it is never mistaken for a link — this is the one place 'native HTML underline' and accessibility best-practice must be reconciled explicitly."
+    }
+  },
+  "layout_and_spacing": {
+    "golden_ratio": 0.618,
+    "asymmetric_grid_split": {
+      "description": "Hero uses a 61.8% / 38.2% two-column split — wide column for the node-link diagram/visual, narrow column for headline + CTA, mirroring both mockups' off-center compositions",
+      "css": "grid-template-columns: 0.618fr 1fr;  /* or 38.2% 61.8% depending on which side leads at each breakpoint */"
+    },
+    "spacing_scale": {
+      "method": "Same phi ladder as typography, base 0.5rem",
+      "--space-1": "0.309rem",
+      "--space-2": "0.5rem",
+      "--space-3": "0.809rem",
+      "--space-4": "1.309rem",
+      "--space-5": "2.118rem",
+      "--space-6": "3.427rem",
+      "--space-7": "5.545rem",
+      "--space-8": "8.972rem"
+    },
+    "breakpoints_mobile_first": {
+      "note": "Author base styles for mobile with no media query; add min-width queries upward only, never max-width",
+      "--bp-sm": "30rem",
+      "--bp-md": "48rem",
+      "--bp-lg": "64rem",
+      "--bp-xl": "90rem"
+    },
+    "no_scroll_technique": {
+      "container": "height: 100dvh (fallback 100vh); overflow: hidden on <body>",
+      "sizing": "every font-size, gap and section padding in the hero MUST be clamp()-based, not fixed, so the layout compresses gracefully on short/landscape mobile viewports instead of overflowing",
+      "verification": "test at 100dvh on: 360x640 (small mobile), 768x1024 (tablet portrait), 1440x900 (laptop), 1920x1080 (desktop) — nothing may require scrolling at any of these"
+    }
+  },
+  "iconography": {
+    "library": "lucide",
+    "stroke_width": 1.75,
+    "sizes": {
+      "sm": "16px",
+      "md": "20px",
+      "lg": "24px",
+      "xl": "32px"
+    },
+    "usage_rule": "Icons inherit currentColor; never hardcode icon fill/stroke color. Prefer inlined SVG (lucide's raw source) over an icon-font or extra HTTP requests."
+  },
+  "motion": {
+    "philosophy": "Subtle and functional, never decorative for its own sake — every animation communicates state or draws attention exactly once",
+    "durations": {
+      "micro": "120ms",
+      "default": "220ms",
+      "entrance": "400ms"
+    },
+    "easing": {
+      "default": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "note": "avoid bouncy/elastic curves — technobrutalism moves with precision, not playfulness"
+    },
+    "entrance_pattern": "On load: staggered fade + 8px translate-Y for headline/CTA (stagger 60ms per item), then the node-link diagram's dashed lines draw in via stroke-dashoffset over 600–900ms",
+    "micro_interactions": "Buttons: 120ms background/border shift. Links/underline emphasis: 120ms underline-offset shift. Focus: instant ring, no transition delay.",
+    "reduced_motion": "Wrap all non-essential motion in @media (prefers-reduced-motion: no-preference); reduced-motion users get instant state changes only"
+  },
+  "visual_motifs": {
+    "corner_radius_rule": {
+      "structural_elements": "0px — cards, sections, containers, inputs stay sharp",
+      "interactive_pill_elements": "9999px — reserved exclusively for buttons, tags, badges, status dots (the one inherited Flecto gesture)"
+    },
+    "borders": "1px solid var(--color-border) as a visible structural/decorative element, not just a container edge — used to expose the grid intentionally",
+    "hero_diagram": "dotted/dashed connector lines (stroke-dasharray) linking small square or circular nodes; nodes labeled in --font-secondary micro-text",
+    "eyebrow_badge": "uppercase, --font-secondary, --text-xs, 0.12em letter-spacing, inside a 9999px-radius pill outlined 1px",
+    "stat_block": "oversized numeral in --font-secondary + --text-3xl/4xl paired with a small uppercase --font-primary label beneath it"
+  },
+  "accessibility": {
+    "contrast_targets": "WCAG AA minimum (4.5:1 body text, 3:1 large text/UI); verify every primary/secondary ramp step actually used for text against its background",
+    "semantic_html": "header/nav/main/section/footer as real landmarks; <button> for actions, <a> only for navigation; <dialog> for modals; <details>/<summary> for any disclosure widget instead of custom JS accordions",
+    "focus_visible": "always a visible focus ring using --color-focus-ring, never suppressed with outline:none without a replacement",
+    "motion_safety": "see reduced_motion above",
+    "language_attribute": "html lang attribute must be updated whenever the i18n language toggle changes"
+  },
+  "structure_and_components": {
+    "philosophy": "Functional and simple — prefer a native HTML element over a custom-built one whenever one exists",
+    "preferred_native_elements": [
+      "header",
+      "nav",
+      "main",
+      "section",
+      "footer",
+      "button",
+      "dialog",
+      "details/summary",
+      "form + native validation attributes (required, pattern, type=email)",
+      "fieldset/legend for grouped inputs"
+    ],
+    "welcome_page_sections_no_scroll": [
+      "header (logo + lang/theme toggle)",
+      "hero (eyebrow + headline + subcopy + primary CTA + node-link diagram)",
+      "optional: single row of 2-3 stat_blocks if space allows within 100dvh"
+    ]
+  },
+  "code_philosophy": {
+    "naming_and_comments_language": "English, standardized, regardless of the product's display language",
+    "css_approach": "Vanilla CSS only, no preprocessor required. Always author via CSS custom properties (var(--token)) — no hardcoded hex/px values in component rules.",
+    "custom_properties_scope": ":root for global tokens, [data-theme] attribute overrides for theme variants",
+    "cleanliness_rule": "No unused abstractions, no premature component variants — build only what the single welcome-page surface currently needs"
+  },
+  "internationalization": {
+    "languages": [
+      "es",
+      "en"
+    ],
+    "default_language": "es",
+    "fallback_language": "en",
+    "file_structure_example": {
+      "/i18n/es.json": {
+        "hero.eyebrow": "...",
+        "hero.headline": "...",
+        "hero.cta": "..."
+      },
+      "/i18n/en.json": {
+        "hero.eyebrow": "...",
+        "hero.headline": "...",
+        "hero.cta": "..."
+      }
+    },
+    "html_wiring": "data-i18n=\"hero.headline\" attributes on elements, resolved by a small vanilla loader that fetches the active language JSON and sets textContent — no framework required",
+    "language_switch_persistence": "selected language is part of the storable appearance config below"
+  },
+  "appearance_settings": {
+    "storable": true,
+    "storage_mechanism": "localStorage, namespaced key e.g. 'app:appearance'",
+    "schema_example": {
+      "theme": "light | dark | system",
+      "language": "es | en",
+      "reducedMotion": "boolean (defaults to OS prefers-reduced-motion, user-overridable)"
+    },
+    "apply_mechanism": "On load, read localStorage config, set data-theme and lang attributes on <html> before first paint (inline blocking script) to avoid flash of wrong theme/language"
+  },
+  "performance_optimization": {
+    "fonts": "self-host Inter + JetBrains Mono woff2, preload the exact weights used, font-display: swap",
+    "css": "single vanilla stylesheet, critical-path CSS is the whole file since the entire page is above-the-fold (no-scroll) by definition",
+    "icons": "inline lucide SVGs directly, no icon-font, no per-icon HTTP request",
+    "animation": "prefer CSS transitions/animations over JS-driven motion; only the dashed-line draw-in may need a small JS trigger (IntersectionObserver is unnecessary since there's no scroll — trigger on DOMContentLoaded instead)",
+    "images": "hero is vector/SVG based (node-link diagram) — avoids raster image weight entirely on the one screen that must load instantly"
+  }
+}
