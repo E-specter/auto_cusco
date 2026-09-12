@@ -62,6 +62,17 @@ Alcance:
 
 Se agrupan porque las métricas dependen directamente de la selección/filtrado y deben evolucionar juntas en la UI.
 
+Avance:
+
+- [x] Consulta de cartera en el backend: campos consultables derivados del catálogo de la sábana, filtros multi-criterio validados antes de tocar la base, orden, paginación y "top n" con aviso de insuficiencia (RF-04, RF-05, RF-08). Ver `docs/consulta-cartera.md`.
+- [x] Segmentación por atributo con cuentas y capital (RF-06).
+- [x] Métricas de la selección: capital total, cuentas, cuentas por segmento financiero, cuota mínima y máxima, más indicadores configurables con suma, conteo, promedio, mínimo y máximo (RF-25 a RF-27).
+- [x] Endpoints `GET /cartera`, `/cartera/campos`, `/cartera/metricas` y `/cartera/segmentacion`, probados contra PostgreSQL.
+- [ ] Pantalla de selección, filtros y métricas en el frontend, con recálculo automático al cambiar la selección (RF-28).
+- [ ] **Bloqueado — RF-07, control de gestiones multicanal:** requiere que existan las gestiones (VoIP, SMS, WhatsApp, correo) y sus fuentes. Se retoma cuando haya un modelo de gestiones, previsiblemente junto con la Fase 5.
+
+Alcance:
+
 - Selección de productos correspondientes a la asignación del día de gestión.
 - Filtros simples y complejos multi-criterio, y segmentación/análisis por atributos.
 - Control de gestiones: historial consolidado multicanal (VoIP, SMS, WhatsApp, correo, y canales futuros) y validación de contacto durante el mes actual.

@@ -39,7 +39,7 @@ flowchart TD
     F --> L
 
     classDef pending stroke-dasharray: 4 3
-    class C,D,E,F,G,H,M,J pending
+    class G,H,M,J pending
 ```
 
 *Los bloques con borde punteado representan piezas de backend aún no implementadas. El detalle funcional completo de cada bloque está en `docs/atomics-requirements.md` (RF-01 a RF-36); el desglose de módulos y sus dependencias en `docs/modules.md`.*

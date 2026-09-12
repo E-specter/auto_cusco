@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.cargas import crear_servicio_ingesta
 from app.api.cargas import router as cargas_router
+from app.api.cartera import router as cartera_router
 from app.api.health import router as health_router
 from app.core.config import get_settings
 
@@ -75,3 +76,4 @@ configurar_cors(app, get_settings().origenes_cors)
 
 app.include_router(health_router)
 app.include_router(cargas_router)
+app.include_router(cartera_router)
