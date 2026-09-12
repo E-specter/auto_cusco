@@ -68,7 +68,7 @@ El script equivale a correr, en orden:
 Desde `frontend/`, cuando la tarea tocó la interfaz:
 
 ```powershell
-npm run verificar        # build, pruebas de nucleo/DOM y extremo a extremo
+npm run verificar        # tipos, build, pruebas de nucleo/DOM y extremo a extremo
 ```
 
 Equivale a, en orden:
@@ -127,5 +127,5 @@ Si un trabajo falla, se corrige antes de seguir. La integración continua no ree
 
 ## 8. Pendientes
 
-- **Cobertura sin medir.** No hay herramienta configurada; por ahora el criterio es el de la sección 3.
+- **Capas avanzadas sin configurar.** El proyecto tiene las capas clásicas y dos contratos, pero no tipos estáticos en el backend, pruebas basadas en propiedades, mutación, cobertura, accesibilidad automatizada, regresión visual, auditoría de seguridad ni el contrato entre el esquema de la API y los tipos del frontend. Qué atrapa cada una, dónde rinde aquí y con qué herramienta encaja está en `.claude/skills/verificar/capas.md`. Configurar cualquiera de ellas es una decisión del usuario.
 - **Pruebas de carga** según volumen real, previstas en la Fase 7 de `docs/planning.md`.
