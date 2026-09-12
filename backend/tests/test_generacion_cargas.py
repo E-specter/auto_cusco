@@ -159,6 +159,17 @@ def test_una_plantilla_invalida_se_rechaza_sin_consultar_la_base() -> None:
     assert repositorio.paginas == []
 
 
+@pytest.mark.parametrize("cantidad", [55_001, 120_000])
+def test_se_aceptan_cargas_del_tamano_de_las_sabanas_mas_grandes(cantidad) -> None:
+    # Ha habido sabanas de mas de 55 000 filas; el tope anterior de 50 000 las cortaba.
+    servicio, _ = _servicio(total=3)
+
+    resultado = servicio.generar(FECHA, DEFINICION, cantidad=cantidad)
+
+    assert resultado.generados == 3
+    assert not resultado.suficiente
+
+
 @pytest.mark.parametrize("cantidad", [0, -1, CANTIDAD_MAXIMA + 1])
 def test_la_cantidad_tiene_limites(cantidad) -> None:
     servicio, _ = _servicio()

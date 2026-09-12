@@ -85,7 +85,31 @@ El nombre del archivo sale del nombre de la definición, pasado a ASCII y sin se
 
 ## 4. Volumen
 
-La selección se lee por páginas y las filas de salida se arman sobre la marcha, así una carga grande no obliga a tener la cartera entera en memoria. El tope por archivo es de **50 000 productos**; una campaña mayor se parte en varios archivos.
+La selección se lee por páginas y las filas de salida se arman sobre la marcha, así una carga grande no obliga a tener la cartera entera en memoria.
+
+El tope por archivo es de **120 000 productos**, más del doble de la sábana más grande que se ha recibido (más de 55 000 filas). **Es un número medido, no estimado:** con una sábana sintética de 120 000 filas ingestada en PostgreSQL, en el equipo de desarrollo,
+
+| Definición | Filas | Generar | Escribir CSV | Escribir XLSX | Memoria pico de Python |
+|---|---|---|---|---|---|
+| 6 columnas | 60 000 | 7,7 s | 0,2 s | 3,3 s | — |
+| 6 columnas | 120 000 | 14,6 s | 0,4 s | 6,3 s | 129 MB |
+| Todos los campos (45) | 60 000 | 8,0 s | 1,0 s | 21,1 s | — |
+| Todos los campos (45) | 120 000 | 16,4 s | 1,9 s | 41,8 s | 468 MB |
+
+Qué dicen los números:
+
+- **El tiempo de generación crece en línea recta** con las filas, así que la lectura por páginas no se degrada con el volumen.
+- **Lo que pesa es el ancho, no el largo.** La memoria y el tiempo del XLSX dependen de columnas por filas: una carga real de plataforma tiene pocas columnas y queda en la primera fila de la tabla. El peor caso, con todos los campos, sigue siendo viable pero lento en XLSX.
+- **Si algún día hace falta más,** el paso siguiente es escribir el archivo mientras se lee la selección, sin juntar la tabla completa en memoria.
+
+Para repetir la medición, desde `backend/` y con la base migrada:
+
+```powershell
+uv run python scripts/generar_sabana_sintetica.py sabana_120k.xlsx --filas 120000
+uv run python scripts/medir_generacion.py sabana_120k.xlsx 60000,120000
+```
+
+Una de las 120 000 filas no se genera a propósito: el generador sintético repite un pagaré, y la ingesta lo descarta (regla V-10).
 
 ## 5. Implementación
 
@@ -96,7 +120,7 @@ La selección se lee por páginas y las filas de salida se arman sobre la marcha
 - **API:** `backend/app/api/archivos_carga.py`; la lectura de filtros y orden, compartida con `/cartera`, está en `backend/app/api/consultas.py`.
 - **Pruebas:** `test_exportadores.py` (los archivos se generan y se vuelven a leer), `test_generacion_cargas.py` (el caso de uso con un repositorio en memoria), `test_api_archivos_carga.py` (la pila de FastAPI con la consulta simulada) y `test_generacion_cargas_postgres.py` (la cadena completa contra PostgreSQL real, entrando por HTTP; marcada `postgres`).
 
-Lo que solo cubre la prueba contra PostgreSQL: la paginación real con `LIMIT`/`OFFSET`, el orden que resuelve la base y los tipos que devuelve. Falta todavía la prueba de extremo a extremo con Playwright, que llegará con la pantalla, y una medición con volumen real: el tope de 50 000 filas es una decisión de diseño, no un número medido.
+Lo que solo cubre la prueba contra PostgreSQL: la paginación real con `LIMIT`/`OFFSET`, el orden que resuelve la base y los tipos que devuelve. Falta todavía la prueba de extremo a extremo con Playwright, que queda a cargo de la sesión `designer` y llegará con la pantalla. La medición de volumen está en la sección 4.
 
 Los exportadores no saben nada de cobranza: reciben cabeceras y filas. Los reportes configurables (RF-24) van a reutilizarlos tal como están.
 

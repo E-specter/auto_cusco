@@ -1,4 +1,4 @@
-"""Genera una sabana de prueba con datos totalmente inventados.
+r"""Genera una sabana de prueba con datos totalmente inventados.
 
 Python no puede escribir .xlsb, asi que el archivo se crea en .xlsx y, si el
 destino termina en .xlsb, se convierte con Excel (Windows). Sirve para probar

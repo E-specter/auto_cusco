@@ -22,9 +22,11 @@ from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA
 from app.core.services.seleccion_cartera.servicio import LIMITE_MAXIMO, ConsultaCarteraService
 
 CANTIDAD_POR_DEFECTO = 1_000
-# Tope de productos por archivo. Protege la memoria del proceso; si una campana
-# necesita mas, se parte en varios archivos.
-CANTIDAD_MAXIMA = 50_000
+# Tope de productos por archivo, medido y no estimado: ha habido sabanas de mas
+# de 55 000 filas, y con 120 000 la generacion sigue siendo lineal en tiempo y
+# razonable en memoria (docs/generacion-cargas.md, seccion 4). Volver a medir
+# con scripts/medir_generacion.py antes de subirlo.
+CANTIDAD_MAXIMA = 120_000
 
 
 @dataclass(frozen=True)
