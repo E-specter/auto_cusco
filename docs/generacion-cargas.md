@@ -94,7 +94,9 @@ La selección se lee por páginas y las filas de salida se arman sobre la marcha
 - **Adaptadores:** `backend/app/adapters/output/exportadores/` — uno por formato, más el registro.
 - **Caso de uso:** `backend/app/core/services/generacion_cargas/servicio.py`.
 - **API:** `backend/app/api/archivos_carga.py`; la lectura de filtros y orden, compartida con `/cartera`, está en `backend/app/api/consultas.py`.
-- **Pruebas:** `test_exportadores.py`, `test_generacion_cargas.py` y `test_api_archivos_carga.py`.
+- **Pruebas:** `test_exportadores.py` (los archivos se generan y se vuelven a leer), `test_generacion_cargas.py` (el caso de uso con un repositorio en memoria), `test_api_archivos_carga.py` (la pila de FastAPI con la consulta simulada) y `test_generacion_cargas_postgres.py` (la cadena completa contra PostgreSQL real, entrando por HTTP; marcada `postgres`).
+
+Lo que solo cubre la prueba contra PostgreSQL: la paginación real con `LIMIT`/`OFFSET`, el orden que resuelve la base y los tipos que devuelve. Falta todavía la prueba de extremo a extremo con Playwright, que llegará con la pantalla, y una medición con volumen real: el tope de 50 000 filas es una decisión de diseño, no un número medido.
 
 Los exportadores no saben nada de cobranza: reciben cabeceras y filas. Los reportes configurables (RF-24) van a reutilizarlos tal como están.
 

@@ -9,13 +9,15 @@ Protocolo de trabajo para que el desarrollo sea controlado y repetible entre ses
 - **Una prueba que falla primero.** Todo error se reproduce con una prueba antes de corregirlo, y esa prueba se queda como red de seguridad.
 - **Una tarea no está terminada hasta pasar la verificación de la sección 4.**
 
+Para tenerlo presente durante el trabajo y no solo al final, la versión corta de este documento vive como skill en `.claude/skills/verificar/SKILL.md`: qué nivel le toca a cada cambio, los comandos y cómo reportarlo. Los agentes que no cargan skills leen el puntero desde `/AGENTS.md`.
+
 ## 2. Niveles de prueba
 
 | Nivel | Qué cubre | Dónde vive | Necesita |
 |---|---|---|---|
 | Núcleo | Reglas de negocio y casos de uso: normalización, mapeo de cabeceras, versionado | `backend/tests/test_sabana_*.py`, `test_ingesta_servicio.py` | Nada. Se usan dobles de prueba en lugar de infraestructura |
 | Adaptadores | Lectura de archivos y forma de las tablas | `backend/tests/test_lector_calamine.py`, `test_modelos_persistencia.py` | Archivos generados en memoria |
-| Integración | Flujo completo contra PostgreSQL real | `backend/tests/test_repositorio_cargas_postgres.py` | Base migrada y la variable `AUTO_CUSCO_DB_TESTS` |
+| Integración | Flujo completo contra PostgreSQL real, incluida la cadena ingesta → selección → generación → archivo entrando por HTTP | `backend/tests/test_repositorio_cargas_postgres.py`, `test_repositorio_cartera_postgres.py`, `test_generacion_cargas_postgres.py` | Base migrada y la variable `AUTO_CUSCO_DB_TESTS` |
 | Verificación con volumen real | Rendimiento y conteos con una sábana de verdad | Local, no se versiona | Sábana real con los datos personales reemplazados en memoria |
 | Núcleo del frontend | Lógica pura de la interfaz: fecha sugerida desde el nombre del archivo, formatos, cliente de API y el contrato con el catálogo de códigos de incidencia | `frontend/tests/nucleo/` | Nada. `fetch` se sustituye por un doble |
 | DOM del frontend | Lógica que toca el documento: cola de diálogos (V-6 → V-4) y cambio de idioma | `frontend/tests/dom/` | Nada. Entorno `jsdom` |

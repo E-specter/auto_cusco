@@ -44,6 +44,6 @@ El backend (Python) tiene ya un esqueleto real funcionando end-to-end (arquitect
 
 - Sigue las convenciones específicas de cada subcarpeta si existen (p. ej. `frontend/AGENTS.md` para el dev server de Astro).
 - Antes de implementar módulos nuevos, revisa `docs/modules.md` para no duplicar responsabilidades.
-- Sigue `docs/testing.md`: cómo se prueba cada nivel, qué verificar antes de cerrar una tarea (`backend/scripts/verificar.ps1`) y cómo corregir un error dejando una prueba de regresión.
+- Sigue `docs/testing.md`: cómo se prueba cada nivel, qué verificar antes de cerrar una tarea (`backend/scripts/verificar.ps1`) y cómo corregir un error dejando una prueba de regresión. La versión corta, para tener presente mientras trabajas, está en `.claude/skills/verificar/SKILL.md`: **un cambio no está verificado hasta correr todos los niveles que le apliquen, y si uno aplica y no se corrió, se dice al reportar.**
 - Actualiza `docs/planning.md` cuando una fase se complete o cambie de alcance.
 - Antes de asumir una regla de negocio de plataforma (VoIP, SMS, WhatsApp, correo) no detallada en `docs/atomics-requirements.md`, levántala con el usuario en vez de inventarla.
