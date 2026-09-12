@@ -69,8 +69,33 @@ El esqueleto real de este enfoque ya existe en `backend/app/` (`core/{entities,p
 ## 10. Frontend (`frontend/`)
 
 - Responsabilidad: UI para selección/filtrado de productos, configuración de cargas, visualización de métricas en tiempo real, y definición/generación de reportes (RF-34: interfaz intuitiva y clara, priorizando claridad sobre estética).
-- Estado: scaffold Astro mínimo, sin páginas de negocio implementadas.
+- Estado: **Fase 1 implementada.** Dos pantallas Astro estáticas que hablan con la API REST desde el navegador; sin framework de UI ni estado de servidor.
 - Convenciones propias: ver `frontend/AGENTS.md`.
+
+### Estructura
+
+| Ruta | Para qué |
+|---|---|
+| `src/pages/index.astro` | Bienvenida. **Única pantalla bloqueada a `100dvh` sin scroll** (regla del brand guide). Diagrama de nodos que dibuja el mecanismo del producto y cifras en vivo leídas de `GET /cargas` |
+| `src/pages/cargas.astro` | Consola de cargas. Una fecha de corte a la vez: regla de fechas, versiones del día, resumen e incidencias. Aquí viven los diálogos de V-4, V-6, V-7 y V-8 |
+| `src/layouts/Shell.astro` | Cabecera común: pulso de `GET /health`, selector de idioma y de tema, y el script en línea que aplica la apariencia **antes del primer pintado** |
+| `src/lib/api.ts` | Cliente tipado de la API. Distingue `ApiError` (el servidor respondió que no) de `NetworkError` (no se pudo contactar) |
+| `src/lib/i18n.ts` | i18n vanilla es/en por atributos `data-i18n`; ambos diccionarios viajan en el bundle |
+| `src/lib/format.ts` | Fechas, números y tamaños; incluye la sugerencia de fecha de corte desde el nombre del archivo (`DD.MM.YYYY`) |
+| `src/styles/` | `tokens.css` (única fuente de verdad visual), `base.css`, `ui.css` (vocabulario compartido) y `console.css` |
+| `src/components/Icon.astro` | Inserta iconos lucide en línea en tiempo de compilación, sin fuente de iconos ni peticiones extra |
+
+### Decisiones de esta fase
+
+- **Fuente de verdad visual:** `docs/design_ui/brand_guide.json`, sin reinterpretar. Los tokens viven en `src/styles/tokens.css`; **ninguna regla de componente escribe un hex o un px a mano**. El sistema tal como quedó construido —paleta, escalas, reglas con nombre y componentes— está registrado en `/DESIGN.md`, que es descriptivo: documenta lo que hace el código, incluidas las divergencias respecto del brand guide y por qué existen.
+- **`console.css` es global, no con ámbito de Astro**, porque la consola construye la regla de fechas, las filas de versión, las cifras y la tabla de incidencias desde el script en tiempo de ejecución, y los estilos con ámbito no alcanzan al DOM que crea el script.
+- **Origen de la API:** el navegador habla con un prefijo `/api` del mismo origen, que `astro.config.mjs` redirige a `http://127.0.0.1:8000` en desarrollo (variable `API_ORIGIN`). Así no hacen falta cabeceras CORS y esa sigue siendo la vía recomendada. `PUBLIC_API_URL` permite apuntar a un origen absoluto; en ese caso hay que habilitar CORS en el backend con `CORS_ORIGENES` en `/.env`, que viene vacío —y por tanto apagado— por defecto.
+- **Seguimiento del procesamiento:** sondeo de `GET /cargas/{id}` cada 1.2 s hasta que la versión cierra. La ingesta tarda segundos, no milisegundos.
+- **C-1 respetada en el código:** en la pregunta de V-4 la opción marcada es siempre *mantener la vigente actual*. Además, si el aviso de archivo idéntico (V-6) está abierto cuando termina el procesamiento, la pregunta **espera a que se cierre** en vez de apilarse encima.
+- **Fuentes autohospedadas** (Inter variable y JetBrains Mono 400/500/700) en `public/fonts/`, precargadas.
+- **Los mensajes de incidencia se traducen por código, no por texto.** El backend escribe `detalle` en español; la interfaz resuelve `incidencia.<codigo>` en el diccionario y usa la frase del servidor como respaldo para cualquier código que todavía no conozca. Si se agrega un código nuevo en `backend/app/core/services/ingesta_sabana/`, añade su clave en `src/i18n/es.json` y `en.json`.
+- **Selector de archivo propio.** El botón nativo de `<input type="file">` toma su texto del idioma del navegador, no del de la página, así que no se puede traducir. El input real sigue existiendo y siendo enfocable; la etiqueta visible es un `<label for>` traducido, y el recuadro acepta además arrastrar y soltar. Por eso ese campo se valida desde el código y no con `required`: el navegador no puede anclar su globo de validación a un control personalizado.
+- **Un solo bloque de reemplazo** (`.standIn`) cubre los dos estados en que la consola no tiene de qué hablar: primera ejecución y API inalcanzable. En ambos, la regla de fechas, su leyenda y los paneles se retiran, y al no haber API el botón de subir queda deshabilitado.
 
 ## Convención para nuevos módulos
 

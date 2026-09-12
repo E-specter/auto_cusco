@@ -51,7 +51,7 @@ flowchart TD
 3. **Métricas en tiempo real**: en paralelo a la selección, se recalculan automáticamente los indicadores (capital, cuentas, segmentos, cuotas) y cualquier indicador adicional configurado por el usuario (RF-25 – RF-28).
 4. **Generación de cargas**: a partir de la selección final, se generan en paralelo (a) cargas para plataformas digitales (SMS, WhatsApp, correo, etc.) y (b) cargas para plataformas VoIP. Ambas rutas comparten el mismo motor de reglas de mapeo/expresión de campos (RF-12) pero mantienen reglas de transformación y estructura independientes por plataforma (RF-09 – RF-19). Las salidas se vuelcan en `data/output/gestiones/`.
 5. **Reportería**: se generan reportes a partir de múltiples fuentes — la base de datos con el histórico completo de sábanas, los reportes descargados de las plataformas digitales tras el envío de cargas, y los reportes de gestiones VoIP — hacia `data/output/reportes/` (RF-20 – RF-24).
-6. **Visualización**: el frontend Astro consulta el backend (vía una API por definir) para exponer selección/filtrado, métricas, configuración de cargas y reportes.
+6. **Visualización**: el frontend Astro consulta el backend (vía su API REST) para exponer selección/filtrado, métricas, configuración de cargas y reportes.
 
 ## Principio arquitectónico: puertos/adaptadores con vertical slicing (RF-30)
 
@@ -70,15 +70,15 @@ La configuración (reglas de transformación, formatos, criterios de filtrado) s
 
 | Capa | Tecnología | Estado |
 |---|---|---|
-| Frontend | Astro + TypeScript | Scaffold mínimo creado (`frontend/`) |
-| Backend | Python gestionado con **uv**, API REST con **FastAPI**, `ruff` + `pytest` | Esqueleto implementado en `backend/` (puertos/adaptadores + caso de uso de referencia `health`, end-to-end y en verde) |
+| Frontend | Astro + TypeScript | Pantalla de bienvenida y consola de cargas implementadas (`frontend/`), siguiendo `docs/design_ui/brand_guide.json` |
+| Backend | Python gestionado con **uv**, API REST con **FastAPI**, `ruff` + `pytest` | Implementado: `health` e ingesta de sábanas con versionado, bajo puertos/adaptadores, con `ruff` y `pytest` en verde |
 | Base de datos | **PostgreSQL** (decidido) | PostgreSQL 18 local con base `auto_cusco` y rol `auto_cusco_app` creados; `GET /health` reporta la base disponible |
 | Migraciones de base de datos | **Alembic** (decidido 2026-09-11) | Implementado: `backend/migrations/`, modelos en `backend/app/adapters/persistence/modelos.py`; migración inicial aplicada en la base local |
-| Comunicación frontend↔backend | **API REST separada** (decidido) — backend Python expone endpoints, Astro los consume | Endpoint `GET /health` implementado y probado; sin endpoints de negocio aún |
+| Comunicación frontend↔backend | **API REST separada** (decidido) — backend Python expone endpoints, Astro los consume | Implementado: `GET /health` y los endpoints de cargas. CORS desactivado por defecto y configurable con `CORS_ORIGENES` para cuando el frontend se sirva desde otro origen |
 | Disparador del procesamiento | **Bajo demanda desde el frontend** (decidido) — sin cron; el usuario sube la sábana y dispara la ingesta desde la UI | No implementado (depende de la Fase 1) |
 | Ejecución de la ingesta | **En segundo plano** (decidido 2026-09-11) — el endpoint recibe el archivo y responde de inmediato; el frontend consulta el avance y el resultado | Implementado: endpoints en `api/cargas.py`, procesamiento en segundo plano dentro del mismo proceso y recuperación de versiones interrumpidas al arrancar |
 | Lectura de `.xlsb` | **`python-calamine`** (decidido 2026-09-11 tras medición) — ver "Medición de lectores de sábana" | Implementado: `backend/app/adapters/input/lector_calamine.py` (puerto `core/ports/lector_sabana_port.py`), validado contra los cortes reales |
-| Versiones de sábana por fecha de corte | **Versionado con una versión vigente por día**, elección y eliminación de versiones, cargas de fechas pasadas permitidas (evaluado 2026-09-11) — ver `docs/versionado-sabanas.md` | Diseño confirmado (C-1 a C-3); tablas creadas con la migración inicial. Falta el caso de uso y los endpoints |
+| Versiones de sábana por fecha de corte | **Versionado con una versión vigente por día**, elección y eliminación de versiones, cargas de fechas pasadas permitidas (evaluado 2026-09-11) — ver `docs/versionado-sabanas.md` | Implementado de extremo a extremo: tablas, caso de uso, endpoints y pantallas del frontend |
 
 **Justificación de las decisiones:** PostgreSQL por su soporte de JSON/JSONB, útil para almacenar la información completa de cada sábana (campos variables e invariables, RF-21) y para el historial evolutivo (RF-22). API REST separada para desacoplar frontend y backend, facilitar pruebas, y dejar abierta la integración futura con otros clientes o sistemas (CRM, VoIP, plataformas digitales — alineado con RF-30). FastAPI porque su tipado con Pydantic encaja con el parseo/tipado de campos de RF-12, es async nativo y genera documentación OpenAPI automática. Disparo bajo demanda porque RF-01 pide carga vía interfaz y evita depender de infraestructura de cron desde el inicio.
 

@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     db_user: str = "auto_cusco_app"
     db_password: str = ""
 
+    # Origenes del frontend permitidos por CORS, separados por coma. Vacio = sin CORS.
+    cors_origenes: str = ""
+
+    @property
+    def origenes_cors(self) -> list[str]:
+        return [origen.strip() for origen in self.cors_origenes.split(",") if origen.strip()]
+
     @property
     def database_url(self) -> str:
         # La contrasena se inserta sin codificar: `@` y `%XX` la corrompen.

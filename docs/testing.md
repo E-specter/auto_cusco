@@ -26,6 +26,13 @@ La arquitectura de puertos y adaptadores es lo que permite el primer nivel: el n
 - **Estructura.** Preparar, ejecutar y comprobar, separados por una línea en blanco. Una sola idea por prueba.
 - **Sin base de datos por defecto.** Las pruebas que la necesitan llevan el marcador `postgres`, se saltan solas y limpian lo que crean.
 - **Datos de prueba.** Se reutilizan los generadores sintéticos que ya existen en las pruebas del normalizador y de cabeceras, en lugar de inventar filas nuevas cada vez.
+- **Sábanas de prueba completas.** Para probar a mano la ingesta o la interfaz, genera una sábana inventada en vez de usar una real, desde `backend/`:
+
+  ```powershell
+  uv run python scripts/generar_sabana_sintetica.py "..\data\sabanas\SINTETICA - 26.09.2026.xlsb" --filas 46000
+  ```
+
+  Python no puede escribir `.xlsb`, así que el script crea el archivo en `.xlsx` y lo convierte con Excel cuando el destino termina en `.xlsb`. Si no tienes Excel, genera el `.xlsx` y úsalo tal cual: el lector acepta ambos formatos. El archivo incluye casos borde a propósito (DNI de 7 dígitos, RUC válido, teléfonos inválidos, un pagaré repetido y una columna fuera del catálogo) y queda fuera de git como cualquier contenido de `data/sabanas/`.
 - **Cobertura mínima de un módulo nuevo:** caso normal, bordes, entradas inválidas y, cuando dos piezas deben coincidir, una prueba de contrato entre ellas. El ejemplo vivo es la prueba que falla si las columnas de la tabla dejan de coincidir con lo que produce la normalización.
 
 ## 4. Verificación antes de cerrar una tarea

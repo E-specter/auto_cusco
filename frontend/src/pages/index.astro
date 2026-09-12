@@ -1,17 +1,449 @@
 ---
-
+/**
+ * Welcome screen. The one surface locked to a single viewport (100dvh, no
+ * scroll), so every size here is clamp()-based and nothing is fixed.
+ *
+ * The node-link diagram is not decoration: it is the product's mechanism
+ * drawn once — one cut-off date fans out into several versions, exactly one
+ * of which is current, and only that one feeds the portfolio.
+ */
+import Shell from '../layouts/Shell.astro';
+import Icon from '../components/Icon.astro';
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<Shell
+  title="auto_cusco — Ingesta y versionado de sábanas"
+  description="Carga, valida y versiona las sábanas diarias de cobranza. Una versión vigente por fecha de corte."
+  lockViewport
+>
+  <section class="hero">
+    <div class="hero__say">
+      <p class="eyebrow hero__eyebrow" data-latest>
+        <span class="dot" aria-hidden="true"></span>
+        <span data-latest-text data-i18n="common.loading">Cargando</span>
+      </p>
+
+      <h1 class="hero__headline" data-i18n-html="welcome.headline">
+        Una sábana por día.<br />Una versión que manda.
+      </h1>
+
+      <p class="hero__sub" data-i18n="welcome.subcopy">
+        Cada fecha de corte es una fotografía de la cartera. Cuando la entidad
+        corrige un archivo, la versión nueva se guarda entera junto a la
+        anterior y tú eliges cuál se considera. Nada se sobrescribe y nada
+        cambia sin que lo confirmes.
+      </p>
+
+      <a class="btn btn--primary hero__cta" href="/cargas">
+        <span data-i18n="welcome.cta">Abrir la consola de cargas</span>
+        <Icon name="arrow-right" size={16} />
+      </a>
+    </div>
+
+    <figure class="hero__figure">
+      <figcaption class="hero__figcaption" data-i18n="welcome.diagram.title">
+        Recorrido de una sábana
+      </figcaption>
+
+      <svg
+        class="diagram"
+        viewBox="0 0 624 314"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        data-i18n-attr="aria-label:welcome.diagram.title"
+        aria-label="Recorrido de una sábana"
+      >
+        <g class="diagram__links" fill="none" stroke-width="1">
+          <path class="link link--a" d="M154 155 C 202 155, 208 59, 252 59" />
+          <path class="link link--b link--live" d="M154 155 L 252 155" />
+          <path class="link link--c" d="M154 155 C 202 155, 208 251, 252 251" />
+          <path class="link link--d link--live" d="M372 155 L 470 155" />
+        </g>
+
+        <g class="diagram__nodes">
+          <g class="node">
+            <rect x="4" y="128" width="150" height="54" />
+            <text class="node__label" x="79" y="152" text-anchor="middle" data-i18n="welcome.diagram.n1">Sábana</text>
+            <text class="node__note" x="79" y="169" text-anchor="middle" data-i18n="welcome.diagram.n1.note">archivo del día</text>
+          </g>
+
+          <g class="node node--step">
+            <rect x="252" y="36" width="120" height="46" />
+            <text class="node__label" x="312" y="57" text-anchor="middle">v1</text>
+            <text class="node__note" x="312" y="73" text-anchor="middle" data-i18n="welcome.diagram.n2">Validación</text>
+          </g>
+
+          <g class="node node--current">
+            <rect x="252" y="132" width="120" height="46" />
+            <circle class="node__dot" cx="268" cy="155" r="4" />
+            <text class="node__label node__label--current" x="316" y="153" text-anchor="middle">v2</text>
+            <text class="node__note node__note--current" x="316" y="169" text-anchor="middle" data-i18n="welcome.diagram.n4">Vigente</text>
+          </g>
+
+          <g class="node node--step">
+            <rect x="252" y="228" width="120" height="46" />
+            <text class="node__label" x="312" y="249" text-anchor="middle">v3</text>
+            <text class="node__note" x="312" y="265" text-anchor="middle" data-i18n="welcome.diagram.n2">Validación</text>
+          </g>
+
+          <g class="node">
+            <rect x="470" y="128" width="150" height="54" />
+            <text class="node__label" x="545" y="152" text-anchor="middle" data-i18n="welcome.diagram.n5">Cartera</text>
+            <text class="node__note" x="545" y="169" text-anchor="middle" data-i18n="welcome.diagram.n5.note">métricas</text>
+          </g>
+        </g>
+      </svg>
+    </figure>
+
+    <dl class="hero__stats" data-stats>
+      <div class="stat">
+        <dt class="stat__label" data-i18n="welcome.stat.fechas">Fechas con vigente</dt>
+        <dd class="stat__value" data-stat="fechas"><span class="skeleton" style="inline-size:3ch"></span></dd>
+      </div>
+      <div class="stat">
+        <dt class="stat__label" data-i18n="welcome.stat.versiones">Versiones registradas</dt>
+        <dd class="stat__value" data-stat="versiones"><span class="skeleton" style="inline-size:3ch"></span></dd>
+      </div>
+      <div class="stat">
+        <dt class="stat__label" data-i18n="welcome.stat.ultima">Último corte cargado</dt>
+        <dd class="stat__value" data-stat="ultima"><span class="skeleton" style="inline-size:6ch"></span></dd>
+      </div>
+    </dl>
+  </section>
+</Shell>
+
+<script>
+  import { listarVersiones } from '../lib/api';
+  import { formatDateCompact } from '../lib/format';
+  import { t } from '../lib/i18n';
+
+  const eyebrow = document.querySelector<HTMLElement>('[data-latest]');
+  const eyebrowText = document.querySelector<HTMLElement>('[data-latest-text]');
+
+  function set(name: string, value: string): void {
+    const node = document.querySelector<HTMLElement>(`[data-stat="${name}"]`);
+    if (node) node.textContent = value;
+  }
+
+  /**
+   * The welcome screen shows the system's real state rather than claims: how
+   * many dates have a current version, how many versions exist, and which
+   * cut-off was loaded last. An empty database reads as zeros, honestly.
+   */
+  async function loadState(): Promise<void> {
+    try {
+      const versiones = await listarVersiones({ limite: 200 });
+
+      const conVigente = new Set(
+        versiones.filter((v) => v.vigente).map((v) => v.fecha_corte),
+      );
+      set('fechas', String(conVigente.size));
+      set('versiones', String(versiones.length));
+
+      const latest = versiones[0];
+      set('ultima', latest ? formatDateCompact(latest.fecha_corte) : t('welcome.stat.none'));
+
+      // The badge carries the exception worth acting on, not a second copy of
+      // the stat below it: the dates whose day currently counts for nothing.
+      if (eyebrow && eyebrowText) {
+        const todas = new Set(versiones.map((v) => v.fecha_corte));
+        const sinVigente = [...todas].filter((f) => !conVigente.has(f)).length;
+
+        if (todas.size === 0) {
+          eyebrow.dataset.state = 'empty';
+          eyebrowText.textContent = t('console.ruler.empty');
+        } else if (sinVigente > 0) {
+          eyebrow.dataset.state = 'attention';
+          eyebrowText.textContent =
+            sinVigente === 1
+              ? t('welcome.badge.sinVigenteOne')
+              : t('welcome.badge.sinVigente', { n: sinVigente });
+        } else {
+          eyebrow.dataset.state = 'loaded';
+          eyebrowText.textContent = t('welcome.badge.todasVigentes', { n: todas.size });
+        }
+        eyebrowText.removeAttribute('data-i18n');
+      }
+    } catch {
+      set('fechas', t('welcome.stat.none'));
+      set('versiones', t('welcome.stat.none'));
+      set('ultima', t('welcome.stat.none'));
+      if (eyebrow && eyebrowText) {
+        eyebrow.dataset.state = 'down';
+        eyebrowText.textContent = t('health.down');
+        eyebrowText.removeAttribute('data-i18n');
+      }
+    }
+  }
+
+  loadState();
+  document.addEventListener('languagechange', loadState);
+</script>
+
+<style>
+  .hero {
+    display: grid;
+    block-size: 100%;
+    padding-inline: var(--shell-gutter);
+    padding-block: clamp(var(--space-3), 2.5vh, var(--space-5));
+    gap: clamp(var(--space-3), 2.5vh, var(--space-5));
+    grid-template-areas:
+      'say'
+      'figure';
+    grid-template-rows: auto minmax(0, 1fr);
+    align-content: center;
+    max-inline-size: var(--shell-max);
+    margin-inline: auto;
+    inline-size: 100%;
+  }
+
+  .hero__say {
+    grid-area: say;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: clamp(var(--space-2), 1.6vh, var(--space-4));
+    min-inline-size: 0;
+  }
+
+  .hero__eyebrow .dot { color: var(--color-text-muted); }
+  .hero__eyebrow[data-state='loaded'] .dot { color: var(--color-accent); }
+  .hero__eyebrow[data-state='attention'] .dot { color: var(--color-signal); }
+  .hero__eyebrow[data-state='empty'] .dot { color: var(--color-text-muted); }
+  .hero__eyebrow[data-state='down'] .dot { color: var(--color-danger-text); }
+
+  .hero__headline {
+    font-size: clamp(var(--text-xl), 3.2vw + 1.1rem, var(--text-3xl));
+    letter-spacing: -0.03em;
+    max-inline-size: 18ch;
+  }
+
+  .hero__sub {
+    max-inline-size: 46ch;
+    font-size: clamp(var(--text-sm), 0.4vw + 0.72rem, var(--text-base));
+    color: var(--color-text-muted);
+  }
+
+  .hero__cta {
+    font-size: clamp(var(--text-sm), 0.3vw + 0.7rem, var(--text-base));
+    padding-inline: var(--space-5);
+    padding-block: var(--space-3);
+  }
+
+  .hero__figure {
+    display: none;
+    grid-area: figure;
+    flex-direction: column;
+    gap: clamp(var(--space-2), 1.5vh, var(--space-3));
+    min-block-size: 0;
+    min-inline-size: 0;
+    align-items: center;
+    justify-content: center;
+    border-block-start: var(--color-border-hairline) solid var(--color-border-subtle);
+    padding-block-start: clamp(var(--space-2), 2vh, var(--space-4));
+  }
+
+  /* Names the figure as a diagram of the model, so its illustrative "v2 ·
+     VIGENTE" is never read as a report of what is loaded. */
+  .hero__figcaption {
+    align-self: flex-start;
+    font-family: var(--font-secondary);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .diagram {
+    inline-size: 100%;
+    min-block-size: 0;
+    flex: 1;
+    max-block-size: 100%;
+  }
+
+  /* ---- Diagram parts --------------------------------------------------- */
+
+  .link {
+    stroke: var(--color-border);
+    stroke-dasharray: 2.5 5;
+    stroke-linecap: round;
+  }
+
+  .link--live {
+    stroke: var(--color-accent);
+    stroke-width: 1.75;
+    stroke-dasharray: 4 5;
+  }
+
+  .node rect {
+    fill: var(--color-bg);
+    stroke: var(--color-border);
+    stroke-width: 1;
+    /* Structural shapes stay sharp; only pills round. */
+    rx: 0;
+  }
+
+  .node--current rect {
+    fill: var(--color-accent-wash);
+    stroke: var(--color-accent);
+    stroke-width: 1.75;
+  }
+
+  .node__dot {
+    fill: var(--color-accent);
+  }
+
+  .node__label {
+    font-family: var(--font-primary);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    fill: var(--color-text);
+  }
+
+  .node__label--current {
+    fill: var(--color-accent-text);
+  }
+
+  .node__note {
+    font-family: var(--font-secondary);
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    fill: var(--color-text-muted);
+  }
+
+  .node__note--current {
+    fill: var(--color-accent-text);
+  }
+
+  /* ---- Stats ------------------------------------------------------------ */
+
+  .hero__stats {
+    display: none;
+    grid-area: stats;
+    gap: var(--space-5);
+    padding-block-start: clamp(var(--space-2), 1.5vh, var(--space-4));
+    border-block-start: var(--color-border-hairline) solid var(--color-border-subtle);
+  }
+
+  .hero__stats .stat__value {
+    font-size: clamp(var(--text-lg), 1.4vw + 1rem, var(--text-2xl));
+    overflow-wrap: normal;
+  }
+
+  .hero__stats .stat__label {
+    overflow-wrap: anywhere;
+  }
+
+  .hero__stats .skeleton {
+    display: inline-block;
+    block-size: 0.8em;
+    vertical-align: baseline;
+  }
+
+  /* ---- Up from mobile --------------------------------------------------- */
+
+  /* Short viewports never get the stat row; it is the optional band. */
+  /* Wide enough for the diagram's notes to be readable at all. */
+  @media (min-width: 48rem) and (min-height: 34rem) {
+    .hero__figure {
+      display: flex;
+    }
+  }
+
+  @media (min-height: 40rem) {
+    .hero {
+      grid-template-areas:
+        'say'
+        'figure'
+        'stats';
+      grid-template-rows: auto minmax(0, 1fr) auto;
+    }
+
+    .hero__stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+      gap: var(--space-4);
+    }
+  }
+
+  /* The golden split: narrow column speaks, wide column shows. */
+  @media (min-width: 64rem) {
+    .hero {
+      grid-template-areas:
+        'say figure'
+        'stats stats';
+      grid-template-columns: var(--phi-minor) 1fr;
+      grid-template-rows: minmax(0, 1fr) auto;
+      column-gap: clamp(var(--space-4), 4vw, var(--space-6));
+      align-items: center;
+    }
+
+    .hero__say {
+      justify-content: center;
+    }
+
+    .hero__figure {
+      border-block-start: 0;
+      border-inline-start: var(--color-border-hairline) solid var(--color-border-subtle);
+      padding-block-start: 0;
+      padding-inline-start: clamp(var(--space-4), 3vw, var(--space-6));
+    }
+
+    /* The stat band runs the full width so the numerals can be oversized. */
+    .hero__stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: clamp(var(--space-4), 3vw, var(--space-6));
+      max-inline-size: 52rem;
+    }
+  }
+
+  /* ---- Entrance -------------------------------------------------------- */
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hero__eyebrow,
+    .hero__headline,
+    .hero__sub,
+    .hero__cta,
+    .hero__stats {
+      animation: rise var(--duration-entrance) var(--ease-default) backwards;
+    }
+
+    .hero__headline { animation-delay: 60ms; }
+    .hero__sub { animation-delay: 120ms; }
+    .hero__cta { animation-delay: 180ms; }
+    .hero__stats { animation-delay: 300ms; }
+
+    .link {
+      clip-path: inset(0 100% 0 0);
+      animation: draw 720ms var(--ease-default) 240ms forwards;
+    }
+
+    .link--b { animation-delay: 300ms; }
+    .link--c { animation-delay: 360ms; }
+    .link--d { animation-delay: 620ms; }
+
+    .node {
+      animation: rise var(--duration-entrance) var(--ease-default) backwards;
+    }
+
+    .node--step { animation-delay: 380ms; }
+    .node--current { animation-delay: 460ms; }
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+
+  @keyframes draw {
+    to {
+      clip-path: inset(0 0 0 0);
+    }
+  }
+</style>

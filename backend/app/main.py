@@ -14,10 +14,12 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.cargas import crear_servicio_ingesta
 from app.api.cargas import router as cargas_router
 from app.api.health import router as health_router
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,26 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
 
 
+def configurar_cors(aplicacion: FastAPI, origenes: list[str]) -> None:
+    """Permite que un frontend servido en otro origen consuma la API.
+
+    Sin origenes configurados no se agrega el middleware y la API no envia
+    cabeceras CORS. En desarrollo no hacen falta: el dev server de Astro
+    redirige /api al backend, asi que el navegador ve un solo origen. Se
+    activa completando CORS_ORIGENES en /.env.
+    """
+    if not origenes:
+        return
+    aplicacion.add_middleware(
+        CORSMiddleware,
+        allow_origins=origenes,
+        allow_credentials=False,  # la API aun no usa cookies ni sesiones
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type"],
+    )
+    logger.info("CORS habilitado para %s", origenes)
+
+
 app = FastAPI(
     title="auto_cusco API",
     description=(
@@ -48,6 +70,8 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+configurar_cors(app, get_settings().origenes_cors)
 
 app.include_router(health_router)
 app.include_router(cargas_router)

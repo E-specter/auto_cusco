@@ -1,0 +1,297 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-12T00:00:00Z",
+  "title": "Design System: auto_cusco",
+  "extensions": {
+    "colorMeta": {
+      "signal-green": {
+        "role": "primary",
+        "displayName": "Signal Green",
+        "canonical": "hsl(155 72% 45%)",
+        "tonalRamp": [
+          "hsl(155 60% 8%)",
+          "hsl(155 65% 14%)",
+          "hsl(155 70% 21%)",
+          "hsl(155 75% 29%)",
+          "hsl(155 75% 37%)",
+          "hsl(155 72% 45%)",
+          "hsl(155 68% 55%)",
+          "hsl(155 65% 68%)",
+          "hsl(155 65% 80%)",
+          "hsl(155 65% 90%)",
+          "hsl(155 70% 96%)"
+        ],
+        "note": "The 500 step is fill-only. Text in this hue reads at 700 in light (recorded 4.65:1 on paper) and at 400 in dark. Steps 100, 300, 900 and 950 are declared in the ramp but not consumed by any rule."
+      },
+      "signal-red-orange": {
+        "role": "secondary",
+        "displayName": "Signal Red-Orange",
+        "canonical": "hsl(14 92% 52%)",
+        "tonalRamp": [
+          "hsl(14 70% 10%)",
+          "hsl(14 75% 18%)",
+          "hsl(14 82% 27%)",
+          "hsl(14 88% 36%)",
+          "hsl(14 90% 44%)",
+          "hsl(14 92% 52%)",
+          "hsl(14 90% 60%)",
+          "hsl(14 88% 71%)",
+          "hsl(14 88% 82%)",
+          "hsl(14 88% 91%)",
+          "hsl(14 90% 96%)"
+        ],
+        "note": "Focus ring and caret colour. Text reads at 700 (recorded 6.2:1 on paper); the 800 step is the warning voice, which is how a third state reading is found without a third hue."
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "hsl(14 25% 98%)",
+        "tonalRamp": [
+          "hsl(14 25% 98%)",
+          "hsl(14 20% 95%)",
+          "hsl(14 15% 90%)",
+          "hsl(14 14% 82%)"
+        ],
+        "note": "The light canvas, tinted from hue 14. Never gray. paper-300 is declared but unused."
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Cool Ink",
+        "canonical": "hsl(155 25% 6%)",
+        "tonalRamp": [
+          "hsl(155 30% 3%)",
+          "hsl(155 25% 6%)",
+          "hsl(155 20% 10%)",
+          "hsl(155 16% 22%)",
+          "hsl(155 12% 34%)"
+        ],
+        "note": "Text and the dark canvas, tinted from hue 155. ink-700 is muted text (recorded 6.3:1 on paper); ink-900 is the hairline border; ink-1000 backs the modal backdrop at 72%. ink-800 is declared but unused."
+      },
+      "color-border-subtle": {
+        "role": "neutral",
+        "displayName": "Hairline Subtle",
+        "canonical": "hsl(14 16% 84%)",
+        "tonalRamp": [
+          "hsl(14 16% 84%)"
+        ],
+        "note": "The only neutral belonging to no ramp. Row dividers, optional-band rules, and the dashed connector behind the date ruler."
+      }
+    },
+    "darkThemeOverrides": {
+      "mechanism": "Light is declared on bare :root. Dark is declared twice: under @media (prefers-color-scheme: dark) guarded by :root:not([data-theme=\"light\"]), and under :root[data-theme=\"dark\"]. An explicit choice wins in both directions; no colour is first defined inside a media query.",
+      "tokens": {
+        "--color-bg": "hsl(155 25% 6%)",
+        "--color-surface": "hsl(155 20% 10%)",
+        "--color-surface-sunken": "hsl(155 30% 3%)",
+        "--color-text": "hsl(14 25% 98%)",
+        "--color-text-muted": "hsl(155 10% 66%)",
+        "--color-border": "hsl(155 14% 30%)",
+        "--color-border-subtle": "hsl(155 16% 18%)",
+        "--color-accent-text": "hsl(155 68% 55%)",
+        "--color-accent-wash": "hsl(155 45% 12%)",
+        "--color-signal-text": "hsl(14 90% 60%)",
+        "--color-signal-wash": "hsl(14 50% 13%)",
+        "--color-warning-text": "hsl(14 88% 71%)",
+        "--color-warning-wash": "hsl(14 45% 14%)",
+        "--color-info-text": "hsl(155 10% 66%)",
+        "--color-info-wash": "hsl(155 16% 15%)",
+        "--color-selection-bg": "hsl(155 70% 21%)"
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The welcome headline only. The single fluid type size in the system, capped at 18ch." },
+      "headline": { "displayName": "Headline", "purpose": "h1. Stepped down to 1.272rem when a h1 sits inside a panel header." },
+      "title": { "displayName": "Title", "purpose": "Section and dialog headings (h2 1.618rem, h3 1.272rem, h4 1rem)." },
+      "body": { "displayName": "Body", "purpose": "Prose. Capped at 68ch (--measure-prose), 58ch in the console stand-in, 46ch in the welcome subcopy." },
+      "data": { "displayName": "Data", "purpose": "Every value the analyst could trace back to a row: table cells, version metadata, inputs, stamps. Tabular numerals." },
+      "label": { "displayName": "Label", "purpose": "Uppercase mono micro-voice: eyebrow badges, field labels, panel titles (700), table headers (700), legends." },
+      "stat": { "displayName": "Stat", "purpose": "The oversized numeral (2.618rem in the console summary). Its dt label is the one label set in Inter rather than mono." }
+    },
+    "shadows": [
+      {
+        "name": "none",
+        "value": "none",
+        "purpose": "The system is flat. Depth is a 1px ink hairline plus a tonal step between --color-bg, --color-surface and --color-surface-sunken. Never add a shadow to lift a surface."
+      },
+      {
+        "name": "selection-bar",
+        "value": "inset 3px 0 0 0 var(--color-text)",
+        "purpose": "Not elevation — an inset marker bar on the selected version row, drawn this way so the row does not move."
+      },
+      {
+        "name": "pulse-ring",
+        "value": "0 0 0 0 color-mix(in srgb, currentColor 45%, transparent) → 0 0 0 5px color-mix(in srgb, currentColor 0%, transparent)",
+        "purpose": "The working dot's 1.4s pulse. Motion only; the meaning is always duplicated elsewhere."
+      },
+      {
+        "name": "pulse-ring-static",
+        "value": "0 0 0 3px color-mix(in srgb, currentColor 30%, transparent)",
+        "purpose": "The reduced-motion substitute for the pulse. Reduced motion never means information is lost."
+      }
+    ],
+    "motion": [
+      { "name": "duration-micro", "value": "120ms", "purpose": "Background, border and colour shifts on buttons, inputs, segments, choices, date nodes." },
+      { "name": "duration-default", "value": "220ms", "purpose": "State entrances — the dialog's opacity + 0.5rem rise." },
+      { "name": "duration-entrance", "value": "400ms", "purpose": "On-load entrance rise, staggered 60ms per item on the welcome screen." },
+      { "name": "ease-default", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "The only curve. Nothing bounces; technobrutalism moves with precision." },
+      { "name": "draw", "value": "clip-path: inset(0 100% 0 0) → inset(0) over 720ms", "purpose": "Drawing the diagram's dotted connectors. Never animate stroke-dashoffset for this — it marches the dashes instead of drawing the line." },
+      { "name": "reduced-motion-gate", "value": "@media (prefers-reduced-motion: no-preference)", "purpose": "Every non-essential animation is wrapped in this; a global reduce block collapses all durations to 0.01ms as a backstop." }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "48rem", "purpose": "Stat grid loosens; the welcome diagram appears (paired with min-height 34rem)." },
+      { "name": "lg", "value": "64rem", "purpose": "The golden split engages (--phi-minor 1fr); the issues table switches from fixed to auto layout." },
+      { "name": "height-sm", "value": "min-height: 34rem", "purpose": "Below this the welcome diagram is dropped rather than compressed." },
+      { "name": "height-md", "value": "min-height: 40rem", "purpose": "Below this the welcome stat band is dropped; height is a real breakpoint in this system." },
+      { "name": "exception-rail", "value": "max-width: 63.99rem", "purpose": "Documented downward exception: the upload action drops below the scrolling date rail." },
+      { "name": "exception-chrome", "value": "max-width: 30rem", "purpose": "Documented downward exception: the header centres and the API pulse reorders." }
+    ],
+    "layout": [
+      { "name": "--phi-minor", "value": "0.618fr", "purpose": "The golden split's narrow column, used with 1fr. Narrow speaks, wide shows." },
+      { "name": "--measure-prose", "value": "68ch", "purpose": "Prose measure cap." },
+      { "name": "--shell-max", "value": "96rem", "purpose": "Outer container cap, centred." },
+      { "name": "--shell-gutter", "value": "var(--space-4)", "purpose": "The single side gutter for chrome and both surfaces." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one action per surface that moves the work forward. Accent fill, ink label, pill.",
+      "html": "<button class=\"ds-btn ds-btn-primary\" type=\"button\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 3v12\"/><path d=\"m17 8-5-5-5 5\"/><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/></svg><span>Subir sábana</span></button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2, 0.5rem); padding: var(--space-2, 0.5rem) var(--space-4, 1.309rem); border: 1px solid var(--color-border, hsl(155 20% 10%)); border-radius: 9999px; background-color: transparent; color: var(--color-text, hsl(155 25% 6%)); font-family: var(--font-primary, Inter, sans-serif); font-size: var(--text-sm, 0.786rem); font-weight: 600; line-height: 1.3; cursor: pointer; white-space: nowrap; transition: background-color 120ms cubic-bezier(0.22,1,0.36,1), border-color 120ms cubic-bezier(0.22,1,0.36,1), color 120ms cubic-bezier(0.22,1,0.36,1); } .ds-btn-primary { background-color: var(--color-accent, hsl(155 72% 45%)); border-color: var(--color-accent, hsl(155 72% 45%)); color: hsl(155 25% 6%); } .ds-btn-primary:hover { background-color: var(--color-accent-hover, hsl(155 75% 37%)); border-color: var(--color-accent-hover, hsl(155 75% 37%)); color: hsl(14 25% 98%); } .ds-btn-primary:active { background-color: hsl(155 75% 29%); border-color: hsl(155 75% 29%); color: hsl(14 25% 98%); } .ds-btn-primary:focus-visible { outline: 2px solid var(--color-focus-ring, hsl(14 92% 52%)); outline-offset: 2px; } .ds-btn-primary:disabled { background-color: var(--color-surface-sunken, hsl(14 15% 90%)); border-color: var(--color-border-subtle, hsl(14 16% 84%)); color: var(--color-text-muted, hsl(155 12% 34%)); opacity: 1; cursor: not-allowed; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive actions. Red-orange text step for both label and border; the fill only arrives on hover.",
+      "html": "<button class=\"ds-btn ds-btn-danger\" type=\"button\">Eliminar definitivamente</button>",
+      "css": ".ds-btn-danger { display: inline-flex; align-items: center; gap: var(--space-2, 0.5rem); padding: var(--space-2, 0.5rem) var(--space-4, 1.309rem); border: 1px solid var(--color-danger-text, hsl(14 88% 36%)); border-radius: 9999px; background-color: transparent; color: var(--color-danger-text, hsl(14 88% 36%)); font-family: var(--font-primary, Inter, sans-serif); font-size: var(--text-sm, 0.786rem); font-weight: 600; line-height: 1.3; cursor: pointer; transition: background-color 120ms cubic-bezier(0.22,1,0.36,1); } .ds-btn-danger:hover { background-color: var(--color-signal-wash, hsl(14 90% 96%)); } .ds-btn-danger:focus-visible { outline: 2px solid var(--color-focus-ring, hsl(14 92% 52%)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "nav",
+      "refersTo": "segmented-item",
+      "description": "One pressed-state group for every either/or on the product: language, theme, severity filter. Pill outside, sharp dividers inside; aria-pressed drives the styling.",
+      "html": "<div class=\"ds-segmented\" role=\"group\" aria-label=\"Severidad\"><button type=\"button\" class=\"ds-segmented-item\" aria-pressed=\"true\">Todas</button><button type=\"button\" class=\"ds-segmented-item\" aria-pressed=\"false\">Error</button><button type=\"button\" class=\"ds-segmented-item\" aria-pressed=\"false\">Advertencia</button></div>",
+      "css": ".ds-segmented { display: inline-flex; border: 1px solid var(--color-border, hsl(155 20% 10%)); border-radius: 9999px; overflow: hidden; } .ds-segmented-item { display: inline-flex; align-items: center; justify-content: center; padding: var(--space-1, 0.309rem) var(--space-3, 0.809rem); border: 0; border-inline-start: 1px solid var(--color-border, hsl(155 20% 10%)); background-color: transparent; color: var(--color-text-muted, hsl(155 12% 34%)); font-family: var(--font-secondary, ui-monospace, monospace); font-size: var(--text-xs, 0.618rem); font-weight: 500; letter-spacing: 0.08em; line-height: 1.3; text-transform: uppercase; white-space: nowrap; cursor: pointer; transition: background-color 120ms cubic-bezier(0.22,1,0.36,1), color 120ms cubic-bezier(0.22,1,0.36,1); } .ds-segmented-item:first-child { border-inline-start: 0; } .ds-segmented-item:hover { background-color: var(--color-surface-sunken, hsl(14 15% 90%)); color: var(--color-text, hsl(155 25% 6%)); } .ds-segmented-item[aria-pressed=\"true\"] { background-color: var(--color-bg-inverse, hsl(155 25% 6%)); color: var(--color-text-inverse, hsl(14 25% 98%)); } .ds-segmented-item:focus-visible { outline: 2px solid var(--color-focus-ring, hsl(14 92% 52%)); outline-offset: -2px; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Square input with a mono value, an uppercase mono label above and a hint below. Invalid state is driven by :user-invalid or aria-invalid, never by a class.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-field-label\" for=\"ds-demo-date\">Fecha de corte</label><input class=\"ds-input\" id=\"ds-demo-date\" type=\"date\" /><p class=\"ds-field-hint\">Es la fecha que representa esta sábana.</p></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: var(--space-2, 0.5rem); min-inline-size: 0; } .ds-field-label { font-family: var(--font-secondary, ui-monospace, monospace); font-size: var(--text-xs, 0.618rem); font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-muted, hsl(155 12% 34%)); } .ds-field-hint { font-family: var(--font-secondary, ui-monospace, monospace); font-size: var(--text-xs, 0.618rem); line-height: 1.3; color: var(--color-text-muted, hsl(155 12% 34%)); margin: 0; } .ds-input { inline-size: 100%; min-inline-size: 0; padding: var(--space-2, 0.5rem) var(--space-3, 0.809rem); border: 1px solid var(--color-border, hsl(155 20% 10%)); border-radius: 0; background-color: var(--color-bg, hsl(14 25% 98%)); color: var(--color-text, hsl(155 25% 6%)); font-family: var(--font-secondary, ui-monospace, monospace); font-size: var(--text-sm, 0.786rem); line-height: 1.3; transition: border-color 120ms cubic-bezier(0.22,1,0.36,1); } .ds-input:hover { border-color: var(--color-accent-text, hsl(155 75% 29%)); } .ds-input:focus-visible { outline: 2px solid var(--color-focus-ring, hsl(14 92% 52%)); outline-offset: 2px; } .ds-input[aria-invalid=\"true\"] { border-color: var(--color-danger-text, hsl(14 88% 36%)); }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "The container. Square, one ink hairline, header one tonal step up, no shadow ever.",
+      "html": "<section class=\"ds-panel\"><div class=\"ds-panel-head\"><h2 class=\"ds-panel-title\">Resumen de la versión</h2><span class=\"ds-eyebrow\">10 sep 2026 · v2</span></div><div class=\"ds-panel-body\"><p style=\"margin:0\">Contenido del panel.</p></div></section>",
+      "css": ".ds-panel { border: 1px solid var(--color-border, hsl(155 20% 10%)); border-radius: 0; background-color: var(--color-bg, hsl(14 25% 98%)); color: var(--color-text, hsl(155 25% 6%)); font-family: var(--font-primary, Inter, sans-serif); } .ds-panel-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3, 0.809rem); flex-wrap: wrap; padding: var(--space-3, 0.809rem) var(--space-4, 1.309rem); border-block-end: 1px solid var(--color-border, hsl(155 20% 10%)); background-color: var(--color-surface, hsl(14 20% 95%)); } .ds-panel-title { margin: 0; font-family: var(--font-secondary, ui-monospace, monospace); font-size: var(--text-xs, 0.618rem); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text, hsl(155 25% 6%)); } .ds-panel-body { padding: var(--space-4, 1.309rem); } .ds-eyebrow { display: inline-flex; align-items: center; gap: var(--space-2, 0.5rem); padding: var(--space-1, 0.309rem) var(--space-3, 0.809rem); border: 1px solid var(--color-border-subtle, hsl(14 16% 84%)); border-radius: 9999px; font-family: var(--font-secondary, ui-monospace, monospace); font-size: var(--text-xs, 0.618rem); font-weight: 500; letter-spacing: 0.12em; line-height: 1.3; text-transform: uppercase; color: var(--color-text-muted, hsl(155 12% 34%)); white-space: nowrap; }"
+    },
+    {
+      "name": "Severity Tag",
+      "kind": "chip",
+      "refersTo": "tag-error",
+      "description": "Pill bordered in currentColor on its own wash. Five variants: error, advertencia, info, vigente, neutral.",
+      "html": "<span class=\"ds-tag ds-tag-error\">Error</span> <span class=\"ds-tag ds-tag-advertencia\">Advertencia</span> <span class=\"ds-tag ds-tag-vigente\">Vigente</span> <span class=\"ds-tag ds-tag-neutral\"><span class=\"ds-dot\"></span>Terminada</span>",
+      "css": ".ds-tag { display: inline-flex; align-items: center; gap: var(--space-2, 0.5rem); padding: var(--space-1, 0.309rem) var(--space-3, 0.809rem); border: 1px solid currentColor; border-radius: 9999px; font-family: var(--font-secondary, ui-monospace, monospace); font-size: var(--text-xs, 0.618rem); font-weight: 500; letter-spacing: 0.06em; line-height: 1.3; text-transform: uppercase; white-space: nowrap; } .ds-tag-error { color: var(--color-danger-text, hsl(14 88% 36%)); background-color: var(--color-signal-wash, hsl(14 90% 96%)); } .ds-tag-advertencia { color: var(--color-warning-text, hsl(14 82% 27%)); background-color: var(--color-warning-wash, hsl(14 88% 91%)); } .ds-tag-info { color: var(--color-info-text, hsl(155 12% 34%)); background-color: var(--color-info-wash, hsl(14 15% 90%)); } .ds-tag-vigente { color: var(--color-accent-text, hsl(155 75% 29%)); background-color: var(--color-accent-wash, hsl(155 70% 96%)); } .ds-tag-neutral { color: var(--color-text-muted, hsl(155 12% 34%)); } .ds-dot { flex: none; inline-size: 0.5rem; block-size: 0.5rem; border-radius: 9999px; background-color: currentColor; }"
+    },
+    {
+      "name": "Date Node",
+      "kind": "custom",
+      "refersTo": "date-node",
+      "description": "The signature component: the brand's node-link motif made functional. One cut-off date per node on a dashed rail. Green = has a current version, red-orange = has none, dashed edge = still processing (the state that reads without colour or motion).",
+      "html": "<div class=\"ds-rail\"><button type=\"button\" class=\"ds-datenode\" data-state=\"vigente\" aria-selected=\"true\"><span class=\"ds-dot\"></span><span class=\"ds-datenode-day\">10.09</span><span class=\"ds-datenode-year\">2026</span><span class=\"ds-datenode-count\">2v</span></button><button type=\"button\" class=\"ds-datenode\" data-state=\"sin\" aria-selected=\"false\"><span class=\"ds-dot\"></span><span class=\"ds-datenode-day\">11.09</span><span class=\"ds-datenode-year\">2026</span><span class=\"ds-datenode-count\">1v</span></button><button type=\"button\" class=\"ds-datenode\" data-state=\"procesando\" aria-selected=\"false\"><span class=\"ds-dot\"></span><span class=\"ds-datenode-day\">12.09</span><span class=\"ds-datenode-year\">2026</span><span class=\"ds-datenode-count\">1v</span></button></div>",
+      "css": ".ds-rail { position: relative; display: flex; align-items: stretch; gap: var(--space-4, 1.309rem); padding: var(--space-4, 1.309rem); overflow-x: auto; } .ds-rail::before { content: ''; position: absolute; inset-inline: var(--space-4, 1.309rem); inset-block-start: 50%; border-block-start: 1px dashed var(--color-border-subtle, hsl(14 16% 84%)); } .ds-datenode { position: relative; flex: none; display: grid; grid-template-columns: auto auto; grid-template-areas: 'dot day' 'year count'; gap: var(--space-1, 0.309rem) var(--space-2, 0.5rem); align-items: center; padding: var(--space-2, 0.5rem) var(--space-3, 0.809rem); border: 1px solid var(--color-border, hsl(155 20% 10%)); border-radius: 0; background-color: var(--color-bg, hsl(14 25% 98%)); cursor: pointer; text-align: start; transition: border-color 120ms cubic-bezier(0.22,1,0.36,1), background-color 120ms cubic-bezier(0.22,1,0.36,1); } .ds-datenode:hover { background-color: var(--color-surface, hsl(14 20% 95%)); } .ds-datenode[aria-selected=\"true\"] { border-color: var(--color-text, hsl(155 25% 6%)); border-width: 2px; padding: calc(var(--space-2, 0.5rem) - 1px) calc(var(--space-3, 0.809rem) - 1px); background-color: var(--color-surface, hsl(14 20% 95%)); } .ds-datenode:focus-visible { outline: 2px solid var(--color-focus-ring, hsl(14 92% 52%)); outline-offset: 2px; } .ds-datenode .ds-dot { grid-area: dot; color: var(--color-text-muted, hsl(155 12% 34%)); } .ds-datenode[data-state=\"vigente\"] .ds-dot { color: var(--color-accent, hsl(155 72% 45%)); } .ds-datenode[data-state=\"sin\"] .ds-dot { color: var(--color-signal, hsl(14 92% 52%)); } .ds-datenode[data-state=\"procesando\"] { border-style: dashed; } .ds-datenode-day { grid-area: day; font-family: var(--font-secondary, ui-monospace, monospace); font-size: var(--text-base, 1rem); font-weight: 700; line-height: 1; letter-spacing: -0.02em; color: var(--color-text, hsl(155 25% 6%)); } .ds-datenode-year { grid-area: year; } .ds-datenode-count { grid-area: count; text-align: end; } .ds-datenode-year, .ds-datenode-count { font-family: var(--font-secondary, ui-monospace, monospace); font-size: var(--text-xs, 0.618rem); line-height: 1; letter-spacing: 0.06em; color: var(--color-text-muted, hsl(155 12% 34%)); }"
+    },
+    {
+      "name": "Stat Block",
+      "kind": "custom",
+      "refersTo": "stat",
+      "description": "Oversized mono numeral with a small uppercase Inter label. The markup keeps the valid dt-then-dd order; CSS order:-1 puts the numeral on top.",
+      "html": "<dl class=\"ds-stats\"><div class=\"ds-stat\"><dt class=\"ds-stat-label\">Filas ingestadas</dt><dd class=\"ds-stat-value\">45 989</dd></div><div class=\"ds-stat\" data-severity=\"error\"><dt class=\"ds-stat-label\">Error</dt><dd class=\"ds-stat-value\">12</dd></div></dl>",
+      "css": ".ds-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr)); gap: var(--space-4, 1.309rem); margin: 0; } .ds-stat { display: flex; flex-direction: column; gap: var(--space-1, 0.309rem); min-inline-size: 0; } .ds-stat-value { order: -1; margin: 0; font-family: var(--font-secondary, ui-monospace, monospace); font-size: var(--text-xl, 2.058rem); font-weight: 700; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--color-text, hsl(155 25% 6%)); } .ds-stat-label { font-family: var(--font-primary, Inter, sans-serif); font-size: var(--text-xs, 0.618rem); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-muted, hsl(155 12% 34%)); } .ds-stat[data-severity=\"error\"] .ds-stat-value { color: var(--color-danger-text, hsl(14 88% 36%)); } .ds-stat[data-severity=\"advertencia\"] .ds-stat-value { color: var(--color-warning-text, hsl(14 82% 27%)); }"
+    },
+    {
+      "name": "Data Table",
+      "kind": "custom",
+      "refersTo": "table",
+      "description": "Collapsed borders, mono, tabular numerals, sticky uppercase headers. Always wrapped in a scroll container that shades only the side still holding off-screen content.",
+      "html": "<div class=\"ds-table-scroll\"><table class=\"ds-table\"><thead><tr><th class=\"ds-num\" scope=\"col\">Fila</th><th scope=\"col\">Columna</th><th scope=\"col\">Detalle</th></tr></thead><tbody><tr><td class=\"ds-num\">1 204</td><td>telefono_1</td><td>Teléfono con formato inválido.</td></tr><tr><td class=\"ds-num\">1 209</td><td>documento</td><td>DNI completado con ceros a la izquierda.</td></tr></tbody></table></div>",
+      "css": ".ds-table-scroll { overflow-x: auto; background-image: linear-gradient(to right, var(--color-bg, hsl(14 25% 98%)), transparent 1.6rem), linear-gradient(to left, var(--color-bg, hsl(14 25% 98%)), transparent 1.6rem), linear-gradient(to right, var(--color-border-subtle, hsl(14 16% 84%)), transparent 0.5rem), linear-gradient(to left, var(--color-border-subtle, hsl(14 16% 84%)), transparent 0.5rem); background-position: 0 0, 100% 0, 0 0, 100% 0; background-repeat: no-repeat; background-size: 2.5rem 100%, 2.5rem 100%, 0.75rem 100%, 0.75rem 100%; background-attachment: local, local, scroll, scroll; } .ds-table { inline-size: 100%; border-collapse: collapse; font-family: var(--font-secondary, ui-monospace, monospace); font-size: var(--text-sm, 0.786rem); line-height: 1.3; font-variant-numeric: tabular-nums; color: var(--color-text, hsl(155 25% 6%)); } .ds-table th, .ds-table td { padding: var(--space-2, 0.5rem) var(--space-3, 0.809rem); border-block-end: 1px solid var(--color-border-subtle, hsl(14 16% 84%)); text-align: start; vertical-align: top; } .ds-table thead th { position: sticky; inset-block-start: 0; z-index: 1; border-block-end-color: var(--color-border, hsl(155 20% 10%)); background-color: var(--color-surface, hsl(14 20% 95%)); font-size: var(--text-xs, 0.618rem); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-muted, hsl(155 12% 34%)); white-space: nowrap; } .ds-table tbody tr:hover { background-color: var(--color-surface, hsl(14 20% 95%)); } .ds-table .ds-num { text-align: end; }"
+    },
+    {
+      "name": "Notice",
+      "kind": "custom",
+      "refersTo": "notice-warning",
+      "description": "The square-cornered, full-width sibling of the tag: 1px solid currentColor on its matching wash, with an inline lucide icon on the first line.",
+      "html": "<p class=\"ds-notice ds-notice-warning\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/></svg><span>El formato de esta versión es distinto al de la vigente actual.</span></p>",
+      "css": ".ds-notice { display: flex; align-items: flex-start; gap: var(--space-3, 0.809rem); margin: 0; padding: var(--space-3, 0.809rem) var(--space-4, 1.309rem); border: 1px solid currentColor; border-radius: 0; font-family: var(--font-primary, Inter, sans-serif); font-size: var(--text-sm, 0.786rem); line-height: 1.5; } .ds-notice svg { flex: none; margin-block-start: 0.15em; } .ds-notice-warning { color: var(--color-warning-text, hsl(14 82% 27%)); background-color: var(--color-warning-wash, hsl(14 88% 91%)); } .ds-notice-danger { color: var(--color-danger-text, hsl(14 88% 36%)); background-color: var(--color-signal-wash, hsl(14 90% 96%)); } .ds-notice-success { color: var(--color-success-text, hsl(155 75% 29%)); background-color: var(--color-accent-wash, hsl(155 70% 96%)); } .ds-notice-info { color: var(--color-info-text, hsl(155 12% 34%)); background-color: var(--color-info-wash, hsl(14 15% 90%)); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Exposed Ledger",
+    "overview": "This is an instrument, not a page. A collections analyst opens it at a call-centre desk under high office light, early, in a hurry, with a 46 000-row spreadsheet to land before the phones start. Everything the system knows is laid out on a visible hairline grid with nothing hidden behind soft edges or drop shadows: the rules are drawn, the numerals are large and monospaced, and the structure of the data is the structure of the screen. The house style is Technobrutalism (organic-fused) as pinned in docs/design_ui/brand_guide.json — Orderful's exposed grid, dotted node-link diagrams and oversized numerals, softened by exactly one inherited gesture: the fully-rounded pill, and only on things you can press or read as status.\n\nTwo hues do all the signalling. A signal green (hue 155) and a signal red-orange (hue 14), and every neutral in the interface is a heavily desaturated tint of one of those two — warm paper from the red-orange, cool ink from the green. There is no gray anywhere in this system, and there is no third hue. When a third or fourth reading is needed (warning, info), it is taken from the same two ramps at a different lightness and weight rather than by adding a colour.\n\nDensity is the point. The product's own principle is density before breathing room: the analyst reads thousands of rows and compares versions, so clarity is bought with hierarchy and alignment, not with air. Both surfaces are built from the same tokens; the welcome screen is the only one locked to a single viewport, and it is the only place fluid type is allowed.",
+    "keyCharacteristics": [
+      "Exposed hairline grid — 1px borders are structure made visible, not container decoration",
+      "Exactly two hues; every neutral is a tint of one of them, never gray",
+      "Golden-ratio (φ = 1.618) ladders for both type and space",
+      "Radius 0 on everything structural; 9999px pills only on buttons, badges, tags and dots",
+      "Inter for chrome, JetBrains Mono for every value the analyst reads",
+      "Absolutely flat: no drop shadows anywhere",
+      "Light theme leads; dark is preserved but secondary",
+      "State is carried by two colours plus one non-colour channel (a dashed edge)"
+    ],
+    "rules": [
+      { "name": "The Two-Hue Rule", "body": "Hue 155 and hue 14 are the entire palette. Every background, border, disabled state, \"black\" and \"white\" is a desaturated tint of one of them. A third hue is never introduced — a state that needs a fourth reading is found at a different lightness on an existing ramp. This is constitutional, not a preference.", "section": "colors" },
+      { "name": "The Fill-Is-Not-Text Rule", "body": "The 500 step of either ramp is a fill only. Text in a hue always reads from the 700 step in light and the 400 step in dark; that is why --color-accent-text and --color-accent are separate tokens with different values. Never set text to --color-accent.", "section": "colors" },
+      { "name": "The Ramps Meet at Their Base Rule", "body": "In light, the two text steps sit at 700 because that is where they clear contrast on paper. On ink both 500-adjacent steps clear it, so the dark theme pulls text up to the 400 step of each ramp. The dark palette is a re-derivation, not a filter.", "section": "colors" },
+      { "name": "The Light-Leads Rule", "body": "The confirmed use scene is a call-centre desk under high office light, so the light palette is declared on bare :root with color-scheme: light and is the polished default. Dark is expressed twice on purpose: once under @media (prefers-color-scheme: dark) guarded by :root:not([data-theme=\"light\"]), so a system preference applies but an explicit light choice always wins, and once under :root[data-theme=\"dark\"], so an explicit dark choice wins against a light system. A colour is never defined for the first time inside a media query.", "section": "colors" },
+      { "name": "The One-Leads Rule", "body": "The two hues never appear at full saturation with the same visual weight in the same component. One leads; the other is a single touch — one dot, one border, one CTA.", "section": "colors" },
+      { "name": "The Mono-Is-Data Rule", "body": "JetBrains Mono is reserved for values, identifiers, stamps and technical microcopy — anything the analyst might match against the source file. Prose, headings and button labels stay in Inter. A sentence never goes mono to look technical.", "section": "typography" },
+      { "name": "The Fixed-Ladder Rule", "body": "Component rules read a ladder step, never a raw size. The one exception is the welcome screen (/), which is locked to 100dvh with no scroll and therefore clamps every size between two ladder steps so the composition compresses instead of overflowing. Operating screens scroll and use the ladder as-is.", "section": "typography" },
+      { "name": "The Numeral-Leads Rule", "body": "In a stat block the markup stays valid (<dt> label, then <dd> value) and CSS order: -1 puts the numeral on top. Never reorder the markup to get the visual order.", "section": "typography" },
+      { "name": "The Underline-Means-Link Rule", "body": "Real underlines belong to <a>. Non-link emphasis (<u>) is drawn dotted and coloured in the red-orange text step, so it can never be mistaken for a link.", "section": "typography" },
+      { "name": "The Golden Split Rule", "body": "When a screen has a narrow side and a wide side, the split is var(--phi-minor) 1fr and it engages at 64rem. Narrow speaks; wide shows.", "section": "layout" },
+      { "name": "The One-Viewport Exception Rule", "body": "Exactly one surface is locked to 100dvh with overflow: hidden — the welcome screen, opted in via lockViewport on the shell. Operating screens scroll and keep the same tokens. Never extend the lock to a screen that carries a table.", "section": "layout" },
+      { "name": "The Ladder-Only Rule", "body": "No component rule contains a raw length or a raw colour. If a value is needed that is not on a ladder, it is either a ch/ratio measure (68ch, aspect-ratio: 1) or it belongs in tokens.css.", "section": "layout" },
+      { "name": "The Flat-Grid Rule", "body": "Depth is a border and a tonal step. Never add a box-shadow to lift a surface, never use a shadow for hover, and never soften an edge to suggest a layer. If two things need separating, draw the hairline.", "section": "elevation" },
+      { "name": "The Scroll-Says-So Rule", "body": "A region that scrolls horizontally says so with edge gradients bound to scroll position (background-attachment: local for the fades, scroll for the shade), so an edge shades only while content remains off-screen on that side. This is used identically on the issues table and the date ruler, and is the only ornamental gradient in the system.", "section": "elevation" },
+      { "name": "The Radius-Zero Rule", "body": "Everything structural is sharp. If a shape holds content, it has square corners.", "section": "shapes" },
+      { "name": "The Pill-Is-Interactive Rule", "body": "9999px means \"you can press this\" or \"this is a state\". A pill is never used on a container, a card, a panel, an input or an image.", "section": "shapes" },
+      { "name": "The No-Reflow Selection Rule", "body": "When selection thickens a border from 1px to 2px, the padding loses the same 1px (calc(var(--space-2) - 1px)) so nothing around it moves. Selection is never allowed to shift the grid.", "section": "shapes" },
+      { "name": "The Bounded-Motion Rule", "body": "Every non-essential animation lives inside @media (prefers-reduced-motion: no-preference), and a global reduce block collapses all durations to 0.01ms as a backstop.", "section": "components" },
+      { "name": "The Substitute-Don't-Subtract Rule", "body": "Reduced motion never means information is lost. The pulsing \"working\" dot becomes a static 3px ring of its own colour; the processing date node was already carrying a dashed border, which reads in a still frame and to anyone who cannot separate the two greens. When motion carries meaning, a still equivalent ships with it.", "section": "components" }
+    ],
+    "dos": [
+      "Do read a token for every colour and every length. tokens.css is the single source of visual truth; a component rule containing a hex, an hsl() or a raw px is a bug.",
+      "Do use the 700 step (light) / 400 step (dark) when a hue must be read as text, and the 500 step only as a fill.",
+      "Do define every colour first on bare :root, then redefine it under both @media (prefers-color-scheme: dark) :root:not([data-theme=\"light\"]) and :root[data-theme=\"dark\"] so an explicit choice wins in both directions.",
+      "Do carry state on a second channel as well as colour — a dashed edge, a border weight, a word — so it survives a still frame and colour-blind reading.",
+      "Do wrap non-essential motion in prefers-reduced-motion: no-preference and ship a static substitute for anything that was carrying meaning.",
+      "Do reach for the native element first: button for actions, a only for navigation, dialog for modals, form with native validation, fieldset/legend for groups, dl/dt/dd for stats. aria-pressed and aria-selected drive the styling, so the accessible state and the visual state cannot drift.",
+      "Do compensate padding when a border thickens on selection, so nothing on the grid moves.",
+      "Do add media queries upward from 48rem and 64rem, matching the pinned breakpoints.",
+      "Do put runtime-built markup's styles in a global stylesheet and server-rendered markup's styles in a scoped block."
+    ],
+    "donts": [
+      "Don't introduce a third hue, and don't use a pure gray for anything. A state needing a new reading is found at a different lightness on one of the two ramps.",
+      "Don't add a box-shadow for depth. This system is flat; separation is a hairline and a tonal step.",
+      "Don't round a structural container. 9999px belongs to buttons, badges, tags and dots and nothing else; everything that holds content is radius 0.",
+      "Don't put both hues at full saturation and equal weight in the same component.",
+      "Don't fade a filled primary button to show a disabled state — drop the fill and keep the label at full opacity.",
+      "Don't set data, identifiers or numerals in Inter, and don't set prose or headings in JetBrains Mono to make them look technical.",
+      "Don't animate stroke-dashoffset to draw a dotted connector; it marches the dashes. Use clip-path: inset().",
+      "Don't stack modals. Queue the second one behind the first's close.",
+      "Don't rely on a native control's own button text in a translated interface — the browser's locale wins over the page's.",
+      "Don't add a max-width media query without a structural reason; two exist and they are documented exceptions, not the pattern.",
+      "Don't lock a scrolling operating screen to 100dvh. The no-scroll rule is the welcome screen's alone.",
+      "Don't put real collections data — names, documents, phone numbers — into any screen, example, test or screenshot. Sample data is synthetic, always."
+    ]
+  }
+}

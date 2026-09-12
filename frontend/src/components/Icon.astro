@@ -1,0 +1,41 @@
+---
+/**
+ * Inlines a lucide icon at build time — no icon font, no per-icon request.
+ * Stroke width follows the brand guide (1.75) and the colour always inherits
+ * currentColor, so an icon never carries a hardcoded value.
+ */
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+
+interface Props {
+  name: string;
+  size?: 16 | 20 | 24 | 32;
+  class?: string;
+}
+
+const { name, size = 20, class: className } = Astro.props;
+
+const require = createRequire(import.meta.url);
+const source = readFileSync(
+  require.resolve(`lucide-static/icons/${name}.svg`),
+  'utf8',
+);
+
+// Keep only the drawing instructions; the wrapper below carries the rest.
+const paths = source.replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>[\s\S]*$/, '');
+---
+
+<svg
+  class={className}
+  width={size}
+  height={size}
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="1.75"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+  focusable="false"
+  set:html={paths}
+/>

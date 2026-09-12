@@ -1,8 +1,8 @@
 # Planificación
 
-## Estado actual (2026-09-11)
+## Estado actual (2026-09-12)
 
-- [x] Scaffold del frontend Astro (`frontend/`)
+- [x] Frontend Astro: scaffold, sistema visual sobre `docs/design_ui/brand_guide.json` y las pantallas de la Fase 1 (`frontend/`)
 - [x] Estructura de carpetas de datos (`data/sabanas/`, `data/output/gestiones/`, `data/output/reportes/`)
 - [x] `.gitignore` protegiendo datos sensibles
 - [x] Requerimientos funcionales detallados y atomizados (`docs/atomics-requirements.md`, RF-01 a RF-36)
@@ -47,7 +47,7 @@ Avance:
 - [x] Caso de uso de guardado: registrar versión, procesarla (normalización y `COPY` en una sola transacción, vigencia automática de la primera versión de cada fecha, pagaré repetido según V-10) y asignar vigente. Probado con repositorio en memoria, con PostgreSQL real y con volumen real sanitizado (45,989 filas procesadas en ~4 s).
 - [x] Ejecución en segundo plano y endpoints REST (`backend/app/api/cargas.py`): subir archivo, listar versiones por fecha, consultar estado, ver incidencias, cambiar la vigente y eliminar versión. Verificado de punta a punta contra PostgreSQL.
 - [x] Recuperar versiones que queden en `procesando`: al arrancar la aplicación vuelven a la cola.
-- [ ] Pantallas del frontend: subir sábana con fecha de corte, resumen de incidencias, pregunta de versión vigente y gestión de versiones.
+- [x] Pantallas del frontend (`frontend/src/pages/`): bienvenida sin scroll (`/`) y consola de cargas (`/cargas`) con subida de sábana y fecha de corte sugerida desde el nombre del archivo, seguimiento del procesamiento en segundo plano, resumen de la versión, incidencias filtrables por severidad y paginadas, listado de versiones por fecha, pregunta de versión vigente (V-4, con C-1 respetada) y eliminación con la confirmación de V-8. Construidas sobre `docs/design_ui/brand_guide.json`; ver `docs/modules.md` §10. Verificadas contra el backend real y PostgreSQL con datos sintéticos, a 360x640, 768x1024, 1440x900 y 1920x1080, en tema claro y oscuro y con `prefers-reduced-motion`.
 
 Alcance:
 
@@ -55,6 +55,8 @@ Alcance:
 - Validación y normalización automática al cargar: formatos de documento de identidad (DNI, RUC, extranjero, etc.) y de teléfono (9 dígitos, inicia con 9).
 - Detección y reporte de inconsistencias/registros inválidos.
 - Gestión de cartera: identificación, alta, actualización y omisión de productos en base a las sábanas cargadas.
+
+**La Fase 1 está cerrada.** El siguiente paso es la Fase 2 (selección, segmentación y métricas), que hereda de esta fase el sistema visual de `frontend/src/styles/` y el cliente de API de `frontend/src/lib/api.ts`.
 
 ## Fase 2 — Selección, segmentación y métricas (RF-04 – RF-08, RF-25 – RF-28)
 

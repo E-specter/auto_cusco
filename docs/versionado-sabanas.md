@@ -135,7 +135,7 @@ Restricciones e índices clave (implementados en `backend/app/adapters/persisten
   | `DELETE /cargas/{id}` | Elimina una versión. Para eliminar la vigente hay que confirmarlo (V-8) |
 
 - **Recuperación de interrupciones:** al arrancar la aplicación, las versiones que quedaron en `procesando` vuelven a la cola. Es seguro porque el guardado es una sola transacción y una versión interrumpida no dejó filas a medias. Asume un solo proceso de la aplicación; con varios haría falta un sistema de colas.
-- **Pendiente:** las pantallas del frontend.
+- **Frontend:** las pantallas que consumen estos endpoints están en `frontend/src/pages/` (bienvenida y consola de cargas). La consola sondea `GET /cargas/{id}` mientras la versión se procesa, y en la pregunta de V-4 deja preseleccionado *mantener la vigente actual* (decisión C-1). Ver `docs/modules.md` §10.
 
 ## 5. Costos y riesgos
 

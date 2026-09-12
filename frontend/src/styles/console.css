@@ -1,0 +1,582 @@
+/*
+ * Upload console.
+ *
+ * Global rather than component-scoped on purpose: the ruler, the version
+ * rows, the summary figures and the issue cells are built by the page script
+ * at runtime, and Astro's scoped styles only reach markup it rendered.
+ */
+
+.console {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-inline-size: var(--shell-max);
+  margin-inline: auto;
+  padding: var(--space-4) var(--shell-gutter) var(--space-6);
+}
+
+/* ---- Ruler --------------------------------------------------------------
+   The brand's node-link motif doing a job: each cut-off date is a node and
+   the dashed rule behind them is the connector. */
+
+.ruler {
+  border: var(--color-border-hairline) solid var(--color-border);
+}
+
+.ruler__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-block-end: var(--color-border-hairline) solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+.ruler__title {
+  font-size: var(--text-md);
+  font-weight: 800;
+  letter-spacing: var(--tracking-heading);
+}
+
+.ruler__legend {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-family: var(--font-secondary);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.ruler__legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ruler__legendItem[data-kind='vigente'] .dot { color: var(--color-accent); }
+.ruler__legendItem[data-kind='sin'] .dot { color: var(--color-signal); }
+
+.ruler__track {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-4);
+  overflow-x: auto;
+  padding: var(--space-4);
+  scroll-padding-inline: var(--space-4);
+  /* Bound to scroll position, so an edge only shades while dates remain
+     off-screen on that side. */
+  background-image:
+    linear-gradient(to right, var(--color-bg), transparent 2rem),
+    linear-gradient(to left, var(--color-bg), transparent 2rem),
+    linear-gradient(to right, var(--color-border-subtle), transparent 0.5rem),
+    linear-gradient(to left, var(--color-border-subtle), transparent 0.5rem);
+  background-position: 0 0, 100% 0, 0 0, 100% 0;
+  background-repeat: no-repeat;
+  background-size: 3rem 100%, 3rem 100%, 0.75rem 100%, 0.75rem 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
+.ruler__track::before {
+  content: '';
+  position: absolute;
+  inset-inline: var(--space-4);
+  inset-block-start: 50%;
+  border-block-start: 1px dashed var(--color-border-subtle);
+}
+
+/* The rail: the dates scroll, the action that extends them does not. */
+.ruler__rail {
+  display: flex;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.ruler__track {
+  flex: 1;
+}
+
+.ruler__action {
+  flex: none;
+  margin-inline: var(--space-4);
+}
+
+@media (max-width: 63.99rem) {
+  .ruler__rail {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .ruler__track {
+    flex: 1 0 100%;
+    padding-block-end: 0;
+  }
+
+  .ruler__action {
+    margin-block-end: var(--space-4);
+  }
+}
+
+.dateNode {
+  position: relative;
+  flex: none;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    'dot day'
+    'year count';
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border: var(--color-border-hairline) solid var(--color-border);
+  border-radius: var(--radius-structural);
+  background-color: var(--color-bg);
+  cursor: pointer;
+  text-align: start;
+  transition:
+    border-color var(--duration-micro) var(--ease-default),
+    background-color var(--duration-micro) var(--ease-default);
+}
+
+.dateNode:hover {
+  background-color: var(--color-surface);
+}
+
+.dateNode[aria-selected='true'] {
+  border-color: var(--color-text);
+  border-width: 2px;
+  padding: calc(var(--space-2) - 1px) calc(var(--space-3) - 1px);
+  background-color: var(--color-surface);
+}
+
+.dateNode .dot { grid-area: dot; color: var(--color-text-muted); }
+.dateNode[data-state='vigente'] .dot { color: var(--color-accent); }
+.dateNode[data-state='sin'] .dot { color: var(--color-signal); }
+.dateNode[data-state='procesando'] .dot { color: var(--color-text-muted); }
+
+/* The pulse only reads in motion. A dashed edge — the same dotted language as
+   the connectors — says "in progress" in a still frame and to anyone who does
+   not separate the two greens. */
+.dateNode[data-state='procesando'] {
+  border-style: dashed;
+}
+
+.ruler__legendItem[data-kind='procesando'] .ruler__legendMark {
+  display: inline-block;
+  inline-size: 0.75rem;
+  block-size: 0;
+  /* Matches the dashed edge the processing node actually wears. */
+  border-block-start: 1px dashed var(--color-border);
+}
+
+.dateNode__day {
+  grid-area: day;
+  font-family: var(--font-secondary);
+  font-size: var(--text-base);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.dateNode__year,
+.dateNode__count {
+  font-family: var(--font-secondary);
+  font-size: var(--text-xs);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.dateNode__year { grid-area: year; }
+.dateNode__count { grid-area: count; text-align: end; }
+
+/* ---- Progress ----------------------------------------------------------- */
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border: var(--color-border-hairline) solid var(--color-accent);
+  background-color: var(--color-accent-wash);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.progress .dot {
+  color: var(--color-accent);
+}
+
+.progress__text {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-family: var(--font-secondary);
+}
+
+.progress__hint {
+  margin-inline-start: auto;
+  font-size: var(--text-xs);
+}
+
+/* ---- Stand-in -----------------------------------------------------------
+   Shown when the console has nothing to be about: a first run, or an API it
+   cannot reach. One block that says what happened and what to do, rather
+   than three panels each reporting the same absence. */
+
+.standIn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-5);
+  border: var(--color-border-hairline) solid var(--color-border);
+  background-color: var(--color-bg);
+}
+
+.standIn__title {
+  font-family: var(--font-secondary);
+  font-size: var(--text-md);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.standIn__body {
+  max-inline-size: 58ch;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* ---- The day in focus ---------------------------------------------------- */
+
+.day {
+  display: grid;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.day__warning {
+  margin: var(--space-4) var(--space-4) 0;
+}
+
+.versions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.version {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-block-end: var(--color-border-hairline) solid var(--color-border-subtle);
+}
+
+.version:last-child {
+  border-block-end: 0;
+}
+
+.version[data-selected='true'] {
+  background-color: var(--color-surface);
+  box-shadow: inset 3px 0 0 0 var(--color-text);
+}
+
+.version__pick {
+  flex: 1 1 15rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.version__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.version__name {
+  font-family: var(--font-secondary);
+  font-size: var(--text-base);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.version__meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.version[data-estado='fallida'] .version__name {
+  color: var(--color-danger-text);
+}
+
+.version__reason {
+  font-family: var(--font-secondary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-data);
+  color: var(--color-danger-text);
+  overflow-wrap: anywhere;
+}
+
+.version__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* ---- Summary ------------------------------------------------------------- */
+
+.summary__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.summary__stat[data-severity='error'] .stat__value { color: var(--color-danger-text); }
+.summary__stat[data-severity='advertencia'] .stat__value { color: var(--color-warning-text); }
+.summary__stat[data-severity='info'] .stat__value { color: var(--color-info-text); }
+
+.summary__stat .stat__value {
+  font-size: var(--text-2xl);
+}
+
+.summary__note {
+  margin-block-start: var(--space-4);
+  padding-block-start: var(--space-3);
+  border-block-start: var(--color-border-hairline) solid var(--color-border-subtle);
+  font-family: var(--font-secondary);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.summary__note--warn {
+  color: var(--color-warning-text);
+}
+
+/* ---- Issues -------------------------------------------------------------- */
+
+.incidencias__controls {
+  gap: var(--space-3);
+}
+
+.incidencias__count {
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+.incidencias .table-scroll {
+  max-block-size: 34rem;
+  overflow: auto;
+}
+
+.incidencia__code {
+  color: var(--color-text-muted);
+  /* The <wbr> markers in the cell are the only break points offered. */
+  overflow-wrap: normal;
+}
+
+.incidencia__detail,
+.incidencia__value {
+  overflow-wrap: anywhere;
+}
+
+.incidencias .table th,
+.incidencias .table td {
+  padding-inline: var(--space-2);
+}
+
+
+
+/* Below the desktop breakpoint the table is width-starved, so the share each
+   column gets is stated rather than left to content — auto layout hands the
+   width to whichever column holds the longest unbroken token, which is never
+   the one carrying the sentence. DETALLE takes the largest share. */
+.incidencias .table {
+  table-layout: fixed;
+}
+
+.incidencia__column {
+  /* The <wbr> markers in the cell are the only break points offered. */
+  overflow-wrap: normal;
+}
+
+/* A nowrap header in a fixed layout pushes the table past its container and
+   takes the last column off the screen with it. */
+.incidencias .table thead th {
+  white-space: normal;
+}
+
+.incidencias .table th:nth-child(1) { inline-size: 6%; }
+/* Wide enough for the longest severity word plus the pill's own padding. */
+.incidencias .table th:nth-child(2) { inline-size: 18%; }
+.incidencias .table th:nth-child(3) { inline-size: 17%; }
+.incidencias .table th:nth-child(4) { inline-size: 15%; }
+.incidencias .table th:nth-child(5) { inline-size: 32%; }
+.incidencias .table th:nth-child(6) { inline-size: 12%; }
+
+@media (min-width: 64rem) {
+  .incidencias .table {
+    table-layout: auto;
+  }
+
+  .incidencias .table th {
+    inline-size: auto;
+  }
+
+  .incidencias .table thead th {
+    white-space: nowrap;
+  }
+
+  .incidencia__code {
+    white-space: nowrap;
+  }
+
+  .incidencia__detail {
+    min-inline-size: 16rem;
+  }
+
+  .incidencia__value {
+    max-inline-size: 16rem;
+  }
+
+  .incidencias .table th,
+  .incidencias .table td {
+    padding-inline: var(--space-3);
+  }
+}
+
+.incidencias__pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-block-start: var(--color-border-hairline) solid var(--color-border);
+  background-color: var(--color-surface);
+  font-size: var(--text-xs);
+}
+
+/* ---- Dialog internals ---------------------------------------------------- */
+
+.dialog--wide {
+  inline-size: min(46rem, calc(100vw - var(--space-5)));
+}
+
+.dialog__intro {
+  margin-block-start: var(--space-2);
+  font-size: var(--text-sm);
+  max-inline-size: 56ch;
+}
+
+.upload__grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: 1fr 1fr;
+}
+
+.upload__file,
+.upload__error {
+  grid-column: 1 / -1;
+}
+
+.choices {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-start: var(--space-4);
+  padding: 0;
+  border: 0;
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: var(--color-border-hairline) solid var(--color-border-subtle);
+  cursor: pointer;
+  transition: border-color var(--duration-micro) var(--ease-default);
+}
+
+.choice:hover {
+  border-color: var(--color-border);
+}
+
+.choice:has(input:checked) {
+  border-color: var(--color-text);
+  background-color: var(--color-surface);
+}
+
+.choice:has(input:focus-visible) {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.choice input {
+  margin-block-start: 0.25em;
+}
+
+.choice__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.choice__title {
+  font-weight: 600;
+}
+
+.choice__note {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.choice__facts {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.choice--check {
+  margin-block-start: var(--space-3);
+}
+
+.delete__vigente {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-block-start: var(--space-4);
+}
+
+/* ---- Up from mobile ------------------------------------------------------ */
+
+@media (min-width: 48rem) {
+  .day__summary .summary__stats {
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  }
+}
+
+@media (min-width: 64rem) {
+  /* The golden split: versions on the narrow side, the figures on the wide. */
+  .day {
+    grid-template-columns: var(--phi-minor) 1fr;
+  }
+}

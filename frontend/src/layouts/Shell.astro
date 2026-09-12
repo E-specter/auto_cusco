@@ -1,0 +1,352 @@
+---
+/**
+ * The application shell: head, appearance boot and header chrome.
+ * Every screen shares it, so the header is the one place the API pulse, the
+ * language switch and the theme switch live.
+ */
+import Icon from '../components/Icon.astro';
+import '../styles/tokens.css';
+import '../styles/base.css';
+import '../styles/ui.css';
+
+interface Props {
+  title: string;
+  /** The welcome screen is the one surface locked to 100dvh with no scroll. */
+  lockViewport?: boolean;
+  description?: string;
+}
+
+const { title, lockViewport = false, description } = Astro.props;
+const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/';
+---
+
+<html lang="es" data-lock-viewport={lockViewport ? 'true' : undefined}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    {description && <meta name="description" content={description} />}
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+
+    <link
+      rel="preload"
+      href="/fonts/inter-latin-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/jetbrains-mono-latin-400-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+
+    {/*
+      Appearance is applied before the first paint so the theme and language
+      never flash. Kept inline and synchronous on purpose.
+    */}
+    <script is:inline>
+      (function () {
+        try {
+          var stored = localStorage.getItem('app:appearance');
+          var config = stored ? JSON.parse(stored) : {};
+          if (config.theme === 'light' || config.theme === 'dark') {
+            document.documentElement.dataset.theme = config.theme;
+          }
+          if (config.language === 'es' || config.language === 'en') {
+            document.documentElement.lang = config.language;
+          }
+        } catch (error) {
+          /* Private mode or blocked storage: the defaults in CSS still hold. */
+        }
+      })();
+    </script>
+  </head>
+
+  <body>
+    <a class="skip-link" href="#main" data-i18n="nav.skip">Saltar al contenido</a>
+
+    <header class="chrome">
+      <a class="mark" href="/" aria-current={currentPath === '/' ? 'page' : undefined}>
+        <span class="mark__dot" aria-hidden="true"></span>
+        <span class="mark__name">auto_cusco</span>
+      </a>
+
+      <p class="chrome__health eyebrow" data-health aria-live="polite">
+        <span class="dot" data-health-dot aria-hidden="true"></span>
+        <span data-i18n="health.label">API</span>
+        <span aria-hidden="true">·</span>
+        <span data-health-state data-i18n="health.checking">comprobando</span>
+      </p>
+
+      <div class="chrome__controls">
+        <div
+          class="segmented"
+          role="group"
+          data-i18n-attr="aria-label:appearance.language"
+          aria-label="Idioma"
+        >
+          <button type="button" class="segmented__item" data-lang="es" aria-pressed="false">ES</button>
+          <button type="button" class="segmented__item" data-lang="en" aria-pressed="false">EN</button>
+        </div>
+
+        <div
+          class="segmented"
+          role="group"
+          data-i18n-attr="aria-label:appearance.theme"
+          aria-label="Tema"
+        >
+          <button
+            type="button"
+            class="segmented__item segmented__item--icon"
+            data-theme-choice="light"
+            aria-pressed="false"
+            data-i18n-attr="title:appearance.theme.light,aria-label:appearance.theme.light"
+            title="Claro"
+            aria-label="Claro"
+          >
+            <Icon name="sun" size={16} />
+          </button>
+          <button
+            type="button"
+            class="segmented__item segmented__item--icon"
+            data-theme-choice="dark"
+            aria-pressed="false"
+            data-i18n-attr="title:appearance.theme.dark,aria-label:appearance.theme.dark"
+            title="Oscuro"
+            aria-label="Oscuro"
+          >
+            <Icon name="moon" size={16} />
+          </button>
+          <button
+            type="button"
+            class="segmented__item segmented__item--icon"
+            data-theme-choice="system"
+            aria-pressed="false"
+            data-i18n-attr="title:appearance.theme.system,aria-label:appearance.theme.system"
+            title="Sistema"
+            aria-label="Sistema"
+          >
+            <Icon name="monitor" size={16} />
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main" class="shell">
+      <slot />
+    </main>
+
+    <script>
+      import { applyTranslations, isLanguage, setLanguage, t } from '../lib/i18n';
+      import { health } from '../lib/api';
+
+      type Theme = 'light' | 'dark' | 'system';
+      interface Appearance {
+        theme: Theme;
+        language: 'es' | 'en';
+      }
+
+      const STORAGE_KEY = 'app:appearance';
+
+      function read(): Appearance {
+        const fallback: Appearance = { theme: 'system', language: 'es' };
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return fallback;
+          const parsed = JSON.parse(raw) as Partial<Appearance>;
+          return {
+            theme:
+              parsed.theme === 'light' || parsed.theme === 'dark' || parsed.theme === 'system'
+                ? parsed.theme
+                : fallback.theme,
+            language: isLanguage(parsed.language) ? parsed.language : fallback.language,
+          };
+        } catch {
+          return fallback;
+        }
+      }
+
+      function write(appearance: Appearance): void {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(appearance));
+        } catch {
+          /* Storage can be blocked; the session still honours the choice. */
+        }
+      }
+
+      let appearance = read();
+
+      function paintTheme(): void {
+        if (appearance.theme === 'system') {
+          delete document.documentElement.dataset.theme;
+        } else {
+          document.documentElement.dataset.theme = appearance.theme;
+        }
+        document.querySelectorAll<HTMLButtonElement>('[data-theme-choice]').forEach((button) => {
+          button.setAttribute(
+            'aria-pressed',
+            String(button.dataset.themeChoice === appearance.theme),
+          );
+        });
+      }
+
+      function paintLanguage(): void {
+        setLanguage(appearance.language);
+        document.querySelectorAll<HTMLButtonElement>('[data-lang]').forEach((button) => {
+          button.setAttribute('aria-pressed', String(button.dataset.lang === appearance.language));
+        });
+      }
+
+      document.querySelectorAll<HTMLButtonElement>('[data-theme-choice]').forEach((button) => {
+        button.addEventListener('click', () => {
+          appearance = { ...appearance, theme: button.dataset.themeChoice as Theme };
+          write(appearance);
+          paintTheme();
+        });
+      });
+
+      document.querySelectorAll<HTMLButtonElement>('[data-lang]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const language = button.dataset.lang;
+          if (!isLanguage(language)) return;
+          appearance = { ...appearance, language };
+          write(appearance);
+          paintLanguage();
+        });
+      });
+
+      paintTheme();
+      paintLanguage();
+
+      // ---- API pulse -------------------------------------------------------
+      const pulse = document.querySelector<HTMLElement>('[data-health]');
+      const pulseDot = document.querySelector<HTMLElement>('[data-health-dot]');
+      const pulseState = document.querySelector<HTMLElement>('[data-health-state]');
+
+      async function checkHealth(): Promise<void> {
+        if (!pulse || !pulseDot || !pulseState) return;
+        try {
+          const status = await health();
+          const key = status.database ? 'health.ok' : 'health.degraded';
+          pulse.dataset.state = status.database ? 'ok' : 'degraded';
+          pulseState.dataset.i18n = key;
+          pulseState.textContent = t(key);
+        } catch {
+          pulse.dataset.state = 'down';
+          pulseState.dataset.i18n = 'health.down';
+          pulseState.textContent = t('health.down');
+        }
+        pulseDot.classList.remove('dot--pulse');
+      }
+
+      checkHealth();
+      window.setInterval(checkHealth, 30_000);
+      // A page that just reached the API knows it before the next poll does.
+      document.addEventListener('healthchanged', () => void checkHealth());
+      document.addEventListener('languagechange', () => applyTranslations());
+    </script>
+
+    <style>
+      /* The shell's own chrome. Component rules read tokens, never values. */
+
+      /* The welcome screen is the only surface locked to one viewport: the
+         header keeps its height and <main> takes exactly what is left. */
+      :global(html[data-lock-viewport='true']) {
+        block-size: 100dvh;
+        overflow: hidden;
+      }
+
+      :global(html[data-lock-viewport='true'] body) {
+        display: flex;
+        flex-direction: column;
+        block-size: 100dvh;
+        min-block-size: 0;
+        overflow: hidden;
+      }
+
+      .chrome {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        flex-wrap: wrap;
+        padding: var(--space-2) var(--shell-gutter);
+        border-block-end: var(--color-border-hairline) solid var(--color-border);
+        background-color: var(--color-bg);
+      }
+
+      .mark {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        color: var(--color-text);
+        text-decoration: none;
+        font-family: var(--font-secondary);
+        font-size: var(--text-sm);
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      .mark__dot {
+        inline-size: 0.5rem;
+        block-size: 0.5rem;
+        border-radius: var(--radius-pill);
+        background-color: var(--color-accent);
+      }
+
+      .mark:hover .mark__name {
+        text-decoration: underline;
+        text-underline-offset: 0.3em;
+      }
+
+      .chrome__health {
+        border-color: var(--color-border-subtle);
+        color: var(--color-text-muted);
+      }
+
+      .chrome__health .dot {
+        color: var(--color-text-muted);
+      }
+
+      .chrome__health[data-state='ok'] .dot { color: var(--color-accent); }
+      .chrome__health[data-state='degraded'] .dot { color: var(--color-warning-text); }
+      .chrome__health[data-state='down'] .dot { color: var(--color-danger-text); }
+
+      .chrome__controls {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
+
+      .shell {
+        display: flow-root;
+      }
+
+      :global(html[data-lock-viewport='true']) .chrome {
+        flex: none;
+      }
+
+      :global(html[data-lock-viewport='true']) .shell {
+        flex: 1;
+        min-block-size: 0;
+        overflow: hidden;
+      }
+
+      @media (max-width: 30rem) {
+        .chrome {
+          justify-content: center;
+        }
+
+        .chrome__health {
+          order: 3;
+        }
+      }
+    </style>
+  </body>
+</html>

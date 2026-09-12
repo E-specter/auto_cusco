@@ -2,7 +2,7 @@
 
 Guía paso a paso para dejar el proyecto corriendo en local. Sigue los pasos en orden — cada uno indica qué instala/verifica y qué deberías ver si salió bien.
 
-> Estado actual: el **frontend** (Astro) y el **esqueleto del backend** (FastAPI, `GET /health`) ya son ejecutables. Falta la ingesta real de sábanas y el resto de módulos de negocio (paso 7, ver [planning.md](planning.md)).
+> Estado actual: el **backend** (FastAPI) ya ingesta sábanas con versionado por fecha de corte, y el **frontend** (Astro) tiene la pantalla de bienvenida y la consola de cargas. Faltan los módulos de selección, generación de cargas y reportes (ver [planning.md](planning.md)).
 
 ## 0. Requisitos previos
 
@@ -82,7 +82,9 @@ El repo trae `.env.example` en la raíz como plantilla (sí se versiona). Cópia
 Copy-Item .env.example .env
 ```
 
-Por ahora ninguna variable es estrictamente necesaria: el frontend no las lee todavía. Las de base de datos (`DB_ENGINE`, `DB_HOST`, etc.) están ahí como adelanto para cuando exista el backend — actualiza `.env.example` (no solo tu `.env` local) cada vez que el código empiece a depender de una variable nueva, para que la plantilla no quede desactualizada.
+Las variables de base de datos (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) sí son necesarias: el backend las usa para conectarse. Actualiza `.env.example` (no solo tu `.env` local) cada vez que el código empiece a depender de una variable nueva, para que la plantilla no quede desactualizada.
+
+**`CORS_ORIGENES`**: déjala vacía mientras desarrolles. El servidor de Astro redirige las llamadas a la API, así que el navegador ve un solo origen y no hacen falta cabeceras CORS. Cuando el frontend se sirva desde un origen distinto al de la API, completa ahí los orígenes permitidos separados por comas.
 
 ## 5. Backend (Python)
 

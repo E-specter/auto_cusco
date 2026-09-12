@@ -41,6 +41,11 @@ uv run alembic downgrade -1                        # revertir la ultima migracio
 
 Revisa siempre la migracion autogenerada antes de aplicarla: autogenerate no detecta atributos como `SET STORAGE` ni cambios en el texto de restricciones `CHECK`. Si cambias las columnas que produce el normalizador, actualiza `CargaFila`; `tests/test_modelos_persistencia.py` falla si no coinciden.
 
+### Contratos con el frontend
+
+- Si agregas un `codigo` de incidencia nuevo en `ingesta_sabana`, agregalo tambien a `frontend/src/i18n/es.json` y `frontend/src/i18n/en.json`: el frontend traduce el detalle por codigo y usa el texto del backend solo como respaldo.
+- La API no envia cabeceras CORS salvo que `CORS_ORIGENES` este definido en `/.env` (ver `configurar_cors` en `app/main.py`). En desarrollo el dev server de Astro redirige `/api` al backend, asi que no hacen falta.
+
 ## Convencion de codigo: puertos/adaptadores con vertical slicing (RF-30)
 
 - `app/core/` -- entidades, puertos (`Protocol`) y servicios (casos de uso). **No** debe importar FastAPI, SQLAlchemy ni ningun detalle de infraestructura.

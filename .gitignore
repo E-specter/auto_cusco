@@ -32,3 +32,8 @@ dist/
 # Editor / OS
 .DS_Store
 Thumbs.db
+
+# Herramientas de diseño (impeccable): las capturas y el servidor de preguntas
+# son artefactos de una sesión; el contrato de superficie sí se versiona.
+.impeccable/review/
+.impeccable/questions/

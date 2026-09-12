@@ -1,0 +1,1502 @@
+---
+/**
+ * Upload console. The screen belongs to one cut-off date at a time: pick the
+ * date on the ruler and everything below — versions, current version,
+ * summary, issues — is that date's.
+ *
+ * Unlike the welcome screen this surface scrolls; it keeps the same tokens.
+ */
+import Shell from '../layouts/Shell.astro';
+import Icon from '../components/Icon.astro';
+import '../styles/console.css';
+---
+
+<Shell
+  title="Consola de cargas — auto_cusco"
+  description="Sube sábanas diarias, sigue su procesamiento y elige qué versión se considera para cada fecha de corte."
+>
+  <div class="console">
+    <!-- ---- The ruler: every cut-off date as a node ---------------------- -->
+    <section class="ruler" aria-labelledby="ruler-title">
+      <div class="ruler__head">
+        <div class="row">
+          <h1 class="ruler__title" id="ruler-title" data-i18n="console.ruler.title">
+            Fechas de corte
+          </h1>
+          <p class="ruler__legend" aria-hidden="true">
+            <span class="ruler__legendItem" data-kind="vigente">
+              <span class="dot"></span><span data-i18n="console.ruler.legend.vigente">Con vigente</span>
+            </span>
+            <span class="ruler__legendItem" data-kind="sin">
+              <span class="dot"></span><span data-i18n="console.ruler.legend.sinVigente">Sin vigente</span>
+            </span>
+            <span class="ruler__legendItem" data-kind="procesando" data-legend-procesando hidden>
+              <span class="ruler__legendMark"></span>
+              <span data-i18n="console.ruler.legend.procesando">Procesando</span>
+            </span>
+          </p>
+        </div>
+
+      </div>
+
+      <div class="ruler__rail">
+        <div class="ruler__track" data-ruler role="tablist" aria-labelledby="ruler-title"></div>
+        <button type="button" class="btn btn--primary ruler__action" data-open-upload>
+          <Icon name="upload" size={16} />
+          <span data-i18n="console.upload.open">Subir sábana</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ---- Live progress of the version being processed ----------------- -->
+    <output class="progress" data-progress hidden>
+      <span class="dot dot--pulse" aria-hidden="true"></span>
+      <span class="progress__text">
+        <strong data-progress-title></strong>
+        <span class="muted" data-progress-state></span>
+      </span>
+      <span class="progress__hint muted" data-i18n="console.progress.hint">
+        Esto toma unos segundos. Puedes seguir trabajando; te avisamos al terminar.
+      </span>
+    </output>
+
+    <!-- ---- Nothing to be about: a first run, or an unreachable API ----- -->
+    <section class="standIn" data-stand-in hidden aria-labelledby="stand-in-title">
+      <h2 class="standIn__title" id="stand-in-title" data-stand-in-title data-i18n="console.firstRun.title">
+        Todavía no hay ninguna sábana cargada.
+      </h2>
+      <p class="standIn__body" data-stand-in-body data-i18n="console.firstRun.body">
+        Sube la sábana del día y elige su fecha de corte. Cada archivo queda
+        guardado como una versión de esa fecha: se valida, se normaliza y se
+        te informa de cada incidencia que encuentre.
+      </p>
+      <button type="button" class="btn btn--primary" data-open-upload data-stand-in-action>
+        <Icon name="upload" size={16} />
+        <span data-i18n="console.upload.open">Subir sábana</span>
+      </button>
+      <button type="button" class="btn btn--primary" data-stand-in-retry hidden>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span class="btn__label" data-i18n="console.offline.retry">Reintentar</span>
+      </button>
+    </section>
+
+    <!-- ---- The day in focus -------------------------------------------- -->
+    <div class="day" data-day>
+      <section class="panel day__versions" aria-labelledby="versions-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="versions-title" data-day-title data-i18n="console.day.titleNone">
+            Versiones
+          </h2>
+        </div>
+        <div data-versions>
+          <p class="empty" data-i18n="common.loading">Cargando</p>
+        </div>
+      </section>
+
+      <section class="panel day__summary" aria-labelledby="summary-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="summary-title" data-i18n="console.summary.title">
+            Resumen de la versión
+          </h2>
+          <p class="eyebrow" data-summary-badge hidden></p>
+        </div>
+        <div class="panel__body" data-summary>
+          <p class="empty" data-i18n="common.loading">Cargando</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- ---- Issues ------------------------------------------------------- -->
+    <section class="panel incidencias" aria-labelledby="incidencias-title">
+      <div class="panel__head">
+        <h2 class="panel__title" id="incidencias-title" data-i18n="console.incidencias.title">
+          Incidencias
+        </h2>
+
+        <div class="row incidencias__controls">
+          <div
+            class="segmented"
+            role="group"
+            data-i18n-attr="aria-label:console.incidencias.filter"
+            aria-label="Severidad"
+          >
+            <button type="button" class="segmented__item" data-sev="" aria-pressed="true" data-i18n="console.incidencias.all">Todas</button>
+            <button type="button" class="segmented__item" data-sev="error" aria-pressed="false" data-i18n="severidad.error">Error</button>
+            <button type="button" class="segmented__item" data-sev="advertencia" aria-pressed="false" data-i18n="severidad.advertencia">Advertencia</button>
+            <button type="button" class="segmented__item" data-sev="info" aria-pressed="false" data-i18n="severidad.info">Info</button>
+          </div>
+
+          <p class="mono incidencias__count muted" data-incidencias-count aria-live="polite"></p>
+        </div>
+      </div>
+
+      <div data-incidencias>
+        <p class="empty" data-i18n="console.incidencias.pending">
+          Las incidencias aparecen cuando termina el procesamiento.
+        </p>
+      </div>
+
+      <div class="incidencias__pager" data-pager hidden>
+        <button type="button" class="btn btn--sm" data-page-prev>
+          <Icon name="chevron-left" size={16} />
+          <span data-i18n="console.incidencias.prev">Anteriores</span>
+        </button>
+        <p class="mono muted" data-page-range></p>
+        <button type="button" class="btn btn--sm" data-page-next>
+          <span data-i18n="console.incidencias.next">Siguientes</span>
+          <Icon name="chevron-right" size={16} />
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ---- Upload ------------------------------------------------------- -->
+  <dialog class="dialog" data-dialog="upload" aria-labelledby="upload-title">
+    <form method="dialog" data-upload-form>
+      <div class="dialog__head">
+        <div>
+          <h2 id="upload-title" data-i18n="console.upload.title">Subir una sábana</h2>
+          <p class="muted dialog__intro" data-i18n="console.upload.intro">
+            Cada archivo que subas crea una versión nueva de su fecha de corte.
+            Nunca se sobrescribe una versión existente.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="btn btn--quiet btn--icon"
+          data-close
+          data-i18n-attr="aria-label:common.close,title:common.close"
+          aria-label="Cerrar"
+          title="Cerrar"
+        >
+          <Icon name="x" size={20} />
+        </button>
+      </div>
+
+      <div class="dialog__body upload__grid">
+        <div class="field upload__file">
+          <span class="field__label" id="upload-file-label" data-i18n="console.upload.file">
+            Archivo de la sábana
+          </span>
+          <!--
+            The native control's button text comes from the browser's locale,
+            not the page's, so a Spanish dialog can read "Choose File". The
+            input stays a real focusable <input type="file"> for the keyboard
+            and assistive tech; the label is its visible, translated trigger.
+          -->
+          <div class="filepick">
+            <input
+              class="filepick__input"
+              id="upload-file"
+              name="archivo"
+              type="file"
+              accept=".xlsb,.xlsx,.xls"
+              aria-labelledby="upload-file-label"
+            />
+            <label class="filepick__button" for="upload-file" data-i18n="console.upload.choose">
+              Elegir archivo
+            </label>
+            <span class="filepick__name mono" data-file-name data-i18n="console.upload.noFile">
+              Ningún archivo elegido
+            </span>
+            <span class="filepick__drop mono" data-i18n="console.upload.drop">
+              o arrastra el archivo aquí
+            </span>
+          </div>
+          <p class="field__hint" data-i18n="console.upload.file.hint">
+            Formato .xlsb o .xlsx, hasta 64 MB.
+          </p>
+          <p class="field__error" id="upload-file-error" data-error-for="archivo" role="alert"></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="upload-date" data-i18n="console.upload.date">
+            Fecha de corte
+          </label>
+          <input class="input" id="upload-date" name="fecha_corte" type="date" required />
+          <p class="field__hint" data-date-hint data-i18n="console.upload.date.plain">
+            Es la fecha que representa esta sábana.
+          </p>
+          <p class="field__error" id="upload-date-error" data-error-for="fecha" role="alert"></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="upload-sheet" data-i18n="console.upload.sheet">Hoja</label>
+          <input class="input" id="upload-sheet" name="hoja" type="text" value="VENCIDA" />
+          <p class="field__hint" data-i18n="console.upload.sheet.hint">
+            La hoja con los datos del corte.
+          </p>
+        </div>
+
+        <p class="field__error upload__error" data-upload-error role="alert"></p>
+      </div>
+
+      <div class="dialog__foot">
+        <button type="button" class="btn" data-close data-i18n="console.upload.cancel">Cancelar</button>
+        <button type="submit" class="btn btn--primary" data-upload-submit>
+          <span class="btn__spinner" aria-hidden="true"></span>
+          <span class="btn__label" data-i18n="console.upload.submit">Registrar versión</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ---- Identical file warning (V-6) --------------------------------- -->
+  <dialog class="dialog" data-dialog="duplicate" aria-labelledby="duplicate-title">
+    <div class="dialog__head">
+      <h2 id="duplicate-title" data-i18n="console.duplicate.title">Este archivo ya se había subido</h2>
+    </div>
+    <div class="dialog__body">
+      <p class="notice notice--warning">
+        <Icon name="triangle-alert" size={20} />
+        <span data-duplicate-body></span>
+      </p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn btn--primary" data-close data-i18n="console.duplicate.dismiss">
+        Entendido
+      </button>
+    </div>
+  </dialog>
+
+  <!-- ---- V-4: which version counts (default keeps the current one) ---- -->
+  <dialog class="dialog dialog--wide" data-dialog="vigente" aria-labelledby="vigente-title">
+    <form method="dialog" data-vigente-form>
+      <div class="dialog__head">
+        <h2 id="vigente-title" data-vigente-title></h2>
+      </div>
+
+      <div class="dialog__body">
+        <p class="muted dialog__intro" data-vigente-intro></p>
+
+        <fieldset class="choices">
+          <legend class="visually-hidden" data-i18n="console.vigente.title">Versión vigente</legend>
+
+          <label class="choice">
+            <input type="radio" name="vigente" value="keep" checked />
+            <span class="choice__body">
+              <span class="choice__title" data-vigente-keep></span>
+              <span class="choice__note" data-i18n="console.vigente.keepNote">
+                Nada cambia. Es la opción preseleccionada.
+              </span>
+              <span class="choice__facts mono" data-vigente-keep-facts></span>
+            </span>
+          </label>
+
+          <label class="choice">
+            <input type="radio" name="vigente" value="replace" />
+            <span class="choice__body">
+              <span class="choice__title" data-vigente-replace></span>
+              <span class="choice__note" data-i18n="console.vigente.replaceNote">
+                La cartera, el historial y las métricas se recalculan sobre esta versión.
+              </span>
+              <span class="choice__facts mono" data-vigente-replace-facts></span>
+            </span>
+          </label>
+        </fieldset>
+
+        <p class="notice notice--warning" data-vigente-format hidden>
+          <Icon name="triangle-alert" size={20} />
+          <span data-i18n="console.vigente.formatChanged">
+            El formato de esta versión es distinto al de la vigente actual.
+          </span>
+        </p>
+      </div>
+
+      <div class="dialog__foot">
+        <button type="button" class="btn" data-close data-i18n="console.vigente.cancel">
+          Decidir más tarde
+        </button>
+        <button type="submit" class="btn btn--primary">
+          <span class="btn__spinner" aria-hidden="true"></span>
+          <span class="btn__label" data-i18n="console.vigente.confirm">Confirmar</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ---- V-7: make a version current ---------------------------------- -->
+  <dialog class="dialog" data-dialog="set-vigente" aria-labelledby="set-vigente-title">
+    <form method="dialog" data-set-vigente-form>
+      <div class="dialog__head">
+        <h2 id="set-vigente-title" data-i18n="console.setVigente.title">Cambiar la versión vigente</h2>
+      </div>
+      <div class="dialog__body">
+        <p data-set-vigente-body></p>
+      </div>
+      <div class="dialog__foot">
+        <button type="button" class="btn" data-close data-i18n="common.cancel">Cancelar</button>
+        <button type="submit" class="btn btn--primary">
+          <span class="btn__spinner" aria-hidden="true"></span>
+          <span class="btn__label" data-i18n="console.setVigente.confirm">Hacer vigente</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ---- V-8: delete a version ---------------------------------------- -->
+  <dialog class="dialog" data-dialog="delete" aria-labelledby="delete-title">
+    <form method="dialog" data-delete-form>
+      <div class="dialog__head">
+        <h2 id="delete-title" data-delete-title></h2>
+      </div>
+
+      <div class="dialog__body">
+        <p data-i18n="console.delete.body">
+          Se borran sus filas, sus incidencias y el archivo original. Queda un
+          registro de auditoría sin datos de la sábana. No se puede deshacer.
+        </p>
+
+        <div class="delete__vigente" data-delete-vigente hidden>
+          <p class="notice notice--danger">
+            <Icon name="triangle-alert" size={20} />
+            <span data-delete-warning></span>
+          </p>
+
+          <label class="choice choice--check">
+            <input type="checkbox" data-delete-confirm />
+            <span class="choice__body">
+              <span class="choice__title" data-delete-choice></span>
+              <span class="choice__note" data-i18n="console.delete.vigenteChoiceNote">
+                Mientras la fecha no tenga vigente, ese día no se considera en la
+                cartera ni en las métricas.
+              </span>
+            </span>
+          </label>
+
+          <p class="field__hint" data-i18n="console.delete.vigenteAlternative">
+            También puedes hacer vigente otra versión de esta fecha antes de eliminar.
+          </p>
+        </div>
+
+        <p class="field__error" data-delete-error role="alert"></p>
+      </div>
+
+      <div class="dialog__foot">
+        <button type="button" class="btn" data-close data-i18n="console.delete.cancel">Cancelar</button>
+        <button type="submit" class="btn btn--danger">
+          <span class="btn__spinner" aria-hidden="true"></span>
+          <span class="btn__label" data-i18n="console.delete.confirm">Eliminar definitivamente</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ---- Generic failure ---------------------------------------------- -->
+  <dialog class="dialog" data-dialog="error" aria-labelledby="error-title">
+    <div class="dialog__head">
+      <h2 id="error-title" data-i18n="common.error">Algo salió mal</h2>
+    </div>
+    <div class="dialog__body">
+      <p class="notice notice--danger">
+        <Icon name="circle-alert" size={20} />
+        <span data-error-body></span>
+      </p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn btn--primary" data-close data-i18n="common.close">Cerrar</button>
+    </div>
+  </dialog>
+</Shell>
+
+<script>
+  import {
+    ApiError,
+    NetworkError,
+    asignarVigente,
+    eliminarVersion,
+    listarIncidencias,
+    listarVersiones,
+    obtenerVersion,
+    subirSabana,
+    type Incidencia,
+    type Severidad,
+    type Version,
+  } from '../lib/api';
+  import { applyTranslations, t } from '../lib/i18n';
+  import {
+    formatBytes,
+    formatDate,
+    formatDateShort,
+    formatDateTime,
+    formatNumber,
+    guessDateFromFilename,
+    parseApiDate,
+  } from '../lib/format';
+
+  const PAGE_SIZE = 50;
+  const POLL_INTERVAL = 1200;
+
+  interface State {
+    versiones: Version[];
+    fechaActiva: string | null;
+    seleccionId: number | null;
+    severidad: Severidad | '';
+    offset: number;
+    /** The version whose background processing we are following, if any. */
+    siguiendoId: number | null;
+  }
+
+  const state: State = {
+    versiones: [],
+    fechaActiva: null,
+    seleccionId: null,
+    severidad: '',
+    offset: 0,
+    siguiendoId: null,
+  };
+
+  const $ = <T extends Element>(selector: string) => document.querySelector<T>(selector);
+
+  const dialogs = {
+    upload: $<HTMLDialogElement>('[data-dialog="upload"]')!,
+    duplicate: $<HTMLDialogElement>('[data-dialog="duplicate"]')!,
+    vigente: $<HTMLDialogElement>('[data-dialog="vigente"]')!,
+    setVigente: $<HTMLDialogElement>('[data-dialog="set-vigente"]')!,
+    delete: $<HTMLDialogElement>('[data-dialog="delete"]')!,
+    error: $<HTMLDialogElement>('[data-dialog="error"]')!,
+  };
+
+  // Every dialog closes from its own [data-close] controls.
+  document.querySelectorAll<HTMLElement>('[data-close]').forEach((button) => {
+    button.addEventListener('click', () => button.closest('dialog')?.close());
+  });
+
+  function showError(error: unknown): void {
+    const body = $<HTMLElement>('[data-error-body]')!;
+    if (error instanceof NetworkError) {
+      body.textContent = t('console.upload.error.network');
+    } else if (error instanceof ApiError && error.detail) {
+      body.textContent = error.detail;
+    } else {
+      body.textContent = t('common.errorBody');
+    }
+    dialogs.error.showModal();
+  }
+
+  /**
+   * Open a modal, waiting for whatever is already open to close first.
+   *
+   * Background processing finishes on its own schedule, so the V-4 question
+   * can land while the identical-file warning is still on screen. Stacking
+   * modals would bury the one decision that matters.
+   */
+  function openWhenFree(dialog: HTMLDialogElement): void {
+    const blocking = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].find(
+      (open) => open !== dialog,
+    );
+    if (!blocking) {
+      dialog.showModal();
+      return;
+    }
+    blocking.addEventListener('close', () => openWhenFree(dialog), { once: true });
+  }
+
+  function setLoading(form: HTMLFormElement, loading: boolean): void {
+    const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+    if (!submit) return;
+    submit.dataset.loading = String(loading);
+    submit.disabled = loading;
+  }
+
+  // ---- Derived reads ------------------------------------------------------
+
+  function versionesDe(fecha: string): Version[] {
+    return state.versiones
+      .filter((v) => v.fecha_corte === fecha)
+      .sort((a, b) => b.version - a.version);
+  }
+
+  function fechas(): string[] {
+    return [...new Set(state.versiones.map((v) => v.fecha_corte))].sort();
+  }
+
+  function seleccion(): Version | null {
+    return state.versiones.find((v) => v.id === state.seleccionId) ?? null;
+  }
+
+  // ---- Ruler --------------------------------------------------------------
+
+  function renderRuler(): void {
+    const track = $<HTMLElement>('[data-ruler]')!;
+    const lista = fechas();
+
+    track.replaceChildren();
+
+    const fragment = document.createDocumentFragment();
+
+    lista.forEach((fecha) => {
+      const delDia = versionesDe(fecha);
+      const tieneVigente = delDia.some((v) => v.vigente);
+      const enProceso = delDia.some(
+        (v) => v.estado === 'en_cola' || v.estado === 'procesando',
+      );
+
+      const node = document.createElement('button');
+      node.type = 'button';
+      node.className = 'dateNode';
+      node.dataset.dateNode = fecha;
+      node.setAttribute('role', 'tab');
+      node.setAttribute('aria-selected', String(fecha === state.fechaActiva));
+      node.dataset.state = enProceso ? 'procesando' : tieneVigente ? 'vigente' : 'sin';
+
+      const dot = document.createElement('span');
+      dot.className = enProceso ? 'dot dot--pulse' : 'dot';
+      dot.setAttribute('aria-hidden', 'true');
+
+      const day = document.createElement('span');
+      day.className = 'dateNode__day';
+      day.textContent = formatDateShort(fecha);
+
+      const year = document.createElement('span');
+      year.className = 'dateNode__year';
+      year.textContent = String(parseApiDate(fecha).getFullYear());
+
+      const count = document.createElement('span');
+      count.className = 'dateNode__count';
+      count.textContent = `${delDia.length}v`;
+
+      node.append(dot, day, year, count);
+      node.addEventListener('click', () => selectFecha(fecha));
+      fragment.append(node);
+    });
+
+    track.append(fragment);
+
+    const legend = $<HTMLElement>('[data-legend-procesando]');
+    if (legend) {
+      legend.hidden = !state.versiones.some(
+        (v) => v.estado === 'en_cola' || v.estado === 'procesando',
+      );
+    }
+
+    const active = track.querySelector<HTMLElement>('[aria-selected="true"]');
+    active?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }
+
+  // ---- Day ----------------------------------------------------------------
+
+  function renderDay(): void {
+    const title = $<HTMLElement>('[data-day-title]')!;
+    const host = $<HTMLElement>('[data-versions]')!;
+    host.replaceChildren();
+
+    if (!state.fechaActiva) {
+      title.textContent = t('console.day.titleNone');
+      title.dataset.i18n = 'console.day.titleNone';
+      host.append(emptyBlock('console.day.empty.title', 'console.day.empty.body'));
+      return;
+    }
+
+    title.textContent = t('console.day.title', { fecha: formatDate(state.fechaActiva) });
+    // The date is interpolated, so the generic re-translation pass must skip it.
+    delete title.dataset.i18n;
+
+    const delDia = versionesDe(state.fechaActiva);
+    if (delDia.length === 0) {
+      host.append(emptyBlock('console.day.empty.title', 'console.day.empty.body'));
+      return;
+    }
+
+    if (!delDia.some((v) => v.vigente)) {
+      const warning = document.createElement('p');
+      warning.className = 'notice notice--warning day__warning';
+      warning.textContent = t('console.day.noVigente');
+      host.append(warning);
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'versions';
+
+    delDia.forEach((version) => {
+      list.append(renderVersionRow(version));
+    });
+
+    host.append(list);
+  }
+
+  function renderVersionRow(version: Version): HTMLLIElement {
+    const item = document.createElement('li');
+    item.className = 'version';
+    item.dataset.selected = String(version.id === state.seleccionId);
+    item.dataset.estado = version.estado;
+
+    const pick = document.createElement('button');
+    pick.type = 'button';
+    pick.className = 'version__pick';
+    pick.setAttribute('aria-label', t('console.day.select'));
+    pick.addEventListener('click', () => selectVersion(version.id));
+
+    const head = document.createElement('span');
+    head.className = 'version__head';
+
+    const name = document.createElement('span');
+    name.className = 'version__name';
+    name.textContent = t('console.day.version', { version: version.version });
+    head.append(name);
+
+    const estado = document.createElement('span');
+    estado.className = `tag tag--${version.estado === 'fallida' ? 'error' : 'neutral'}`;
+    const estadoDot = document.createElement('span');
+    estadoDot.className =
+      version.estado === 'en_cola' || version.estado === 'procesando'
+        ? 'dot dot--pulse'
+        : 'dot';
+    estadoDot.setAttribute('aria-hidden', 'true');
+    estado.append(estadoDot, document.createTextNode(t(`estado.${version.estado}`)));
+    head.append(estado);
+
+    if (version.vigente) {
+      const vigente = document.createElement('span');
+      vigente.className = 'tag tag--vigente';
+      vigente.textContent = t('console.day.isVigente');
+      head.append(vigente);
+    }
+
+    const meta = document.createElement('span');
+    meta.className = 'version__meta mono';
+    meta.textContent = [
+      version.nombre_archivo,
+      formatBytes(version.tamano_bytes),
+      formatDateTime(version.creado_en),
+    ].join('  ·  ');
+
+    pick.append(head, meta);
+
+    // Why it failed is the only thing that matters about a failed version, so
+    // it reads in the row rather than one click away.
+    if (version.estado === 'fallida' && version.motivo_fallo) {
+      const reason = document.createElement('span');
+      reason.className = 'version__reason';
+      reason.textContent = version.motivo_fallo;
+      pick.append(reason);
+    }
+
+    const actions = document.createElement('span');
+    actions.className = 'version__actions';
+
+    if (!version.vigente && version.estado === 'terminada') {
+      const makeCurrent = document.createElement('button');
+      makeCurrent.type = 'button';
+      makeCurrent.className = 'btn btn--sm';
+      makeCurrent.textContent = t('console.day.makeVigente');
+      makeCurrent.addEventListener('click', () => openSetVigente(version));
+      actions.append(makeCurrent);
+    }
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn btn--sm btn--danger';
+    remove.textContent = t('console.day.delete');
+    remove.addEventListener('click', () => openDelete(version));
+    actions.append(remove);
+
+    item.append(pick, actions);
+    return item;
+  }
+
+  function emptyBlock(titleKey: string, bodyKey: string): HTMLElement {
+    const block = document.createElement('div');
+    block.className = 'empty';
+    const title = document.createElement('p');
+    title.className = 'empty__title';
+    title.textContent = t(titleKey);
+    const body = document.createElement('p');
+    body.textContent = t(bodyKey);
+    block.append(title, body);
+    return block;
+  }
+
+  // ---- Summary ------------------------------------------------------------
+
+  function renderSummary(): void {
+    const host = $<HTMLElement>('[data-summary]')!;
+    const badge = $<HTMLElement>('[data-summary-badge]')!;
+    host.replaceChildren();
+
+    const version = seleccion();
+    if (!version) {
+      badge.hidden = true;
+      host.append(emptyBlock('console.day.empty.title', 'console.day.empty.body'));
+      return;
+    }
+
+    badge.hidden = false;
+    badge.textContent = `${formatDate(version.fecha_corte)} · ${t('console.day.version', {
+      version: version.version,
+    })}`;
+
+    if (version.estado === 'fallida') {
+      const notice = document.createElement('p');
+      notice.className = 'notice notice--danger';
+      const label = document.createElement('strong');
+      label.textContent = `${t('console.summary.failed')}: `;
+      notice.append(label, document.createTextNode(version.motivo_fallo ?? '—'));
+      host.append(notice);
+      return;
+    }
+
+    if (version.estado !== 'terminada') {
+      host.append(emptyBlock('console.progress.running', 'console.summary.pending'));
+      return;
+    }
+
+    const stats = document.createElement('dl');
+    stats.className = 'summary__stats';
+
+    const cells: Array<[string, number | null, string?]> = [
+      ['console.summary.filasTotal', version.filas_total],
+      ['console.summary.filasIngestadas', version.filas_ingestadas],
+      ['console.summary.error', version.incidencias_error, 'error'],
+      ['console.summary.advertencia', version.incidencias_advertencia, 'advertencia'],
+      ['console.summary.info', version.incidencias_info, 'info'],
+    ];
+
+    cells.forEach(([key, value, severity]) => {
+      const cell = document.createElement('div');
+      cell.className = 'stat summary__stat';
+      if (severity) cell.dataset.severity = severity;
+
+      const figure = document.createElement('dd');
+      figure.className = 'stat__value';
+      figure.textContent = value === null ? '—' : formatNumber(value);
+
+      const label = document.createElement('dt');
+      label.className = 'stat__label';
+      label.textContent = t(key);
+
+      cell.append(label, figure);
+      stats.append(cell);
+    });
+
+    host.append(stats);
+
+    const total = version.filas_total ?? 0;
+    const stored = version.filas_ingestadas ?? 0;
+    const note = document.createElement('p');
+    note.className = 'summary__note';
+    if (total > stored) {
+      note.classList.add('summary__note--warn');
+      note.textContent = t('console.summary.discarded', { n: formatNumber(total - stored) });
+    } else {
+      note.textContent = t('console.summary.allSaved');
+    }
+    host.append(note);
+  }
+
+  // ---- Issues -------------------------------------------------------------
+
+  async function renderIncidencias(): Promise<void> {
+    const host = $<HTMLElement>('[data-incidencias]')!;
+    const count = $<HTMLElement>('[data-incidencias-count]')!;
+    const pager = $<HTMLElement>('[data-pager]')!;
+
+    const version = seleccion();
+    if (!version || version.estado !== 'terminada') {
+      host.replaceChildren();
+      host.append(emptyBlock('console.incidencias.title', 'console.incidencias.pending'));
+      count.textContent = '';
+      pager.hidden = true;
+      return;
+    }
+
+    host.replaceChildren();
+    const loading = document.createElement('p');
+    loading.className = 'empty';
+    loading.textContent = t('console.incidencias.loading');
+    host.append(loading);
+
+    let page: { total: number; incidencias: Incidencia[] };
+    try {
+      page = await listarIncidencias(version.id, {
+        severidad: state.severidad || undefined,
+        limite: PAGE_SIZE,
+        desplazamiento: state.offset,
+      });
+    } catch (error) {
+      host.replaceChildren();
+      showError(error);
+      return;
+    }
+
+    // A later click may have won the race; only paint if we are still current.
+    if (seleccion()?.id !== version.id) return;
+
+    host.replaceChildren();
+    count.textContent =
+      page.total === 1
+        ? t('console.incidencias.countOne')
+        : t('console.incidencias.count', { total: formatNumber(page.total) });
+
+    if (page.incidencias.length === 0) {
+      host.append(
+        emptyBlock(
+          'console.incidencias.title',
+          state.severidad ? 'console.incidencias.empty' : 'console.incidencias.emptyAll',
+        ),
+      );
+      pager.hidden = true;
+      return;
+    }
+
+    host.append(buildIncidenciasTable(page.incidencias));
+
+    const showPager = page.total > PAGE_SIZE;
+    pager.hidden = !showPager;
+    if (showPager) {
+      const from = state.offset + 1;
+      const to = Math.min(state.offset + page.incidencias.length, page.total);
+      $<HTMLElement>('[data-page-range]')!.textContent = t('console.incidencias.range', {
+        desde: formatNumber(from),
+        hasta: formatNumber(to),
+        total: formatNumber(page.total),
+      });
+      $<HTMLButtonElement>('[data-page-prev]')!.disabled = state.offset === 0;
+      $<HTMLButtonElement>('[data-page-next]')!.disabled = to >= page.total;
+    }
+  }
+
+  /**
+   * The API's `detalle` is written in Spanish by the ingestion core. The
+   * `codigo` is the enumerable part, so the interface translates that and
+   * falls back to the server's own sentence for a code it does not know.
+   */
+  function detalleDe(incidencia: Incidencia): string {
+    const key = `incidencia.${incidencia.codigo}`;
+    const translated = t(key);
+    return translated === key ? incidencia.detalle : translated;
+  }
+
+  /**
+   * Write a snake_case identifier with break opportunities at its underscores.
+   * Left alone in a narrow column these split mid-word ("columna_f / altante");
+   * the underscore is the only honest place to wrap one.
+   */
+  function appendBreakable(cell: HTMLElement, value: string): void {
+    const parts = value.split('_');
+    parts.forEach((part, index) => {
+      const last = index === parts.length - 1;
+      cell.append(last ? part : `${part}_`);
+      if (!last) cell.append(document.createElement('wbr'));
+    });
+  }
+
+  function buildIncidenciasTable(incidencias: Incidencia[]): HTMLElement {
+    const scroll = document.createElement('div');
+    scroll.className = 'table-scroll';
+
+    const table = document.createElement('table');
+    table.className = 'table';
+
+    const head = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    const columns: Array<[string, boolean]> = [
+      ['console.incidencias.col.fila', true],
+      ['console.incidencias.col.severidad', false],
+      ['console.incidencias.col.columna', false],
+      ['console.incidencias.col.codigo', false],
+      ['console.incidencias.col.detalle', false],
+      ['console.incidencias.col.valor', false],
+    ];
+    columns.forEach(([key, numeric]) => {
+      const cell = document.createElement('th');
+      cell.scope = 'col';
+      if (numeric) cell.className = 'num';
+      cell.textContent = t(key);
+      headRow.append(cell);
+    });
+    head.append(headRow);
+
+    const body = document.createElement('tbody');
+    incidencias.forEach((incidencia) => {
+      const row = document.createElement('tr');
+
+      const fila = document.createElement('td');
+      fila.className = 'num';
+      fila.textContent = incidencia.fila === null ? '—' : formatNumber(incidencia.fila);
+
+      const severidad = document.createElement('td');
+      const tag = document.createElement('span');
+      tag.className = `tag tag--${incidencia.severidad}`;
+      tag.textContent = t(`severidad.${incidencia.severidad}`);
+      severidad.append(tag);
+
+      const columna = document.createElement('td');
+      columna.className = 'incidencia__column';
+      appendBreakable(columna, incidencia.columna ?? '—');
+
+      const codigo = document.createElement('td');
+      codigo.className = 'incidencia__code';
+      appendBreakable(codigo, incidencia.codigo);
+
+      const detalle = document.createElement('td');
+      detalle.className = 'incidencia__detail';
+      detalle.textContent = detalleDe(incidencia);
+
+      const valor = document.createElement('td');
+      valor.className = 'incidencia__value';
+      valor.textContent = incidencia.valor_original ?? '—';
+
+      row.append(fila, severidad, columna, codigo, detalle, valor);
+      body.append(row);
+    });
+
+    table.append(head, body);
+    scroll.append(table);
+    return scroll;
+  }
+
+  // ---- Selection ----------------------------------------------------------
+
+  function selectFecha(fecha: string): void {
+    state.fechaActiva = fecha;
+    const delDia = versionesDe(fecha);
+    const preferida = delDia.find((v) => v.vigente) ?? delDia[0] ?? null;
+    state.seleccionId = preferida?.id ?? null;
+    state.offset = 0;
+    renderRuler();
+    renderDay();
+    renderSummary();
+    void renderIncidencias();
+  }
+
+  function selectVersion(id: number): void {
+    state.seleccionId = id;
+    state.offset = 0;
+    renderDay();
+    renderSummary();
+    void renderIncidencias();
+  }
+
+  // ---- Data ---------------------------------------------------------------
+
+  async function refresh(): Promise<void> {
+    state.versiones = await listarVersiones({ limite: 200 });
+
+    const disponibles = fechas();
+    if (!state.fechaActiva || !disponibles.includes(state.fechaActiva)) {
+      state.fechaActiva = disponibles.at(-1) ?? null;
+      state.seleccionId = null;
+    }
+
+    if (state.fechaActiva && !seleccion()) {
+      const delDia = versionesDe(state.fechaActiva);
+      state.seleccionId = (delDia.find((v) => v.vigente) ?? delDia[0])?.id ?? null;
+    }
+
+    renderShape();
+    renderRuler();
+    renderDay();
+    renderSummary();
+  }
+
+  /**
+   * On a first run the console has nothing to be about, so it collapses to a
+   * single invitation instead of three panels repeating "no versions".
+   */
+  function renderShape(): void {
+    const empty = state.versiones.length === 0;
+    if (empty) {
+      showStandIn('console.firstRun.title', 'console.firstRun.body', true);
+    } else {
+      hideStandIn();
+    }
+  }
+
+  /**
+   * Collapse the console to one block. The working panels have nothing to
+   * show, and an empty ruler is a rail with no stops beside a legend for
+   * states nothing is in.
+   */
+  function showStandIn(titleKey: string, bodyKey: string, canUpload: boolean): void {
+    const title = $<HTMLElement>('[data-stand-in-title]')!;
+    const body = $<HTMLElement>('[data-stand-in-body]')!;
+    title.dataset.i18n = titleKey;
+    title.textContent = t(titleKey);
+    body.dataset.i18n = bodyKey;
+    body.textContent = t(bodyKey);
+
+    $<HTMLElement>('[data-stand-in-action]')!.hidden = !canUpload;
+    // Offline is the one stand-in the analyst can act on, so it carries the
+    // only action that helps: ask the API again.
+    $<HTMLElement>('[data-stand-in-retry]')!.hidden = canUpload;
+    $<HTMLElement>('[data-stand-in]')!.hidden = false;
+    $<HTMLElement>('[data-day]')!.hidden = true;
+    $<HTMLElement>('.incidencias')!.hidden = true;
+    $<HTMLElement>('.ruler__rail')!.hidden = true;
+    $<HTMLElement>('.ruler__legend')!.hidden = true;
+  }
+
+  function hideStandIn(): void {
+    $<HTMLElement>('[data-stand-in]')!.hidden = true;
+    $<HTMLElement>('[data-day]')!.hidden = false;
+    $<HTMLElement>('.incidencias')!.hidden = false;
+    $<HTMLElement>('.ruler__rail')!.hidden = false;
+    $<HTMLElement>('.ruler__legend')!.hidden = false;
+  }
+
+  /** Stand the console down while the API cannot be reached. */
+  function setOffline(offline: boolean): void {
+    // Uploading can only fail while the API is unreachable, so the primary
+    // action stands down with everything else.
+    document.querySelectorAll<HTMLButtonElement>('[data-open-upload]').forEach((trigger) => {
+      trigger.disabled = offline;
+    });
+    if (offline) showStandIn('console.offline.title', 'console.offline.body', false);
+
+    // The header's pulse polls on its own clock; this call just proved the
+    // answer, so the chrome should not contradict the page until it catches up.
+    document.dispatchEvent(new CustomEvent('healthchanged'));
+  }
+
+  async function boot(): Promise<void> {
+    try {
+      await refresh();
+      await renderIncidencias();
+      setOffline(false);
+    } catch {
+      // No modal: the analyst cannot act on this from a dialog, and the page
+      // already carries the message where the data would have been.
+      setOffline(true);
+    }
+  }
+
+  // ---- Upload -------------------------------------------------------------
+
+  const uploadForm = $<HTMLFormElement>('[data-upload-form]')!;
+  const fileInput = $<HTMLInputElement>('#upload-file')!;
+  const filePick = $<HTMLElement>('.filepick')!;
+  const dateInput = $<HTMLInputElement>('#upload-date')!;
+
+  /** Adopt a file from either the picker or a drop, and suggest its date. */
+  function adoptFile(file: File): void {
+    const name = $<HTMLElement>('[data-file-name]')!;
+    name.textContent = file.name;
+    name.removeAttribute('data-i18n');
+
+    const guess = guessDateFromFilename(file.name);
+    const hint = $<HTMLElement>('[data-date-hint]')!;
+    // The entity names its files with the cut-off date; we suggest, never
+    // decide, and we only claim a suggestion when one actually happened.
+    hint.dataset.i18n = guess ? 'console.upload.date.suggested' : 'console.upload.date.plain';
+    hint.textContent = t(hint.dataset.i18n);
+    if (guess) dateInput.value = guess;
+  }
+
+  // The dashed border reads as a dropzone, so it behaves like one.
+  ['dragenter', 'dragover'].forEach((type) =>
+    filePick.addEventListener(type, (event) => {
+      event.preventDefault();
+      filePick.dataset.dragging = 'true';
+    }),
+  );
+
+  ['dragleave', 'dragend'].forEach((type) =>
+    filePick.addEventListener(type, () => delete filePick.dataset.dragging),
+  );
+
+  filePick.addEventListener('drop', (event) => {
+    event.preventDefault();
+    delete filePick.dataset.dragging;
+    const dropped = (event as DragEvent).dataTransfer?.files;
+    if (!dropped || dropped.length === 0) return;
+
+    const transfer = new DataTransfer();
+    transfer.items.add(dropped[0]);
+    fileInput.files = transfer.files;
+
+    clearFieldErrors();
+    adoptFile(dropped[0]);
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-open-upload]').forEach((trigger) => {
+  trigger.addEventListener('click', () => {
+    uploadForm.reset();
+    const name = $<HTMLElement>('[data-file-name]')!;
+    name.dataset.i18n = 'console.upload.noFile';
+    name.textContent = t('console.upload.noFile');
+    const hint = $<HTMLElement>('[data-date-hint]')!;
+    hint.dataset.i18n = 'console.upload.date.plain';
+    hint.textContent = t('console.upload.date.plain');
+    clearFieldErrors();
+    dateInput.value = state.fechaActiva ?? '';
+    dialogs.upload.showModal();
+  });
+  });
+
+  // A message about the previous attempt must not outlive the edit that
+  // answers it.
+  uploadForm.addEventListener('input', clearFieldErrors);
+
+  // The entity names its files with the cut-off date; we suggest, never decide.
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (file) adoptFile(file);
+  });
+
+  /**
+   * Report a validation failure where the analyst is looking: under the field
+   * it concerns, marked on the control, announced to assistive tech, and with
+   * the focus moved there so the recovery needs no hunting.
+   */
+  function failField(field: 'archivo' | 'fecha', key: string): void {
+    const slot = $<HTMLElement>(`[data-error-for="${field}"]`)!;
+    slot.textContent = t(key);
+
+    const control = field === 'archivo' ? filePick : dateInput;
+    control.setAttribute('aria-invalid', 'true');
+    control.setAttribute('aria-describedby', `upload-${field === 'archivo' ? 'file' : 'date'}-error`);
+    (field === 'archivo' ? fileInput : dateInput).focus();
+  }
+
+  function clearFieldErrors(): void {
+    document.querySelectorAll<HTMLElement>('[data-error-for]').forEach((slot) => {
+      slot.textContent = '';
+    });
+    [filePick, dateInput].forEach((control) => {
+      control.removeAttribute('aria-invalid');
+      control.removeAttribute('aria-describedby');
+    });
+    $<HTMLElement>('[data-upload-error]')!.textContent = '';
+  }
+
+  uploadForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const error = $<HTMLElement>('[data-upload-error]')!;
+    clearFieldErrors();
+
+    const file = fileInput.files?.[0];
+    if (!file) {
+      failField('archivo', 'console.upload.error.file');
+      return;
+    }
+    if (file.size === 0) {
+      failField('archivo', 'console.upload.error.empty');
+      return;
+    }
+    if (!dateInput.value) {
+      failField('fecha', 'console.upload.error.date');
+      return;
+    }
+
+    setLoading(uploadForm, true);
+    try {
+      const hoja = $<HTMLInputElement>('#upload-sheet')!.value.trim();
+      const creada = await subirSabana({
+        archivo: file,
+        fechaCorte: dateInput.value,
+        hoja: hoja || undefined,
+      });
+
+      dialogs.upload.close();
+      state.fechaActiva = creada.fecha_corte;
+      state.seleccionId = creada.id;
+      state.offset = 0;
+      await refresh();
+      void renderIncidencias();
+
+      if (creada.versiones_identicas.length > 0) {
+        $<HTMLElement>('[data-duplicate-body]')!.textContent = t('console.duplicate.body', {
+          versiones: creada.versiones_identicas.join(', '),
+        });
+        dialogs.duplicate.showModal();
+      }
+
+      follow(creada.id);
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 413) {
+        failField('archivo', 'console.upload.error.tooBig');
+      } else if (caught instanceof ApiError && caught.status === 400) {
+        failField('archivo', 'console.upload.error.empty');
+      } else if (caught instanceof NetworkError) {
+        error.textContent = t('console.upload.error.network');
+      } else {
+        error.textContent = t('common.errorBody');
+      }
+    } finally {
+      setLoading(uploadForm, false);
+    }
+  });
+
+  // ---- Background processing ----------------------------------------------
+
+  const progress = $<HTMLElement>('[data-progress]')!;
+
+  function paintProgress(version: Version | null): void {
+    if (!version) {
+      progress.hidden = true;
+      return;
+    }
+    progress.hidden = false;
+    $<HTMLElement>('[data-progress-title]')!.textContent = t('console.progress.title', {
+      version: version.version,
+    });
+    $<HTMLElement>('[data-progress-state]')!.textContent =
+      version.estado === 'en_cola'
+        ? t('console.progress.queued')
+        : t('console.progress.running');
+  }
+
+  /**
+   * Follow a version until the backend closes it. Processing a real cut-off
+   * takes a few seconds (about 4 s for 46k rows), so this polls rather than
+   * blocking the analyst.
+   */
+  function follow(id: number): void {
+    state.siguiendoId = id;
+    const tick = async (): Promise<void> => {
+      if (state.siguiendoId !== id) return;
+
+      let version: Version;
+      try {
+        version = await obtenerVersion(id);
+      } catch {
+        // A transient failure should not kill the follow; try again.
+        window.setTimeout(tick, POLL_INTERVAL * 2);
+        return;
+      }
+
+      const index = state.versiones.findIndex((v) => v.id === id);
+      if (index >= 0) state.versiones[index] = version;
+
+      if (version.estado === 'en_cola' || version.estado === 'procesando') {
+        paintProgress(version);
+        renderRuler();
+        renderDay();
+        window.setTimeout(tick, POLL_INTERVAL);
+        return;
+      }
+
+      state.siguiendoId = null;
+      paintProgress(null);
+      await refresh();
+      void renderIncidencias();
+
+      // V-3 already made it current if the date had none. Anything else that
+      // finished means the date had a current version, so V-4 applies.
+      if (version.estado === 'terminada' && !version.vigente) {
+        const actual = versionesDe(version.fecha_corte).find((v) => v.vigente);
+        if (actual) openVigenteQuestion(actual, version);
+      }
+    };
+
+    void tick();
+  }
+
+  // ---- V-4 question -------------------------------------------------------
+
+  const vigenteForm = $<HTMLFormElement>('[data-vigente-form]')!;
+  let vigenteCandidate: Version | null = null;
+
+  function versionFacts(version: Version): string {
+    return [
+      `${formatNumber(version.filas_ingestadas ?? 0)} ${t('console.summary.filasIngestadas').toLowerCase()}`,
+      `${formatNumber(version.incidencias_error)} ${t('console.summary.error').toLowerCase()}`,
+      `${formatNumber(version.incidencias_advertencia)} ${t('console.summary.advertencia').toLowerCase()}`,
+    ].join('  ·  ');
+  }
+
+  function openVigenteQuestion(actual: Version, nueva: Version): void {
+    vigenteCandidate = nueva;
+
+    $<HTMLElement>('[data-vigente-title]')!.textContent = t('console.vigente.title', {
+      fecha: formatDate(nueva.fecha_corte),
+    });
+    $<HTMLElement>('[data-vigente-intro]')!.textContent = t('console.vigente.intro', {
+      nueva: nueva.version,
+    });
+    $<HTMLElement>('[data-vigente-keep]')!.textContent = t('console.vigente.keep', {
+      version: actual.version,
+    });
+    $<HTMLElement>('[data-vigente-replace]')!.textContent = t('console.vigente.replace', {
+      version: nueva.version,
+    });
+    $<HTMLElement>('[data-vigente-keep-facts]')!.textContent = versionFacts(actual);
+    $<HTMLElement>('[data-vigente-replace-facts]')!.textContent = versionFacts(nueva);
+
+    const formatChanged =
+      Boolean(actual.huella_formato) &&
+      Boolean(nueva.huella_formato) &&
+      actual.huella_formato !== nueva.huella_formato;
+    $<HTMLElement>('[data-vigente-format]')!.hidden = !formatChanged;
+
+    // Decision C-1: keeping the current version is always preselected.
+    vigenteForm.querySelector<HTMLInputElement>('input[value="keep"]')!.checked = true;
+    openWhenFree(dialogs.vigente);
+  }
+
+  vigenteForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const choice = new FormData(vigenteForm).get('vigente');
+    if (choice !== 'replace' || !vigenteCandidate) {
+      dialogs.vigente.close();
+      return;
+    }
+
+    setLoading(vigenteForm, true);
+    try {
+      await asignarVigente(vigenteCandidate.id);
+      dialogs.vigente.close();
+      await refresh();
+      void renderIncidencias();
+    } catch (error) {
+      dialogs.vigente.close();
+      showError(error);
+    } finally {
+      setLoading(vigenteForm, false);
+    }
+  });
+
+  // ---- V-7: make current --------------------------------------------------
+
+  const setVigenteForm = $<HTMLFormElement>('[data-set-vigente-form]')!;
+  let setVigenteTarget: Version | null = null;
+
+  function openSetVigente(version: Version): void {
+    setVigenteTarget = version;
+    $<HTMLElement>('[data-set-vigente-body]')!.textContent = t('console.setVigente.body', {
+      version: version.version,
+      fecha: formatDate(version.fecha_corte),
+    });
+    dialogs.setVigente.showModal();
+  }
+
+  setVigenteForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!setVigenteTarget) return;
+
+    setLoading(setVigenteForm, true);
+    try {
+      await asignarVigente(setVigenteTarget.id);
+      dialogs.setVigente.close();
+      await refresh();
+      void renderIncidencias();
+    } catch (error) {
+      dialogs.setVigente.close();
+      if (error instanceof ApiError && error.status === 409) {
+        $<HTMLElement>('[data-error-body]')!.textContent = t('console.setVigente.error409');
+        dialogs.error.showModal();
+      } else {
+        showError(error);
+      }
+    } finally {
+      setLoading(setVigenteForm, false);
+    }
+  });
+
+  // ---- V-8: delete --------------------------------------------------------
+
+  const deleteForm = $<HTMLFormElement>('[data-delete-form]')!;
+  const deleteConfirm = $<HTMLInputElement>('[data-delete-confirm]')!;
+  let deleteTarget: Version | null = null;
+
+  function openDelete(version: Version): void {
+    deleteTarget = version;
+    deleteConfirm.checked = false;
+    $<HTMLElement>('[data-delete-error]')!.textContent = '';
+
+    $<HTMLElement>('[data-delete-title]')!.textContent = t('console.delete.title', {
+      version: version.version,
+    });
+
+    const block = $<HTMLElement>('[data-delete-vigente]')!;
+    block.hidden = !version.vigente;
+    if (version.vigente) {
+      const fecha = formatDate(version.fecha_corte);
+      $<HTMLElement>('[data-delete-warning]')!.textContent = t(
+        'console.delete.vigenteWarning',
+        { fecha },
+      );
+      $<HTMLElement>('[data-delete-choice]')!.textContent = t(
+        'console.delete.vigenteChoice',
+        { fecha },
+      );
+    }
+
+    dialogs.delete.showModal();
+  }
+
+  deleteForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!deleteTarget) return;
+
+    const error = $<HTMLElement>('[data-delete-error]')!;
+    error.textContent = '';
+
+    // V-8: the current version only goes if the analyst confirms the date is
+    // left without one.
+    if (deleteTarget.vigente && !deleteConfirm.checked) {
+      error.textContent = t('console.delete.needsConfirm');
+      return;
+    }
+
+    setLoading(deleteForm, true);
+    try {
+      await eliminarVersion(deleteTarget.id, deleteTarget.vigente && deleteConfirm.checked);
+      if (state.seleccionId === deleteTarget.id) state.seleccionId = null;
+      if (state.siguiendoId === deleteTarget.id) {
+        state.siguiendoId = null;
+        paintProgress(null);
+      }
+      dialogs.delete.close();
+      await refresh();
+      void renderIncidencias();
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 409) {
+        error.textContent = caught.detail || t('console.delete.needsConfirm');
+      } else {
+        dialogs.delete.close();
+        showError(caught);
+      }
+    } finally {
+      setLoading(deleteForm, false);
+    }
+  });
+
+  // ---- Filters and paging -------------------------------------------------
+
+  document.querySelectorAll<HTMLButtonElement>('[data-sev]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.severidad = (button.dataset.sev ?? '') as Severidad | '';
+      state.offset = 0;
+      document.querySelectorAll<HTMLButtonElement>('[data-sev]').forEach((other) => {
+        other.setAttribute('aria-pressed', String(other === button));
+      });
+      void renderIncidencias();
+    });
+  });
+
+  $<HTMLButtonElement>('[data-page-prev]')!.addEventListener('click', () => {
+    state.offset = Math.max(0, state.offset - PAGE_SIZE);
+    void renderIncidencias();
+  });
+
+  $<HTMLButtonElement>('[data-page-next]')!.addEventListener('click', () => {
+    state.offset += PAGE_SIZE;
+    void renderIncidencias();
+  });
+
+  // A language switch has to repaint the parts JavaScript drew, too.
+  document.addEventListener('languagechange', () => {
+    applyTranslations();
+    renderRuler();
+    renderDay();
+    renderSummary();
+    void renderIncidencias();
+  });
+
+  const retry = $<HTMLButtonElement>('[data-stand-in-retry]')!;
+  retry.addEventListener('click', async () => {
+    retry.dataset.loading = 'true';
+    retry.disabled = true;
+    try {
+      await boot();
+    } finally {
+      retry.dataset.loading = 'false';
+      retry.disabled = false;
+    }
+  });
+
+  void boot();
+</script>
+

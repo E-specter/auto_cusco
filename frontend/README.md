@@ -1,43 +1,61 @@
-# Astro Starter Kit: Minimal
+# frontend — auto_cusco
+
+Interfaz de `auto_cusco`: dos pantallas Astro estáticas que hablan con la API REST desde el navegador. Sin framework de UI, sin estado de servidor, CSS vanilla.
+
+El desglose completo está en `docs/modules.md` §10; las convenciones de agentes, en `AGENTS.md`.
+
+## Arrancar
+
+El frontend necesita el backend en marcha:
 
 ```sh
-npm create astro@latest -- --template minimal
+# terminal 1 — API
+cd backend
+uv run fastapi dev app/main.py
+
+# terminal 2 — interfaz
+cd frontend
+npm install
+npx astro dev --background     # gestión: astro dev stop | status | logs
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+La interfaz queda en <http://localhost:4321> y la API en <http://127.0.0.1:8000>.
 
-## 🚀 Project Structure
+El navegador **nunca** habla con `127.0.0.1:8000` directamente: pide a un prefijo `/api` del mismo origen que `astro.config.mjs` redirige al backend, así no hacen falta cabeceras CORS. Para apuntar a otro origen:
 
-Inside of your Astro project, you'll see the following folders and files:
+- `API_ORIGIN=http://otro-host:8000 npx astro dev` cambia el destino del proxy de desarrollo;
+- `PUBLIC_API_URL=https://api.ejemplo.com` hace que el navegador llame a ese origen absoluto — **y entonces hay que habilitar CORS en el backend**, completando `CORS_ORIGENES` en `/.env` con ese origen (ver `docs/setup.md` paso 4). Viene apagado por defecto a propósito: sin origen configurado la API no envía cabeceras CORS.
 
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
+## Rutas
+
+| Ruta | Qué es |
+|---|---|
+| `/` | Bienvenida. La **única** pantalla bloqueada a `100dvh` sin scroll, por regla del brand guide. Sus cifras son reales: salen de `GET /cargas` |
+| `/cargas` | Consola de cargas. Una fecha de corte a la vez: regla de fechas, versiones del día, resumen e incidencias, más los diálogos de V-4, V-6, V-7 y V-8 |
+
+## Dónde tocar qué
+
+```
+src/
+├── pages/        index.astro (bienvenida) · cargas.astro (consola)
+├── layouts/      Shell.astro — cabecera, pulso de la API, idioma y tema
+├── components/   Icon.astro — inserta iconos lucide en compilación
+├── styles/       tokens.css · base.css · ui.css · console.css
+├── lib/          api.ts (cliente) · i18n.ts · format.ts
+└── i18n/         es.json · en.json
 ```
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+- **`tokens.css` es la única fuente de verdad visual.** Deriva de `docs/design_ui/brand_guide.json`. Ninguna regla de componente escribe un hex ni un px a mano: todo sale de un token.
+- **`console.css` es global, no con ámbito de Astro**, a propósito: la consola construye la regla de fechas, las filas de versión, las cifras y la tabla de incidencias desde el script en tiempo de ejecución, y los estilos con ámbito no alcanzan al DOM que crea el script. Si agregas estilos para algo que dibuja el script, van ahí.
+- **Los diccionarios están emparejados.** Cada clave existe en los dos idiomas y ninguna clave sin usar sobrevive. Los mensajes de incidencia se traducen por **código** (`incidencia.<codigo>`), con la frase del backend como respaldo: si `backend/app/core/services/ingesta_sabana/` emite un código nuevo, agrégalo a ambos JSON.
+- **Las fuentes están autohospedadas** en `public/fonts/` y se precargan. Se copian de `@fontsource-variable/inter` y `@fontsource/jetbrains-mono`; si cambian de versión, vuelve a copiarlas.
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+## Comprobar antes de cerrar una tarea
 
-Any static assets, like images, can be placed in the `public/` directory.
+```sh
+npm run build      # tiene que terminar sin errores
+```
 
-## 🧞 Commands
+Y en el navegador, contra el backend real: 360x640, 768x1024, 1440x900 y 1920x1080, en tema claro y oscuro, con foco visible en todo control y con `prefers-reduced-motion` activo. El protocolo general está en `docs/testing.md`.
 
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+**Nunca uses sábanas reales para probar.** Los datos de cobranza son sensibles: genera archivos sintéticos y no dejes nombres, documentos ni teléfonos reales en capturas, pruebas ni documentación.
