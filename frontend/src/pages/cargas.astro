@@ -414,6 +414,7 @@ import '../styles/console.css';
     type Version,
   } from '../lib/api';
   import { applyTranslations, t } from '../lib/i18n';
+  import { openWhenFree } from '../lib/dialogs';
   import {
     formatBytes,
     formatDate,
@@ -472,24 +473,6 @@ import '../styles/console.css';
       body.textContent = t('common.errorBody');
     }
     dialogs.error.showModal();
-  }
-
-  /**
-   * Open a modal, waiting for whatever is already open to close first.
-   *
-   * Background processing finishes on its own schedule, so the V-4 question
-   * can land while the identical-file warning is still on screen. Stacking
-   * modals would bury the one decision that matters.
-   */
-  function openWhenFree(dialog: HTMLDialogElement): void {
-    const blocking = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].find(
-      (open) => open !== dialog,
-    );
-    if (!blocking) {
-      dialog.showModal();
-      return;
-    }
-    blocking.addEventListener('close', () => openWhenFree(dialog), { once: true });
   }
 
   function setLoading(form: HTMLFormElement, loading: boolean): void {
@@ -1322,7 +1305,7 @@ import '../styles/console.css';
 
     // Decision C-1: keeping the current version is always preselected.
     vigenteForm.querySelector<HTMLInputElement>('input[value="keep"]')!.checked = true;
-    openWhenFree(dialogs.vigente);
+    void openWhenFree(dialogs.vigente);
   }
 
   vigenteForm.addEventListener('submit', async (event) => {

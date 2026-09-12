@@ -11,25 +11,25 @@ El esqueleto real de este enfoque ya existe en `backend/app/` (`core/{entities,p
 - Estado: **en progreso.** Implementado el núcleo puro de normalización (reglas N-1 a N-6 y N-8 de `docs/sabana-schema.md`): entidades en `app/core/entities/sabana.py`; reglas, catálogo de columnas, mapeo de cabeceras y normalizador de filas en `app/core/services/ingesta_sabana/`; tests en `tests/test_sabana_*.py`. Lector de archivos implementado con `python-calamine` en `app/adapters/input/lector_calamine.py`. Validado contra los cortes reales. Persistencia con versionado por fecha de corte diseñada en `docs/versionado-sabanas.md` e implementada: modelos en `app/adapters/persistence/modelos.py` y migración inicial en `backend/migrations/`, ya aplicada. Guardado y API implementados: caso de uso en `app/core/services/ingesta_sabana/servicio.py`, repositorio PostgreSQL con `COPY` en `app/adapters/persistence/repositorio_cargas_postgres.py` y endpoints en `app/api/cargas.py`, con procesamiento en segundo plano y recuperación de versiones interrumpidas al arrancar. Pendiente: pantallas del frontend.
 - Depende de: `docs/sabana-schema.md` y de confirmar las preguntas abiertas de su sección 8 antes de fijar las reglas afectadas.
 
-## 2. Selección, filtrado y segmentación (`backend/seleccion/`, TBD)
+## 2. Selección, filtrado y segmentación (`backend/app/core/services/seleccion_cartera/`)
 
 - Responsabilidad: seleccionar productos de la asignación del día, aplicar filtros simples/complejos multi-criterio, segmentar/analizar por atributos, consultar historial de gestiones consolidado multicanal, y resolver la selección "top n" con manejo explícito de insuficiencia.
 - Cubre: RF-04, RF-05, RF-06, RF-07, RF-08.
-- Estado: no implementado.
-- Depende de: módulo de Ingesta y cartera (datos normalizados de cartera) y de la consolidación de historial de gestiones (todos los canales de contactabilidad).
+- Estado: **implementado en el backend**, salvo RF-07. Núcleo en `app/core/services/seleccion_cartera/` (catálogo de campos y validación de consultas), adaptador en `app/adapters/persistence/repositorio_cartera_postgres.py` y endpoints en `app/api/cartera.py`. Contrato en `docs/consulta-cartera.md`. Pendiente: la pantalla del frontend y RF-07, que espera a que existan las gestiones.
+- Depende de: módulo de Ingesta y cartera (la cartera es la versión vigente de cada fecha) y, para RF-07, de la consolidación de historial de gestiones (todos los canales de contactabilidad).
 
-## 3. Métricas y analítica de selección (`backend/metricas/`, TBD)
+## 3. Métricas y analítica de selección (`backend/app/core/services/seleccion_cartera/`)
 
 - Responsabilidad: calcular en tiempo real los indicadores sobre los productos resultantes de filtros/selección (capital total, cantidad de cuentas, cuentas por segmento, cuota mín/máx) y los indicadores adicionales configurables por el usuario mediante funciones simples (suma, conteo, promedio, mínimo, máximo), actualizándose automáticamente ante cualquier cambio de filtros o selección.
 - Cubre: RF-25, RF-26, RF-27, RF-28.
-- Estado: no implementado.
+- Estado: **implementado en el backend** dentro del mismo caso de uso que la selección, porque las métricas se calculan sobre la misma consulta filtrada: `GET /cartera/metricas` devuelve capital total, cuentas, cuentas por segmento financiero, cuota mínima y máxima, más los indicadores configurables de RF-27. Ver `docs/consulta-cartera.md`. Pendiente: RF-28, que es el recálculo automático en la pantalla al cambiar filtros o selección.
 - Depende de: módulo de Selección, filtrado y segmentación (opera sobre su resultado en tiempo real). Evitar cálculos complejos que saturen el procesamiento en tiempo real (restricción explícita de RF-27).
 
-## 4. Motor de reglas de mapeo y expresión de campos (`backend/mapeo_campos/`, TBD)
+## 4. Motor de reglas de mapeo y expresión de campos (`backend/app/core/services/mapeo_campos/`)
 
 - Responsabilidad: núcleo compartido que define, campo por campo, cómo se construye cada valor de un archivo de carga: valores fijos/constantes, concatenación con campos de origen (`[@campo]`), prefijos/sufijos, y parseo/tipado explícito (`fecha` con formato configurable, `numero`, `texto`, `financiero` con separadores configurables).
 - Cubre: RF-12 (transversal a las secciones 3 y 4 de `docs/atomics-requirements.md`).
-- Estado: no implementado.
+- Estado: **implementado el núcleo.** Entidades en `app/core/entities/mapeo.py` y motor en `app/core/services/mapeo_campos/` (plantillas con `[@campo]`, tipado de texto, número, fecha y financiero, y generación de filas que junta los errores sin detenerse). Contrato en `docs/mapeo-campos.md`. Pendiente: guardar definiciones desde la interfaz y los adaptadores de cada plataforma.
 - Depende de: nada externo — es un módulo núcleo reutilizado por Generación de cargas digitales y Generación de cargas VoIP. **No debe duplicarse por plataforma.**
 
 ## 5. Generación de cargas — plataformas digitales (`backend/cargas/digitales/`, TBD)
@@ -69,7 +69,8 @@ El esqueleto real de este enfoque ya existe en `backend/app/` (`core/{entities,p
 ## 10. Frontend (`frontend/`)
 
 - Responsabilidad: UI para selección/filtrado de productos, configuración de cargas, visualización de métricas en tiempo real, y definición/generación de reportes (RF-34: interfaz intuitiva y clara, priorizando claridad sobre estética).
-- Estado: **Fase 1 implementada.** Dos pantallas Astro estáticas que hablan con la API REST desde el navegador; sin framework de UI ni estado de servidor.
+- Estado: **Fase 1 implementada y con pruebas automáticas.** Dos pantallas Astro estáticas que hablan con la API REST desde el navegador; sin framework de UI ni estado de servidor.
+- Pruebas: Vitest (`frontend/tests/nucleo/` y `frontend/tests/dom/`) y Playwright (`frontend/e2e/`), las herramientas que recomienda la documentación de Astro. Ver `docs/testing.md` secciones 2, 4 y 7.
 - Convenciones propias: ver `frontend/AGENTS.md`.
 
 ### Estructura

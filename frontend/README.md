@@ -50,12 +50,30 @@ src/
 - **Los diccionarios están emparejados.** Cada clave existe en los dos idiomas y ninguna clave sin usar sobrevive. Los mensajes de incidencia se traducen por **código** (`incidencia.<codigo>`), con la frase del backend como respaldo: si `backend/app/core/services/ingesta_sabana/` emite un código nuevo, agrégalo a ambos JSON.
 - **Las fuentes están autohospedadas** en `public/fonts/` y se precargan. Se copian de `@fontsource-variable/inter` y `@fontsource/jetbrains-mono`; si cambian de versión, vuelve a copiarlas.
 
-## Comprobar antes de cerrar una tarea
+## Pruebas
 
 ```sh
-npm run build      # tiene que terminar sin errores
+npx playwright install chromium   # solo la primera vez
+npm run verificar                 # build + nucleo/DOM + extremo a extremo
 ```
 
-Y en el navegador, contra el backend real: 360x640, 768x1024, 1440x900 y 1920x1080, en tema claro y oscuro, con foco visible en todo control y con `prefers-reduced-motion` activo. El protocolo general está en `docs/testing.md`.
+O por separado: `npx astro check`, `npm run test`, `npm run test:e2e`.
+
+| Carpeta | Qué cubre | Entorno |
+|---|---|---|
+| `tests/nucleo/` | Fecha sugerida desde el nombre del archivo, formatos, cliente de API y el contrato de traducción de incidencias | `node` |
+| `tests/dom/` | Cola de diálogos (V-6 → V-4) y cambio de idioma | `jsdom` |
+| `e2e/` | Las pantallas contra el sitio construido | Chromium |
+
+Dos cosas que conviene saber antes de tocarlas:
+
+- **Las pruebas de extremo a extremo no necesitan backend ni PostgreSQL.** Playwright levanta `npm run preview` y cada prueba intercepta `/api` con `page.route` (`e2e/api-falsa.ts`). Comprueban qué hace la interfaz con una respuesta, que es la única parte que le pertenece.
+- **`tests/nucleo/i18n-incidencias.test.ts` lee el catálogo canónico del backend** (`backend/app/core/entities/incidencias.py`, constante `CODIGOS_INCIDENCIA`) y falla si un código no está traducido en los dos idiomas, o si sobra una traducción de un código retirado. Es la mitad frontend de un contrato: el backend tiene su propia prueba que falla si emite un código fuera del catálogo. Así ninguno de los dos lee el código fuente del otro, solo esa lista compartida. Sin esto, un código nuevo deja una frase en español dentro de la tabla en inglés y nada se queja.
+
+Si una pieza de lógica no se puede importar, no se puede probar: sácala del `<script>` de la página a `src/lib/` antes de escribirle una prueba.
+
+## Comprobar a mano antes de cerrar una tarea
+
+Lo que las pruebas no ven: en el navegador, contra el backend real, a 360x640, 768x1024, 1440x900 y 1920x1080, en tema claro y oscuro, con foco visible en todo control y con `prefers-reduced-motion` activo. El protocolo general está en `docs/testing.md`.
 
 **Nunca uses sábanas reales para probar.** Los datos de cobranza son sensibles: genera archivos sintéticos y no dejes nombres, documentos ni teléfonos reales en capturas, pruebas ni documentación.

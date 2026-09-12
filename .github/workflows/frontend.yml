@@ -1,0 +1,56 @@
+name: frontend
+
+# Protocolo completo en docs/testing.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  calidad:
+    name: Build y pruebas de nucleo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      # La comprobacion de tipos de Astro sobre .astro, .ts y el marcado.
+      - run: npx astro check
+      - run: npm run build
+      # Incluye el contrato con los codigos de incidencia del backend, que lee
+      # el codigo Python del propio repositorio.
+      - run: npm run test
+
+  extremo_a_extremo:
+    name: Pruebas de extremo a extremo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      # El runner no trae navegador; Playwright instala Chromium y sus
+      # dependencias del sistema.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      # Playwright levanta `npm run preview` por su cuenta (webServer) y cada
+      # prueba intercepta la API, asi que no hacen falta backend ni PostgreSQL.
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: reporte-playwright
+          path: frontend/playwright-report/
+          retention-days: 7

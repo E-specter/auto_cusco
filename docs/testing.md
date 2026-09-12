@@ -17,8 +17,13 @@ Protocolo de trabajo para que el desarrollo sea controlado y repetible entre ses
 | Adaptadores | Lectura de archivos y forma de las tablas | `backend/tests/test_lector_calamine.py`, `test_modelos_persistencia.py` | Archivos generados en memoria |
 | Integración | Flujo completo contra PostgreSQL real | `backend/tests/test_repositorio_cargas_postgres.py` | Base migrada y la variable `AUTO_CUSCO_DB_TESTS` |
 | Verificación con volumen real | Rendimiento y conteos con una sábana de verdad | Local, no se versiona | Sábana real con los datos personales reemplazados en memoria |
+| Núcleo del frontend | Lógica pura de la interfaz: fecha sugerida desde el nombre del archivo, formatos, cliente de API y el contrato con el catálogo de códigos de incidencia | `frontend/tests/nucleo/` | Nada. `fetch` se sustituye por un doble |
+| DOM del frontend | Lógica que toca el documento: cola de diálogos (V-6 → V-4) y cambio de idioma | `frontend/tests/dom/` | Nada. Entorno `jsdom` |
+| Extremo a extremo | Las pantallas contra el sitio construido: camino de subida, confirmaciones de V-4 y V-8, API caída y la regla de no-scroll de la bienvenida | `frontend/e2e/` | Navegador. Playwright levanta `npm run preview`; **ni backend ni PostgreSQL** |
 
 La arquitectura de puertos y adaptadores es lo que permite el primer nivel: el núcleo depende de interfaces, así que en las pruebas se sustituyen por dobles y no hace falta ni base de datos ni archivos.
+
+En el frontend el equivalente es el cliente de API: las pruebas de extremo a extremo interceptan cada llamada con `page.route`, así que comprueban qué hace la interfaz con una respuesta —que es la única parte que le pertenece— sin depender de que el backend esté levantado.
 
 ## 3. Convenciones
 
@@ -34,6 +39,9 @@ La arquitectura de puertos y adaptadores es lo que permite el primer nivel: el n
 
   Python no puede escribir `.xlsb`, así que el script crea el archivo en `.xlsx` y lo convierte con Excel cuando el destino termina en `.xlsb`. Si no tienes Excel, genera el `.xlsx` y úsalo tal cual: el lector acepta ambos formatos. El archivo incluye casos borde a propósito (DNI de 7 dígitos, RUC válido, teléfonos inválidos, un pagaré repetido y una columna fuera del catálogo) y queda fuera de git como cualquier contenido de `data/sabanas/`.
 - **Cobertura mínima de un módulo nuevo:** caso normal, bordes, entradas inválidas y, cuando dos piezas deben coincidir, una prueba de contrato entre ellas. El ejemplo vivo es la prueba que falla si las columnas de la tabla dejan de coincidir con lo que produce la normalización.
+- **En el frontend valen las mismas convenciones,** con dos añadidos:
+  - **Lo que se prueba se puede importar.** Si una pieza de lógica vive dentro del `<script>` de una página, no hay forma de probarla; se saca a `src/lib/` primero. Así nació `src/lib/dialogs.ts`.
+  - **Nada de datos reales tampoco aquí.** Los archivos que se adjuntan en las pruebas de extremo a extremo se construyen en memoria (`e2e/api-falsa.ts`), nunca se lee uno de `data/sabanas/`.
 
 ## 4. Verificación antes de cerrar una tarea
 
@@ -54,11 +62,28 @@ El script equivale a correr, en orden:
 | Migraciones | `uv run alembic check` | Si tocaste modelos o migraciones |
 | Integración | `uv run pytest -m postgres -q` | Si tocaste persistencia |
 
+Desde `frontend/`, cuando la tarea tocó la interfaz:
+
+```powershell
+npm run verificar        # build, pruebas de nucleo/DOM y extremo a extremo
+```
+
+Equivale a, en orden:
+
+| Paso | Comando | Cuándo |
+|---|---|---|
+| Tipos | `npx astro check` | Siempre |
+| Build | `npm run build` | Siempre |
+| Núcleo y DOM | `npm run test` | Siempre |
+| Extremo a extremo | `npm run test:e2e` | Siempre. Playwright construye y levanta `preview` por su cuenta |
+
+La primera vez hace falta `npx playwright install chromium` para bajar el navegador.
+
 Además, antes de cerrar:
 
 - Actualiza `docs/planning.md` si cambió el alcance o se completó un punto, y `docs/modules.md` si cambió el estado de un módulo.
 - Si cambió una regla de negocio, actualízala en su documento: `docs/sabana-schema.md` para la sábana y `docs/versionado-sabanas.md` para las versiones.
-- Commit con prefijo: `feat`, `fix`, `docs`, `test`, `refactor` o `chore`, seguido del módulo entre paréntesis. Ejemplo: `fix(ingesta): ...`.
+- Commit con prefijo: `feat`, `fix`, `docs`, `test`, `refactor` o `chore`, seguido del módulo entre paréntesis. Ejemplo: `fix(ingesta): ...`. El mensaje termina con el trailer `Agente:` que identifica la sesión que lo desarrolló (ver `docs/agents/README.md`).
 
 ## 5. Protocolo de corrección de errores por módulo
 
@@ -90,10 +115,14 @@ Son cosas distintas y se tratan distinto.
 - **Formato, lint y pruebas,** sin base de datos.
 - **Migraciones e integración,** que levanta un PostgreSQL temporal, aplica las migraciones, verifica que no haya cambios sin migrar y corre las pruebas marcadas. La contraseña que aparece ahí es de una base desechable que vive solo durante la ejecución, no es un secreto del proyecto.
 
+`.github/workflows/frontend.yml` corre con los mismos disparadores, también con dos trabajos:
+
+- **Build y pruebas de núcleo:** tipos con `astro check`, build y `vitest`. Aquí vive la mitad frontend del contrato de códigos de incidencia: si el catálogo gana un código y nadie lo traduce, este trabajo falla.
+- **Extremo a extremo:** instala Chromium en el runner, construye el sitio y corre Playwright, que levanta `preview` por su cuenta. No necesita backend ni PostgreSQL porque cada prueba intercepta la API. Sube el reporte como artefacto cuando algo falla.
+
 Si un trabajo falla, se corrige antes de seguir. La integración continua no reemplaza la verificación local: es la red que atrapa lo que se olvidó correr.
 
 ## 8. Pendientes
 
-- **Frontend sin pruebas.** El proyecto Astro no tiene herramienta de pruebas elegida todavía. Es una decisión abierta.
 - **Cobertura sin medir.** No hay herramienta configurada; por ahora el criterio es el de la sección 3.
 - **Pruebas de carga** según volumen real, previstas en la Fase 7 de `docs/planning.md`.

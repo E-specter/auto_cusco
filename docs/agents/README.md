@@ -22,6 +22,33 @@ Este proyecto está pensado para que trabajen en él varios agentes de código e
 | OpenCode | `/AGENTS.md` (directo) | Igual que Codex — sigue la misma convención `agents.md`. |
 | Hermes | `/AGENTS.md` (directo, hasta confirmar convención propia) | Si Hermes requiere un archivo con nombre distinto, crear `/HERMES.md` como thin wrapper que importe/repita `AGENTS.md`, siguiendo el mismo patrón que `CLAUDE.md`. |
 
+## Firma de los commits
+
+Varios agentes trabajan sobre el mismo repositorio, así que cada commit dice **qué sesión lo desarrolló**. No basta con el autor de git: todas las sesiones commitean con la misma identidad configurada en la máquina.
+
+La marca es un trailer al final del mensaje, después del cuerpo y junto a los que ya se usan:
+
+```
+feat(frontend): pruebas automaticas con Vitest y Playwright
+
+Cuerpo del mensaje.
+
+Agente: designer
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_...
+```
+
+- **El valor es el nombre de la sesión**, el mismo con el que los agentes se llaman entre sí. Hoy en uso: `architec` (backend y arquitectura) y `designer` (frontend e interfaz).
+- **Un trailer, no una etiqueta de git.** Las etiquetas de git marcan versiones, no autoría, y una por commit no serviría de nada. Un trailer viaja con el mensaje y se consulta directo:
+
+  ```powershell
+  git log --grep="Agente: designer" --oneline
+  ```
+
+- **Se firma el trabajo propio.** Si una sesión commitea trabajo de otra —pasa, y es legítimo— el mensaje lo dice en el cuerpo y el trailer nombra a quien lo escribió, no a quien ejecutó el commit.
+
+Esto no reemplaza el prefijo por módulo (`feat`, `fix`, `docs`, `test`, `refactor`, `chore`) que define `docs/testing.md`, sección 4: lo complementa.
+
 ## Archivos anidados
 
 Subcarpetas pueden tener su propio `AGENTS.md` (o equivalente) con reglas específicas de esa parte del código, que complementan (no reemplazan) el de la raíz. Ejemplo existente: `frontend/AGENTS.md` (convenciones del dev server de Astro).
