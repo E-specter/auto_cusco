@@ -11,33 +11,30 @@ Los indicadores adicionales (RF-27) usan `nombre:funcion:campo`:
 
     ?indicador=capital promedio:promedio:saldo_capital_pendiente
 
-Los montos se devuelven como texto para no perder precision al pasar por JSON.
+La lectura de esa sintaxis vive en `app/api/consultas.py`, compartida con la
+generacion de archivos de carga. Los montos se devuelven como texto para no
+perder precision al pasar por JSON.
 """
 
 from datetime import date
-from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_cartera_postgres import RepositorioCarteraPostgres
-from app.core.entities.cartera import (
-    ConsultaInvalida,
-    Filtro,
-    Funcion,
-    Indicador,
-    Operador,
-    Orden,
-    SinVersionVigente,
+from app.api.consultas import (
+    parsear_filtro,
+    parsear_indicador,
+    parsear_orden,
+    texto_si_es_monto,
+    traducir_errores,
 )
-from app.core.services.seleccion_cartera import campos
+from app.core.entities.cartera import ConsultaInvalida, SinVersionVigente
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
 
 router = APIRouter(prefix="/cartera", tags=["cartera"])
-
-SEPARADOR_VALORES = "|"
 
 
 def crear_servicio_cartera() -> ConsultaCarteraService:
@@ -77,63 +74,8 @@ class MetricasRespuesta(BaseModel):
     adicionales: dict[str, Any]
 
 
-def _texto_si_es_monto(valor: Any) -> Any:
-    return str(valor) if isinstance(valor, Decimal) else valor
-
-
 def _producto(fila: dict[str, Any]) -> dict[str, Any]:
-    return {clave: _texto_si_es_monto(valor) for clave, valor in fila.items()}
-
-
-def _parsear_filtro(crudo: str) -> Filtro:
-    partes = crudo.split(":", 2)
-    if len(partes) < 2:
-        raise ConsultaInvalida(
-            f"El filtro {crudo!r} debe tener la forma campo:operador o campo:operador:valor"
-        )
-    campo, operador_crudo = partes[0].strip(), partes[1].strip()
-    try:
-        operador = Operador(operador_crudo)
-    except ValueError as exc:
-        permitidos = ", ".join(sorted(o.value for o in Operador))
-        raise ConsultaInvalida(
-            f"El operador {operador_crudo!r} no existe; permitidos: {permitidos}"
-        ) from exc
-    if len(partes) == 2:
-        return Filtro(campo=campo, operador=operador)
-    valores = tuple(campos.convertir(campo, valor) for valor in partes[2].split(SEPARADOR_VALORES))
-    return Filtro(campo=campo, operador=operador, valores=valores)
-
-
-def _parsear_orden(crudo: str | None) -> Orden | None:
-    if not crudo:
-        return None
-    descendente = crudo.startswith("-")
-    return Orden(campo=crudo.lstrip("-").strip(), descendente=descendente)
-
-
-def _parsear_indicador(crudo: str) -> Indicador:
-    partes = [parte.strip() for parte in crudo.split(":")]
-    if len(partes) not in (2, 3):
-        raise ConsultaInvalida(
-            f"El indicador {crudo!r} debe tener la forma nombre:funcion o nombre:funcion:campo"
-        )
-    try:
-        funcion = Funcion(partes[1])
-    except ValueError as exc:
-        permitidas = ", ".join(sorted(f.value for f in Funcion))
-        raise ConsultaInvalida(
-            f"La funcion {partes[1]!r} no existe; permitidas: {permitidas}"
-        ) from exc
-    return Indicador(
-        nombre=partes[0], funcion=funcion, campo=partes[2] if len(partes) == 3 else None
-    )
-
-
-def _traducir_errores(exc: Exception) -> HTTPException:
-    if isinstance(exc, SinVersionVigente):
-        return HTTPException(status_code=404, detail=str(exc))
-    return HTTPException(status_code=400, detail=str(exc))
+    return {clave: texto_si_es_monto(valor) for clave, valor in fila.items()}
 
 
 @router.get("/campos")
@@ -157,13 +99,13 @@ def consultar_cartera(
     try:
         pagina = servicio.consultar(
             fecha_corte,
-            [_parsear_filtro(crudo) for crudo in filtro],
-            _parsear_orden(orden),
+            [parsear_filtro(crudo) for crudo in filtro],
+            parsear_orden(orden),
             limite,
             desplazamiento,
         )
     except (ConsultaInvalida, SinVersionVigente) as exc:
-        raise _traducir_errores(exc) from exc
+        raise traducir_errores(exc) from exc
     return PaginaRespuesta(
         total=pagina.total,
         limite=pagina.limite,
@@ -184,11 +126,11 @@ def metricas_cartera(
     try:
         metricas = servicio.metricas(
             fecha_corte,
-            [_parsear_filtro(crudo) for crudo in filtro],
-            [_parsear_indicador(crudo) for crudo in indicador],
+            [parsear_filtro(crudo) for crudo in filtro],
+            [parsear_indicador(crudo) for crudo in indicador],
         )
     except (ConsultaInvalida, SinVersionVigente) as exc:
-        raise _traducir_errores(exc) from exc
+        raise traducir_errores(exc) from exc
     return MetricasRespuesta(
         cuentas=metricas.cuentas,
         capital_total=str(metricas.capital_total),
@@ -196,7 +138,7 @@ def metricas_cartera(
         cuota_maxima=None if metricas.cuota_maxima is None else str(metricas.cuota_maxima),
         cuentas_por_segmento=metricas.cuentas_por_segmento,
         adicionales={
-            nombre: _texto_si_es_monto(valor) for nombre, valor in metricas.adicionales.items()
+            nombre: texto_si_es_monto(valor) for nombre, valor in metricas.adicionales.items()
         },
     )
 
@@ -211,10 +153,10 @@ def segmentar_cartera(
     """Cuentas y capital por cada valor de un atributo (RF-06)."""
     try:
         segmentacion = servicio.segmentar(
-            fecha_corte, campo, [_parsear_filtro(crudo) for crudo in filtro]
+            fecha_corte, campo, [parsear_filtro(crudo) for crudo in filtro]
         )
     except (ConsultaInvalida, SinVersionVigente) as exc:
-        raise _traducir_errores(exc) from exc
+        raise traducir_errores(exc) from exc
     return SegmentacionRespuesta(
         campo=segmentacion.campo,
         grupos=[

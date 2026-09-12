@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.archivos_carga import router as archivos_carga_router
 from app.api.cargas import crear_servicio_ingesta
 from app.api.cargas import router as cargas_router
 from app.api.cartera import router as cartera_router
@@ -57,6 +58,16 @@ def configurar_cors(aplicacion: FastAPI, origenes: list[str]) -> None:
         allow_credentials=False,  # la API aun no usa cookies ni sesiones
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type"],
+        # Sin esto el navegador no deja leer el nombre del archivo generado ni
+        # el resumen de la carga cuando el frontend corre en otro origen.
+        expose_headers=[
+            "Content-Disposition",
+            "X-Carga-Generados",
+            "X-Carga-Disponibles",
+            "X-Carga-Solicitados",
+            "X-Carga-Suficiente",
+            "X-Carga-Errores",
+        ],
     )
     logger.info("CORS habilitado para %s", origenes)
 
@@ -77,3 +88,4 @@ configurar_cors(app, get_settings().origenes_cors)
 app.include_router(health_router)
 app.include_router(cargas_router)
 app.include_router(cartera_router)
+app.include_router(archivos_carga_router)

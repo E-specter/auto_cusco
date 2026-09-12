@@ -58,4 +58,5 @@ El motor no conoce ninguna plataforma. Las cabeceras y reglas concretas de cada 
 
 - **Guardar definiciones** y editarlas desde la interfaz.
 - **Adaptadores por plataforma:** SMS y WhatsApp primero, luego Cisvox para VoIP. Su estructura exacta de campos debe levantarse con el usuario o su documentación antes de implementarlos (RF-10, RF-18).
-- **Exportación a XLSX, CSV y JSON** (RF-13).
+
+La escritura del archivo ya está resuelta: cómo se convierte esta tabla en XLSX, CSV o JSON está en [generacion-cargas.md](generacion-cargas.md).

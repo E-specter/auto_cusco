@@ -32,11 +32,11 @@ El esqueleto real de este enfoque ya existe en `backend/app/` (`core/{entities,p
 - Estado: **implementado el núcleo.** Entidades en `app/core/entities/mapeo.py` y motor en `app/core/services/mapeo_campos/` (plantillas con `[@campo]`, tipado de texto, número, fecha y financiero, y generación de filas que junta los errores sin detenerse). Contrato en `docs/mapeo-campos.md`. Pendiente: guardar definiciones desde la interfaz y los adaptadores de cada plataforma.
 - Depende de: nada externo — es un módulo núcleo reutilizado por Generación de cargas digitales y Generación de cargas VoIP. **No debe duplicarse por plataforma.**
 
-## 5. Generación de cargas — plataformas digitales (`backend/cargas/digitales/`, TBD)
+## 5. Generación de cargas — plataformas digitales (`backend/app/core/services/generacion_cargas/`)
 
 - Responsabilidad: generar tablas de carga personalizadas desde los productos seleccionados y producir archivos de carga por plataforma en múltiples formatos (XLSX, CSV, JSON, otros), aplicando las reglas de transformación configuradas.
 - Cubre: RF-09, RF-10, RF-11, RF-13, RF-14, RF-15 (usa RF-12 vía el módulo de mapeo de campos).
-- Estado: no implementado. **Primeras plataformas objetivo (decidido): SMS y WhatsApp**; correo electrónico queda para una iteración posterior.
+- Estado: **implementada la generación y la exportación.** Caso de uso en `app/core/services/generacion_cargas/`, exportadores XLSX/CSV/JSON en `app/adapters/output/exportadores/` (uno por formato, tras el puerto `exportador_tabla_port.py`) y endpoints en `app/api/archivos_carga.py`, con previsualización antes de descargar. Contrato en `docs/generacion-cargas.md`. Pendiente: guardar definiciones desde la interfaz y los adaptadores de cada plataforma. **Primeras plataformas objetivo (decidido): SMS y WhatsApp**; correo electrónico queda para una iteración posterior.
 - Depende de: módulo de Selección (productos ya filtrados/seleccionados) y del Motor de reglas de mapeo y expresión de campos.
 - Convención: cada plataforma (SMS, WhatsApp, correo, ...) es un adaptador independiente y sustituible; agregar una plataforma nueva no debe requerir modificar las demás (RF-14). La estructura exacta de campos que exigen los proveedores concretos de SMS/WhatsApp elegidos debe levantarse antes de implementar cada adaptador.
 
@@ -50,6 +50,7 @@ El esqueleto real de este enfoque ya existe en `backend/app/` (`core/{entities,p
 
 ## 7. Reportería (`backend/reportes/`, TBD)
 
+- Reutiliza: los exportadores de `app/adapters/output/exportadores/` para los formatos de salida (RF-24); son genéricos, reciben cabeceras y filas.
 - Responsabilidad: generar reportes de evolución de productos/gestiones, dar seguimiento a atributos (campos variables vs. invariables, campos de interés de la entidad), exponer el historial evolutivo por cuenta, y ofrecer un módulo de reportes configurable desde interfaz gráfica (sin desarrollo) para formatos estándar y solicitudes ocasionales, con definiciones reutilizables.
 - Cubre: RF-20, RF-21, RF-22, RF-23, RF-24.
 - Estado: no implementado.
