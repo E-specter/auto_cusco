@@ -23,9 +23,11 @@ from pydantic import BaseModel, Field
 from app.adapters.output import exportadores
 from app.api.cartera import obtener_servicio_cartera
 from app.api.consultas import parsear_filtro, parsear_orden, texto_si_es_monto, traducir_errores
+from app.api.errores import respuestas_de_error
 from app.core.entities.cartera import ConsultaInvalida, SinVersionVigente
 from app.core.entities.exportacion import (
     EXTENSIONES,
+    TIPOS_MIME,
     ExportacionInvalida,
     FormatoArchivo,
     OpcionesArchivo,
@@ -48,6 +50,16 @@ from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
 router = APIRouter(prefix="/archivos-carga", tags=["archivos de carga"])
 
 FILAS_DE_MUESTRA = 20
+
+# Resumen que acompana a la descarga. Una sola lista para lo que se envia, lo
+# que declara el contrato OpenAPI y lo que CORS deja leer al navegador.
+CABECERAS_RESUMEN: dict[str, str] = {
+    "X-Carga-Generados": "Filas escritas en el archivo",
+    "X-Carga-Disponibles": "Productos que cumplen la seleccion completa",
+    "X-Carga-Solicitados": "Cantidad de productos pedida",
+    "X-Carga-Suficiente": "1 si habia al menos tantos productos como se pidieron, 0 si no",
+    "X-Carga-Errores": "Campos que no se pudieron generar; el detalle esta en /previsualizacion",
+}
 
 
 def obtener_servicio_generacion(
@@ -94,7 +106,7 @@ class PeticionGeneracion(BaseModel):
     opciones: OpcionesEntrada | None = None
 
 
-class ErrorRespuesta(BaseModel):
+class ErrorGeneracionRespuesta(BaseModel):
     fila: int
     campo: str
     detalle: str
@@ -109,7 +121,7 @@ class PrevisualizacionRespuesta(BaseModel):
     generados: int
     suficiente: bool
     completa: bool
-    errores: list[ErrorRespuesta]
+    errores: list[ErrorGeneracionRespuesta]
 
 
 class FormatoRespuesta(BaseModel):
@@ -183,7 +195,11 @@ def listar_formatos() -> list[FormatoRespuesta]:
     ]
 
 
-@router.post("/previsualizacion", response_model=PrevisualizacionRespuesta)
+@router.post(
+    "/previsualizacion",
+    response_model=PrevisualizacionRespuesta,
+    responses=respuestas_de_error(400, 404),
+)
 def previsualizar(
     peticion: PeticionGeneracion,
     servicio: GeneracionCargasService = Depends(obtener_servicio_generacion),
@@ -208,13 +224,40 @@ def previsualizar(
         suficiente=resultado.disponibles >= peticion.cantidad,
         completa=resultado.completa,
         errores=[
-            ErrorRespuesta(fila=error.fila, campo=error.campo, detalle=error.detalle)
+            ErrorGeneracionRespuesta(fila=error.fila, campo=error.campo, detalle=error.detalle)
             for error in resultado.errores
         ],
     )
 
 
-@router.post("")
+def _respuesta_de_descarga() -> dict[int | str, dict[str, Any]]:
+    """El archivo generado y su resumen, en vez del JSON que FastAPI supondria."""
+    numero = {"type": "string", "pattern": "^[0-9]+$"}
+    esquemas = {nombre: numero for nombre in CABECERAS_RESUMEN}
+    esquemas["X-Carga-Suficiente"] = {"type": "string", "enum": ["0", "1"]}
+    return {
+        200: {
+            "description": "El archivo de carga en el formato pedido",
+            "content": {
+                TIPOS_MIME[formato]: {"schema": {"type": "string", "format": "binary"}}
+                for formato in exportadores.EXPORTADORES
+            },
+            "headers": {
+                "Content-Disposition": {
+                    "description": 'attachment; filename="<nombre>.<extension>"',
+                    "schema": {"type": "string"},
+                },
+                **{
+                    nombre: {"description": descripcion, "schema": esquemas[nombre]}
+                    for nombre, descripcion in CABECERAS_RESUMEN.items()
+                },
+            },
+        },
+        **respuestas_de_error(400, 404),
+    }
+
+
+@router.post("", response_class=Response, responses=_respuesta_de_descarga())
 def generar_archivo(
     peticion: PeticionGeneracion,
     servicio: GeneracionCargasService = Depends(obtener_servicio_generacion),

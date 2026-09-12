@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.archivos_carga import CABECERAS_RESUMEN
 from app.api.archivos_carga import router as archivos_carga_router
 from app.api.cargas import crear_servicio_ingesta
 from app.api.cargas import router as cargas_router
@@ -60,14 +61,7 @@ def configurar_cors(aplicacion: FastAPI, origenes: list[str]) -> None:
         allow_headers=["Content-Type"],
         # Sin esto el navegador no deja leer el nombre del archivo generado ni
         # el resumen de la carga cuando el frontend corre en otro origen.
-        expose_headers=[
-            "Content-Disposition",
-            "X-Carga-Generados",
-            "X-Carga-Disponibles",
-            "X-Carga-Solicitados",
-            "X-Carga-Suficiente",
-            "X-Carga-Errores",
-        ],
+        expose_headers=["Content-Disposition", *CABECERAS_RESUMEN],
     )
     logger.info("CORS habilitado para %s", origenes)
 

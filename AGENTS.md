@@ -21,6 +21,7 @@ auto_cusco/
 │   └── output/
 │       ├── gestiones/  # Salida: casos generados (NO versionada)
 │       └── reportes/   # Salida: reportes generados (NO versionada)
+├── contratos/          # openapi.json: contrato entre la API y el frontend (versionado)
 └── docs/               # Documentación de arquitectura/requerimientos/planificación
 ```
 
@@ -46,5 +47,6 @@ El backend (Python) tiene ya un esqueleto real funcionando end-to-end (arquitect
 - Antes de implementar módulos nuevos, revisa `docs/modules.md` para no duplicar responsabilidades.
 - Sigue `docs/testing.md`: cómo se prueba cada nivel, qué verificar antes de cerrar una tarea (`backend/scripts/verificar.ps1`) y cómo corregir un error dejando una prueba de regresión. La versión corta, para tener presente mientras trabajas, está en `.claude/skills/verificar/SKILL.md`: **un cambio no está verificado hasta correr todos los niveles que le apliquen, y si uno aplica y no se corrió, se dice al reportar.**
 - Actualiza `docs/planning.md` cuando una fase se complete o cambie de alcance.
+- **Si cambias la forma de un endpoint, regenera `contratos/openapi.json` en el mismo commit** (`uv run python scripts/exportar_openapi.py` desde `backend/`). El frontend escribe sus tipos contra ese archivo, y una prueba del backend falla si no coincide con la API. Ver `docs/contrato-api.md`.
 - **Cada commit se informa al usuario en el momento en que se crea**, sin esperar al cierre de la tarea: hash corto, mensaje, qué incluye, cómo se verificó (niveles de prueba que corrieron y cuáles quedaron fuera) y si falta subirlo con `git push`. Un commit que el usuario no conoce es un cambio que no puede revisar. Aplica a todos los agentes, y cada commit lleva además la firma `Agente:` descrita en `docs/agents/README.md`.
 - Antes de asumir una regla de negocio de plataforma (VoIP, SMS, WhatsApp, correo) no detallada en `docs/atomics-requirements.md`, levántala con el usuario en vez de inventarla.

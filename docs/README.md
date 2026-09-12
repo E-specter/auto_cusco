@@ -11,6 +11,7 @@
 | [modules.md](modules.md) | Módulos del sistema, requerimientos que cubren y responsabilidades |
 | [mapeo-campos.md](mapeo-campos.md) | Motor de reglas de mapeo y expresión de campos (RF-12): plantillas, tipado y formatos, compartido por las cargas digitales y VoIP |
 | [consulta-cartera.md](consulta-cartera.md) | Contrato de consulta de cartera: endpoints, sintaxis de filtros, tipos de campo y operadores, y reglas de selección |
+| [contrato-api.md](contrato-api.md) | Contrato entre la API y el frontend: `contratos/openapi.json`, cómo se regenera y qué garantizan sus pruebas |
 | [generacion-cargas.md](generacion-cargas.md) | Generación de archivos de carga (RF-09, RF-13, RF-15): endpoints, previsualización, formatos XLSX/CSV/JSON y sus opciones |
 | [testing.md](testing.md) | Protocolo de pruebas y de corrección de errores por módulo: niveles, convenciones, criterio para cerrar una tarea e integración continua |
 | [versionado-sabanas.md](versionado-sabanas.md) | Evaluación y diseño del versionado de sábanas por fecha de corte: versión vigente, corrección de días pasados, eliminación y trazabilidad de formatos |

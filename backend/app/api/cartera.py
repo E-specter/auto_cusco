@@ -31,6 +31,7 @@ from app.api.consultas import (
     texto_si_es_monto,
     traducir_errores,
 )
+from app.api.errores import respuestas_de_error
 from app.core.entities.cartera import ConsultaInvalida, SinVersionVigente
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
 
@@ -44,6 +45,11 @@ def crear_servicio_cartera() -> ConsultaCarteraService:
 def obtener_servicio_cartera() -> ConsultaCarteraService:
     """Dependencia de FastAPI; los tests la sustituyen por un doble de prueba."""
     return crear_servicio_cartera()
+
+
+class CampoRespuesta(BaseModel):
+    tipo: str
+    operadores: list[str]
 
 
 class GrupoRespuesta(BaseModel):
@@ -78,7 +84,7 @@ def _producto(fila: dict[str, Any]) -> dict[str, Any]:
     return {clave: texto_si_es_monto(valor) for clave, valor in fila.items()}
 
 
-@router.get("/campos")
+@router.get("/campos", response_model=dict[str, CampoRespuesta])
 def listar_campos(
     servicio: ConsultaCarteraService = Depends(obtener_servicio_cartera),
 ) -> dict[str, dict]:
@@ -86,7 +92,7 @@ def listar_campos(
     return servicio.campos_disponibles()
 
 
-@router.get("", response_model=PaginaRespuesta)
+@router.get("", response_model=PaginaRespuesta, responses=respuestas_de_error(400, 404))
 def consultar_cartera(
     fecha_corte: date,
     filtro: list[str] = Query(default=[]),
@@ -115,7 +121,7 @@ def consultar_cartera(
     )
 
 
-@router.get("/metricas", response_model=MetricasRespuesta)
+@router.get("/metricas", response_model=MetricasRespuesta, responses=respuestas_de_error(400, 404))
 def metricas_cartera(
     fecha_corte: date,
     filtro: list[str] = Query(default=[]),
@@ -143,7 +149,11 @@ def metricas_cartera(
     )
 
 
-@router.get("/segmentacion", response_model=SegmentacionRespuesta)
+@router.get(
+    "/segmentacion",
+    response_model=SegmentacionRespuesta,
+    responses=respuestas_de_error(400, 404),
+)
 def segmentar_cartera(
     fecha_corte: date,
     campo: str,

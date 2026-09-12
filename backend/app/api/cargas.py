@@ -24,6 +24,7 @@ from pydantic import BaseModel, ConfigDict
 from app.adapters.input.lector_calamine import LectorCalamine
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_cargas_postgres import RepositorioCargasPostgres
+from app.api.errores import respuestas_de_error
 from app.core.entities.carga import (
     CargaDetalle,
     CargaNoEncontrada,
@@ -122,7 +123,12 @@ def _procesar_en_segundo_plano(servicio: IngestaSabanaService, carga_id: int) ->
         logger.error("Error al procesar la carga %s (%s)", carga_id, type(exc).__name__)
 
 
-@router.post("", status_code=202, response_model=CargaCreadaRespuesta)
+@router.post(
+    "",
+    status_code=202,
+    response_model=CargaCreadaRespuesta,
+    responses=respuestas_de_error(400, 413),
+)
 async def subir_sabana(
     tareas: BackgroundTasks,
     fecha_corte: date = Form(description="Fecha del corte que representa la sabana"),
@@ -171,7 +177,7 @@ def listar_versiones(
     return servicio.listar_versiones(fecha_corte, limite, desplazamiento)
 
 
-@router.get("/{carga_id}", response_model=VersionRespuesta)
+@router.get("/{carga_id}", response_model=VersionRespuesta, responses=respuestas_de_error(404))
 def obtener_version(
     carga_id: int, servicio: IngestaSabanaService = Depends(obtener_servicio)
 ) -> CargaDetalle:
@@ -181,7 +187,11 @@ def obtener_version(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.get("/{carga_id}/incidencias", response_model=IncidenciasRespuesta)
+@router.get(
+    "/{carga_id}/incidencias",
+    response_model=IncidenciasRespuesta,
+    responses=respuestas_de_error(404),
+)
 def listar_incidencias(
     carga_id: int,
     severidad: Severidad | None = Query(default=None),
@@ -196,7 +206,11 @@ def listar_incidencias(
     return IncidenciasRespuesta(total=total, incidencias=[_a_incidencia(i) for i in incidencias])
 
 
-@router.post("/{carga_id}/vigente", response_model=VersionRespuesta)
+@router.post(
+    "/{carga_id}/vigente",
+    response_model=VersionRespuesta,
+    responses=respuestas_de_error(404, 409),
+)
 def asignar_vigente(
     carga_id: int, servicio: IngestaSabanaService = Depends(obtener_servicio)
 ) -> CargaDetalle:
@@ -210,7 +224,7 @@ def asignar_vigente(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
-@router.delete("/{carga_id}", status_code=204)
+@router.delete("/{carga_id}", status_code=204, responses=respuestas_de_error(404, 409))
 def eliminar_version(
     carga_id: int,
     dejar_fecha_sin_vigente: bool = Query(

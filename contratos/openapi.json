@@ -1,0 +1,1840 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "auto_cusco API",
+    "description": "API REST del backend de auto_cusco: ingesta de sabanas, seleccion y segmentacion de cartera, generacion de cargas (digitales y VoIP) y reportes de cobranza.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "description": "Reporta si la API y la base de datos estan disponibles.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cargas": {
+      "post": {
+        "tags": [
+          "cargas"
+        ],
+        "summary": "Subir Sabana",
+        "description": "Registra una version nueva y lanza su procesamiento en segundo plano (V-1).",
+        "operationId": "subir_sabana_cargas_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_subir_sabana_cargas_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CargaCreadaRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "El archivo supera el tamano maximo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "cargas"
+        ],
+        "summary": "Listar Versiones",
+        "operationId": "listar_versiones_cargas_get",
+        "parameters": [
+          {
+            "name": "fecha_corte",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fecha Corte"
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limite"
+            }
+          },
+          {
+            "name": "desplazamiento",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Desplazamiento"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VersionRespuesta"
+                  },
+                  "title": "Response Listar Versiones Cargas Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cargas/{carga_id}": {
+      "get": {
+        "tags": [
+          "cargas"
+        ],
+        "summary": "Obtener Version",
+        "operationId": "obtener_version_cargas__carga_id__get",
+        "parameters": [
+          {
+            "name": "carga_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Carga Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "cargas"
+        ],
+        "summary": "Eliminar Version",
+        "operationId": "eliminar_version_cargas__carga_id__delete",
+        "parameters": [
+          {
+            "name": "carga_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Carga Id"
+            }
+          },
+          {
+            "name": "dejar_fecha_sin_vigente",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Confirma que la fecha quede sin version vigente (V-8)",
+              "default": false,
+              "title": "Dejar Fecha Sin Vigente"
+            },
+            "description": "Confirma que la fecha quede sin version vigente (V-8)"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operacion choca con el estado actual",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cargas/{carga_id}/incidencias": {
+      "get": {
+        "tags": [
+          "cargas"
+        ],
+        "summary": "Listar Incidencias",
+        "operationId": "listar_incidencias_cargas__carga_id__incidencias_get",
+        "parameters": [
+          {
+            "name": "carga_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Carga Id"
+            }
+          },
+          {
+            "name": "severidad",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Severidad"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Severidad"
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limite"
+            }
+          },
+          {
+            "name": "desplazamiento",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Desplazamiento"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidenciasRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cargas/{carga_id}/vigente": {
+      "post": {
+        "tags": [
+          "cargas"
+        ],
+        "summary": "Asignar Vigente",
+        "description": "Regla V-7: elige que version se considera para su fecha.",
+        "operationId": "asignar_vigente_cargas__carga_id__vigente_post",
+        "parameters": [
+          {
+            "name": "carga_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Carga Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operacion choca con el estado actual",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartera/campos": {
+      "get": {
+        "tags": [
+          "cartera"
+        ],
+        "summary": "Listar Campos",
+        "description": "Campos consultables con su tipo y los operadores que admite cada uno.",
+        "operationId": "listar_campos_cartera_campos_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/CampoRespuesta"
+                  },
+                  "type": "object",
+                  "title": "Response Listar Campos Cartera Campos Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartera": {
+      "get": {
+        "tags": [
+          "cartera"
+        ],
+        "summary": "Consultar Cartera",
+        "description": "Productos de la version vigente de la fecha (RF-04, RF-05, RF-08).",
+        "operationId": "consultar_cartera_cartera_get",
+        "parameters": [
+          {
+            "name": "fecha_corte",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Fecha Corte"
+            }
+          },
+          {
+            "name": "filtro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "title": "Filtro"
+            }
+          },
+          {
+            "name": "orden",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "campo, o -campo para descendente",
+              "title": "Orden"
+            },
+            "description": "campo, o -campo para descendente"
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 5000,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limite"
+            }
+          },
+          {
+            "name": "desplazamiento",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Desplazamiento"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartera/metricas": {
+      "get": {
+        "tags": [
+          "cartera"
+        ],
+        "summary": "Metricas Cartera",
+        "description": "Capital, cuentas, segmentos y cuotas de la seleccion (RF-26), mas RF-27.",
+        "operationId": "metricas_cartera_cartera_metricas_get",
+        "parameters": [
+          {
+            "name": "fecha_corte",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Fecha Corte"
+            }
+          },
+          {
+            "name": "filtro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "title": "Filtro"
+            }
+          },
+          {
+            "name": "indicador",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "title": "Indicador"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricasRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartera/segmentacion": {
+      "get": {
+        "tags": [
+          "cartera"
+        ],
+        "summary": "Segmentar Cartera",
+        "description": "Cuentas y capital por cada valor de un atributo (RF-06).",
+        "operationId": "segmentar_cartera_cartera_segmentacion_get",
+        "parameters": [
+          {
+            "name": "fecha_corte",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Fecha Corte"
+            }
+          },
+          {
+            "name": "campo",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Campo"
+            }
+          },
+          {
+            "name": "filtro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "title": "Filtro"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentacionRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/archivos-carga/formatos": {
+      "get": {
+        "tags": [
+          "archivos de carga"
+        ],
+        "summary": "Listar Formatos",
+        "description": "Formatos que se pueden generar y que opciones admite cada uno (RF-13).",
+        "operationId": "listar_formatos_archivos_carga_formatos_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FormatoRespuesta"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Formatos Archivos Carga Formatos Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/archivos-carga/previsualizacion": {
+      "post": {
+        "tags": [
+          "archivos de carga"
+        ],
+        "summary": "Previsualizar",
+        "description": "Primeras filas y errores de la carga, sin escribir el archivo.\n\n`disponibles` es el total de la seleccion completa, no el de la muestra: es\nlo que dice si alcanzan los productos para la cantidad pedida (RF-08).",
+        "operationId": "previsualizar_archivos_carga_previsualizacion_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionGeneracion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrevisualizacionRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/archivos-carga": {
+      "post": {
+        "tags": [
+          "archivos de carga"
+        ],
+        "summary": "Generar Archivo",
+        "description": "Genera la carga completa y devuelve el archivo (RF-09, RF-13, RF-15).\n\nEl resumen viaja en cabeceras `X-Carga-*` porque el cuerpo es el archivo;\nel detalle de los errores se consulta en `/previsualizacion`.",
+        "operationId": "generar_archivo_archivos_carga_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionGeneracion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "El archivo de carga en el formato pedido",
+            "headers": {
+              "Content-Disposition": {
+                "description": "attachment; filename=\"<nombre>.<extension>\"",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Carga-Generados": {
+                "description": "Filas escritas en el archivo",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              },
+              "X-Carga-Disponibles": {
+                "description": "Productos que cumplen la seleccion completa",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              },
+              "X-Carga-Solicitados": {
+                "description": "Cantidad de productos pedida",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              },
+              "X-Carga-Suficiente": {
+                "description": "1 si habia al menos tantos productos como se pidieron, 0 si no",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "0",
+                    "1"
+                  ]
+                }
+              },
+              "X-Carga-Errores": {
+                "description": "Campos que no se pudieron generar; el detalle esta en /previsualizacion",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              }
+            },
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_subir_sabana_cargas_post": {
+        "properties": {
+          "fecha_corte": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Corte",
+            "description": "Fecha del corte que representa la sabana"
+          },
+          "archivo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "description": "Archivo de la sabana (.xlsb, .xlsx)"
+          },
+          "hoja": {
+            "type": "string",
+            "title": "Hoja",
+            "default": "VENCIDA"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fecha_corte",
+          "archivo"
+        ],
+        "title": "Body_subir_sabana_cargas_post"
+      },
+      "CampoEntrada": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "plantilla": {
+            "type": "string",
+            "title": "Plantilla"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoSalida",
+            "default": "texto"
+          },
+          "formato_fecha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formato Fecha"
+          },
+          "formato_financiero": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FormatoFinancieroEntrada"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "plantilla"
+        ],
+        "title": "CampoEntrada"
+      },
+      "CampoRespuesta": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "operadores": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Operadores"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "operadores"
+        ],
+        "title": "CampoRespuesta"
+      },
+      "CargaCreadaRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "fecha_corte": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Corte"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "estado": {
+            "$ref": "#/components/schemas/EstadoCarga"
+          },
+          "versiones_identicas": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Versiones Identicas"
+          },
+          "aviso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aviso"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "fecha_corte",
+          "version",
+          "estado",
+          "versiones_identicas"
+        ],
+        "title": "CargaCreadaRespuesta"
+      },
+      "DefinicionEntrada": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "campos": {
+            "items": {
+              "$ref": "#/components/schemas/CampoEntrada"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Campos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "campos"
+        ],
+        "title": "DefinicionEntrada"
+      },
+      "DetalleError": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "DetalleError",
+        "description": "Motivo legible por el que la API rechazo la peticion."
+      },
+      "ErrorGeneracionRespuesta": {
+        "properties": {
+          "fila": {
+            "type": "integer",
+            "title": "Fila"
+          },
+          "campo": {
+            "type": "string",
+            "title": "Campo"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fila",
+          "campo",
+          "detalle"
+        ],
+        "title": "ErrorGeneracionRespuesta"
+      },
+      "EstadoCarga": {
+        "type": "string",
+        "enum": [
+          "en_cola",
+          "procesando",
+          "terminada",
+          "fallida"
+        ],
+        "title": "EstadoCarga",
+        "description": "Estado de procesamiento de una version (la ingesta corre en segundo plano)."
+      },
+      "FormatoArchivo": {
+        "type": "string",
+        "enum": [
+          "xlsx",
+          "csv",
+          "json"
+        ],
+        "title": "FormatoArchivo",
+        "description": "Formatos de archivo soportados (RF-13)."
+      },
+      "FormatoFinancieroEntrada": {
+        "properties": {
+          "separador_miles": {
+            "type": "string",
+            "maxLength": 1,
+            "title": "Separador Miles",
+            "default": ","
+          },
+          "separador_decimal": {
+            "type": "string",
+            "maxLength": 1,
+            "title": "Separador Decimal",
+            "default": "."
+          },
+          "decimales": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Decimales",
+            "default": 2
+          }
+        },
+        "type": "object",
+        "title": "FormatoFinancieroEntrada"
+      },
+      "FormatoRespuesta": {
+        "properties": {
+          "formato": {
+            "type": "string",
+            "title": "Formato"
+          },
+          "extension": {
+            "type": "string",
+            "title": "Extension"
+          },
+          "opciones": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Opciones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "formato",
+          "extension",
+          "opciones"
+        ],
+        "title": "FormatoRespuesta"
+      },
+      "GrupoRespuesta": {
+        "properties": {
+          "valor": {
+            "title": "Valor"
+          },
+          "cuentas": {
+            "type": "integer",
+            "title": "Cuentas"
+          },
+          "capital": {
+            "type": "string",
+            "title": "Capital"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valor",
+          "cuentas",
+          "capital"
+        ],
+        "title": "GrupoRespuesta"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthRespuesta": {
+        "properties": {
+          "api": {
+            "type": "boolean",
+            "title": "Api"
+          },
+          "database": {
+            "type": "boolean",
+            "title": "Database"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          }
+        },
+        "type": "object",
+        "required": [
+          "api",
+          "database",
+          "ok"
+        ],
+        "title": "HealthRespuesta"
+      },
+      "IncidenciaRespuesta": {
+        "properties": {
+          "fila": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fila"
+          },
+          "columna": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columna"
+          },
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "severidad": {
+            "$ref": "#/components/schemas/Severidad"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          },
+          "valor_original": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor Original"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fila",
+          "columna",
+          "codigo",
+          "severidad",
+          "detalle"
+        ],
+        "title": "IncidenciaRespuesta"
+      },
+      "IncidenciasRespuesta": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "incidencias": {
+            "items": {
+              "$ref": "#/components/schemas/IncidenciaRespuesta"
+            },
+            "type": "array",
+            "title": "Incidencias"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "incidencias"
+        ],
+        "title": "IncidenciasRespuesta"
+      },
+      "MetricasRespuesta": {
+        "properties": {
+          "cuentas": {
+            "type": "integer",
+            "title": "Cuentas"
+          },
+          "capital_total": {
+            "type": "string",
+            "title": "Capital Total"
+          },
+          "cuota_minima": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuota Minima"
+          },
+          "cuota_maxima": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuota Maxima"
+          },
+          "cuentas_por_segmento": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Cuentas Por Segmento"
+          },
+          "adicionales": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Adicionales"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cuentas",
+          "capital_total",
+          "cuota_minima",
+          "cuota_maxima",
+          "cuentas_por_segmento",
+          "adicionales"
+        ],
+        "title": "MetricasRespuesta"
+      },
+      "OpcionesEntrada": {
+        "properties": {
+          "delimitador": {
+            "type": "string",
+            "maxLength": 1,
+            "minLength": 1,
+            "title": "Delimitador",
+            "default": ","
+          },
+          "codificacion": {
+            "type": "string",
+            "title": "Codificacion",
+            "default": "utf-8"
+          },
+          "con_cabeceras": {
+            "type": "boolean",
+            "title": "Con Cabeceras",
+            "default": true
+          },
+          "hoja": {
+            "type": "string",
+            "title": "Hoja",
+            "default": "Carga"
+          },
+          "sangria": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 8.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sangria"
+          }
+        },
+        "type": "object",
+        "title": "OpcionesEntrada"
+      },
+      "PaginaRespuesta": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limite": {
+            "type": "integer",
+            "title": "Limite"
+          },
+          "desplazamiento": {
+            "type": "integer",
+            "title": "Desplazamiento"
+          },
+          "suficiente": {
+            "type": "boolean",
+            "title": "Suficiente"
+          },
+          "productos": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Productos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "limite",
+          "desplazamiento",
+          "suficiente",
+          "productos"
+        ],
+        "title": "PaginaRespuesta"
+      },
+      "PeticionGeneracion": {
+        "properties": {
+          "fecha_corte": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Corte"
+          },
+          "definicion": {
+            "$ref": "#/components/schemas/DefinicionEntrada"
+          },
+          "formato": {
+            "$ref": "#/components/schemas/FormatoArchivo",
+            "default": "xlsx"
+          },
+          "filtros": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Filtros",
+            "default": []
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          },
+          "cantidad": {
+            "type": "integer",
+            "maximum": 120000.0,
+            "minimum": 1.0,
+            "title": "Cantidad",
+            "default": 1000
+          },
+          "opciones": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpcionesEntrada"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "fecha_corte",
+          "definicion"
+        ],
+        "title": "PeticionGeneracion"
+      },
+      "PrevisualizacionRespuesta": {
+        "properties": {
+          "nombre_archivo": {
+            "type": "string",
+            "title": "Nombre Archivo"
+          },
+          "cabeceras": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cabeceras"
+          },
+          "filas": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Filas"
+          },
+          "disponibles": {
+            "type": "integer",
+            "title": "Disponibles"
+          },
+          "solicitados": {
+            "type": "integer",
+            "title": "Solicitados"
+          },
+          "generados": {
+            "type": "integer",
+            "title": "Generados"
+          },
+          "suficiente": {
+            "type": "boolean",
+            "title": "Suficiente"
+          },
+          "completa": {
+            "type": "boolean",
+            "title": "Completa"
+          },
+          "errores": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorGeneracionRespuesta"
+            },
+            "type": "array",
+            "title": "Errores"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre_archivo",
+          "cabeceras",
+          "filas",
+          "disponibles",
+          "solicitados",
+          "generados",
+          "suficiente",
+          "completa",
+          "errores"
+        ],
+        "title": "PrevisualizacionRespuesta"
+      },
+      "SegmentacionRespuesta": {
+        "properties": {
+          "campo": {
+            "type": "string",
+            "title": "Campo"
+          },
+          "grupos": {
+            "items": {
+              "$ref": "#/components/schemas/GrupoRespuesta"
+            },
+            "type": "array",
+            "title": "Grupos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "campo",
+          "grupos"
+        ],
+        "title": "SegmentacionRespuesta"
+      },
+      "Severidad": {
+        "type": "string",
+        "enum": [
+          "error",
+          "advertencia",
+          "info"
+        ],
+        "title": "Severidad",
+        "description": "Gravedad de una incidencia detectada al normalizar."
+      },
+      "TipoSalida": {
+        "type": "string",
+        "enum": [
+          "texto",
+          "numero",
+          "fecha",
+          "financiero"
+        ],
+        "title": "TipoSalida",
+        "description": "Tipado explicito de cada campo generado (RF-12)."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VersionRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "fecha_corte": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Corte"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "estado": {
+            "$ref": "#/components/schemas/EstadoCarga"
+          },
+          "vigente": {
+            "type": "boolean",
+            "title": "Vigente"
+          },
+          "nombre_archivo": {
+            "type": "string",
+            "title": "Nombre Archivo"
+          },
+          "tamano_bytes": {
+            "type": "integer",
+            "title": "Tamano Bytes"
+          },
+          "hoja": {
+            "type": "string",
+            "title": "Hoja"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "procesado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procesado En"
+          },
+          "huella_formato": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Huella Formato"
+          },
+          "filas_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filas Total"
+          },
+          "filas_ingestadas": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filas Ingestadas"
+          },
+          "incidencias_error": {
+            "type": "integer",
+            "title": "Incidencias Error",
+            "default": 0
+          },
+          "incidencias_advertencia": {
+            "type": "integer",
+            "title": "Incidencias Advertencia",
+            "default": 0
+          },
+          "incidencias_info": {
+            "type": "integer",
+            "title": "Incidencias Info",
+            "default": 0
+          },
+          "motivo_fallo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Fallo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "fecha_corte",
+          "version",
+          "estado",
+          "vigente",
+          "nombre_archivo",
+          "tamano_bytes",
+          "hoja",
+          "creado_en"
+        ],
+        "title": "VersionRespuesta"
+      }
+    }
+  }
+}
