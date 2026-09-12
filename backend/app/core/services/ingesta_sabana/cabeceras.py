@@ -41,13 +41,28 @@ def mapear_cabeceras(
             asignadas.add(libre.nombre)
             continue
         desconocidas[indice] = original
-        codigo = "cabecera_duplicada" if candidatas else "cabecera_desconocida"
-        detalle = (
-            f"La cabecera de la posicion {indice + 1} repite una columna ya asignada"
-            if candidatas
-            else f"La cabecera de la posicion {indice + 1} no esta en el catalogo"
-        )
-        incidencias.append(Incidencia(None, original, codigo, Severidad.ADVERTENCIA, detalle))
+        # Codigo literal en cada rama: asi el catalogo de codigos se puede verificar
+        # (ver tests/test_codigos_incidencia.py).
+        if candidatas:
+            incidencias.append(
+                Incidencia(
+                    None,
+                    original,
+                    "cabecera_duplicada",
+                    Severidad.ADVERTENCIA,
+                    f"La cabecera de la posicion {indice + 1} repite una columna ya asignada",
+                )
+            )
+        else:
+            incidencias.append(
+                Incidencia(
+                    None,
+                    original,
+                    "cabecera_desconocida",
+                    Severidad.ADVERTENCIA,
+                    f"La cabecera de la posicion {indice + 1} no esta en el catalogo",
+                )
+            )
 
     faltantes = [col for col in catalogo if col.nombre not in asignadas]
     for col in faltantes:

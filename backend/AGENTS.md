@@ -43,7 +43,7 @@ Revisa siempre la migracion autogenerada antes de aplicarla: autogenerate no det
 
 ### Contratos con el frontend
 
-- Si agregas un `codigo` de incidencia nuevo en `ingesta_sabana`, agregalo tambien a `frontend/src/i18n/es.json` y `frontend/src/i18n/en.json`: el frontend traduce el detalle por codigo y usa el texto del backend solo como respaldo.
+- Los codigos de incidencia viven en `app/core/entities/incidencias.py` (`CODIGOS_INCIDENCIA`). Al agregar uno nuevo en `ingesta_sabana`, sumalo ahi y tambien a `frontend/src/i18n/es.json` y `frontend/src/i18n/en.json`: el frontend traduce el detalle por codigo y usa el texto del backend solo como respaldo. `tests/test_codigos_incidencia.py` falla si el catalogo y lo que se emite dejan de coincidir.
 - La API no envia cabeceras CORS salvo que `CORS_ORIGENES` este definido en `/.env` (ver `configurar_cors` en `app/main.py`). En desarrollo el dev server de Astro redirige `/api` al backend, asi que no hacen falta.
 
 ## Convencion de codigo: puertos/adaptadores con vertical slicing (RF-30)
