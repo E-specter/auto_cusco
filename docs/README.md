@@ -9,6 +9,7 @@
 | [setup.md](setup.md) | Instalación y ejecución del proyecto, paso a paso |
 | [requirements.md](requirements.md) | Resumen de contexto y requerimientos no funcionales (remite a atomics-requirements.md para el detalle funcional) |
 | [modules.md](modules.md) | Módulos del sistema, requerimientos que cubren y responsabilidades |
+| [mapeo-campos.md](mapeo-campos.md) | Motor de reglas de mapeo y expresión de campos (RF-12): plantillas, tipado y formatos, compartido por las cargas digitales y VoIP |
 | [consulta-cartera.md](consulta-cartera.md) | Contrato de consulta de cartera: endpoints, sintaxis de filtros, tipos de campo y operadores, y reglas de selección |
 | [testing.md](testing.md) | Protocolo de pruebas y de corrección de errores por módulo: niveles, convenciones, criterio para cerrar una tarea e integración continua |
 | [versionado-sabanas.md](versionado-sabanas.md) | Evaluación y diseño del versionado de sábanas por fecha de corte: versión vigente, corrección de días pasados, eliminación y trazabilidad de formatos |

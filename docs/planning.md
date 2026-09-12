@@ -82,6 +82,12 @@ Alcance:
 
 ## Fase 3 — Generación de cargas para plataformas digitales (RF-09 – RF-15)
 
+Avance:
+
+- [x] Motor de reglas de mapeo y expresión de campos (RF-12), compartido con la Fase 4: plantillas con valores fijos, referencias `[@campo]`, prefijos y concatenación, más tipado explícito de texto, número, fecha con formato configurable y financiero con separadores configurables. Los errores se juntan por fila y campo sin detener la generación. Ver `docs/mapeo-campos.md`.
+- [ ] Guardar y editar definiciones de carga desde la interfaz.
+- [ ] Adaptadores de plataforma (SMS y WhatsApp primero) y exportación a XLSX, CSV y JSON.
+
 - Generación de tablas de carga personalizadas a partir de los productos seleccionados.
 - Adaptadores independientes por plataforma. **Primeras plataformas objetivo: SMS y WhatsApp** (decidido); correo electrónico queda para una iteración posterior, y futuras plataformas se incorporan bajo el mismo patrón de adaptador (RF-14).
 - Motor de reglas de mapeo y expresión de campos (RF-12) — **compartido con la Fase 4 (VoIP)**: valores fijos, concatenación con campos de origen (`[@campo]`), prefijos/sufijos, y parseo/tipado explícito (`fecha` con formato configurable, `numero`, `texto`, `financiero` con separadores configurables).
