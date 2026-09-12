@@ -64,4 +64,5 @@ Lo segundo es lo que permite decidir si se puede seguir. Lo primero suena mejor 
 
 - `docs/planning.md` si se completó un punto o cambió el alcance; `docs/modules.md` si cambió el estado de un módulo.
 - Si cambió una regla de negocio, actualízala en su documento (`docs/sabana-schema.md`, `docs/versionado-sabanas.md`, `docs/mapeo-campos.md`, `docs/generacion-cargas.md`, `docs/consulta-cartera.md`).
-- Commit con prefijo `feat`, `fix`, `docs`, `test`, `refactor` o `chore` y el módulo entre paréntesis.
+- Commit con prefijo `feat`, `fix`, `docs`, `test`, `refactor` o `chore` y el módulo entre paréntesis, firmado con el trailer `Agente: <nombre de la sesión>` (ver `docs/agents/README.md`).
+- **Informa el commit al usuario en cuanto lo creas:** hash corto, mensaje, qué incluye, qué niveles de prueba corrieron y cuáles no, y si falta `git push`.

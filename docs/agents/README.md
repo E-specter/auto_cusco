@@ -47,6 +47,17 @@ Claude-Session: https://claude.ai/code/session_...
 
 - **Se firma el trabajo propio.** Si una sesión commitea trabajo de otra —pasa, y es legítimo— el mensaje lo dice en el cuerpo y el trailer nombra a quien lo escribió, no a quien ejecutó el commit.
 
+## Informar cada commit
+
+**Todo commit se le informa al usuario en el momento en que se crea**, no al final de la tarea ni agrupado con otros. El aviso dice:
+
+- el hash corto y el mensaje,
+- qué incluye, en una o dos líneas,
+- cómo se verificó: qué niveles de prueba corrieron y cuáles quedaron fuera, con el motivo,
+- si queda pendiente subirlo con `git push`.
+
+Varios agentes commitean en el mismo repositorio; si el usuario no se entera de un commit, no puede revisarlo ni saber qué está por subir.
+
 Esto no reemplaza el prefijo por módulo (`feat`, `fix`, `docs`, `test`, `refactor`, `chore`) que define `docs/testing.md`, sección 4: lo complementa.
 
 ## Archivos anidados
