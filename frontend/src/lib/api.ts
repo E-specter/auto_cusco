@@ -43,11 +43,20 @@ export class NetworkError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * Reach the API and hand back a response that said yes, whatever its body.
+ * Binary downloads start here too (see `descargas.ts`), so every caller shares
+ * one reading of "the server said no" versus "the server never answered".
+ *
+ * A request the caller aborted rethrows its `AbortError` untouched: a newer
+ * request replacing it is not the API being down.
+ */
+export async function requestRespuesta(path: string, init?: RequestInit): Promise<Response> {
   let response: Response;
   try {
     response = await fetch(`${API_BASE}${path}`, init);
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
     throw new NetworkError();
   }
 
@@ -62,6 +71,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(response.status, detail);
   }
 
+  return response;
+}
+
+/** A JSON call. Feature clients (`api-<module>.ts`) build on this one. */
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await requestRespuesta(path, init);
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
