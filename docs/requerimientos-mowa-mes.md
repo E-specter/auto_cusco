@@ -18,6 +18,7 @@ Los requerimientos de este documento se numeran `RF-MM-XX` dentro del módulo, p
 
 * **RF-MM-01 — Control del límite mensual:** Mostrar cuántos SMS se cargaron en el mes calendario y cuánto queda respecto del límite mensual de la plataforma.
   * Límite por defecto: 2 500 000 SMS por mes, configurable (RF-32).
+  * El consumo de una campaña se imputa al mes calendario de su fecha de envío, la misma que usa RF-MM-15 (supuesto S-MM-7).
   * Si una campaña superaría el límite del mes, entonces el sistema lo advierte antes de generar la carga y pide confirmación explícita (supuesto S-MM-2: advertir, no bloquear).
 * **RF-MM-02 — SMS cargados y SMS enviados:** Distinguir en cada campaña los **SMS cargados** (los que el sistema generó y exportó) de los **SMS enviados** (los que MES reporta como despachados), porque pueden diferir por causas propias de la plataforma.
   * Los cargados se conocen al generar la carga; los enviados, al importar el reporte de enviados (sección 5).
@@ -40,8 +41,9 @@ Los requerimientos de este documento se numeran `RF-MM-XX` dentro del módulo, p
   * `Enviar en hora determinada` (**por defecto**): una fecha y hora; la fecha sugerida es el siguiente día gestionable (RF-MM-08).
   * `Enviar en diferentes horas` (uso ocasional): varias fechas y horas.
 * **RF-MM-08 — Día gestionable:** Calcular el siguiente día gestionable a partir de la fecha de generación: de lunes a viernes, excluyendo los feriados nacionales de Perú.
-  * El calendario de feriados es configurable: se pueden agregar días no laborables decretados y ajustar la lista cuando cambie la ley (RF-32, RF-33).
-  * Supuesto S-MM-4: el calendario inicial es la lista de feriados nacionales vigente al 2026, incluidos los que dependen de Semana Santa (Jueves y Viernes Santo). Debe revisarse con el usuario.
+  * Los feriados nacionales se calculan para cualquier año: los de fecha fija por su día y mes, y Jueves y Viernes Santo a partir de la fecha de Pascua. Así el cálculo no depende de cargar las fechas de cada año.
+  * La configuración permite agregar días no laborables decretados y retirar un feriado cuando cambie la ley (RF-32, RF-33).
+  * Supuesto S-MM-4: la regla inicial es la lista de feriados nacionales de Perú vigente al 2026. Debe revisarse con el usuario.
 * **RF-MM-09 — Base de datos de la campaña:** Tomar como base de la campaña una selección de cartera de una fecha de corte (filtros, orden y cantidad, o una selección guardada), con el mismo orden y desempate que la lista de `/cartera` y que el resumen del top n (RF-08).
 
 ## 3. Archivo de carga
@@ -59,10 +61,13 @@ Formato confirmado con el ejemplo de carga (sección 7).
 * **RF-MM-11 — Límites por archivo y división:** Limitar cada archivo de carga a **50 000 registros y 2 MB**; si la carga supera cualquiera de los dos límites, entonces dividirla en dos o más archivos que respeten ambos.
   * Los registros de supervisión van en el primer archivo (RF-41).
   * Cada archivo conserva el orden de la selección.
+  * El límite de 2 MB se mide sobre el tamaño real del `.xlsx` generado, no sobre una estimación.
+  * Los archivos generados se conservan con la campaña: una descarga posterior entrega exactamente los mismos archivos, aunque la cartera o el speech hayan cambiado.
 * **RF-MM-12 — Registros de supervisión en MOWA MES:** Ubicar los registros de supervisión (RF-37 a RF-40) **al inicio del primer archivo**, antes de los productos de la cartera, como en el formato observado.
   * `numero`: el número del supervisor; `dni`: el asignado según RF-39; `mensaje`: el de la primera fila válida de productos (RF-40).
 * **RF-MM-13 — Productos excluidos de la carga:** Excluir de la carga, y reportar con su motivo, cada producto que cumpla alguna de estas condiciones:
   * No tiene teléfono válido según RF-02.
+  * No tiene documento de identidad para la columna `dni` (supuesto S-MM-8).
   * No tiene speech: sus días de atraso ajustados quedan fuera de los segmentos de RF-MM-15.
   * Le falta un dato que el speech necesita (titular o fecha de vencimiento de cuota).
   * Su mensaje supera los 160 caracteres (RF-MM-19).
@@ -102,6 +107,7 @@ Formato confirmado con el ejemplo de carga (sección 7).
 * **RF-MM-17 — Speech versionado y trazable:** Permitir ajustar y personalizar las partes del speech de cada segmento, guardando cada cambio como una **versión nueva y trazable** (`Speech original`, `Speech 2`, …).
   * Cada campaña registra la versión de speech con la que se generó.
   * Si una versión ya se usó en alguna campaña, entonces no se modifica: el cambio crea una versión nueva.
+  * La versión `Speech original` (RF-MM-18) es la referencia del módulo y **no se modifica nunca**, aunque no se haya usado: personalizarla siempre crea una versión nueva.
   * La estructura de RF-MM-14 es la de la versión por defecto; una versión nueva puede cambiar el texto de las partes.
 * **RF-MM-18 — Speech original:** Mantener como versión por defecto el speech vigente, con la fecha incluida en todos los segmentos:
 
@@ -118,7 +124,7 @@ Formato confirmado con el ejemplo de carga (sección 7).
 * **RF-MM-19 — Largo del mensaje:** Controlar el largo de cada `mensaje`:
   * Si supera **160 caracteres** (límite de un SMS), entonces el producto se excluye (RF-MM-13).
   * Si supera **150 caracteres**, entonces se carga pero se advierte, porque el speech se ajusta para no pasar de ~150.
-  * La previsualización de una versión de speech muestra el largo máximo que puede alcanzar cada segmento. Con el speech original, `9 a 30` llega a unos 152 caracteres: se advierte.
+  * La previsualización de una versión de speech muestra el largo máximo que puede alcanzar cada segmento. Con el speech original, `9 a 30` llega a 156 caracteres: se advierte.
 
 ## 5. Reporte de enviados (descargado de MES)
 
@@ -140,10 +146,11 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
   * Si falta una columna o la hoja no tiene filas, entonces se rechaza con el motivo.
 * **RF-MM-21 — Asociar el reporte a la campaña:** Asociar cada reporte importado a una campaña del sistema, identificada en MES por su `id`.
   * Una campaña del sistema puede tener varios `id` de MES si su carga se dividió en varios archivos.
+  * Si un mismo archivo de reporte trae varios `id` de MES, entonces cada `id` se asocia a la campaña elegida y se muestra su conteo por separado; si un `id` no coincide con ninguna fila cargada de la campaña, se advierte, porque probablemente es de otra campaña.
   * Si el mismo `id` de MES ya estaba importado, entonces se advierte y se reemplaza solo con confirmación.
 * **RF-MM-22 — Conciliación de cargados y enviados:** Conciliar las filas cargadas con las filas del reporte y mostrar, por campaña: cargados, enviados, cargados no enviados y filas del reporte sin correspondencia, además del conteo por `estado`.
   * La correspondencia usa `numero`/`celular`, `dni` y `mensaje` normalizado.
-  * **Normalización del mensaje:** sin tildes ni diéresis y sin espacios en los extremos, porque MES los quita al enviar (sección 7).
+  * **Normalización del mensaje:** se quitan los signos diacríticos (tildes, diéresis y la virgulilla de la `ñ`, que queda `n`) y los espacios en los extremos, **por igual en el mensaje cargado y en el enviado**. MES quita las tildes y recorta espacios al enviar (sección 7); normalizar los dos lados hace que la conciliación funcione aunque MES conserve o no la `ñ`.
   * Los registros de supervisión se concilian y se muestran aparte de los productos (RF-41).
 
 ## 6. Decisiones tomadas sobre los puntos abiertos del pedido
@@ -185,6 +192,8 @@ Los ejemplos están en `archivos_anexo_chat/`, con prefijo `MOWA_MES_Ejemplo_`: 
 | S-MM-1 | Sin integración por API: se generan archivos y se importa el reporte a mano | Todo el módulo |
 | S-MM-2 | Superar el límite mensual se advierte y se confirma, no se bloquea | RF-MM-01 |
 | S-MM-3 | La descripción de campaña no tiene largo máximo mientras no se confirme el de MES | RF-MM-04 |
-| S-MM-4 | Calendario inicial: feriados nacionales de Perú vigentes al 2026, configurable | RF-MM-08 |
+| S-MM-4 | Feriados nacionales de Perú vigentes al 2026, calculados por regla para cualquier año; decretos y cambios de ley por configuración | RF-MM-08 |
 | S-MM-5 | Con `Enviar en diferentes horas`, el segmento se calcula con la fecha más temprana | RF-MM-15 |
 | S-MM-6 | `dias_ajustados = 0` es `Preventiva` | RF-MM-15 |
+| S-MM-7 | El consumo del límite mensual se imputa al mes de la fecha de envío, no al de generación | RF-MM-01 |
+| S-MM-8 | Un producto sin documento de identidad se excluye (no se carga con `dni` vacío) | RF-MM-13 |

@@ -58,7 +58,7 @@ El esqueleto real de este enfoque ya existe en `backend/app/` (`core/{entities,p
   | Puertos | `app/core/ports/` | Repositorio de campañas, speech y supervisores; lector del reporte de enviados; escritor del archivo de carga |
   | Archivo de carga | `app/adapters/output/plataformas/mowa_mes/` | `.xlsx` en el formato de MES, reutilizando el exportador XLSX |
   | Reporte de enviados | `app/adapters/input/` | Lectura con `python-calamine` y validación de columnas |
-  | Persistencia | `app/adapters/persistence/` + migración Alembic | Campañas, archivos, filas cargadas, speech por versión, supervisores por defecto, feriados, reportes importados |
+  | Persistencia | `app/adapters/persistence/` + migración Alembic | Campañas, archivos, filas cargadas, speech por versión, supervisores por defecto, feriados, reportes importados. Los `.xlsx` generados se guardan en PostgreSQL, igual que el archivo original de cada sábana, para que la descarga sea reproducible |
   | API | `app/api/mowa_mes.py` | Configuración, speech, supervisores, previsualización y creación de campaña, descarga de archivos, importación del reporte, límite mensual |
   | Frontend | `frontend/src/pages/` | Pantalla de campaña, seguimiento de cargados y enviados, configuración de speech y supervisores |
 
