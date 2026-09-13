@@ -22,4 +22,4 @@
 
 ## Nota de continuidad para la próxima sesión
 
-- 2026-09-13: requerimientos generales de gestiones digitales (supervisión) y específicos de `mowa_mes` en redacción; decisiones del usuario: RF nuevos como sección aparte sin renumerar, fecha en todos los speech y exclusión de productos sin speech, supervisión configurable por campaña, delegación por subagentes desde esta sesión.
+- 2026-09-13: requerimientos generales de gestiones digitales (supervisión) y específicos de `mowa_mes` en redacción; decisiones del usuario: RF nuevos como sección aparte sin renumerar, fecha en todos los speech y exclusión de productos sin speech, supervisión configurable por campaña. Delegación a las sesiones ya abiertas `coordinador_modulo_mowa_mes`, `dev_backend_modulo_mowa_mes` y `dev_frontend_modulo_mowa_mes`: el usuario eligió usarlas en vez de lanzar subagentes, para no tener dos agentes con el mismo nombre en el repositorio. Requerimientos commiteados en `1bd7bb7`.

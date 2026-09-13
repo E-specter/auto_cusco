@@ -952,7 +952,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PrevisualizacionRespuesta"
+                  "$ref": "#/components/schemas/app__api__archivos_carga__PrevisualizacionRespuesta"
                 }
               }
             }
@@ -1415,6 +1415,662 @@
           }
         }
       }
+    },
+    "/calendario/feriados": {
+      "get": {
+        "tags": [
+          "calendario"
+        ],
+        "summary": "Listar Feriados",
+        "description": "Feriados de ley del ano (los retirados, marcados) y los dias agregados.",
+        "operationId": "listar_feriados_calendario_feriados_get",
+        "parameters": [
+          {
+            "name": "anio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 2999,
+                  "minimum": 1900
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Anio"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeriadosRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calendario/excepciones": {
+      "get": {
+        "tags": [
+          "calendario"
+        ],
+        "summary": "Listar Excepciones",
+        "operationId": "listar_excepciones_calendario_excepciones_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExcepcionRespuesta"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Excepciones Calendario Excepciones Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "calendario"
+        ],
+        "summary": "Agregar Excepcion",
+        "description": "Agrega un dia no laborable decretado o retira un feriado de ley de ese ano.",
+        "operationId": "agregar_excepcion_calendario_excepciones_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExcepcionEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExcepcionRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operacion choca con el estado actual",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calendario/excepciones/{fecha}": {
+      "delete": {
+        "tags": [
+          "calendario"
+        ],
+        "summary": "Eliminar Excepcion",
+        "operationId": "eliminar_excepcion_calendario_excepciones__fecha__delete",
+        "parameters": [
+          {
+            "name": "fecha",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Fecha"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calendario/siguiente-dia-gestionable": {
+      "get": {
+        "tags": [
+          "calendario"
+        ],
+        "summary": "Siguiente Dia Gestionable",
+        "description": "Primer dia de lunes a viernes, posterior a `desde`, que no es feriado ni decretado.",
+        "operationId": "siguiente_dia_gestionable_calendario_siguiente_dia_gestionable_get",
+        "parameters": [
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiguienteDiaRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/supervisores": {
+      "get": {
+        "tags": [
+          "supervisores"
+        ],
+        "summary": "Obtener Supervisores",
+        "operationId": "obtener_supervisores_supervisores_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionSupervisionRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "supervisores"
+        ],
+        "summary": "Reemplazar Supervisores",
+        "description": "Reemplaza procedencias y supervisores. Los numeros siguen RF-02.",
+        "operationId": "reemplazar_supervisores_supervisores_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfiguracionSupervisionEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionSupervisionRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mowa-mes/configuracion": {
+      "get": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Obtener Configuracion",
+        "operationId": "obtener_configuracion_mowa_mes_configuracion_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Guardar Configuracion",
+        "description": "Limite mensual (RF-MM-01) y WhatsApp de contacto por defecto (RF-MM-16), que sigue RF-02.",
+        "operationId": "guardar_configuracion_mowa_mes_configuracion_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfiguracionEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mowa-mes/speech": {
+      "get": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Listar Speech",
+        "operationId": "listar_speech_mowa_mes_speech_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VersionSpeechRespuesta"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Speech Mowa Mes Speech Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Crear Speech",
+        "description": "Guarda una version nueva. 404 si `basada_en_id` no existe.",
+        "operationId": "crear_speech_mowa_mes_speech_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpeechNuevoEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionSpeechRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operacion choca con el estado actual",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mowa-mes/speech/previsualizacion": {
+      "post": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Previsualizar Speech",
+        "description": "Largo maximo de cada segmento, con titular de 8 y fecha de 10 (RF-MM-19).\n\nUn segmento que usa [whatsapp] sin numero se marca con `falta_whatsapp` y sin\nejemplo: nunca se muestra un enlace roto.",
+        "operationId": "previsualizar_speech_mowa_mes_speech_previsualizacion_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrevisualizacionEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__api__mowa_mes__PrevisualizacionRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mowa-mes/speech/{speech_id}": {
+      "get": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Obtener Speech",
+        "operationId": "obtener_speech_mowa_mes_speech__speech_id__get",
+        "parameters": [
+          {
+            "name": "speech_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Speech Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionSpeechRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Actualizar Speech",
+        "description": "Reemplaza una version que nadie uso. Si ya se uso o es la original, 409.",
+        "operationId": "actualizar_speech_mowa_mes_speech__speech_id__put",
+        "parameters": [
+          {
+            "name": "speech_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Speech Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpeechEdicionEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionSpeechRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operacion choca con el estado actual",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1581,6 +2237,136 @@
         ],
         "title": "CargaCreadaRespuesta"
       },
+      "CodigoMowaMes": {
+        "type": "string",
+        "enum": [
+          "telefono_invalido",
+          "falta_documento",
+          "sin_speech",
+          "falta_titular",
+          "falta_vencimiento",
+          "mensaje_excede_160",
+          "mensaje_excede_150",
+          "limite_mensual_excedido"
+        ],
+        "title": "CodigoMowaMes",
+        "description": "Motivos de exclusion y advertencias, en el orden en que se evaluan.\n\nUn producto excluido lleva un solo motivo: el primero que falla en este orden."
+      },
+      "ConfiguracionEntrada": {
+        "properties": {
+          "limite_mensual": {
+            "type": "integer",
+            "maximum": 1000000000.0,
+            "minimum": 1.0,
+            "title": "Limite Mensual"
+          },
+          "whatsapp_contacto": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Contacto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "limite_mensual"
+        ],
+        "title": "ConfiguracionEntrada"
+      },
+      "ConfiguracionRespuesta": {
+        "properties": {
+          "limite_mensual": {
+            "type": "integer",
+            "title": "Limite Mensual"
+          },
+          "whatsapp_contacto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Contacto"
+          },
+          "actualizado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualizado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "limite_mensual",
+          "whatsapp_contacto",
+          "actualizado_en"
+        ],
+        "title": "ConfiguracionRespuesta"
+      },
+      "ConfiguracionSupervisionEntrada": {
+        "properties": {
+          "procedencias": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Procedencias"
+          },
+          "supervisores": {
+            "items": {
+              "$ref": "#/components/schemas/SupervisorEntrada"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Supervisores"
+          }
+        },
+        "type": "object",
+        "required": [
+          "procedencias",
+          "supervisores"
+        ],
+        "title": "ConfiguracionSupervisionEntrada"
+      },
+      "ConfiguracionSupervisionRespuesta": {
+        "properties": {
+          "procedencias": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Procedencias"
+          },
+          "supervisores": {
+            "items": {
+              "$ref": "#/components/schemas/SupervisorRespuesta"
+            },
+            "type": "array",
+            "title": "Supervisores"
+          }
+        },
+        "type": "object",
+        "required": [
+          "procedencias",
+          "supervisores"
+        ],
+        "title": "ConfiguracionSupervisionRespuesta"
+      },
       "DefinicionEntrada": {
         "properties": {
           "nombre": {
@@ -1617,6 +2403,34 @@
         "title": "DetalleError",
         "description": "Motivo legible por el que la API rechazo la peticion."
       },
+      "DiaNoLaborableRespuesta": {
+        "properties": {
+          "fecha": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha"
+          },
+          "descripcion": {
+            "type": "string",
+            "title": "Descripcion"
+          },
+          "origen": {
+            "$ref": "#/components/schemas/OrigenDia"
+          },
+          "retirado": {
+            "type": "boolean",
+            "title": "Retirado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fecha",
+          "descripcion",
+          "origen",
+          "retirado"
+        ],
+        "title": "DiaNoLaborableRespuesta"
+      },
       "ErrorGeneracionRespuesta": {
         "properties": {
           "fila": {
@@ -1650,6 +2464,88 @@
         ],
         "title": "EstadoCarga",
         "description": "Estado de procesamiento de una version (la ingesta corre en segundo plano)."
+      },
+      "ExcepcionEntrada": {
+        "properties": {
+          "fecha": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoExcepcion"
+          },
+          "descripcion": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Descripcion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fecha",
+          "tipo",
+          "descripcion"
+        ],
+        "title": "ExcepcionEntrada"
+      },
+      "ExcepcionRespuesta": {
+        "properties": {
+          "fecha": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoExcepcion"
+          },
+          "descripcion": {
+            "type": "string",
+            "title": "Descripcion"
+          },
+          "creado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fecha",
+          "tipo",
+          "descripcion",
+          "creado_en"
+        ],
+        "title": "ExcepcionRespuesta"
+      },
+      "FeriadosRespuesta": {
+        "properties": {
+          "anio": {
+            "type": "integer",
+            "title": "Anio"
+          },
+          "dias": {
+            "items": {
+              "$ref": "#/components/schemas/DiaNoLaborableRespuesta"
+            },
+            "type": "array",
+            "title": "Dias"
+          }
+        },
+        "type": "object",
+        "required": [
+          "anio",
+          "dias"
+        ],
+        "title": "FeriadosRespuesta"
       },
       "FormatoArchivo": {
         "type": "string",
@@ -1849,6 +2745,61 @@
         ],
         "title": "IncidenciasRespuesta"
       },
+      "LargoSegmentoRespuesta": {
+        "properties": {
+          "segmento": {
+            "$ref": "#/components/schemas/Segmento"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta"
+          },
+          "usa_whatsapp": {
+            "type": "boolean",
+            "title": "Usa Whatsapp"
+          },
+          "falta_whatsapp": {
+            "type": "boolean",
+            "title": "Falta Whatsapp"
+          },
+          "largo_maximo": {
+            "type": "integer",
+            "title": "Largo Maximo"
+          },
+          "codigo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodigoMowaMes"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ejemplo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ejemplo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "segmento",
+          "etiqueta",
+          "usa_whatsapp",
+          "falta_whatsapp",
+          "largo_maximo",
+          "codigo",
+          "ejemplo"
+        ],
+        "title": "LargoSegmentoRespuesta"
+      },
       "MetricasRespuesta": {
         "properties": {
           "cuentas": {
@@ -1946,6 +2897,14 @@
         "type": "object",
         "title": "OpcionesEntrada"
       },
+      "OrigenDia": {
+        "type": "string",
+        "enum": [
+          "ley",
+          "agregado"
+        ],
+        "title": "OrigenDia"
+      },
       "PaginaRespuesta": {
         "properties": {
           "total": {
@@ -1993,6 +2952,79 @@
           "indicador"
         ],
         "title": "ParteSeleccion"
+      },
+      "PartesEntrada": {
+        "properties": {
+          "segmento": {
+            "$ref": "#/components/schemas/Segmento"
+          },
+          "parte_1": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Parte 1"
+          },
+          "parte_2": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Parte 2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "segmento",
+          "parte_1",
+          "parte_2"
+        ],
+        "title": "PartesEntrada"
+      },
+      "PartesRespuesta": {
+        "properties": {
+          "segmento": {
+            "$ref": "#/components/schemas/Segmento"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta"
+          },
+          "dias_desde": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Desde"
+          },
+          "dias_hasta": {
+            "type": "integer",
+            "title": "Dias Hasta"
+          },
+          "parte_1": {
+            "type": "string",
+            "title": "Parte 1"
+          },
+          "parte_2": {
+            "type": "string",
+            "title": "Parte 2"
+          },
+          "usa_whatsapp": {
+            "type": "boolean",
+            "title": "Usa Whatsapp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "segmento",
+          "etiqueta",
+          "dias_desde",
+          "dias_hasta",
+          "parte_1",
+          "parte_2",
+          "usa_whatsapp"
+        ],
+        "title": "PartesRespuesta"
       },
       "PeticionGeneracion": {
         "properties": {
@@ -2052,68 +3084,34 @@
         ],
         "title": "PeticionGeneracion"
       },
-      "PrevisualizacionRespuesta": {
+      "PrevisualizacionEntrada": {
         "properties": {
-          "nombre_archivo": {
-            "type": "string",
-            "title": "Nombre Archivo"
-          },
-          "cabeceras": {
+          "partes": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/PartesEntrada"
             },
             "type": "array",
-            "title": "Cabeceras"
+            "title": "Partes"
           },
-          "filas": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Filas"
-          },
-          "disponibles": {
-            "type": "integer",
-            "title": "Disponibles"
-          },
-          "solicitados": {
-            "type": "integer",
-            "title": "Solicitados"
-          },
-          "generados": {
-            "type": "integer",
-            "title": "Generados"
-          },
-          "suficiente": {
-            "type": "boolean",
-            "title": "Suficiente"
-          },
-          "completa": {
-            "type": "boolean",
-            "title": "Completa"
-          },
-          "errores": {
-            "items": {
-              "$ref": "#/components/schemas/ErrorGeneracionRespuesta"
-            },
-            "type": "array",
-            "title": "Errores"
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp",
+            "description": "Sin numero, se usa el WhatsApp de contacto configurado"
           }
         },
         "type": "object",
         "required": [
-          "nombre_archivo",
-          "cabeceras",
-          "filas",
-          "disponibles",
-          "solicitados",
-          "generados",
-          "suficiente",
-          "completa",
-          "errores"
+          "partes"
         ],
-        "title": "PrevisualizacionRespuesta"
+        "title": "PrevisualizacionEntrada"
       },
       "ProblemaRespuesta": {
         "properties": {
@@ -2136,6 +3134,35 @@
           "detalle"
         ],
         "title": "ProblemaRespuesta"
+      },
+      "ProblemaSpeechRespuesta": {
+        "properties": {
+          "segmento": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Segmento"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "campo": {
+            "type": "string",
+            "title": "Campo"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "segmento",
+          "campo",
+          "detalle"
+        ],
+        "title": "ProblemaSpeechRespuesta"
       },
       "ResumenRespuesta": {
         "properties": {
@@ -2223,6 +3250,18 @@
           "grupos"
         ],
         "title": "SegmentacionRespuesta"
+      },
+      "Segmento": {
+        "type": "string",
+        "enum": [
+          "preventiva",
+          "1_a_8",
+          "9_a_30",
+          "31_a_60",
+          "61_a_90",
+          "91_a_120"
+        ],
+        "title": "Segmento"
       },
       "SeleccionEntrada": {
         "properties": {
@@ -2371,6 +3410,140 @@
         ],
         "title": "Severidad",
         "description": "Gravedad de una incidencia detectada al normalizar."
+      },
+      "SiguienteDiaRespuesta": {
+        "properties": {
+          "desde": {
+            "type": "string",
+            "format": "date",
+            "title": "Desde"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha"
+          }
+        },
+        "type": "object",
+        "required": [
+          "desde",
+          "fecha"
+        ],
+        "title": "SiguienteDiaRespuesta"
+      },
+      "SpeechEdicionEntrada": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Nombre"
+          },
+          "partes": {
+            "items": {
+              "$ref": "#/components/schemas/PartesEntrada"
+            },
+            "type": "array",
+            "title": "Partes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "partes"
+        ],
+        "title": "SpeechEdicionEntrada"
+      },
+      "SpeechNuevoEntrada": {
+        "properties": {
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre",
+            "description": "Sin nombre, se le asigna el siguiente 'Speech N'"
+          },
+          "basada_en_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basada En Id"
+          },
+          "partes": {
+            "items": {
+              "$ref": "#/components/schemas/PartesEntrada"
+            },
+            "type": "array",
+            "title": "Partes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "partes"
+        ],
+        "title": "SpeechNuevoEntrada"
+      },
+      "SupervisorEntrada": {
+        "properties": {
+          "numero": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Numero"
+          },
+          "procedencia": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Procedencia"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "procedencia"
+        ],
+        "title": "SupervisorEntrada"
+      },
+      "SupervisorRespuesta": {
+        "properties": {
+          "numero": {
+            "type": "string",
+            "title": "Numero"
+          },
+          "procedencia": {
+            "type": "string",
+            "title": "Procedencia"
+          },
+          "documento": {
+            "type": "string",
+            "title": "Documento"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "procedencia",
+          "documento"
+        ],
+        "title": "SupervisorRespuesta"
+      },
+      "TipoExcepcion": {
+        "type": "string",
+        "enum": [
+          "agregado",
+          "retirado"
+        ],
+        "title": "TipoExcepcion"
       },
       "TipoSalida": {
         "type": "string",
@@ -2555,6 +3728,174 @@
           "motivo_fallo"
         ],
         "title": "VersionRespuesta"
+      },
+      "VersionSpeechRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "original": {
+            "type": "boolean",
+            "title": "Original"
+          },
+          "basada_en_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basada En Id"
+          },
+          "usada": {
+            "type": "boolean",
+            "title": "Usada"
+          },
+          "editable": {
+            "type": "boolean",
+            "title": "Editable"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "partes": {
+            "items": {
+              "$ref": "#/components/schemas/PartesRespuesta"
+            },
+            "type": "array",
+            "title": "Partes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "original",
+          "basada_en_id",
+          "usada",
+          "editable",
+          "creado_en",
+          "partes"
+        ],
+        "title": "VersionSpeechRespuesta"
+      },
+      "app__api__archivos_carga__PrevisualizacionRespuesta": {
+        "properties": {
+          "nombre_archivo": {
+            "type": "string",
+            "title": "Nombre Archivo"
+          },
+          "cabeceras": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cabeceras"
+          },
+          "filas": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Filas"
+          },
+          "disponibles": {
+            "type": "integer",
+            "title": "Disponibles"
+          },
+          "solicitados": {
+            "type": "integer",
+            "title": "Solicitados"
+          },
+          "generados": {
+            "type": "integer",
+            "title": "Generados"
+          },
+          "suficiente": {
+            "type": "boolean",
+            "title": "Suficiente"
+          },
+          "completa": {
+            "type": "boolean",
+            "title": "Completa"
+          },
+          "errores": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorGeneracionRespuesta"
+            },
+            "type": "array",
+            "title": "Errores"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre_archivo",
+          "cabeceras",
+          "filas",
+          "disponibles",
+          "solicitados",
+          "generados",
+          "suficiente",
+          "completa",
+          "errores"
+        ],
+        "title": "PrevisualizacionRespuesta"
+      },
+      "app__api__mowa_mes__PrevisualizacionRespuesta": {
+        "properties": {
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp"
+          },
+          "largo_advertencia": {
+            "type": "integer",
+            "title": "Largo Advertencia"
+          },
+          "largo_maximo": {
+            "type": "integer",
+            "title": "Largo Maximo"
+          },
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaSpeechRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
+          },
+          "segmentos": {
+            "items": {
+              "$ref": "#/components/schemas/LargoSegmentoRespuesta"
+            },
+            "type": "array",
+            "title": "Segmentos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "whatsapp",
+          "largo_advertencia",
+          "largo_maximo",
+          "problemas",
+          "segmentos"
+        ],
+        "title": "PrevisualizacionRespuesta"
       }
     }
   }

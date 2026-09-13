@@ -26,6 +26,7 @@ from sqlalchemy import (
     LargeBinary,
     MetaData,
     Numeric,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -34,6 +35,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+from app.core.entities.calendario import TipoExcepcion
 from app.core.entities.carga import EstadoCarga, EventoAuditoria
 from app.core.entities.sabana import Severidad, TipoDocumento
 
@@ -253,4 +255,110 @@ class Seleccion(Base):
     __table_args__ = (
         UniqueConstraint("nombre_normalizado"),
         CheckConstraint("cantidad IS NULL OR cantidad >= 1", name="cantidad_positiva"),
+    )
+
+
+# --- Calendario laboral (RF-MM-08) ---------------------------------------
+
+_TELEFONO_RF02 = "'^9[0-9]{8}$'"
+
+
+class CalendarioExcepcion(Base):
+    """Excepcion a la regla de feriados: dia agregado por decreto o feriado retirado.
+
+    Los feriados de ley no se guardan: se calculan para cualquier ano (S-MM-4).
+    """
+
+    __tablename__ = "calendario_excepcion"
+
+    fecha: Mapped[date] = mapped_column(Date, primary_key=True)
+    tipo: Mapped[str] = mapped_column(String(12))
+    descripcion: Mapped[str] = mapped_column(Text)
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (CheckConstraint(f"tipo IN ({_en(TipoExcepcion)})", name="tipo_valido"),)
+
+
+# --- Supervision de campanas digitales (RF-37 a RF-41) -------------------
+
+
+class SupervisorProcedencia(Base):
+    """Procedencias de los supervisores, en el orden en que se asignan los DNIs (RF-39)."""
+
+    __tablename__ = "supervisor_procedencia"
+
+    nombre: Mapped[str] = mapped_column(Text, primary_key=True)
+    posicion: Mapped[int] = mapped_column(Integer)
+
+    __table_args__ = (
+        UniqueConstraint("posicion"),
+        CheckConstraint("posicion >= 0", name="posicion_no_negativa"),
+    )
+
+
+class SupervisorDigital(Base):
+    """Lista de supervisores por defecto (RF-38). Sin numeros sembrados (RF-32)."""
+
+    __tablename__ = "supervisor_digital"
+
+    posicion: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    numero: Mapped[str] = mapped_column(String(9))
+    procedencia: Mapped[str] = mapped_column(Text, ForeignKey("supervisor_procedencia.nombre"))
+
+    __table_args__ = (
+        CheckConstraint("posicion >= 0", name="posicion_no_negativa"),
+        CheckConstraint(f"numero ~ {_TELEFONO_RF02}", name="numero_valido"),
+    )
+
+
+# --- Conector MOWA MES (docs/requerimientos-mowa-mes.md) -----------------
+
+
+class MowaMesConfiguracion(Base):
+    """Configuracion del conector: una sola fila (RF-MM-01, RF-MM-16)."""
+
+    __tablename__ = "mowa_mes_configuracion"
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
+    limite_mensual: Mapped[int] = mapped_column(BigInteger)
+    whatsapp_contacto: Mapped[str | None] = mapped_column(String(9))
+    actualizado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint("id = 1", name="fila_unica"),
+        CheckConstraint("limite_mensual > 0", name="limite_positivo"),
+        CheckConstraint(
+            f"whatsapp_contacto IS NULL OR whatsapp_contacto ~ {_TELEFONO_RF02}",
+            name="whatsapp_valido",
+        ),
+    )
+
+
+class MowaMesSpeechVersion(Base):
+    """Version trazable del speech (RF-MM-17). `partes`: lista de {segmento, parte_1, parte_2}."""
+
+    __tablename__ = "mowa_mes_speech_version"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    nombre: Mapped[str] = mapped_column(Text)
+    nombre_normalizado: Mapped[str] = mapped_column(Text)
+    partes: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    original: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    basada_en_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("mowa_mes_speech_version.id", ondelete="SET NULL")
+    )
+    # La marca la campana que la usa, en su misma transaccion: desde ahi es inmutable.
+    usada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("nombre_normalizado"),
+        Index(
+            "uq_mowa_mes_speech_version_original",
+            "original",
+            unique=True,
+            postgresql_where="original",
+        ),
     )

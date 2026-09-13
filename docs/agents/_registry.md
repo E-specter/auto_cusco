@@ -38,6 +38,7 @@
 | /docs/agents/coordinador_modulo_mowa_mes/profile.md | Doc | Perfil del coordinador del módulo `mowa_mes` | architec; coordinador_modulo_mowa_mes | 2026-09-13 |
 | /docs/agents/dev_backend_modulo_mowa_mes/profile.md | Doc | Perfil del desarrollador backend del módulo `mowa_mes` (E2E y calidad de código) | architec; dev_backend_modulo_mowa_mes | 2026-09-13 |
 | /docs/agents/dev_frontend_modulo_mowa_mes/profile.md | Doc | Perfil del desarrollador frontend del módulo `mowa_mes` (pruebas unitarias, coordinación con designer) | architec; dev_frontend_modulo_mowa_mes | 2026-09-13 |
+| /docs/agents/coordinador_modulo_mowa_mes/plan.md | Doc | Plan de ejecución del módulo `mowa_mes` (T-MM-C1): diseño confirmado, secuencia, criterio de listo y consultas escaladas | coordinador_modulo_mowa_mes | 2026-09-13 |
 | /docs/requerimientos-mowa-mes.md | Doc | Requerimientos del conector SMS MOWA MES (RF-MM-01 a RF-MM-22), decisiones y evidencia de los ejemplos | architec (requisitos) | 2026-09-13 |
 
 ## Pendientes de incorporar formalmente a la skill

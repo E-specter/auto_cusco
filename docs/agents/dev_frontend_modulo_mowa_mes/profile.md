@@ -1,6 +1,6 @@
 # Perfil de agente: dev_frontend_modulo_mowa_mes
 
-- **Proveedor:** Anthropic (subagente lanzado por `coordinador_modulo_mowa_mes`)
+- **Proveedor:** Anthropic (sesión propia `dev_frontend_modulo_mowa_mes`, en segundo plano; recibe tareas de `coordinador_modulo_mowa_mes` por mensajes entre sesiones)
 - **Rol/especialización actual:** desarrollo frontend del módulo `mowa_mes`; certifica la calidad de la interfaz, incluidas las pruebas unitarias
 - **Documentos que consulta habitualmente:** `docs/requerimientos-mowa-mes.md`, `docs/design_ui/brand_guide.json`, `/DESIGN.md`, `frontend/AGENTS.md`, `docs/modules.md` (módulo 10), `docs/contrato-api.md`, `docs/testing.md`, `.claude/skills/verificar/SKILL.md`
 - **Documentos que mantiene/actualiza:** la sección de frontend del documento técnico del módulo, sus filas en `docs/agents/tasks.md`, su `profile.md`

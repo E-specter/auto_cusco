@@ -338,6 +338,191 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/calendario/feriados": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar Feriados
+         * @description Feriados de ley del ano (los retirados, marcados) y los dias agregados.
+         */
+        get: operations["listar_feriados_calendario_feriados_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendario/excepciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar Excepciones */
+        get: operations["listar_excepciones_calendario_excepciones_get"];
+        put?: never;
+        /**
+         * Agregar Excepcion
+         * @description Agrega un dia no laborable decretado o retira un feriado de ley de ese ano.
+         */
+        post: operations["agregar_excepcion_calendario_excepciones_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendario/excepciones/{fecha}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Eliminar Excepcion */
+        delete: operations["eliminar_excepcion_calendario_excepciones__fecha__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendario/siguiente-dia-gestionable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Siguiente Dia Gestionable
+         * @description Primer dia de lunes a viernes, posterior a `desde`, que no es feriado ni decretado.
+         */
+        get: operations["siguiente_dia_gestionable_calendario_siguiente_dia_gestionable_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/supervisores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Obtener Supervisores */
+        get: operations["obtener_supervisores_supervisores_get"];
+        /**
+         * Reemplazar Supervisores
+         * @description Reemplaza procedencias y supervisores. Los numeros siguen RF-02.
+         */
+        put: operations["reemplazar_supervisores_supervisores_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/configuracion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Obtener Configuracion */
+        get: operations["obtener_configuracion_mowa_mes_configuracion_get"];
+        /**
+         * Guardar Configuracion
+         * @description Limite mensual (RF-MM-01) y WhatsApp de contacto por defecto (RF-MM-16), que sigue RF-02.
+         */
+        put: operations["guardar_configuracion_mowa_mes_configuracion_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/speech": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar Speech */
+        get: operations["listar_speech_mowa_mes_speech_get"];
+        put?: never;
+        /**
+         * Crear Speech
+         * @description Guarda una version nueva. 404 si `basada_en_id` no existe.
+         */
+        post: operations["crear_speech_mowa_mes_speech_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/speech/previsualizacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Previsualizar Speech
+         * @description Largo maximo de cada segmento, con titular de 8 y fecha de 10 (RF-MM-19).
+         *
+         *     Un segmento que usa [whatsapp] sin numero se marca con `falta_whatsapp` y sin
+         *     ejemplo: nunca se muestra un enlace roto.
+         */
+        post: operations["previsualizar_speech_mowa_mes_speech_previsualizacion_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/speech/{speech_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Obtener Speech */
+        get: operations["obtener_speech_mowa_mes_speech__speech_id__get"];
+        /**
+         * Actualizar Speech
+         * @description Reemplaza una version que nadie uso. Si ya se uso o es la original, 409.
+         */
+        put: operations["actualizar_speech_mowa_mes_speech__speech_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -402,6 +587,44 @@ export interface components {
             /** Aviso */
             aviso: string | null;
         };
+        /**
+         * CodigoMowaMes
+         * @description Motivos de exclusion y advertencias, en el orden en que se evaluan.
+         *
+         *     Un producto excluido lleva un solo motivo: el primero que falla en este orden.
+         * @enum {string}
+         */
+        CodigoMowaMes: "telefono_invalido" | "falta_documento" | "sin_speech" | "falta_titular" | "falta_vencimiento" | "mensaje_excede_160" | "mensaje_excede_150" | "limite_mensual_excedido";
+        /** ConfiguracionEntrada */
+        ConfiguracionEntrada: {
+            /** Limite Mensual */
+            limite_mensual: number;
+            /** Whatsapp Contacto */
+            whatsapp_contacto?: string | null;
+        };
+        /** ConfiguracionRespuesta */
+        ConfiguracionRespuesta: {
+            /** Limite Mensual */
+            limite_mensual: number;
+            /** Whatsapp Contacto */
+            whatsapp_contacto: string | null;
+            /** Actualizado En */
+            actualizado_en: string | null;
+        };
+        /** ConfiguracionSupervisionEntrada */
+        ConfiguracionSupervisionEntrada: {
+            /** Procedencias */
+            procedencias: string[];
+            /** Supervisores */
+            supervisores: components["schemas"]["SupervisorEntrada"][];
+        };
+        /** ConfiguracionSupervisionRespuesta */
+        ConfiguracionSupervisionRespuesta: {
+            /** Procedencias */
+            procedencias: string[];
+            /** Supervisores */
+            supervisores: components["schemas"]["SupervisorRespuesta"][];
+        };
         /** DefinicionEntrada */
         DefinicionEntrada: {
             /** Nombre */
@@ -416,6 +639,19 @@ export interface components {
         DetalleError: {
             /** Detail */
             detail: string;
+        };
+        /** DiaNoLaborableRespuesta */
+        DiaNoLaborableRespuesta: {
+            /**
+             * Fecha
+             * Format: date
+             */
+            fecha: string;
+            /** Descripcion */
+            descripcion: string;
+            origen: components["schemas"]["OrigenDia"];
+            /** Retirado */
+            retirado: boolean;
         };
         /** ErrorGeneracionRespuesta */
         ErrorGeneracionRespuesta: {
@@ -432,6 +668,37 @@ export interface components {
          * @enum {string}
          */
         EstadoCarga: "en_cola" | "procesando" | "terminada" | "fallida";
+        /** ExcepcionEntrada */
+        ExcepcionEntrada: {
+            /**
+             * Fecha
+             * Format: date
+             */
+            fecha: string;
+            tipo: components["schemas"]["TipoExcepcion"];
+            /** Descripcion */
+            descripcion: string;
+        };
+        /** ExcepcionRespuesta */
+        ExcepcionRespuesta: {
+            /**
+             * Fecha
+             * Format: date
+             */
+            fecha: string;
+            tipo: components["schemas"]["TipoExcepcion"];
+            /** Descripcion */
+            descripcion: string;
+            /** Creado En */
+            creado_en: string | null;
+        };
+        /** FeriadosRespuesta */
+        FeriadosRespuesta: {
+            /** Anio */
+            anio: number;
+            /** Dias */
+            dias: components["schemas"]["DiaNoLaborableRespuesta"][];
+        };
         /**
          * FormatoArchivo
          * @description Formatos de archivo soportados (RF-13).
@@ -509,6 +776,21 @@ export interface components {
             /** Incidencias */
             incidencias: components["schemas"]["IncidenciaRespuesta"][];
         };
+        /** LargoSegmentoRespuesta */
+        LargoSegmentoRespuesta: {
+            segmento: components["schemas"]["Segmento"];
+            /** Etiqueta */
+            etiqueta: string;
+            /** Usa Whatsapp */
+            usa_whatsapp: boolean;
+            /** Falta Whatsapp */
+            falta_whatsapp: boolean;
+            /** Largo Maximo */
+            largo_maximo: number;
+            codigo: components["schemas"]["CodigoMowaMes"] | null;
+            /** Ejemplo */
+            ejemplo: string | null;
+        };
         /** MetricasRespuesta */
         MetricasRespuesta: {
             /** Cuentas */
@@ -553,6 +835,11 @@ export interface components {
             /** Sangria */
             sangria?: number | null;
         };
+        /**
+         * OrigenDia
+         * @enum {string}
+         */
+        OrigenDia: "ley" | "agregado";
         /** PaginaRespuesta */
         PaginaRespuesta: {
             /** Total */
@@ -573,6 +860,30 @@ export interface components {
          * @enum {string}
          */
         ParteSeleccion: "nombre" | "filtro" | "orden" | "cantidad" | "indicador";
+        /** PartesEntrada */
+        PartesEntrada: {
+            segmento: components["schemas"]["Segmento"];
+            /** Parte 1 */
+            parte_1: string;
+            /** Parte 2 */
+            parte_2: string;
+        };
+        /** PartesRespuesta */
+        PartesRespuesta: {
+            segmento: components["schemas"]["Segmento"];
+            /** Etiqueta */
+            etiqueta: string;
+            /** Dias Desde */
+            dias_desde: number | null;
+            /** Dias Hasta */
+            dias_hasta: number;
+            /** Parte 1 */
+            parte_1: string;
+            /** Parte 2 */
+            parte_2: string;
+            /** Usa Whatsapp */
+            usa_whatsapp: boolean;
+        };
         /** PeticionGeneracion */
         PeticionGeneracion: {
             /**
@@ -597,34 +908,29 @@ export interface components {
             cantidad: number;
             opciones?: components["schemas"]["OpcionesEntrada"] | null;
         };
-        /** PrevisualizacionRespuesta */
-        PrevisualizacionRespuesta: {
-            /** Nombre Archivo */
-            nombre_archivo: string;
-            /** Cabeceras */
-            cabeceras: string[];
-            /** Filas */
-            filas: {
-                [key: string]: unknown;
-            }[];
-            /** Disponibles */
-            disponibles: number;
-            /** Solicitados */
-            solicitados: number;
-            /** Generados */
-            generados: number;
-            /** Suficiente */
-            suficiente: boolean;
-            /** Completa */
-            completa: boolean;
-            /** Errores */
-            errores: components["schemas"]["ErrorGeneracionRespuesta"][];
+        /** PrevisualizacionEntrada */
+        PrevisualizacionEntrada: {
+            /** Partes */
+            partes: components["schemas"]["PartesEntrada"][];
+            /**
+             * Whatsapp
+             * @description Sin numero, se usa el WhatsApp de contacto configurado
+             */
+            whatsapp?: string | null;
         };
         /** ProblemaRespuesta */
         ProblemaRespuesta: {
             parte: components["schemas"]["ParteSeleccion"];
             /** Expresion */
             expresion: string;
+            /** Detalle */
+            detalle: string;
+        };
+        /** ProblemaSpeechRespuesta */
+        ProblemaSpeechRespuesta: {
+            segmento: components["schemas"]["Segmento"] | null;
+            /** Campo */
+            campo: string;
             /** Detalle */
             detalle: string;
         };
@@ -653,6 +959,11 @@ export interface components {
             /** Grupos */
             grupos: components["schemas"]["GrupoRespuesta"][];
         };
+        /**
+         * Segmento
+         * @enum {string}
+         */
+        Segmento: "preventiva" | "1_a_8" | "9_a_30" | "31_a_60" | "61_a_90" | "91_a_120";
         /** SeleccionEntrada */
         SeleccionEntrada: {
             /** Nombre */
@@ -707,6 +1018,59 @@ export interface components {
          * @enum {string}
          */
         Severidad: "error" | "advertencia" | "info";
+        /** SiguienteDiaRespuesta */
+        SiguienteDiaRespuesta: {
+            /**
+             * Desde
+             * Format: date
+             */
+            desde: string;
+            /**
+             * Fecha
+             * Format: date
+             */
+            fecha: string;
+        };
+        /** SpeechEdicionEntrada */
+        SpeechEdicionEntrada: {
+            /** Nombre */
+            nombre: string;
+            /** Partes */
+            partes: components["schemas"]["PartesEntrada"][];
+        };
+        /** SpeechNuevoEntrada */
+        SpeechNuevoEntrada: {
+            /**
+             * Nombre
+             * @description Sin nombre, se le asigna el siguiente 'Speech N'
+             */
+            nombre?: string | null;
+            /** Basada En Id */
+            basada_en_id?: number | null;
+            /** Partes */
+            partes: components["schemas"]["PartesEntrada"][];
+        };
+        /** SupervisorEntrada */
+        SupervisorEntrada: {
+            /** Numero */
+            numero: string;
+            /** Procedencia */
+            procedencia: string;
+        };
+        /** SupervisorRespuesta */
+        SupervisorRespuesta: {
+            /** Numero */
+            numero: string;
+            /** Procedencia */
+            procedencia: string;
+            /** Documento */
+            documento: string;
+        };
+        /**
+         * TipoExcepcion
+         * @enum {string}
+         */
+        TipoExcepcion: "agregado" | "retirado";
         /**
          * TipoSalida
          * @description Tipado explicito de cada campo generado (RF-12).
@@ -776,6 +1140,64 @@ export interface components {
             incidencias_info: number;
             /** Motivo Fallo */
             motivo_fallo: string | null;
+        };
+        /** VersionSpeechRespuesta */
+        VersionSpeechRespuesta: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Original */
+            original: boolean;
+            /** Basada En Id */
+            basada_en_id: number | null;
+            /** Usada */
+            usada: boolean;
+            /** Editable */
+            editable: boolean;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+            /** Partes */
+            partes: components["schemas"]["PartesRespuesta"][];
+        };
+        /** PrevisualizacionRespuesta */
+        app__api__archivos_carga__PrevisualizacionRespuesta: {
+            /** Nombre Archivo */
+            nombre_archivo: string;
+            /** Cabeceras */
+            cabeceras: string[];
+            /** Filas */
+            filas: {
+                [key: string]: unknown;
+            }[];
+            /** Disponibles */
+            disponibles: number;
+            /** Solicitados */
+            solicitados: number;
+            /** Generados */
+            generados: number;
+            /** Suficiente */
+            suficiente: boolean;
+            /** Completa */
+            completa: boolean;
+            /** Errores */
+            errores: components["schemas"]["ErrorGeneracionRespuesta"][];
+        };
+        /** PrevisualizacionRespuesta */
+        app__api__mowa_mes__PrevisualizacionRespuesta: {
+            /** Whatsapp */
+            whatsapp: string | null;
+            /** Largo Advertencia */
+            largo_advertencia: number;
+            /** Largo Maximo */
+            largo_maximo: number;
+            /** Problemas */
+            problemas: components["schemas"]["ProblemaSpeechRespuesta"][];
+            /** Segmentos */
+            segmentos: components["schemas"]["LargoSegmentoRespuesta"][];
         };
     };
     responses: never;
@@ -1347,7 +1769,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PrevisualizacionRespuesta"];
+                    "application/json": components["schemas"]["app__api__archivos_carga__PrevisualizacionRespuesta"];
                 };
             };
             /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
@@ -1670,6 +2092,525 @@ export interface operations {
             };
             /** @description No existe lo pedido */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_feriados_calendario_feriados_get: {
+        parameters: {
+            query?: {
+                anio?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeriadosRespuesta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_excepciones_calendario_excepciones_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExcepcionRespuesta"][];
+                };
+            };
+        };
+    };
+    agregar_excepcion_calendario_excepciones_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExcepcionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExcepcionRespuesta"];
+                };
+            };
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description La operacion choca con el estado actual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    eliminar_excepcion_calendario_excepciones__fecha__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fecha: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    siguiente_dia_gestionable_calendario_siguiente_dia_gestionable_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiguienteDiaRespuesta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtener_supervisores_supervisores_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfiguracionSupervisionRespuesta"];
+                };
+            };
+        };
+    };
+    reemplazar_supervisores_supervisores_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfiguracionSupervisionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfiguracionSupervisionRespuesta"];
+                };
+            };
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtener_configuracion_mowa_mes_configuracion_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfiguracionRespuesta"];
+                };
+            };
+        };
+    };
+    guardar_configuracion_mowa_mes_configuracion_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfiguracionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfiguracionRespuesta"];
+                };
+            };
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_speech_mowa_mes_speech_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionSpeechRespuesta"][];
+                };
+            };
+        };
+    };
+    crear_speech_mowa_mes_speech_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeechNuevoEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionSpeechRespuesta"];
+                };
+            };
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description La operacion choca con el estado actual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    previsualizar_speech_mowa_mes_speech_previsualizacion_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrevisualizacionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__api__mowa_mes__PrevisualizacionRespuesta"];
+                };
+            };
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtener_speech_mowa_mes_speech__speech_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speech_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionSpeechRespuesta"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    actualizar_speech_mowa_mes_speech__speech_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speech_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeechEdicionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionSpeechRespuesta"];
+                };
+            };
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description La operacion choca con el estado actual */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

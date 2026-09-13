@@ -18,11 +18,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.archivos_carga import CABECERAS_RESUMEN
 from app.api.archivos_carga import router as archivos_carga_router
+from app.api.calendario import router as calendario_router
 from app.api.cargas import crear_servicio_ingesta
 from app.api.cargas import router as cargas_router
 from app.api.cartera import router as cartera_router
 from app.api.health import router as health_router
+from app.api.mowa_mes import router as mowa_mes_router
 from app.api.selecciones import router as selecciones_router
+from app.api.supervisores import router as supervisores_router
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -85,3 +88,6 @@ app.include_router(cargas_router)
 app.include_router(cartera_router)
 app.include_router(archivos_carga_router)
 app.include_router(selecciones_router)
+app.include_router(calendario_router)
+app.include_router(supervisores_router)
+app.include_router(mowa_mes_router)
