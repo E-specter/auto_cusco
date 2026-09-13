@@ -90,7 +90,10 @@ Avance:
 - [x] Generación de tablas de carga a partir de la selección y exportación a XLSX, CSV y JSON (RF-09, RF-13, RF-15), con previsualización antes de descargar y aviso de selección insuficiente (RF-08). Un adaptador por formato tras un puerto, de modo que incorporar otro no toque el núcleo (RF-14). Ver `docs/generacion-cargas.md`.
 - [ ] Guardar y editar definiciones de carga desde la interfaz (RF-11, RF-32).
 - [ ] Pantalla de generación en el frontend, sobre los endpoints de `/archivos-carga`.
-- [ ] Adaptadores por plataforma (SMS y WhatsApp primero). **Bloqueado**: falta levantar con el usuario o con la documentación del proveedor la estructura exacta de campos y cabeceras que exige cada uno (RF-10).
+- [x] Requerimientos generales de gestiones digitales: registros de supervisión (RF-37 a RF-41, 2026-09-13).
+- [x] Requerimientos del primer conector SMS, **MOWA MES** (`mowa_mes`): formato de carga y de reporte confirmados con ejemplos, speech por días de atraso ajustados, límites y conciliación. Ver `docs/requerimientos-mowa-mes.md`.
+- [ ] **En progreso — conector SMS MOWA MES** (backend y frontend con sus pruebas), delegado a `coordinador_modulo_mowa_mes`; tablero en `docs/agents/tasks.md`.
+- [ ] Conector de WhatsApp. **Bloqueado**: falta levantar con el usuario o con la documentación del proveedor la estructura exacta de campos y cabeceras (RF-10).
 
 - Generación de tablas de carga personalizadas a partir de los productos seleccionados.
 - Adaptadores independientes por plataforma. **Primeras plataformas objetivo: SMS y WhatsApp** (decidido); correo electrónico queda para una iteración posterior, y futuras plataformas se incorporan bajo el mismo patrón de adaptador (RF-14).

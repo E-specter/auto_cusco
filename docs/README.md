@@ -12,6 +12,8 @@
 | [mapeo-campos.md](mapeo-campos.md) | Motor de reglas de mapeo y expresión de campos (RF-12): plantillas, tipado y formatos, compartido por las cargas digitales y VoIP |
 | [consulta-cartera.md](consulta-cartera.md) | Contrato de consulta de cartera: endpoints, sintaxis de filtros, tipos de campo y operadores, y reglas de selección |
 | [contrato-api.md](contrato-api.md) | Contrato entre la API y el frontend: `contratos/openapi.json`, cómo se regenera y qué garantizan sus pruebas |
+| [requerimientos-mowa-mes.md](requerimientos-mowa-mes.md) | Requerimientos del conector SMS de MOWA MES (`mowa_mes`): inputs de campaña, archivo de carga, speech, reporte de enviados, decisiones y evidencia |
+| [agents/_registry.md](agents/_registry.md) · [agents/tasks.md](agents/tasks.md) | Registro vivo de `/docs` y tablero de subtareas multiagente (skill `coordinador-multiagente`) |
 | [selecciones-guardadas.md](selecciones-guardadas.md) | Selecciones de cartera guardadas y compartidas: qué se guarda, validez al guardar y al cargar, nombre único y endpoints |
 | [generacion-cargas.md](generacion-cargas.md) | Generación de archivos de carga (RF-09, RF-13, RF-15): endpoints, previsualización, formatos XLSX/CSV/JSON y sus opciones |
 | [testing.md](testing.md) | Protocolo de pruebas y de corrección de errores por módulo: niveles, convenciones, criterio para cerrar una tarea e integración continua |

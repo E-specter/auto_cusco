@@ -17,8 +17,29 @@ Ver [atomics-requirements.md](atomics-requirements.md), organizado en las siguie
 7. Diseño modular y extensible (RF-29 – RF-33)
 8. Experiencia de usuario e interfaz (RF-34)
 9. Documentación y entorno de trabajo con agentes de IA (RF-35 – RF-36)
+10. Gestiones digitales: registros de supervisión (RF-37 – RF-41)
 
-La numeración `RF-1`…`RF-10` usada anteriormente en este documento queda **superseded** por la numeración `RF-01`…`RF-36` de `atomics-requirements.md`; no reutilizar la numeración antigua.
+La numeración `RF-1`…`RF-10` usada anteriormente en este documento queda **superseded** por la numeración `RF-01`… de `atomics-requirements.md`; no reutilizar la numeración antigua.
+
+## Requerimientos generales de gestiones digitales
+
+Aplican a toda plataforma digital (SMS, WhatsApp, correo y futuras). Texto formal en la sección 10 de [atomics-requirements.md](atomics-requirements.md).
+
+| RF | Qué exige |
+|---|---|
+| RF-37 | Inyectar registros de control de supervisores en cada campaña digital, para que la gestión les llegue como a un cliente y puedan monitorear el envío real |
+| RF-38 | Lista de supervisores configurable por campaña, con número y procedencia; por defecto 3 de `Caja Cusco` y 2 de `nuestra empresa` |
+| RF-39 | DNI no real y secuencial desde `00000001`, primero `Caja Cusco` y luego `nuestra empresa` |
+| RF-40 | Los demás campos de carga de la supervisión (p. ej. `mensaje`) se copian de la primera fila válida de los productos filtrados |
+| RF-41 | Los registros de supervisión se anexan a la carga, van en el primer archivo si se divide, y cuentan en el resumen de cargados y enviados |
+
+## Requerimientos por plataforma
+
+Cada plataforma tiene su documento con requerimientos propios, numerados dentro del módulo para no mezclar su secuencia con la global:
+
+| Plataforma | Módulo | Documento |
+|---|---|---|
+| SMS — MOWA, Messaging Enterprise Service (MES) | `mowa_mes` | [requerimientos-mowa-mes.md](requerimientos-mowa-mes.md) |
 
 ## Requerimientos no funcionales
 

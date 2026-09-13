@@ -103,3 +103,32 @@
 
 * **RF-35 — Centro de documentación técnica:** Mantener el directorio **`/docs`** como el repositorio central de la documentación técnica del proyecto (especificaciones, arquitectura, documentación de módulos y reglas de negocio), tanto general como específica de cada módulo.
 * **RF-36 — Espacio de trabajo multi-agente:** Mantener el subdirectorio **`/docs/agents`** como espacio de trabajo dedicado para agentes de inteligencia artificial, permitiendo que múltiples agentes —de distintos proveedores (Anthropic, OpenAI, Google u otros modelos)— puedan operar y coordinarse sobre el mismo proyecto a partir de esta documentación compartida.
+
+## 10. Gestiones digitales: registros de supervisión
+
+Reglas transversales a toda **plataforma digital** (SMS, WhatsApp, correo y futuras, según RF-10). Los requerimientos propios de cada plataforma viven en su documento de módulo; el primero es [requerimientos-mowa-mes.md](requerimientos-mowa-mes.md).
+
+* **RF-37 — Registros de supervisión en campañas digitales:** Permitir inyectar, en la carga de cada campaña digital, un conjunto de registros de control dirigidos a supervisores, para que la gestión les llegue como si fueran productos de la cartera y puedan monitorear el envío real.
+  * Aplica a toda carga generada según RF-09 y RF-10, sea cual sea la plataforma digital.
+  * Si la selección de la campaña no tiene productos que se puedan cargar, entonces no se generan registros de supervisión ni carga.
+* **RF-38 — Configuración de supervisores por campaña:** Mantener una lista de supervisores por defecto, donde cada supervisor define su **número de contacto** y su **procedencia** (tag interno), y permitir ajustarla en cada campaña antes de generar la carga.
+  * Distribución por defecto: **5 registros, 3 de procedencia `Caja Cusco` y 2 de procedencia `nuestra empresa`**.
+  * Procedencias iniciales: `Caja Cusco` y `nuestra empresa` (lista no exhaustiva, ampliable).
+  * La campaña guarda la lista de supervisores con la que se generó, aunque la lista por defecto cambie después.
+  * Los números de los supervisores se cargan desde la configuración; no se fijan en el código (RF-32).
+* **RF-39 — Documento asignado a los registros de supervisión:** Asignar a cada registro de supervisión un DNI no real, secuencial desde `00000001`, que solo sirve para permitir la carga y su seguimiento.
+  * Orden de asignación: primero los supervisores de procedencia `Caja Cusco` y luego los de `nuestra empresa`, cada grupo en el orden de la lista de la campaña.
+  * Con la distribución por defecto: `00000001`–`00000003` → `Caja Cusco`; `00000004`–`00000005` → `nuestra empresa`.
+  * Si la campaña cambia la cantidad de supervisores, la secuencia se extiende o se acorta siguiendo el mismo orden.
+* **RF-40 — Campos de carga de los registros de supervisión:** Completar los campos de carga de cada registro de supervisión que no sean su número ni su documento (por ejemplo, `mensaje`) tomando como plantilla **la primera fila válida de los productos filtrados** de la campaña.
+  * "Primera fila válida" es la primera, según el orden vigente de la selección (RF-08), que quedó dentro de la carga después de aplicar las exclusiones propias de la plataforma.
+* **RF-41 — Inclusión en la carga y en el seguimiento:** Anexar los registros de supervisión a la carga de la campaña e incluirlos en el resumen y el seguimiento de mensajes cargados y enviados.
+  * Si la carga se divide en varios archivos por los límites de la plataforma, entonces los registros de supervisión van en el **primer archivo**.
+  * El resumen muestra por separado los productos de la cartera y los registros de supervisión, además del total.
+  * La posición exacta de los registros dentro del primer archivo la fija cada plataforma en su documento de módulo.
+
+## Registro de cambios de esta versión
+
+- **RF nuevos incorporados:** RF-37, RF-38, RF-39, RF-40, RF-41 (sección 10, 2026-09-13).
+- **RF existentes ampliados/modificados en su redacción:** ninguno.
+- **Nota de numeración:** los RF-01 a RF-36 conservan su número y su texto. Los nuevos se agregaron como sección 10 al final, sin renumerar, por decisión del usuario: RF-16 a RF-36 se citan por número en el código y en la documentación, y renumerarlos rompería esas referencias. Los requerimientos específicos de cada plataforma se numeran en su propio documento de módulo (por ejemplo, `RF-MM-01` en `requerimientos-mowa-mes.md`) para no mezclar su secuencia con la global.

@@ -37,3 +37,7 @@ Thumbs.db
 # son artefactos de una sesión; el contrato de superficie sí se versiona.
 .impeccable/review/
 .impeccable/questions/
+
+# Adjuntos compartidos en el chat (ejemplos de plataformas con datos de cobranza):
+# se leen como referencia, nunca se versionan.
+archivos_anexo_chat/

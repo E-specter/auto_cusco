@@ -39,6 +39,31 @@ El esqueleto real de este enfoque ya existe en `backend/app/` (`core/{entities,p
 - Estado: **implementada la generación y la exportación.** Caso de uso en `app/core/services/generacion_cargas/`, exportadores XLSX/CSV/JSON en `app/adapters/output/exportadores/` (uno por formato, tras el puerto `exportador_tabla_port.py`) y endpoints en `app/api/archivos_carga.py`, con previsualización antes de descargar. Contrato en `docs/generacion-cargas.md`. Pendiente: guardar definiciones desde la interfaz y los adaptadores de cada plataforma. **Primeras plataformas objetivo (decidido): SMS y WhatsApp**; correo electrónico queda para una iteración posterior.
 - Depende de: módulo de Selección (productos ya filtrados/seleccionados) y del Motor de reglas de mapeo y expresión de campos.
 - Convención: cada plataforma (SMS, WhatsApp, correo, ...) es un adaptador independiente y sustituible; agregar una plataforma nueva no debe requerir modificar las demás (RF-14). La estructura exacta de campos que exigen los proveedores concretos de SMS/WhatsApp elegidos debe levantarse antes de implementar cada adaptador.
+- **Reglas transversales de gestiones digitales (RF-37 a RF-41):** los registros de supervisión (lista configurable por campaña, DNIs secuenciales, campos copiados de la primera fila válida, inclusión en el primer archivo y en el seguimiento) viven aquí, en el núcleo compartido de las plataformas digitales, y no dentro de un conector: WhatsApp y correo los reutilizarán igual. Ruta prevista: `app/core/services/gestiones_digitales/`.
+
+### 5.1 Conector SMS — MOWA MES (`mowa_mes`)
+
+- Responsabilidad: primer conector de plataforma SMS. Arma la campaña de MOWA MES a partir de una selección de cartera: speech por días de atraso ajustados, registros de supervisión, exclusiones con motivo, archivos `.xlsx` en el formato de MES divididos por límites, registro de los inputs de la campaña, control del límite mensual, e importación y conciliación del reporte de enviados.
+- Cubre: RF-MM-01 a RF-MM-22 de `docs/requerimientos-mowa-mes.md`; aplica RF-37 a RF-41, RF-09 a RF-15 y RF-08.
+- Estado: **requerimientos definidos, implementación delegada** (2026-09-13) a `coordinador_modulo_mowa_mes` → `dev_backend_modulo_mowa_mes` y `dev_frontend_modulo_mowa_mes`. Tablero en `docs/agents/tasks.md`.
+- **Inputs:** fecha de corte y selección de cartera (filtros, orden y cantidad, o una selección guardada); inputs de campaña (tipo de carga, descripción, salida, herramientas, programación); lista de supervisores de la campaña; versión de speech; número de WhatsApp de contacto; reporte de enviados descargado de MES.
+- **Outputs:** uno o más archivos `.xlsx` de carga (`Hoja1`: `numero`, `mensaje`, `dni`); registro de la campaña con productos cargados, excluidos con motivo y supervisión; cifras de cargados, enviados y conciliación; consumo del límite mensual.
+- **Diseño previsto (puertos/adaptadores, RF-30):**
+
+  | Pieza | Ruta prevista | Qué hace |
+  |---|---|---|
+  | Calendario laboral | `app/core/services/calendario/` | Siguiente día gestionable (lunes a viernes sin feriados de Perú); feriados configurables. Transversal, no propio de MOWA |
+  | Supervisión digital | `app/core/services/gestiones_digitales/` | RF-37 a RF-41, reutilizable por WhatsApp y correo |
+  | Núcleo del conector | `app/core/entities/mowa_mes.py`, `app/core/services/plataformas/mowa_mes/` | Días ajustados y segmento, speech versionado sobre el motor de mapeo (RF-12), exclusiones, división por límites, conciliación |
+  | Puertos | `app/core/ports/` | Repositorio de campañas, speech y supervisores; lector del reporte de enviados; escritor del archivo de carga |
+  | Archivo de carga | `app/adapters/output/plataformas/mowa_mes/` | `.xlsx` en el formato de MES, reutilizando el exportador XLSX |
+  | Reporte de enviados | `app/adapters/input/` | Lectura con `python-calamine` y validación de columnas |
+  | Persistencia | `app/adapters/persistence/` + migración Alembic | Campañas, archivos, filas cargadas, speech por versión, supervisores por defecto, feriados, reportes importados |
+  | API | `app/api/mowa_mes.py` | Configuración, speech, supervisores, previsualización y creación de campaña, descarga de archivos, importación del reporte, límite mensual |
+  | Frontend | `frontend/src/pages/` | Pantalla de campaña, seguimiento de cargados y enviados, configuración de speech y supervisores |
+
+- Depende de: Selección (módulo 2) y resumen del top n, Selecciones guardadas, Motor de mapeo (módulo 4), exportador XLSX (módulo 5), lector `python-calamine` y contrato OpenAPI (`docs/contrato-api.md`).
+- Convención: nada propio de MOWA se filtra al núcleo compartido. Un conector SMS o WhatsApp siguiente agrega su propio paquete bajo `plataformas/` y reutiliza calendario y supervisión (RF-14, RF-31).
 
 ## 6. Generación de cargas — VoIP (`backend/cargas/voip/`, TBD)
 
