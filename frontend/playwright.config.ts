@@ -30,5 +30,12 @@ export default defineConfig({
     url: 'http://localhost:4321',
     timeout: 120 * 1000,
     reuseExistingServer: !process.env.CI,
+    // Since Astro 7.2, `astro preview` detaches into the background when it
+    // detects an AI coding agent. Playwright then sees its process exit at once,
+    // reports the server as dead, and leaves an orphan on port 4321. Playwright
+    // has to own the server's lifecycle, so the preview stays in the foreground
+    // for whoever runs the tests (docs: Building Astro sites with AI tools >
+    // Background mode).
+    env: { ASTRO_PREVIEW_BACKGROUND: '0' },
   },
 });

@@ -1,64 +1,28 @@
 /**
  * Typed client for the auto_cusco REST API.
  *
- * Contract: docs/versionado-sabanas.md, section 4.5. The base URL defaults to
- * a same-origin `/api` prefix (proxied in dev by astro.config.mjs, by the
- * reverse proxy in production) so the browser never needs CORS headers.
+ * The base URL defaults to a same-origin `/api` prefix (proxied in dev by
+ * astro.config.mjs, by the reverse proxy in production) so the browser never
+ * needs CORS headers.
+ *
+ * Every response shape comes from the backend's contract, never from here:
+ * `contrato-api.d.ts` is generated from contratos/openapi.json by
+ * `npm run contrato`, and CI fails if it drifts. See docs/contrato-api.md.
  */
+
+import type { components } from './contrato-api';
 
 export const API_BASE = import.meta.env.PUBLIC_API_URL || '/api';
 
-export type EstadoCarga = 'en_cola' | 'procesando' | 'terminada' | 'fallida';
-export type Severidad = 'error' | 'advertencia' | 'info';
+type Esquemas = components['schemas'];
 
-export interface Version {
-  id: number;
-  fecha_corte: string;
-  version: number;
-  estado: EstadoCarga;
-  vigente: boolean;
-  nombre_archivo: string;
-  tamano_bytes: number;
-  hoja: string;
-  creado_en: string;
-  procesado_en: string | null;
-  huella_formato: string | null;
-  filas_total: number | null;
-  filas_ingestadas: number | null;
-  incidencias_error: number;
-  incidencias_advertencia: number;
-  incidencias_info: number;
-  motivo_fallo: string | null;
-}
-
-export interface CargaCreada {
-  id: number;
-  fecha_corte: string;
-  version: number;
-  estado: EstadoCarga;
-  versiones_identicas: number[];
-  aviso: string | null;
-}
-
-export interface Incidencia {
-  fila: number | null;
-  columna: string | null;
-  codigo: string;
-  severidad: Severidad;
-  detalle: string;
-  valor_original: string | null;
-}
-
-export interface IncidenciasPagina {
-  total: number;
-  incidencias: Incidencia[];
-}
-
-export interface Health {
-  api: boolean;
-  database: boolean;
-  ok: boolean;
-}
+export type EstadoCarga = Esquemas['EstadoCarga'];
+export type Severidad = Esquemas['Severidad'];
+export type Version = Esquemas['VersionRespuesta'];
+export type CargaCreada = Esquemas['CargaCreadaRespuesta'];
+export type Incidencia = Esquemas['IncidenciaRespuesta'];
+export type IncidenciasPagina = Esquemas['IncidenciasRespuesta'];
+export type Health = Esquemas['HealthRespuesta'];
 
 /** An API response that arrived but said no. `detail` is the server's reason. */
 export class ApiError extends Error {

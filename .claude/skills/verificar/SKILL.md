@@ -39,7 +39,7 @@ Atrapan lo que las clásicas dejan pasar. **Ninguna está configurada todavía s
 | Capa | Qué pregunta responde | Aplica sobre todo a | Estado |
 |---|---|---|---|
 | Tipos estáticos | ¿El código es coherente antes de ejecutarlo? | Todo el backend | Frontend sí (`astro check`); backend no |
-| Contratos | ¿Dos piezas que deben coincidir siguen coincidiendo? | Frontera frontend-backend, catálogos compartidos | Parcial: códigos de incidencia y columnas; falta el esquema de la API |
+| Contratos | ¿Dos piezas que deben coincidir siguen coincidiendo? | Frontera frontend-backend, catálogos compartidos | Sí: códigos de incidencia, columnas y esquema de la API ↔ tipos del frontend |
 | Basadas en propiedades | ¿La regla se cumple para *cualquier* entrada, no solo las que imaginé? | Normalización (N-1 a N-8), mapeo de campos, fecha desde el nombre | No |
 | Mutación | ¿Mis pruebas fallarían si el código estuviera mal? | Núcleo de ingesta, versionado, mapeo | Solo a mano ("romper a propósito") |
 | Cobertura | ¿Qué código no ejecuta ninguna prueba? | Todo, como señal y no como meta | No |
@@ -80,7 +80,7 @@ Desde `backend/`:
 Desde `frontend/`, cuando la tarea tocó la interfaz:
 
 ```powershell
-npm run verificar                  # tipos, build, núcleo/DOM y extremo a extremo
+npm run verificar                  # contrato, tipos, build, núcleo/DOM y extremo a extremo
 ```
 
 Las pruebas `postgres` se saltan solas sin `AUTO_CUSCO_DB_TESTS=1`; que el resumen diga "9 skipped" **no** es que estén en verde.

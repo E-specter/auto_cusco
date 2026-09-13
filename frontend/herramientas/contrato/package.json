@@ -1,0 +1,10 @@
+{
+  "name": "auto-cusco-generador-contrato",
+  "private": true,
+  "type": "module",
+  "description": "Genera los tipos TypeScript del frontend desde contratos/openapi.json. Vive aparte porque openapi-typescript exige TypeScript 5 y la app usa TypeScript 6.",
+  "dependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

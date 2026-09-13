@@ -31,10 +31,10 @@ Detalle de las capas que complementan a las clásicas de [SKILL.md](SKILL.md). P
 |---|---|---|
 | Códigos de incidencia ↔ traducciones del frontend | `backend/tests/test_codigos_incidencia.py` + `frontend/tests/nucleo/i18n-incidencias.test.ts`, sobre `CODIGOS_INCIDENCIA` | **Configurado**, cerrado por los dos extremos |
 | Columnas de la tabla ↔ salida de la normalización | Pruebas del backend | **Configurado** |
-| Esquema de la API ↔ tipos del cliente del frontend | `frontend/src/lib/api.ts` escribe a mano lo que FastAPI publica en `/openapi.json` | **No configurado.** Es el hueco más probable hoy |
-| Respuestas falsas de Playwright ↔ API real | `frontend/e2e/api-falsa.ts` inventa respuestas que podrían divergir del backend | **No configurado** |
+| Esquema de la API ↔ tipos del cliente del frontend | Backend: `contratos/openapi.json` + `backend/tests/test_contrato_openapi.py`. Frontend: `src/lib/contrato-api.d.ts` generado + `npm run contrato:comprobar` | **Configurado**, cerrado por los dos extremos y en CI |
+| Respuestas falsas de Playwright ↔ API real | `frontend/e2e/api-falsa.ts` tipa sus respuestas con los tipos generados | **Configurado** en compilación: una respuesta falsa que el backend no podría enviar no compila. No comprueba valores, solo formas |
 
-**Cómo cerrar el hueco del esquema:** exportar `openapi.json` del backend en CI y, en el frontend, generar o comprobar los tipos contra él (`openapi-typescript` y una prueba que falle si el tipo generado difiere del escrito). Así las respuestas falsas de las pruebas de extremo a extremo también se pueden tipar contra el esquema real.
+**Cómo funciona:** el backend exporta el esquema y su prueba falla si no coincide con la API; el frontend genera sus tipos desde ese archivo y su comprobación falla si los tipos commiteados quedaron atrás. El detalle está en `docs/contrato-api.md`.
 
 ---
 

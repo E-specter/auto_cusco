@@ -6,25 +6,14 @@
  */
 import type { Page, Route } from '@playwright/test';
 
-export interface VersionFalsa {
-  id: number;
-  fecha_corte: string;
-  version: number;
-  estado: 'en_cola' | 'procesando' | 'terminada' | 'fallida';
-  vigente: boolean;
-  nombre_archivo: string;
-  tamano_bytes: number;
-  hoja: string;
-  creado_en: string;
-  procesado_en: string | null;
-  huella_formato: string | null;
-  filas_total: number | null;
-  filas_ingestadas: number | null;
-  incidencias_error: number;
-  incidencias_advertencia: number;
-  incidencias_info: number;
-  motivo_fallo: string | null;
-}
+import type { Incidencia, Version } from '../src/lib/api';
+
+/**
+ * Fake responses are typed against the real contract, so a fake the backend
+ * could never send fails to compile instead of passing a test that proves
+ * nothing about the real API.
+ */
+export type VersionFalsa = Version;
 
 export function version(parcial: Partial<VersionFalsa> = {}): VersionFalsa {
   return {
@@ -53,14 +42,7 @@ export interface ApiFalsa {
   /** Versions the listing returns, newest first. */
   versiones: VersionFalsa[];
   /** Issues the table pages through. */
-  incidencias: Array<{
-    fila: number | null;
-    columna: string | null;
-    codigo: string;
-    severidad: 'error' | 'advertencia' | 'info';
-    detalle: string;
-    valor_original: string | null;
-  }>;
+  incidencias: Incidencia[];
   /** Answers `POST /cargas` in order; the last one repeats. */
   respuestasSubida: Array<{ estado: number; cuerpo: unknown }>;
   /** Answers `DELETE /cargas/{id}` in order; the last one repeats. */

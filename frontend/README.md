@@ -57,7 +57,9 @@ npx playwright install chromium   # solo la primera vez
 npm run verificar                 # build + nucleo/DOM + extremo a extremo
 ```
 
-O por separado: `npx astro check`, `npm run test`, `npm run test:e2e`.
+O por separado: `npm run contrato:comprobar`, `npx astro check`, `npm run test`, `npm run test:e2e`.
+
+**Tipos de la API.** `src/lib/contrato-api.d.ts` se genera desde `contratos/openapi.json` y no se edita a mano. Si el backend cambió el contrato, regenéralo con `npm run contrato` (la primera vez, `npm ci` dentro de `herramientas/contrato/`). El generador vive en esa carpeta aparte porque exige TypeScript 5 y la app usa el 6.
 
 | Carpeta | Qué cubre | Entorno |
 |---|---|---|
