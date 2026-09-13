@@ -101,3 +101,43 @@ def test_las_cabeceras_que_envia_la_descarga_son_las_declaradas() -> None:
     enviadas = {nombre for nombre in respuesta.headers if nombre.startswith("x-carga-")}
     assert respuesta.status_code == 200
     assert enviadas == {nombre.lower() for nombre in CABECERAS_RESUMEN}
+
+
+def _esquemas_de_respuesta() -> set[str]:
+    """Nombres de los esquemas alcanzables desde alguna respuesta exitosa."""
+    esquemas = ESQUEMA["components"]["schemas"]
+    pendientes: list = [
+        contenido.get("schema", {})
+        for _, codigo, respuesta in _respuestas()
+        if codigo.startswith("2")
+        for contenido in respuesta.get("content", {}).values()
+    ]
+    vistos: set[str] = set()
+    while pendientes:
+        nodo = pendientes.pop()
+        if isinstance(nodo, list):
+            pendientes.extend(nodo)
+        elif isinstance(nodo, dict):
+            referencia = nodo.get("$ref", "")
+            nombre = referencia.rsplit("/", 1)[-1]
+            if referencia and nombre not in vistos:
+                vistos.add(nombre)
+                pendientes.append(esquemas[nombre])
+            pendientes.extend(nodo.values())
+    return vistos
+
+
+def test_todo_campo_de_una_respuesta_es_obligatorio() -> None:
+    # Opcional en el contrato significa "a veces no viene". Un campo que el backend
+    # siempre envia va obligatorio, con null en su tipo si puede venir vacio; si no,
+    # el frontend tiene que tratarlo como si pudiera faltar. Ver ModeloRespuesta.
+    esquemas = ESQUEMA["components"]["schemas"]
+
+    opcionales = sorted(
+        f"{nombre}.{campo}"
+        for nombre in _esquemas_de_respuesta()
+        for campo in esquemas[nombre].get("properties", {})
+        if campo not in esquemas[nombre].get("required", [])
+    )
+
+    assert opcionales == [], f"Campos de respuesta opcionales en el contrato: {opcionales}"

@@ -24,6 +24,7 @@ from app.adapters.output import exportadores
 from app.api.cartera import obtener_servicio_cartera
 from app.api.consultas import parsear_filtro, parsear_orden, texto_si_es_monto, traducir_errores
 from app.api.errores import respuestas_de_error
+from app.api.respuestas import ModeloRespuesta
 from app.core.entities.cartera import ConsultaInvalida, SinVersionVigente
 from app.core.entities.exportacion import (
     EXTENSIONES,
@@ -106,13 +107,13 @@ class PeticionGeneracion(BaseModel):
     opciones: OpcionesEntrada | None = None
 
 
-class ErrorGeneracionRespuesta(BaseModel):
+class ErrorGeneracionRespuesta(ModeloRespuesta):
     fila: int
     campo: str
     detalle: str
 
 
-class PrevisualizacionRespuesta(BaseModel):
+class PrevisualizacionRespuesta(ModeloRespuesta):
     nombre_archivo: str
     cabeceras: list[str]
     filas: list[dict[str, Any]]
@@ -124,7 +125,7 @@ class PrevisualizacionRespuesta(BaseModel):
     errores: list[ErrorGeneracionRespuesta]
 
 
-class FormatoRespuesta(BaseModel):
+class FormatoRespuesta(ModeloRespuesta):
     formato: str
     extension: str
     opciones: list[str]

@@ -69,3 +69,10 @@ def test_filas_e_incidencias_se_eliminan_con_su_version() -> None:
 
 def test_auditoria_sobrevive_a_la_eliminacion_de_la_version() -> None:
     assert not Base.metadata.tables["carga_auditoria"].foreign_keys
+
+
+def test_el_nombre_de_una_seleccion_es_unico_y_la_cantidad_positiva() -> None:
+    ddl = str(CreateTable(Base.metadata.tables["seleccion"]).compile(dialect=postgresql.dialect()))
+
+    assert "CONSTRAINT uq_seleccion_nombre_normalizado UNIQUE (nombre_normalizado)" in ddl
+    assert "cantidad IS NULL OR cantidad >= 1" in ddl

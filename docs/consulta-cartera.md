@@ -14,6 +14,7 @@ La cartera de una fecha es el contenido de su **versión vigente** (ver `version
 | `GET /cartera` | Productos de la fecha, con filtros, orden y paginación (RF-04, RF-05, RF-08) |
 | `GET /cartera/metricas` | Capital, cuentas, cuota mínima y máxima, cuentas por segmento, más los indicadores que pida el usuario (RF-26, RF-27) |
 | `GET /cartera/segmentacion` | Cuentas y capital por cada valor de un atributo (RF-06) |
+| `GET /cartera/resumen` | Métricas del universo filtrado y de sus primeros n, lado a lado, en un solo llamado (RF-08, RF-26 a RF-28) |
 
 Todos reciben `fecha_corte` en formato `AAAA-MM-DD` y aceptan los mismos filtros.
 
@@ -50,21 +51,38 @@ Las funciones de los indicadores son las cinco de RF-27: suma, conteo, promedio,
 
 **Una consulta mal formada nunca llega a la base de datos.** El núcleo valida campo, operador, cantidad de valores y tipo antes de consultar, y la API responde 400 con el motivo.
 
-## 5. Reglas de negocio
+## 5. Resumen: el universo filtrado y los primeros n
+
+`GET /cartera/resumen` responde de una vez lo que la pantalla de selección muestra lado a lado: las métricas de todos los productos que cumplen los filtros y las de los primeros n que eligió el analista. Si filtra 3 200 productos y pide los primeros 500, recibe los dos bloques.
+
+| Parámetro | Para qué |
+|---|---|
+| `fecha_corte`, `filtro`, `indicador` | Igual que en el resto de los endpoints |
+| `orden` | Qué productos son "los primeros". Sin él, el orden es solo por pagaré |
+| `cantidad` | El n del top n, de 1 a 120 000. Sin ella no hay bloque de selección |
+| `segmento` | Campo por el que segmentar los dos bloques. Sin él, `segmentacion` es `null` |
+
+La respuesta trae `disponibles`, `solicitados` y `suficiente`, y dos bloques: `universo` y `seleccion`, este último `null` si no se pidió cantidad. Cada bloque tiene `metricas`, con los indicadores de RF-27, y `segmentacion`.
+
+**Los primeros n son siempre los mismos productos.** Salen con el mismo orden, los nulos al final y el mismo desempate por pagaré que `GET /cartera` y que la generación del archivo de carga. Así, las métricas de la selección describen exactamente los productos de la lista y los del archivo. Dos pruebas contra PostgreSQL lo comprueban: una con un orden que tiene empates, frente a la lista, y otra frente a las filas del archivo generado.
+
+Pensado para RF-28: al cambiar un filtro, la pantalla hace un solo pedido en vez de uno por métrica y por bloque. `/cartera/metricas` y `/cartera/segmentacion` siguen disponibles tal como estaban.
+
+## 6. Reglas de negocio
 
 - **RF-08, cantidad insuficiente.** La respuesta trae `total` y `suficiente`. Cuando se piden más productos de los que hay, `suficiente` es `false` y el frontend debe avisarlo de forma explícita.
 - **Montos como texto.** Capital, cuotas y demás importes viajan como cadena para no perder precisión al pasar por JSON. Las cantidades y conteos viajan como número.
 - **Segmentos sin valor.** En las métricas por segmento, los productos sin segmento se agrupan bajo `(sin segmento)`.
 
-## 6. Implementación
+## 7. Implementación
 
 - **Núcleo:** `backend/app/core/services/seleccion_cartera/` con el catálogo de campos y el caso de uso. Entidades en `app/core/entities/cartera.py`.
 - **Adaptador:** `backend/app/adapters/persistence/repositorio_cartera_postgres.py`. Cada filtro se traduce a una expresión de SQLAlchemy; nunca se arma SQL con texto.
 - **API:** `backend/app/api/cartera.py`.
 - **Pruebas:** catálogo y validación, caso de uso con repositorio en memoria, endpoints con doble de prueba, e integración contra PostgreSQL con una sábana sintética.
 
-## 7. Lo que falta de la Fase 2
+## 8. Lo que falta de la Fase 2
 
 - **RF-07, control de gestiones multicanal.** Bloqueado: todavía no existen las gestiones (VoIP, SMS, WhatsApp, correo) ni sus fuentes en el sistema. Filtrar por "contactado este mes" depende de eso.
-- **RF-28, actualización automática de métricas.** Es comportamiento de la interfaz: recalcular al cambiar filtros o selección. El backend ya responde lo necesario.
+- **RF-28, actualización automática de métricas.** Es comportamiento de la interfaz: recalcular al cambiar filtros o selección. El backend lo resuelve con un solo pedido a `GET /cartera/resumen`.
 - **Pantalla de selección y métricas** en el frontend.

@@ -20,7 +20,6 @@ from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
 
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_cartera_postgres import RepositorioCarteraPostgres
@@ -32,8 +31,15 @@ from app.api.consultas import (
     traducir_errores,
 )
 from app.api.errores import respuestas_de_error
-from app.core.entities.cartera import ConsultaInvalida, SinVersionVigente
-from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
+from app.api.respuestas import ModeloRespuesta
+from app.core.entities.cartera import (
+    BloqueResumen,
+    ConsultaInvalida,
+    MetricasCartera,
+    Segmentacion,
+    SinVersionVigente,
+)
+from app.core.services.seleccion_cartera.servicio import CANTIDAD_MAXIMA, ConsultaCarteraService
 
 router = APIRouter(prefix="/cartera", tags=["cartera"])
 
@@ -47,23 +53,23 @@ def obtener_servicio_cartera() -> ConsultaCarteraService:
     return crear_servicio_cartera()
 
 
-class CampoRespuesta(BaseModel):
+class CampoRespuesta(ModeloRespuesta):
     tipo: str
     operadores: list[str]
 
 
-class GrupoRespuesta(BaseModel):
+class GrupoRespuesta(ModeloRespuesta):
     valor: Any
     cuentas: int
     capital: str
 
 
-class SegmentacionRespuesta(BaseModel):
+class SegmentacionRespuesta(ModeloRespuesta):
     campo: str
     grupos: list[GrupoRespuesta]
 
 
-class PaginaRespuesta(BaseModel):
+class PaginaRespuesta(ModeloRespuesta):
     total: int
     limite: int
     desplazamiento: int
@@ -71,13 +77,58 @@ class PaginaRespuesta(BaseModel):
     productos: list[dict[str, Any]]
 
 
-class MetricasRespuesta(BaseModel):
+class MetricasRespuesta(ModeloRespuesta):
     cuentas: int
     capital_total: str
     cuota_minima: str | None
     cuota_maxima: str | None
     cuentas_por_segmento: dict[str, int]
     adicionales: dict[str, Any]
+
+
+class BloqueRespuesta(ModeloRespuesta):
+    metricas: MetricasRespuesta
+    segmentacion: SegmentacionRespuesta | None
+
+
+class ResumenRespuesta(ModeloRespuesta):
+    disponibles: int
+    solicitados: int | None
+    suficiente: bool
+    universo: BloqueRespuesta
+    seleccion: BloqueRespuesta | None
+
+
+def _metricas_respuesta(metricas: MetricasCartera) -> MetricasRespuesta:
+    return MetricasRespuesta(
+        cuentas=metricas.cuentas,
+        capital_total=str(metricas.capital_total),
+        cuota_minima=None if metricas.cuota_minima is None else str(metricas.cuota_minima),
+        cuota_maxima=None if metricas.cuota_maxima is None else str(metricas.cuota_maxima),
+        cuentas_por_segmento=metricas.cuentas_por_segmento,
+        adicionales={
+            nombre: texto_si_es_monto(valor) for nombre, valor in metricas.adicionales.items()
+        },
+    )
+
+
+def _segmentacion_respuesta(segmentacion: Segmentacion) -> SegmentacionRespuesta:
+    return SegmentacionRespuesta(
+        campo=segmentacion.campo,
+        grupos=[
+            GrupoRespuesta(valor=grupo.valor, cuentas=grupo.cuentas, capital=str(grupo.capital))
+            for grupo in segmentacion.grupos
+        ],
+    )
+
+
+def _bloque_respuesta(bloque: BloqueResumen) -> BloqueRespuesta:
+    return BloqueRespuesta(
+        metricas=_metricas_respuesta(bloque.metricas),
+        segmentacion=(
+            None if bloque.segmentacion is None else _segmentacion_respuesta(bloque.segmentacion)
+        ),
+    )
 
 
 def _producto(fila: dict[str, Any]) -> dict[str, Any]:
@@ -137,16 +188,7 @@ def metricas_cartera(
         )
     except (ConsultaInvalida, SinVersionVigente) as exc:
         raise traducir_errores(exc) from exc
-    return MetricasRespuesta(
-        cuentas=metricas.cuentas,
-        capital_total=str(metricas.capital_total),
-        cuota_minima=None if metricas.cuota_minima is None else str(metricas.cuota_minima),
-        cuota_maxima=None if metricas.cuota_maxima is None else str(metricas.cuota_maxima),
-        cuentas_por_segmento=metricas.cuentas_por_segmento,
-        adicionales={
-            nombre: texto_si_es_monto(valor) for nombre, valor in metricas.adicionales.items()
-        },
-    )
+    return _metricas_respuesta(metricas)
 
 
 @router.get(
@@ -167,10 +209,48 @@ def segmentar_cartera(
         )
     except (ConsultaInvalida, SinVersionVigente) as exc:
         raise traducir_errores(exc) from exc
-    return SegmentacionRespuesta(
-        campo=segmentacion.campo,
-        grupos=[
-            GrupoRespuesta(valor=grupo.valor, cuentas=grupo.cuentas, capital=str(grupo.capital))
-            for grupo in segmentacion.grupos
-        ],
+    return _segmentacion_respuesta(segmentacion)
+
+
+@router.get("/resumen", response_model=ResumenRespuesta, responses=respuestas_de_error(400, 404))
+def resumir_cartera(
+    fecha_corte: date,
+    filtro: list[str] = Query(default=[]),
+    orden: str | None = Query(
+        default=None, description="Que productos son los primeros: campo, o -campo"
+    ),
+    cantidad: int | None = Query(
+        default=None,
+        ge=1,
+        le=CANTIDAD_MAXIMA,
+        description="El n del top n. Sin ella no hay bloque de seleccion",
+    ),
+    indicador: list[str] = Query(default=[]),
+    segmento: str | None = Query(
+        default=None, description="Campo por el que segmentar los dos bloques"
+    ),
+    servicio: ConsultaCarteraService = Depends(obtener_servicio_cartera),
+) -> ResumenRespuesta:
+    """Metricas del universo filtrado y de sus primeros n, lado a lado (RF-08, RF-26 a RF-28).
+
+    Los primeros n son los mismos productos que devuelve `/cartera` con ese orden
+    y los mismos que se escriben en el archivo de carga.
+    """
+    try:
+        resumen = servicio.resumen(
+            fecha_corte,
+            [parsear_filtro(crudo) for crudo in filtro],
+            parsear_orden(orden),
+            cantidad,
+            [parsear_indicador(crudo) for crudo in indicador],
+            segmento,
+        )
+    except (ConsultaInvalida, SinVersionVigente) as exc:
+        raise traducir_errores(exc) from exc
+    return ResumenRespuesta(
+        disponibles=resumen.disponibles,
+        solicitados=resumen.solicitados,
+        suficiente=resumen.suficiente,
+        universo=_bloque_respuesta(resumen.universo),
+        seleccion=None if resumen.seleccion is None else _bloque_respuesta(resumen.seleccion),
     )

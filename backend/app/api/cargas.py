@@ -19,12 +19,13 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 
 from app.adapters.input.lector_calamine import LectorCalamine
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_cargas_postgres import RepositorioCargasPostgres
 from app.api.errores import respuestas_de_error
+from app.api.respuestas import ModeloRespuesta
 from app.core.entities.carga import (
     CargaDetalle,
     CargaNoEncontrada,
@@ -52,7 +53,7 @@ def obtener_servicio() -> IngestaSabanaService:
     return crear_servicio_ingesta()
 
 
-class VersionRespuesta(BaseModel):
+class VersionRespuesta(ModeloRespuesta):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -74,7 +75,7 @@ class VersionRespuesta(BaseModel):
     motivo_fallo: str | None = None
 
 
-class CargaCreadaRespuesta(BaseModel):
+class CargaCreadaRespuesta(ModeloRespuesta):
     id: int
     fecha_corte: date
     version: int
@@ -83,7 +84,7 @@ class CargaCreadaRespuesta(BaseModel):
     aviso: str | None = None
 
 
-class IncidenciaRespuesta(BaseModel):
+class IncidenciaRespuesta(ModeloRespuesta):
     fila: int | None
     columna: str | None
     codigo: str
@@ -92,7 +93,7 @@ class IncidenciaRespuesta(BaseModel):
     valor_original: str | None = None
 
 
-class IncidenciasRespuesta(BaseModel):
+class IncidenciasRespuesta(ModeloRespuesta):
     total: int
     incidencias: list[IncidenciaRespuesta]
 

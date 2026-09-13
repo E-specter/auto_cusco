@@ -22,6 +22,7 @@ from app.api.cargas import crear_servicio_ingesta
 from app.api.cargas import router as cargas_router
 from app.api.cartera import router as cartera_router
 from app.api.health import router as health_router
+from app.api.selecciones import router as selecciones_router
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ def configurar_cors(aplicacion: FastAPI, origenes: list[str]) -> None:
         CORSMiddleware,
         allow_origins=origenes,
         allow_credentials=False,  # la API aun no usa cookies ni sesiones
-        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type"],
         # Sin esto el navegador no deja leer el nombre del archivo generado ni
         # el resumen de la carga cuando el frontend corre en otro origen.
@@ -83,3 +84,4 @@ app.include_router(health_router)
 app.include_router(cargas_router)
 app.include_router(cartera_router)
 app.include_router(archivos_carga_router)
+app.include_router(selecciones_router)

@@ -31,6 +31,7 @@ La exportación es estable —el mismo esquema produce los mismos bytes— y se 
 Que el archivo coincida no alcanza si el esquema no dice nada. Las pruebas cuidan además que el contrato sea útil:
 
 - **Toda respuesta exitosa declara su forma.** Un endpoint que devuelve un `dict` sin modelo aparece en el esquema como un objeto libre, y el frontend no puede tiparlo. La prueba lo rechaza: por eso `/health` y `/cartera/campos` tienen ahora su modelo.
+- **Opcional significa "a veces no viene".** Todo campo que el backend envía siempre va obligatorio en el esquema, con `null` en su tipo si puede venir vacío, aunque en Pydantic tenga valor por defecto. Los modelos de respuesta heredan de `ModeloRespuesta` (`backend/app/api/respuestas.py`), que lo resuelve para todos, y una prueba rechaza cualquier campo opcional en un esquema de respuesta.
 - **Los errores están declarados y usan el cuerpo común** `{"detail": "..."}` (`DetalleError`), con el código que corresponde a cada endpoint: `400`, `404`, `409` o `413`. El `422` de validación lo declara FastAPI con su propio esquema.
 - **La descarga de `/archivos-carga` describe lo que envía:** un cuerpo binario en XLSX, CSV o JSON, el nombre en `Content-Disposition` y el resumen en las cabeceras `X-Carga-*`. Una prueba hace la descarga y comprueba que **las cabeceras que se envían son exactamente las declaradas**. La misma lista alimenta lo que CORS deja leer al navegador, así que las tres cosas no pueden desalinearse.
 
@@ -42,4 +43,7 @@ Que el archivo coincida no alcanza si el esquema no dice nada. Las pruebas cuida
 ## 5. Estado
 
 - **Backend: configurado.** `contratos/openapi.json`, `backend/app/api/contrato.py`, `backend/scripts/exportar_openapi.py` y `backend/tests/test_contrato_openapi.py`.
-- **Frontend: pendiente, a cargo de la sesión `designer`.** Generar los tipos desde `contratos/openapi.json` y comprobar en CI que `api.ts` coincide con ellos.
+- **Frontend: configurado.** Los tipos se generan desde `contratos/openapi.json` en `frontend/src/lib/contrato-api.d.ts`, archivo generado que nadie edita a mano. `frontend/src/lib/api.ts` y las respuestas falsas de las pruebas de extremo a extremo (`frontend/e2e/api-falsa.ts`) toman de ahí todas sus formas, así que una respuesta que el backend no podría enviar no compila.
+  - Regenerar, desde `frontend/`: `npm run contrato`. Comprobar sin escribir: `npm run contrato:comprobar`, que falla si los tipos commiteados no coinciden con el contrato. Está dentro de `npm run verificar` y en el trabajo de calidad de `.github/workflows/frontend.yml`.
+  - El generador (`openapi-typescript`) vive en `frontend/herramientas/contrato/` con su propio `package.json` y lockfile, porque declara TypeScript 5 como dependencia par y la app usa TypeScript 6. El script le pasa el esquema ya leído, no una ruta: la versión 7.13 convierte las rutas en URL y codifica los espacios, así que falla en un checkout bajo una carpeta con espacios.
+  - **Quien cambie el contrato regenera también los tipos del frontend en el mismo commit**, o el CI del frontend queda en rojo.

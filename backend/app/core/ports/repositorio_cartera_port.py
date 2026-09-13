@@ -10,6 +10,7 @@ from app.core.entities.cartera import (
     Indicador,
     MetricasCartera,
     Orden,
+    Recorte,
 )
 
 
@@ -34,8 +35,18 @@ class RepositorioCarteraPort(Protocol):
         fecha_corte: date,
         filtros: Sequence[Filtro],
         indicadores: Sequence[Indicador],
-    ) -> MetricasCartera: ...
+        recorte: Recorte | None = None,
+    ) -> MetricasCartera:
+        """Sobre todos los que cumplen los filtros o, con recorte, sobre sus primeros n.
+
+        Los primeros n deben salir con el mismo orden y desempate que `consultar`.
+        """
+        ...
 
     def segmentar(
-        self, fecha_corte: date, campo: str, filtros: Sequence[Filtro]
+        self,
+        fecha_corte: date,
+        campo: str,
+        filtros: Sequence[Filtro],
+        recorte: Recorte | None = None,
     ) -> list[Grupo]: ...

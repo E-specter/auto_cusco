@@ -226,3 +226,31 @@ class CargaAuditoria(Base):
         CheckConstraint(f"evento IN ({_en(EventoAuditoria)})", name="evento_valido"),
         Index(None, "fecha_corte", "ocurrido_en"),
     )
+
+
+class Seleccion(Base):
+    """Seleccion de cartera guardada y compartida (docs/selecciones-guardadas.md).
+
+    Filtros, orden e indicadores en la sintaxis de texto de la API. Sin usuario
+    hasta que exista autenticacion (decision C-3).
+    """
+
+    __tablename__ = "seleccion"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    nombre: Mapped[str] = mapped_column(Text)
+    # Sin espacios en los extremos y en minusculas: la unicidad no distingue mayusculas.
+    nombre_normalizado: Mapped[str] = mapped_column(Text)
+    filtros: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
+    orden: Mapped[str | None] = mapped_column(Text)
+    cantidad: Mapped[int | None] = mapped_column(Integer)
+    indicadores: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    actualizado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("nombre_normalizado"),
+        CheckConstraint("cantidad IS NULL OR cantidad >= 1", name="cantidad_positiva"),
+    )

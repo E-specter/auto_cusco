@@ -8,10 +8,10 @@ que lo descubra en produccion.
 
 from typing import Any
 
-from pydantic import BaseModel
+from app.api.respuestas import ModeloRespuesta
 
 
-class DetalleError(BaseModel):
+class DetalleError(ModeloRespuesta):
     """Motivo legible por el que la API rechazo la peticion."""
 
     detail: str

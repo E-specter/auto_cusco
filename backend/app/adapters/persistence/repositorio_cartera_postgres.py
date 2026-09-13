@@ -5,12 +5,12 @@ Todo se resuelve contra la version vigente de la fecha pedida, uniendo
 traducen a expresiones de SQLAlchemy, nunca a SQL armado con texto.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import ColumnElement, Engine, func, select
+from sqlalchemy import ColumnElement, Engine, FromClause, Select, func, select
 
 from app.adapters.persistence.modelos import Carga, CargaFila
 from app.core.entities.cartera import (
@@ -21,6 +21,7 @@ from app.core.entities.cartera import (
     MetricasCartera,
     Operador,
     Orden,
+    Recorte,
 )
 from app.core.ports.repositorio_cartera_port import RepositorioCarteraPort
 
@@ -66,10 +67,23 @@ def _condicion(filtro: Filtro) -> ColumnElement[bool]:
     raise ValueError(f"Operador no soportado: {filtro.operador}")  # pragma: no cover
 
 
-def _agregado(indicador: Indicador):
+def _ordenar(consulta: Select, orden: Orden | None) -> Select:
+    """Orden pedido con los nulos al final y desempate estable por pagare.
+
+    Es el mismo para la lista, los primeros n de las metricas y el archivo de
+    carga: si difiriera, las metricas de la seleccion describirian otros productos.
+    """
+    if orden is not None:
+        columna = _COLUMNAS[orden.campo]
+        criterio = columna.desc() if orden.descendente else columna.asc()
+        consulta = consulta.order_by(criterio.nulls_last())
+    return consulta.order_by(_FILA.c.pagare)
+
+
+def _agregado(indicador: Indicador, columnas: Mapping[str, ColumnElement]):
     if indicador.campo is None:  # solo CONTEO llega sin campo (validado en el nucleo)
         return func.count()
-    columna = _COLUMNAS[indicador.campo]
+    columna = columnas[indicador.campo]
     match indicador.funcion:
         case Funcion.SUMA:
             return func.sum(columna)
@@ -119,12 +133,7 @@ class RepositorioCarteraPostgres(RepositorioCarteraPort):
     ) -> tuple[int, list[dict[str, Any]]]:
         condiciones = self._condiciones(fecha_corte, filtros)
         consulta = select(*_COLUMNAS_PRODUCTO).select_from(self._origen()).where(*condiciones)
-        if orden is not None:
-            columna = _COLUMNAS[orden.campo]
-            criterio = columna.desc() if orden.descendente else columna.asc()
-            consulta = consulta.order_by(criterio.nulls_last())
-        # Desempate estable para que la paginacion no repita ni salte productos.
-        consulta = consulta.order_by(_FILA.c.pagare).limit(limite).offset(desplazamiento)
+        consulta = _ordenar(consulta, orden).limit(limite).offset(desplazamiento)
         with self._engine.connect() as cx:
             total = cx.execute(
                 select(func.count()).select_from(self._origen()).where(*condiciones)
@@ -132,30 +141,46 @@ class RepositorioCarteraPostgres(RepositorioCarteraPort):
             filas = [dict(fila._mapping) for fila in cx.execute(consulta)]
         return total, filas
 
+    def _fuente(
+        self, fecha_corte: date, filtros: Sequence[Filtro], recorte: Recorte | None
+    ) -> tuple[FromClause, list[ColumnElement[bool]], Mapping[str, ColumnElement]]:
+        """De donde se agrega: el universo filtrado o, con recorte, sus primeros n.
+
+        El recorte es una subconsulta con el mismo orden y LIMIT que la lista; las
+        metricas se calculan sobre sus columnas.
+        """
+        condiciones = self._condiciones(fecha_corte, filtros)
+        if recorte is None:
+            return self._origen(), condiciones, _COLUMNAS
+        seleccion = select(*_COLUMNAS_PRODUCTO).select_from(self._origen()).where(*condiciones)
+        primeros = _ordenar(seleccion, recorte.orden).limit(recorte.cantidad).subquery("primeros")
+        return primeros, [], {columna.name: columna for columna in primeros.c}
+
     def metricas(
         self,
         fecha_corte: date,
         filtros: Sequence[Filtro],
         indicadores: Sequence[Indicador],
+        recorte: Recorte | None = None,
     ) -> MetricasCartera:
-        condiciones = self._condiciones(fecha_corte, filtros)
-        capital = _COLUMNAS[CAMPO_CAPITAL]
-        cuota = _COLUMNAS[CAMPO_CUOTA]
-        segmento = _COLUMNAS[CAMPO_SEGMENTO]
+        origen, condiciones, columnas = self._fuente(fecha_corte, filtros, recorte)
+        capital = columnas[CAMPO_CAPITAL]
+        cuota = columnas[CAMPO_CUOTA]
+        segmento = columnas[CAMPO_SEGMENTO]
         base = (
             select(
                 func.count(),
                 func.coalesce(func.sum(capital), 0),
                 func.min(cuota),
                 func.max(cuota),
-                *(_agregado(indicador) for indicador in indicadores),
+                *(_agregado(indicador, columnas) for indicador in indicadores),
             )
-            .select_from(self._origen())
+            .select_from(origen)
             .where(*condiciones)
         )
         por_segmento = (
             select(segmento, func.count())
-            .select_from(self._origen())
+            .select_from(origen)
             .where(*condiciones)
             .group_by(segmento)
             .order_by(segmento)
@@ -178,13 +203,20 @@ class RepositorioCarteraPostgres(RepositorioCarteraPort):
             },
         )
 
-    def segmentar(self, fecha_corte: date, campo: str, filtros: Sequence[Filtro]) -> list[Grupo]:
-        columna = _COLUMNAS[campo]
-        capital = _COLUMNAS[CAMPO_CAPITAL]
+    def segmentar(
+        self,
+        fecha_corte: date,
+        campo: str,
+        filtros: Sequence[Filtro],
+        recorte: Recorte | None = None,
+    ) -> list[Grupo]:
+        origen, condiciones, columnas = self._fuente(fecha_corte, filtros, recorte)
+        columna = columnas[campo]
+        capital = columnas[CAMPO_CAPITAL]
         consulta = (
             select(columna, func.count(), func.coalesce(func.sum(capital), 0))
-            .select_from(self._origen())
-            .where(*self._condiciones(fecha_corte, filtros))
+            .select_from(origen)
+            .where(*condiciones)
             .group_by(columna)
             .order_by(func.count().desc(), columna)
         )

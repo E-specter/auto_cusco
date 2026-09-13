@@ -68,13 +68,14 @@ El script equivale a correr, en orden:
 Desde `frontend/`, cuando la tarea tocó la interfaz:
 
 ```powershell
-npm run verificar        # tipos, build, pruebas de nucleo/DOM y extremo a extremo
+npm run verificar        # contrato, tipos, build, pruebas de nucleo/DOM y extremo a extremo
 ```
 
 Equivale a, en orden:
 
 | Paso | Comando | Cuándo |
 |---|---|---|
+| Contrato | `npm run contrato:comprobar` | Siempre. Falla si los tipos del frontend no coinciden con `contratos/openapi.json` |
 | Tipos | `npx astro check` | Siempre |
 | Build | `npm run build` | Siempre |
 | Núcleo y DOM | `npm run test` | Siempre |

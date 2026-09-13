@@ -291,3 +291,43 @@ def test_una_fecha_sin_version_vigente_es_404_por_http(cliente) -> None:
     )
 
     assert respuesta.status_code == 404
+
+
+# --- Metricas de la seleccion frente al archivo --------------------------
+
+
+def test_las_metricas_de_la_seleccion_coinciden_con_el_archivo_generado(generador) -> None:
+    servicio, engine = generador
+    consulta = ConsultaCarteraService(RepositorioCarteraPostgres(engine))
+    orden = Orden("saldo_capital_pendiente", descendente=True)
+
+    resumen = consulta.resumen(FECHA, orden=orden, cantidad=3)
+    carga = servicio.generar(FECHA, DEFINICION, orden=orden, cantidad=3)
+
+    assert resumen.seleccion.metricas.cuentas == carga.generados == 3
+    assert [fila["pagare"] for fila in carga.tabla.filas] == [f"{i:018d}" for i in (5, 4, 3)]
+    # 5000.50 + 4000.50 + 3000.50: el capital de la seleccion es el de las filas del archivo.
+    assert str(resumen.seleccion.metricas.capital_total) == "12001.50"
+    assert str(resumen.universo.metricas.capital_total) == "15002.50"
+
+
+def test_resumen_por_http_contra_la_base(cliente) -> None:
+    respuesta = cliente.get(
+        "/cartera/resumen",
+        params={
+            "fecha_corte": FECHA.isoformat(),
+            "filtro": ["region:igual:CUSCO SUR"],
+            "orden": "-saldo_capital_pendiente",
+            "cantidad": 2,
+            "segmento": "region",
+        },
+    )
+
+    cuerpo = respuesta.json()
+    assert respuesta.status_code == 200
+    assert (cuerpo["disponibles"], cuerpo["solicitados"], cuerpo["suficiente"]) == (3, 2, True)
+    assert cuerpo["universo"]["metricas"]["capital_total"] == "9001.50"
+    assert cuerpo["seleccion"]["metricas"]["capital_total"] == "8001.00"
+    assert cuerpo["seleccion"]["segmentacion"]["grupos"] == [
+        {"valor": "CUSCO SUR", "cuentas": 2, "capital": "8001.00"}
+    ]

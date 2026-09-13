@@ -205,3 +205,59 @@ def test_la_cartera_sigue_a_la_version_vigente(cartera) -> None:
             .all()
         )
     assert vigentes == [correccion.id]
+
+
+def test_resumen_de_los_primeros_n_segun_el_orden(cartera) -> None:
+    servicio, _ = cartera
+
+    resumen = servicio.resumen(
+        FECHA,
+        orden=Orden("saldo_capital_pendiente", descendente=True),
+        cantidad=2,
+        indicadores=[Indicador("cuota mayor", Funcion.MAXIMO, "monto_cuota")],
+        segmento="region",
+    )
+
+    seleccion = resumen.seleccion
+    assert (resumen.disponibles, resumen.solicitados, resumen.suficiente) == (3, 2, True)
+    assert resumen.universo.metricas.capital_total == Decimal("3500.75")
+    # Los dos de mayor saldo: 2000.50 (TACNA) y 1000.00 (CUSCO SUR).
+    assert seleccion.metricas.cuentas == 2
+    assert seleccion.metricas.capital_total == Decimal("3000.50")
+    assert (seleccion.metricas.cuota_minima, seleccion.metricas.cuota_maxima) == (
+        Decimal("100.00"),
+        Decimal("250.25"),
+    )
+    assert seleccion.metricas.cuentas_por_segmento == {"1. Preventiva": 1, "2. 1 a 8": 1}
+    assert seleccion.metricas.adicionales["cuota mayor"] == Decimal("250.25")
+    assert sorted((g.valor, g.cuentas) for g in seleccion.segmentacion.grupos) == [
+        ("CUSCO SUR", 1),
+        ("TACNA", 1),
+    ]
+
+
+def test_las_metricas_de_la_seleccion_describen_los_productos_de_la_lista(cartera) -> None:
+    servicio, _ = cartera
+    # Orden con empates: dos productos comparten region. El desempate por pagare
+    # tiene que ser el mismo en la lista y en las metricas.
+    orden = Orden("region")
+
+    pagina = servicio.consultar(FECHA, orden=orden, limite=2)
+    resumen = servicio.resumen(FECHA, orden=orden, cantidad=2)
+
+    assert [fila["pagare"] for fila in pagina.filas] == [
+        "000000000000000001",
+        "000000000000000003",
+    ]
+    assert resumen.seleccion.metricas.capital_total == sum(
+        fila["saldo_capital_pendiente"] for fila in pagina.filas
+    )
+
+
+def test_pedir_mas_de_los_que_hay_resume_lo_disponible(cartera) -> None:
+    servicio, _ = cartera
+
+    resumen = servicio.resumen(FECHA, [Filtro("region", Operador.IGUAL, ("TACNA",))], cantidad=10)
+
+    assert (resumen.disponibles, resumen.suficiente) == (1, False)
+    assert resumen.seleccion.metricas.capital_total == Decimal("2000.50")

@@ -141,6 +141,40 @@ class Segmentacion:
     grupos: tuple[Grupo, ...]
 
 
+@dataclass(frozen=True)
+class Recorte:
+    """Los primeros `cantidad` productos segun `orden`, con desempate por pagare (RF-08)."""
+
+    orden: Orden | None
+    cantidad: int
+
+
+@dataclass(frozen=True)
+class BloqueResumen:
+    """Metricas de un conjunto de productos y, si se pidio, su segmentacion."""
+
+    metricas: MetricasCartera
+    segmentacion: Segmentacion | None = None
+
+
+@dataclass(frozen=True)
+class ResumenCartera:
+    """El universo filtrado y la seleccion recortada, lado a lado (RF-08, RF-26 a RF-28).
+
+    `seleccion` es None cuando no se pidio cantidad.
+    """
+
+    disponibles: int
+    solicitados: int | None
+    universo: BloqueResumen
+    seleccion: BloqueResumen | None
+
+    @property
+    def suficiente(self) -> bool:
+        """False cuando se pidieron mas productos de los que cumplen los filtros."""
+        return self.solicitados is None or self.disponibles >= self.solicitados
+
+
 class ConsultaInvalida(Exception):
     """La consulta pide un campo, operador o valor que no existe o no aplica."""
 

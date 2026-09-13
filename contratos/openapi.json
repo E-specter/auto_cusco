@@ -756,6 +756,152 @@
         }
       }
     },
+    "/cartera/resumen": {
+      "get": {
+        "tags": [
+          "cartera"
+        ],
+        "summary": "Resumir Cartera",
+        "description": "Metricas del universo filtrado y de sus primeros n, lado a lado (RF-08, RF-26 a RF-28).\n\nLos primeros n son los mismos productos que devuelve `/cartera` con ese orden\ny los mismos que se escriben en el archivo de carga.",
+        "operationId": "resumir_cartera_cartera_resumen_get",
+        "parameters": [
+          {
+            "name": "fecha_corte",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Fecha Corte"
+            }
+          },
+          {
+            "name": "filtro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "title": "Filtro"
+            }
+          },
+          {
+            "name": "orden",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Que productos son los primeros: campo, o -campo",
+              "title": "Orden"
+            },
+            "description": "Que productos son los primeros: campo, o -campo"
+          },
+          {
+            "name": "cantidad",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 120000,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "El n del top n. Sin ella no hay bloque de seleccion",
+              "title": "Cantidad"
+            },
+            "description": "El n del top n. Sin ella no hay bloque de seleccion"
+          },
+          {
+            "name": "indicador",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "title": "Indicador"
+            }
+          },
+          {
+            "name": "segmento",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Campo por el que segmentar los dos bloques",
+              "title": "Segmento"
+            },
+            "description": "Campo por el que segmentar los dos bloques"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumenRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/archivos-carga/formatos": {
       "get": {
         "tags": [
@@ -964,10 +1110,338 @@
           }
         }
       }
+    },
+    "/selecciones": {
+      "get": {
+        "tags": [
+          "selecciones"
+        ],
+        "summary": "Listar Selecciones",
+        "description": "Todas las selecciones, ordenadas por nombre y revisadas contra el catalogo actual.",
+        "operationId": "listar_selecciones_selecciones_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SeleccionRespuesta"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Selecciones Selecciones Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "selecciones"
+        ],
+        "summary": "Crear Seleccion",
+        "description": "Guarda una seleccion nueva. Si alguna parte no aplica, se rechaza con el motivo.",
+        "operationId": "crear_seleccion_selecciones_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeleccionEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeleccionRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operacion choca con el estado actual",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/selecciones/revision": {
+      "post": {
+        "tags": [
+          "selecciones"
+        ],
+        "summary": "Revisar Seleccion",
+        "description": "Que partes no aplican, sin guardar nada: para marcar errores mientras se edita.",
+        "operationId": "revisar_seleccion_selecciones_revision_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeleccionEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/selecciones/{seleccion_id}": {
+      "get": {
+        "tags": [
+          "selecciones"
+        ],
+        "summary": "Obtener Seleccion",
+        "description": "Una seleccion. Si perdio validez se devuelve igual, con sus problemas marcados.",
+        "operationId": "obtener_seleccion_selecciones__seleccion_id__get",
+        "parameters": [
+          {
+            "name": "seleccion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Seleccion Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeleccionRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "selecciones"
+        ],
+        "summary": "Actualizar Seleccion",
+        "description": "Reemplaza la seleccion completa.",
+        "operationId": "actualizar_seleccion_selecciones__seleccion_id__put",
+        "parameters": [
+          {
+            "name": "seleccion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Seleccion Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeleccionEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeleccionRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operacion choca con el estado actual",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "selecciones"
+        ],
+        "summary": "Eliminar Seleccion",
+        "operationId": "eliminar_seleccion_selecciones__seleccion_id__delete",
+        "parameters": [
+          {
+            "name": "seleccion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Seleccion Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "BloqueRespuesta": {
+        "properties": {
+          "metricas": {
+            "$ref": "#/components/schemas/MetricasRespuesta"
+          },
+          "segmentacion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SegmentacionRespuesta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "metricas",
+          "segmentacion"
+        ],
+        "title": "BloqueRespuesta"
+      },
       "Body_subir_sabana_cargas_post": {
         "properties": {
           "fecha_corte": {
@@ -1102,7 +1576,8 @@
           "fecha_corte",
           "version",
           "estado",
-          "versiones_identicas"
+          "versiones_identicas",
+          "aviso"
         ],
         "title": "CargaCreadaRespuesta"
       },
@@ -1348,7 +1823,8 @@
           "columna",
           "codigo",
           "severidad",
-          "detalle"
+          "detalle",
+          "valor_original"
         ],
         "title": "IncidenciaRespuesta"
       },
@@ -1507,6 +1983,17 @@
         ],
         "title": "PaginaRespuesta"
       },
+      "ParteSeleccion": {
+        "type": "string",
+        "enum": [
+          "nombre",
+          "filtro",
+          "orden",
+          "cantidad",
+          "indicador"
+        ],
+        "title": "ParteSeleccion"
+      },
       "PeticionGeneracion": {
         "properties": {
           "fecha_corte": {
@@ -1628,6 +2115,94 @@
         ],
         "title": "PrevisualizacionRespuesta"
       },
+      "ProblemaRespuesta": {
+        "properties": {
+          "parte": {
+            "$ref": "#/components/schemas/ParteSeleccion"
+          },
+          "expresion": {
+            "type": "string",
+            "title": "Expresion"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parte",
+          "expresion",
+          "detalle"
+        ],
+        "title": "ProblemaRespuesta"
+      },
+      "ResumenRespuesta": {
+        "properties": {
+          "disponibles": {
+            "type": "integer",
+            "title": "Disponibles"
+          },
+          "solicitados": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solicitados"
+          },
+          "suficiente": {
+            "type": "boolean",
+            "title": "Suficiente"
+          },
+          "universo": {
+            "$ref": "#/components/schemas/BloqueRespuesta"
+          },
+          "seleccion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BloqueRespuesta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "disponibles",
+          "solicitados",
+          "suficiente",
+          "universo",
+          "seleccion"
+        ],
+        "title": "ResumenRespuesta"
+      },
+      "RevisionRespuesta": {
+        "properties": {
+          "aplicable": {
+            "type": "boolean",
+            "title": "Aplicable"
+          },
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "aplicable",
+          "problemas"
+        ],
+        "title": "RevisionRespuesta"
+      },
       "SegmentacionRespuesta": {
         "properties": {
           "campo": {
@@ -1648,6 +2223,144 @@
           "grupos"
         ],
         "title": "SegmentacionRespuesta"
+      },
+      "SeleccionEntrada": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Nombre"
+          },
+          "filtros": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Filtros",
+            "default": []
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          },
+          "cantidad": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 120000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "indicadores": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Indicadores",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre"
+        ],
+        "title": "SeleccionEntrada"
+      },
+      "SeleccionRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "filtros": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Filtros"
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          },
+          "cantidad": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "indicadores": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Indicadores"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "actualizado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Actualizado En"
+          },
+          "aplicable": {
+            "type": "boolean",
+            "title": "Aplicable"
+          },
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "filtros",
+          "orden",
+          "cantidad",
+          "indicadores",
+          "creado_en",
+          "actualizado_en",
+          "aplicable",
+          "problemas"
+        ],
+        "title": "SeleccionRespuesta"
       },
       "Severidad": {
         "type": "string",
@@ -1831,7 +2544,15 @@
           "nombre_archivo",
           "tamano_bytes",
           "hoja",
-          "creado_en"
+          "creado_en",
+          "procesado_en",
+          "huella_formato",
+          "filas_total",
+          "filas_ingestadas",
+          "incidencias_error",
+          "incidencias_advertencia",
+          "incidencias_info",
+          "motivo_fallo"
         ],
         "title": "VersionRespuesta"
       }

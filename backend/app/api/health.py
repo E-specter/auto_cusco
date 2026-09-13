@@ -1,11 +1,11 @@
 """Adaptador de entrada HTTP para el caso de uso de health-check."""
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.adapters.persistence.db import get_db_session
 from app.adapters.persistence.postgres_health_adapter import PostgresHealthAdapter
+from app.api.respuestas import ModeloRespuesta
 from app.core.services.health_service import HealthService
 
 router = APIRouter(prefix="/health", tags=["health"])
@@ -15,7 +15,7 @@ def get_health_service(session: Session = Depends(get_db_session)) -> HealthServ
     return HealthService(database_health_port=PostgresHealthAdapter(session))
 
 
-class HealthRespuesta(BaseModel):
+class HealthRespuesta(ModeloRespuesta):
     api: bool
     database: bool
     ok: bool

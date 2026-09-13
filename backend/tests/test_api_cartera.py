@@ -12,15 +12,18 @@ from fastapi.testclient import TestClient
 
 from app.api.cartera import obtener_servicio_cartera
 from app.core.entities.cartera import (
+    BloqueResumen,
     ConsultaInvalida,
     Funcion,
     Grupo,
     MetricasCartera,
     Operador,
     PaginaCartera,
+    ResumenCartera,
     Segmentacion,
     SinVersionVigente,
 )
+from app.core.services.seleccion_cartera.servicio import CANTIDAD_MAXIMA
 from app.main import app
 
 FECHA = date(2026, 9, 10)
@@ -72,6 +75,36 @@ class ServicioFalso:
         self.recibido = {"campo": campo, "filtros": list(filtros)}
         return Segmentacion(
             campo=campo, grupos=(Grupo(valor="CUSCO SUR", cuentas=4, capital=Decimal("8000.00")),)
+        )
+
+    def resumen(self, fecha_corte, filtros, orden, cantidad, indicadores, segmento):
+        self._quizas_fallar()
+        self.recibido = {
+            "filtros": list(filtros),
+            "orden": orden,
+            "cantidad": cantidad,
+            "indicadores": list(indicadores),
+            "segmento": segmento,
+        }
+        metricas = MetricasCartera(
+            cuentas=7,
+            capital_total=Decimal("10500.75"),
+            cuota_minima=Decimal("50.00"),
+            cuota_maxima=Decimal("900.00"),
+            cuentas_por_segmento={"1. Preventiva": 7},
+            adicionales={indicador.nombre: Decimal("2.5") for indicador in indicadores},
+        )
+        segmentacion = (
+            None
+            if segmento is None
+            else Segmentacion(campo=segmento, grupos=(Grupo("CUSCO SUR", 4, Decimal("8000.00")),))
+        )
+        bloque = BloqueResumen(metricas=metricas, segmentacion=segmentacion)
+        return ResumenCartera(
+            disponibles=7,
+            solicitados=cantidad,
+            universo=bloque,
+            seleccion=None if cantidad is None else bloque,
         )
 
 
@@ -215,3 +248,64 @@ def test_campos_disponibles(cliente) -> None:
     respuesta = client.get("/cartera/campos")
 
     assert respuesta.json()["region"]["tipo"] == "texto"
+
+
+def test_resumen_con_top_n_trae_universo_y_seleccion(cliente) -> None:
+    client, servicio = cliente
+
+    respuesta = client.get(
+        "/cartera/resumen",
+        params={
+            "fecha_corte": "2026-09-10",
+            "filtro": ["region:igual:CUSCO SUR"],
+            "orden": "-saldo_capital_pendiente",
+            "cantidad": 500,
+            "indicador": ["cuota promedio:promedio:monto_cuota"],
+            "segmento": "region",
+        },
+    )
+
+    cuerpo = respuesta.json()
+    assert respuesta.status_code == 200
+    assert (cuerpo["disponibles"], cuerpo["solicitados"], cuerpo["suficiente"]) == (7, 500, False)
+    assert cuerpo["universo"]["metricas"]["capital_total"] == "10500.75"
+    assert cuerpo["seleccion"]["metricas"]["adicionales"]["cuota promedio"] == "2.5"
+    assert cuerpo["seleccion"]["segmentacion"]["grupos"][0]["capital"] == "8000.00"
+    assert servicio.recibido["filtros"][0].valores == ("CUSCO SUR",)
+    assert servicio.recibido["orden"].descendente
+    assert (servicio.recibido["cantidad"], servicio.recibido["segmento"]) == (500, "region")
+
+
+def test_resumen_sin_cantidad_no_trae_bloque_de_seleccion(cliente) -> None:
+    client, _ = cliente
+
+    cuerpo = client.get("/cartera/resumen", params={"fecha_corte": "2026-09-10"}).json()
+
+    assert cuerpo["seleccion"] is None
+    assert cuerpo["solicitados"] is None
+    assert cuerpo["suficiente"] is True
+    assert cuerpo["universo"]["segmentacion"] is None
+
+
+@pytest.mark.parametrize("cantidad", [0, CANTIDAD_MAXIMA + 1])
+def test_resumen_rechaza_una_cantidad_fuera_de_rango(cliente, cantidad) -> None:
+    client, servicio = cliente
+
+    respuesta = client.get(
+        "/cartera/resumen", params={"fecha_corte": "2026-09-10", "cantidad": cantidad}
+    )
+
+    assert respuesta.status_code == 422
+    assert servicio.recibido == {}
+
+
+def test_resumen_sin_version_vigente_devuelve_no_encontrado() -> None:
+    client = _con_error(SinVersionVigente(FECHA))
+    try:
+        respuesta = client.get(
+            "/cartera/resumen", params={"fecha_corte": "2026-09-10", "cantidad": 5}
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 404
