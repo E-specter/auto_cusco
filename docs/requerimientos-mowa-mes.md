@@ -18,10 +18,11 @@ Los requerimientos de este documento se numeran `RF-MM-XX` dentro del módulo, p
 
 * **RF-MM-01 — Control del límite mensual:** Mostrar cuántos SMS se cargaron en el mes calendario y cuánto queda respecto del límite mensual de la plataforma.
   * Límite por defecto: 2 500 000 SMS por mes, configurable (RF-32).
-  * El consumo de una campaña se imputa al mes calendario de su fecha de envío, la misma que usa RF-MM-15 (supuesto S-MM-7).
+  * El consumo de una campaña se imputa al mes calendario de su fecha de envío, la misma que usa RF-MM-15, no al de la fecha de generación (decisión del usuario, sección 6).
   * Si una campaña superaría el límite del mes, entonces el sistema lo advierte antes de generar la carga y pide confirmación explícita (supuesto S-MM-2: advertir, no bloquear).
 * **RF-MM-02 — SMS cargados y SMS enviados:** Distinguir en cada campaña los **SMS cargados** (los que el sistema generó y exportó) de los **SMS enviados** (los que MES reporta como despachados), porque pueden diferir por causas propias de la plataforma.
   * Los cargados se conocen al generar la carga; los enviados, al importar el reporte de enviados (sección 5).
+  * Un SMS cargado cuenta como **enviado** solo si su fila del reporte trae `estado` = `enviado`. Si la fila del reporte trae otro estado, el SMS cuenta como cargado no enviado y aparece en el conteo por `estado` (RF-MM-22).
 
 ## 2. Inputs de la campaña
 
@@ -58,6 +59,8 @@ Formato confirmado con el ejemplo de carga (sección 7).
   | `mensaje` | Texto del SMS (sección 4) | texto |
   | `dni` | Documento del destinatario: DNI de 8 dígitos con ceros a la izquierda, o RUC de 11 | texto |
 
+  * Si el documento del producto no es DNI ni RUC (por ejemplo, carné de extranjería o pasaporte), entonces se carga igual en `dni`, con su número normalizado, y la previsualización de la campaña advierte cuántos registros lo llevan. No se sabe si MES acepta esos documentos: la advertencia deja decidir antes de subir el archivo.
+
 * **RF-MM-11 — Límites por archivo y división:** Limitar cada archivo de carga a **50 000 registros y 2 MB**; si la carga supera cualquiera de los dos límites, entonces dividirla en dos o más archivos que respeten ambos.
   * Los registros de supervisión van en el primer archivo (RF-41).
   * Cada archivo conserva el orden de la selección.
@@ -67,11 +70,12 @@ Formato confirmado con el ejemplo de carga (sección 7).
   * `numero`: el número del supervisor; `dni`: el asignado según RF-39; `mensaje`: el de la primera fila válida de productos (RF-40).
 * **RF-MM-13 — Productos excluidos de la carga:** Excluir de la carga, y reportar con su motivo, cada producto que cumpla alguna de estas condiciones:
   * No tiene teléfono válido según RF-02.
-  * No tiene documento de identidad para la columna `dni` (supuesto S-MM-8).
+  * No tiene documento de identidad para la columna `dni`; no se carga con `dni` vacío.
   * No tiene speech: sus días de atraso ajustados quedan fuera de los segmentos de RF-MM-15.
   * Le falta un dato que el speech necesita (titular o fecha de vencimiento de cuota).
   * Su mensaje supera los 160 caracteres (RF-MM-19).
   * Un mismo teléfono puede recibir más de un mensaje si tiene varios productos en la selección: no es motivo de exclusión (así ocurre en el ejemplo).
+  * Un documento que no es DNI ni RUC tampoco es motivo de exclusión: se carga y se advierte (RF-MM-10).
 
 ## 4. Construcción del campo `mensaje` (speech)
 
@@ -150,6 +154,7 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
   * Si el mismo `id` de MES ya estaba importado, entonces se advierte y se reemplaza solo con confirmación.
 * **RF-MM-22 — Conciliación de cargados y enviados:** Conciliar las filas cargadas con las filas del reporte y mostrar, por campaña: cargados, enviados, cargados no enviados y filas del reporte sin correspondencia, además del conteo por `estado`.
   * La correspondencia usa `numero`/`celular`, `dni` y `mensaje` normalizado.
+  * Enviados son las filas cargadas que tienen correspondencia con `estado` = `enviado` (RF-MM-02). Las que tienen correspondencia con otro estado suman a cargados no enviados.
   * **Normalización del mensaje:** se quitan los signos diacríticos (tildes, diéresis y la virgulilla de la `ñ`, que queda `n`) y los espacios en los extremos, **por igual en el mensaje cargado y en el enviado**. MES quita las tildes y recorta espacios al enviar (sección 7); normalizar los dos lados hace que la conciliación funcione aunque MES conserve o no la `ñ`.
   * Los registros de supervisión se concilian y se muestran aparte de los productos (RF-41).
 
@@ -164,6 +169,10 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Split 3/2 y DNIs `00000001`–`00000005` | Configurables por campaña, con 3/2 por defecto y DNIs secuenciales (RF-38, RF-39) | Usuario (2026-09-13) |
 | Formato de fecha | `dd/mm/yyyy` es la fecha de vencimiento dentro del speech; `dd/mm/yy` es la fecha de envío del reporte. Son campos distintos | Ejemplos de carga y de reporte |
 | Formato de la carga | Se replica el del ejemplo de carga: `Hoja1`, `numero` (entero), `mensaje`, `dni` (texto) | Usuario (2026-09-13); ejemplo de carga |
+| Qué cuenta como SMS enviado | Solo la fila con correspondencia y `estado` = `enviado`; otro estado cuenta como cargado no enviado (RF-MM-02, RF-MM-22) | Usuario (2026-09-14); el ejemplo de reporte solo trae `enviado` |
+| Documento que no es DNI ni RUC en `dni` | Se carga y la previsualización advierte cuántos lo llevan; no se excluye (RF-MM-10, RF-MM-13) | Usuario (2026-09-14) |
+| Mes al que se imputa el límite mensual (antes S-MM-7) | El de la fecha de envío, no el de generación (RF-MM-01) | Usuario (2026-09-14) |
+| Producto sin documento de identidad (antes S-MM-8) | Se excluye con su motivo; no se carga con `dni` vacío (RF-MM-13) | Usuario (2026-09-14) |
 
 ## 7. Evidencia de los ejemplos
 
@@ -195,5 +204,5 @@ Los ejemplos están en `archivos_anexo_chat/`, con prefijo `MOWA_MES_Ejemplo_`: 
 | S-MM-4 | Feriados nacionales de Perú vigentes al 2026, calculados por regla para cualquier año; decretos y cambios de ley por configuración | RF-MM-08 |
 | S-MM-5 | Con `Enviar en diferentes horas`, el segmento se calcula con la fecha más temprana | RF-MM-15 |
 | S-MM-6 | `dias_ajustados = 0` es `Preventiva` | RF-MM-15 |
-| S-MM-7 | El consumo del límite mensual se imputa al mes de la fecha de envío, no al de generación | RF-MM-01 |
-| S-MM-8 | Un producto sin documento de identidad se excluye (no se carga con `dni` vacío) | RF-MM-13 |
+
+S-MM-7 y S-MM-8 se confirmaron el 2026-09-14 y pasaron a la sección 6.
