@@ -1,5 +1,9 @@
 {
   "nav.skip": "Skip to content",
+  "nav.label": "Sections",
+  "nav.cargas": "Uploads",
+  "nav.canales": "Channels",
+  "nav.mowaMes": "MOWA MES",
   "appearance.theme": "Theme",
   "appearance.theme.light": "Light",
   "appearance.theme.dark": "Dark",

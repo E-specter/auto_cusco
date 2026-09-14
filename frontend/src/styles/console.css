@@ -482,12 +482,6 @@
   inline-size: min(46rem, calc(100vw - var(--space-5)));
 }
 
-.dialog__intro {
-  margin-block-start: var(--space-2);
-  font-size: var(--text-sm);
-  max-inline-size: 56ch;
-}
-
 .upload__grid {
   display: grid;
   gap: var(--space-4);

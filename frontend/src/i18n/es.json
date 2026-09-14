@@ -1,5 +1,9 @@
 {
   "nav.skip": "Saltar al contenido",
+  "nav.label": "Secciones",
+  "nav.cargas": "Cargas",
+  "nav.canales": "Canales",
+  "nav.mowaMes": "MOWA MES",
   "appearance.theme": "Tema",
   "appearance.theme.light": "Claro",
   "appearance.theme.dark": "Oscuro",

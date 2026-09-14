@@ -562,6 +562,12 @@
   background-color: var(--color-surface);
 }
 
+.dialog__intro {
+  margin-block-start: var(--space-2);
+  font-size: var(--text-sm);
+  max-inline-size: 56ch;
+}
+
 .dialog__body {
   padding: var(--space-4);
 }
