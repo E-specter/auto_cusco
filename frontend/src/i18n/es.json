@@ -295,5 +295,16 @@
   "mowaMes.speech.resumen.excede.uno": "1 segmento pasa de 160 caracteres.",
   "mowaMes.speech.resumen.excede": "{n} segmentos pasan de 160 caracteres.",
   "mowaMes.speech.resumen.advertencia.uno": "1 segmento pasa de 150 caracteres.",
-  "mowaMes.speech.resumen.advertencia": "{n} segmentos pasan de 150 caracteres."
+  "mowaMes.speech.resumen.advertencia": "{n} segmentos pasan de 150 caracteres.",
+  "mowaMes.codigo.id_sin_correspondencia": "Un id de MES del reporte no coincide con ninguna fila cargada de esta campaña: probablemente es de otra.",
+  "mowaMes.codigo.falta_whatsapp": "Un segmento con productos usa [whatsapp] y no hay número de WhatsApp de contacto.",
+  "mowaMes.codigo.sin_supervisores": "La campaña no tiene supervisores: sin ellos no se puede crear.",
+  "mowaMes.codigo.sin_productos_cargables": "Ningún producto quedó dentro de la carga: no hay nada que enviar.",
+  "mowaMes.codigo.documento_no_estandar": "El documento no es un DNI ni un RUC: se carga igual, pero conviene revisarlo.",
+  "mowaMes.plataforma.registros": "Filas por archivo",
+  "mowaMes.plataforma.registros.hint": "Hasta {max} filas por archivo; la supervisión cuenta dentro del primero.",
+  "mowaMes.plataforma.registros.rango": "Las filas por archivo van de 1 a 50 000.",
+  "mowaMes.plataforma.bytes": "Tamaño máximo por archivo (bytes)",
+  "mowaMes.plataforma.bytes.hint": "Entre {min} y {max} bytes. Ahora: {actual}.",
+  "mowaMes.plataforma.bytes.rango": "El tamaño por archivo va de 100 000 a 2 000 000 bytes."
 }

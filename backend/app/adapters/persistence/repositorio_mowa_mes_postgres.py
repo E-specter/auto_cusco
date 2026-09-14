@@ -55,6 +55,8 @@ def _configuracion(fila: Row) -> ConfiguracionMowaMes:
         limite_mensual=fila.limite_mensual,
         whatsapp_contacto=fila.whatsapp_contacto,
         actualizado_en=fila.actualizado_en,
+        registros_por_archivo=fila.registros_por_archivo,
+        bytes_por_archivo=fila.bytes_por_archivo,
     )
 
 
@@ -83,6 +85,8 @@ class RepositorioMowaMesPostgres(RepositorioMowaMesPort):
             .values(
                 limite_mensual=configuracion.limite_mensual,
                 whatsapp_contacto=configuracion.whatsapp_contacto,
+                registros_por_archivo=configuracion.registros_por_archivo,
+                bytes_por_archivo=configuracion.bytes_por_archivo,
                 actualizado_en=func.clock_timestamp(),
             )
             .returning(*_CONFIGURACION.c)

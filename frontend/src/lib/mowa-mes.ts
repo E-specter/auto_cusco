@@ -116,6 +116,31 @@ export function traducirCodigo(codigo: string, respaldo: string): string {
   return traducido === clave ? respaldo : traducido;
 }
 
+// ---- Connector configuration ---------------------------------------------------
+
+/**
+ * Accepted ranges, the same the API declares. The per-file limits (RF-MM-11)
+ * can only go down from the platform's own 50 000 rows and 2 MB.
+ */
+export const RANGOS_CONFIGURACION = {
+  limite_mensual: { minimo: 1, maximo: 1_000_000_000 },
+  registros_por_archivo: { minimo: 1, maximo: 50_000 },
+  bytes_por_archivo: { minimo: 100_000, maximo: 2_000_000 },
+} as const;
+
+export type CampoConfiguracion = keyof typeof RANGOS_CONFIGURACION;
+
+/** The fields whose typed value is not a whole number inside its range, in form order. */
+export function problemasConfiguracion(valores: Record<CampoConfiguracion, string>): CampoConfiguracion[] {
+  return (Object.keys(RANGOS_CONFIGURACION) as CampoConfiguracion[]).filter((campo) => {
+    const texto = valores[campo].trim();
+    if (!/^\d+$/.test(texto)) return true;
+    const valor = Number(texto);
+    const { minimo, maximo } = RANGOS_CONFIGURACION[campo];
+    return valor < minimo || valor > maximo;
+  });
+}
+
 // ---- Calendar ----------------------------------------------------------------
 
 export type AccionDia = 'retirar' | 'restaurar' | 'quitar';

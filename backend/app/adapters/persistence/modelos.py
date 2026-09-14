@@ -37,6 +37,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.core.entities.calendario import TipoExcepcion
 from app.core.entities.carga import EstadoCarga, EventoAuditoria
+from app.core.entities.mowa_mes import Programacion
+from app.core.entities.mowa_mes_campana import Salida, TipoCarga
 from app.core.entities.sabana import Severidad, TipoDocumento
 
 # Nombres de restricciones estables: Alembic los necesita para migraciones reproducibles.
@@ -325,10 +327,19 @@ class MowaMesConfiguracion(Base):
     actualizado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # RF-MM-11: el maximo de la plataforma; la configuracion solo puede bajarlo.
+    registros_por_archivo: Mapped[int] = mapped_column(Integer, server_default="50000")
+    bytes_por_archivo: Mapped[int] = mapped_column(Integer, server_default="2000000")
 
     __table_args__ = (
         CheckConstraint("id = 1", name="fila_unica"),
         CheckConstraint("limite_mensual > 0", name="limite_positivo"),
+        CheckConstraint(
+            "registros_por_archivo BETWEEN 1 AND 50000", name="registros_por_archivo_valido"
+        ),
+        CheckConstraint(
+            "bytes_por_archivo BETWEEN 100000 AND 2000000", name="bytes_por_archivo_valido"
+        ),
         CheckConstraint(
             f"whatsapp_contacto IS NULL OR whatsapp_contacto ~ {_TELEFONO_RF02}",
             name="whatsapp_valido",
@@ -362,3 +373,144 @@ class MowaMesSpeechVersion(Base):
             postgresql_where="original",
         ),
     )
+
+
+class MowaMesCampana(Base):
+    """Campana de MOWA MES con la copia de lo que se uso y sus cifras (RF-MM-01 a RF-MM-13).
+
+    Filtros y orden en la sintaxis de texto de `/cartera`; `seleccion_id` es solo
+    una referencia informativa: la seleccion guardada puede cambiar o borrarse.
+    """
+
+    __tablename__ = "mowa_mes_campana"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    fecha_corte: Mapped[date] = mapped_column(Date)
+    filtros: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
+    orden: Mapped[str | None] = mapped_column(Text)
+    cantidad: Mapped[int] = mapped_column(Integer)
+    seleccion_id: Mapped[int | None] = mapped_column(BigInteger)
+    tipo_carga: Mapped[str] = mapped_column(String(20))
+    descripcion: Mapped[str] = mapped_column(Text)
+    salida: Mapped[str] = mapped_column(String(20))
+    herramientas: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    programacion: Mapped[str] = mapped_column(String(20))
+    envios: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
+    fecha_generacion: Mapped[date] = mapped_column(Date)
+    fecha_envio: Mapped[date] = mapped_column(Date)
+    mes_imputacion: Mapped[date] = mapped_column(Date)  # S-MM-7: mes de la fecha de envio
+    speech_version_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("mowa_mes_speech_version.id")
+    )
+    speech_huella: Mapped[str] = mapped_column(String(64))
+    whatsapp: Mapped[str | None] = mapped_column(String(9))
+    supervisores: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    disponibles: Mapped[int] = mapped_column(Integer)
+    evaluados: Mapped[int] = mapped_column(Integer)
+    productos_cargados: Mapped[int] = mapped_column(Integer)
+    supervision_cargados: Mapped[int] = mapped_column(Integer)
+    total_cargados: Mapped[int] = mapped_column(Integer)
+    excluidos: Mapped[int] = mapped_column(Integer)
+    advertencias: Mapped[int] = mapped_column(Integer)
+    confirmo_limite: Mapped[bool] = mapped_column(Boolean, server_default="false")
+
+    __table_args__ = (
+        CheckConstraint(f"tipo_carga IN ({_en(TipoCarga)})", name="tipo_carga_valido"),
+        CheckConstraint(f"salida IN ({_en(Salida)})", name="salida_valida"),
+        CheckConstraint(f"programacion IN ({_en(Programacion)})", name="programacion_valida"),
+        CheckConstraint("cantidad >= 1", name="cantidad_positiva"),
+        CheckConstraint(
+            "total_cargados = productos_cargados + supervision_cargados", name="total_cuadra"
+        ),
+        Index(None, "mes_imputacion"),
+        Index(None, "creado_en"),
+    )
+
+
+class MowaMesArchivo(Base):
+    """Archivo `.xlsx` generado: se guarda para que la descarga sea identica (C-6)."""
+
+    __tablename__ = "mowa_mes_archivo"
+
+    campana_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("mowa_mes_campana.id", ondelete="CASCADE"), primary_key=True
+    )
+    numero: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    filas: Mapped[int] = mapped_column(Integer)
+    supervision: Mapped[int] = mapped_column(Integer)
+    bytes: Mapped[int] = mapped_column(Integer)
+    contenido: Mapped[bytes] = mapped_column(LargeBinary)
+
+    __table_args__ = (CheckConstraint("numero >= 1", name="numero_positivo"),)
+
+
+class MowaMesFilaCargada(Base):
+    """Cada fila cargada, en su orden: base de la conciliacion (RF-MM-22)."""
+
+    __tablename__ = "mowa_mes_fila_cargada"
+
+    campana_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("mowa_mes_campana.id", ondelete="CASCADE"), primary_key=True
+    )
+    posicion: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    archivo: Mapped[int] = mapped_column(Integer)
+    numero: Mapped[str] = mapped_column(String(9))
+    dni: Mapped[str] = mapped_column(Text)
+    mensaje: Mapped[str] = mapped_column(Text)
+    supervision: Mapped[bool] = mapped_column(Boolean)
+    pagare: Mapped[str | None] = mapped_column(Text)
+    segmento: Mapped[str | None] = mapped_column(String(12))
+    advertencias: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
+
+
+class MowaMesExclusion(Base):
+    """Producto excluido con su unico motivo (RF-MM-13), en el orden de la seleccion."""
+
+    __tablename__ = "mowa_mes_exclusion"
+
+    campana_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("mowa_mes_campana.id", ondelete="CASCADE"), primary_key=True
+    )
+    pagare: Mapped[str] = mapped_column(Text, primary_key=True)
+    orden: Mapped[int] = mapped_column(Integer)
+    codigo: Mapped[str] = mapped_column(String(40))
+
+    __table_args__ = (Index(None, "campana_id", "codigo", "orden"),)
+
+
+class MowaMesReporte(Base):
+    """Un `id` de MES importado y asociado a una campana (RF-MM-21, C-5)."""
+
+    __tablename__ = "mowa_mes_reporte"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    campana_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("mowa_mes_campana.id", ondelete="CASCADE")
+    )
+    mes_id: Mapped[int] = mapped_column(BigInteger)
+    nombre_archivo: Mapped[str] = mapped_column(Text)
+    filas: Mapped[int] = mapped_column(Integer)
+    importado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (UniqueConstraint("mes_id"), Index(None, "campana_id"))
+
+
+class MowaMesReporteFila(Base):
+    """Fila del reporte de enviados tal como la entrega MES (RF-MM-20)."""
+
+    __tablename__ = "mowa_mes_reporte_fila"
+
+    reporte_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("mowa_mes_reporte.id", ondelete="CASCADE"), primary_key=True
+    )
+    fila: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    celular: Mapped[str] = mapped_column(Text)
+    mensaje: Mapped[str] = mapped_column(Text)
+    fecha_envio: Mapped[str] = mapped_column(Text)
+    dni: Mapped[str] = mapped_column(Text)
+    estado: Mapped[str] = mapped_column(Text)
+    salida: Mapped[str] = mapped_column(Text)
+    usuario: Mapped[str] = mapped_column(Text)

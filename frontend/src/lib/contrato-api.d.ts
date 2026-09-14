@@ -448,7 +448,9 @@ export interface paths {
         get: operations["obtener_configuracion_mowa_mes_configuracion_get"];
         /**
          * Guardar Configuracion
-         * @description Limite mensual (RF-MM-01) y WhatsApp de contacto por defecto (RF-MM-16), que sigue RF-02.
+         * @description Limite mensual (RF-MM-01), WhatsApp de contacto (RF-MM-16) y limites por archivo.
+         *
+         *     Los limites por archivo son opcionales y solo pueden bajar del maximo de la plataforma.
          */
         put: operations["guardar_configuracion_mowa_mes_configuracion_put"];
         post?: never;
@@ -523,14 +525,220 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/mowa-mes/campanas/previsualizacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Previsualizar Campana
+         * @description La campana calculada sin guardar nada. Los errores de campana no son 4xx: se listan.
+         *
+         *     `speech.huella` es lo que la creacion tiene que enviar como `speech_huella`.
+         */
+        post: operations["previsualizar_campana_mowa_mes_campanas_previsualizacion_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/campanas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar Campanas */
+        get: operations["listar_campanas_mowa_mes_campanas_get"];
+        put?: never;
+        /**
+         * Crear Campana
+         * @description Genera los archivos y guarda la campana. 400 si tiene errores (los de la
+         *     previsualizacion), 409 si supera el limite sin `confirmar_limite` o si el speech
+         *     cambio desde la previsualizacion.
+         */
+        post: operations["crear_campana_mowa_mes_campanas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/campanas/{campana_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Obtener Campana */
+        get: operations["obtener_campana_mowa_mes_campanas__campana_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/campanas/{campana_id}/exclusiones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar Exclusiones */
+        get: operations["listar_exclusiones_mowa_mes_campanas__campana_id__exclusiones_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/campanas/{campana_id}/archivos/{numero}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Descargar Archivo
+         * @description Los bytes guardados al crear la campana: la misma descarga siempre (C-6).
+         */
+        get: operations["descargar_archivo_mowa_mes_campanas__campana_id__archivos__numero__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/limite-mensual": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Limite Mensual
+         * @description Cargados del mes (productos y supervision) respecto del limite (RF-MM-01, S-MM-7).
+         */
+        get: operations["limite_mensual_mowa_mes_limite_mensual_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/campanas/{campana_id}/reportes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Importar Reporte
+         * @description Asocia cada `id` de MES del archivo a la campana y devuelve la conciliacion.
+         */
+        post: operations["importar_reporte_mowa_mes_campanas__campana_id__reportes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/campanas/{campana_id}/conciliacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Conciliacion */
+        get: operations["conciliacion_mowa_mes_campanas__campana_id__conciliacion_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AdvertenciaReporteRespuesta */
+        AdvertenciaReporteRespuesta: {
+            codigo: components["schemas"]["CodigoMowaMes"];
+            tipo: components["schemas"]["TipoCodigo"];
+            /** Mes Id */
+            mes_id: number;
+            /** Detalle */
+            detalle: string;
+        };
+        /** ArchivoPrevistoRespuesta */
+        ArchivoPrevistoRespuesta: {
+            /** Numero */
+            numero: number;
+            /** Filas */
+            filas: number;
+            /** Supervision */
+            supervision: number;
+        };
+        /** ArchivoRespuesta */
+        ArchivoRespuesta: {
+            /** Numero */
+            numero: number;
+            /** Filas */
+            filas: number;
+            /** Supervision */
+            supervision: number;
+            /** Bytes */
+            bytes: number;
+        };
+        /** AvisoCampanaRespuesta */
+        AvisoCampanaRespuesta: {
+            codigo: components["schemas"]["CodigoMowaMes"];
+            tipo: components["schemas"]["TipoCodigo"];
+            /** Detalle */
+            detalle: string;
+        };
         /** BloqueRespuesta */
         BloqueRespuesta: {
             metricas: components["schemas"]["MetricasRespuesta"];
             segmentacion: components["schemas"]["SegmentacionRespuesta"] | null;
+        };
+        /** Body_importar_reporte_mowa_mes_campanas__campana_id__reportes_post */
+        Body_importar_reporte_mowa_mes_campanas__campana_id__reportes_post: {
+            /**
+             * Archivo
+             * @description Reporte 'Campanas de enviados' de MES (.xlsx)
+             */
+            archivo: string;
+            /**
+             * Reemplazar
+             * @description Reemplazar los id de MES que ya estaban importados
+             * @default false
+             */
+            reemplazar: boolean;
         };
         /** Body_subir_sabana_cargas_post */
         Body_subir_sabana_cargas_post: {
@@ -550,6 +758,70 @@ export interface components {
              * @default VENCIDA
              */
             hoja: string;
+        };
+        /** CampanaRespuesta */
+        CampanaRespuesta: {
+            /** Id */
+            id: number;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+            /**
+             * Fecha Corte
+             * Format: date
+             */
+            fecha_corte: string;
+            /** Filtros */
+            filtros: string[];
+            /** Orden */
+            orden: string | null;
+            /** Cantidad */
+            cantidad: number;
+            /** Seleccion Id */
+            seleccion_id: number | null;
+            tipo_carga: components["schemas"]["TipoCarga"];
+            /** Descripcion */
+            descripcion: string;
+            salida: components["schemas"]["Salida"];
+            herramientas: components["schemas"]["HerramientasRespuesta"];
+            programacion: components["schemas"]["Programacion"];
+            /** Envios */
+            envios: string[];
+            /**
+             * Fecha Envio
+             * Format: date
+             */
+            fecha_envio: string;
+            /**
+             * Mes Imputacion
+             * @description YYYY-MM
+             */
+            mes_imputacion: string;
+            speech: components["schemas"]["SpeechRegistradoRespuesta"];
+            /** Whatsapp */
+            whatsapp: string | null;
+            /** Supervisores */
+            supervisores: components["schemas"]["SupervisorAsignadoRespuesta"][];
+            /** Disponibles */
+            disponibles: number;
+            /** Evaluados */
+            evaluados: number;
+            /** Productos Cargados */
+            productos_cargados: number;
+            /** Supervision Cargados */
+            supervision_cargados: number;
+            /** Total Cargados */
+            total_cargados: number;
+            /** Excluidos */
+            excluidos: number;
+            /** Advertencias */
+            advertencias: number;
+            /** Confirmo Limite */
+            confirmo_limite: boolean;
+            /** Archivos */
+            archivos: components["schemas"]["ArchivoRespuesta"][];
         };
         /** CampoEntrada */
         CampoEntrada: {
@@ -587,20 +859,77 @@ export interface components {
             /** Aviso */
             aviso: string | null;
         };
+        /** CifrasGrupoRespuesta */
+        CifrasGrupoRespuesta: {
+            /** Cargados */
+            cargados: number;
+            /** Enviados */
+            enviados: number;
+            /** No Enviados */
+            no_enviados: number;
+            /** Por Estado */
+            por_estado: components["schemas"]["EstadoConteoRespuesta"][];
+        };
+        /** CifrasIdRespuesta */
+        CifrasIdRespuesta: {
+            /** Mes Id */
+            mes_id: number;
+            /** Filas */
+            filas: number;
+            /** Con Correspondencia */
+            con_correspondencia: number;
+        };
+        /** CodigoConteoRespuesta */
+        CodigoConteoRespuesta: {
+            codigo: components["schemas"]["CodigoMowaMes"];
+            tipo: components["schemas"]["TipoCodigo"];
+            /** Cantidad */
+            cantidad: number;
+        };
         /**
          * CodigoMowaMes
-         * @description Motivos de exclusion y advertencias, en el orden en que se evaluan.
+         * @description Catalogo de codigos que el frontend traduce como `mowaMes.codigo.<codigo>`.
          *
-         *     Un producto excluido lleva un solo motivo: el primero que falla en este orden.
+         *     Las exclusiones van en el orden en que se evaluan: un producto excluido lleva
+         *     un solo motivo, el primero que falla. Un codigo por linea, con la forma
+         *     `NOMBRE = "codigo"`: la prueba espejo del frontend lee esta clase.
          * @enum {string}
          */
-        CodigoMowaMes: "telefono_invalido" | "falta_documento" | "sin_speech" | "falta_titular" | "falta_vencimiento" | "mensaje_excede_160" | "mensaje_excede_150" | "limite_mensual_excedido";
+        CodigoMowaMes: "telefono_invalido" | "falta_documento" | "sin_speech" | "falta_titular" | "falta_vencimiento" | "mensaje_excede_160" | "mensaje_excede_150" | "documento_no_estandar" | "limite_mensual_excedido" | "id_sin_correspondencia" | "falta_whatsapp" | "sin_supervisores" | "sin_productos_cargables";
+        /** ConciliacionRespuesta */
+        ConciliacionRespuesta: {
+            /** Campana Id */
+            campana_id: number;
+            /** Reportes */
+            reportes: components["schemas"]["ReporteImportadoRespuesta"][];
+            productos: components["schemas"]["CifrasGrupoRespuesta"];
+            supervision: components["schemas"]["CifrasGrupoRespuesta"];
+            total: components["schemas"]["CifrasGrupoRespuesta"];
+            /** Sin Correspondencia */
+            sin_correspondencia: number;
+            /** Sin Correspondencia Por Estado */
+            sin_correspondencia_por_estado: components["schemas"]["EstadoConteoRespuesta"][];
+            /** Por Id */
+            por_id: components["schemas"]["CifrasIdRespuesta"][];
+            /** Advertencias */
+            advertencias: components["schemas"]["AdvertenciaReporteRespuesta"][];
+        };
         /** ConfiguracionEntrada */
         ConfiguracionEntrada: {
             /** Limite Mensual */
             limite_mensual: number;
             /** Whatsapp Contacto */
             whatsapp_contacto?: string | null;
+            /**
+             * Registros Por Archivo
+             * @description Filas por archivo (RF-MM-11); sin valor se conserva el actual
+             */
+            registros_por_archivo?: number | null;
+            /**
+             * Bytes Por Archivo
+             * @description Bytes por archivo (RF-MM-11); sin valor se conserva el actual
+             */
+            bytes_por_archivo?: number | null;
         };
         /** ConfiguracionRespuesta */
         ConfiguracionRespuesta: {
@@ -610,6 +939,10 @@ export interface components {
             whatsapp_contacto: string | null;
             /** Actualizado En */
             actualizado_en: string | null;
+            /** Registros Por Archivo */
+            registros_por_archivo: number;
+            /** Bytes Por Archivo */
+            bytes_por_archivo: number;
         };
         /** ConfiguracionSupervisionEntrada */
         ConfiguracionSupervisionEntrada: {
@@ -624,6 +957,100 @@ export interface components {
             procedencias: string[];
             /** Supervisores */
             supervisores: components["schemas"]["SupervisorRespuesta"][];
+        };
+        /** ConsumoLimiteRespuesta */
+        ConsumoLimiteRespuesta: {
+            /**
+             * Mes
+             * @description YYYY-MM
+             */
+            mes: string;
+            /** Limite */
+            limite: number;
+            /** Cargados Mes */
+            cargados_mes: number;
+            /** Esta Campana */
+            esta_campana: number;
+            /** Total */
+            total: number;
+            /** Disponible */
+            disponible: number;
+            /** Excedido */
+            excedido: boolean;
+        };
+        /** CreacionCampanaEntrada */
+        CreacionCampanaEntrada: {
+            /**
+             * Fecha Corte
+             * Format: date
+             */
+            fecha_corte: string;
+            /**
+             * Filtros
+             * @default []
+             */
+            filtros: string[];
+            /** Orden */
+            orden?: string | null;
+            /** Cantidad */
+            cantidad: number;
+            /**
+             * Seleccion Id
+             * @description Referencia informativa a la seleccion guardada de origen
+             */
+            seleccion_id?: number | null;
+            /** @default masiva */
+            tipo_carga: components["schemas"]["TipoCarga"];
+            /**
+             * Descripcion
+             * @description Sin descripcion se usa la sugerida
+             */
+            descripcion?: string | null;
+            /** @default numero_largo */
+            salida: components["schemas"]["Salida"];
+            /**
+             * @default {
+             *       "keyword": false,
+             *       "respuesta_automatica": false,
+             *       "blacklist_indecopi": false,
+             *       "speech_optimizado": false
+             *     }
+             */
+            herramientas: components["schemas"]["HerramientasModelo"];
+            /** @default hora_determinada */
+            programacion: components["schemas"]["Programacion"];
+            /**
+             * Envios
+             * @description Fechas y horas de envio; sin zona horaria se toman en America/Lima
+             * @default []
+             */
+            envios: string[];
+            /**
+             * Speech Id
+             * @description Sin id se usa el Speech original
+             */
+            speech_id?: number | null;
+            /**
+             * Whatsapp
+             * @description Sin numero se usa el de la configuracion
+             */
+            whatsapp?: string | null;
+            /**
+             * Supervisores
+             * @description Sin lista se usa la configurada por defecto
+             */
+            supervisores?: components["schemas"]["SupervisorCampanaEntrada"][] | null;
+            /**
+             * Speech Huella
+             * @description La huella del speech que devolvio la previsualizacion; si cambio, 409
+             */
+            speech_huella: string;
+            /**
+             * Confirmar Limite
+             * @description Crear aunque la campana supere el limite mensual (S-MM-2)
+             * @default false
+             */
+            confirmar_limite: boolean;
         };
         /** DefinicionEntrada */
         DefinicionEntrada: {
@@ -668,6 +1095,13 @@ export interface components {
          * @enum {string}
          */
         EstadoCarga: "en_cola" | "procesando" | "terminada" | "fallida";
+        /** EstadoConteoRespuesta */
+        EstadoConteoRespuesta: {
+            /** Estado */
+            estado: string;
+            /** Cantidad */
+            cantidad: number;
+        };
         /** ExcepcionEntrada */
         ExcepcionEntrada: {
             /**
@@ -692,12 +1126,36 @@ export interface components {
             /** Creado En */
             creado_en: string | null;
         };
+        /** ExclusionRespuesta */
+        ExclusionRespuesta: {
+            /** Pagare */
+            pagare: string;
+            codigo: components["schemas"]["CodigoMowaMes"];
+        };
         /** FeriadosRespuesta */
         FeriadosRespuesta: {
             /** Anio */
             anio: number;
             /** Dias */
             dias: components["schemas"]["DiaNoLaborableRespuesta"][];
+        };
+        /** FilaMuestraRespuesta */
+        FilaMuestraRespuesta: {
+            /** Numero */
+            numero: string;
+            /** Mensaje */
+            mensaje: string;
+            /** Dni */
+            dni: string;
+            /** Supervision */
+            supervision: boolean;
+            /** Pagare */
+            pagare: string | null;
+            segmento: components["schemas"]["Segmento"] | null;
+            /** Largo */
+            largo: number;
+            /** Advertencias */
+            advertencias: components["schemas"]["CodigoMowaMes"][];
         };
         /**
          * FormatoArchivo
@@ -755,6 +1213,40 @@ export interface components {
             /** Ok */
             ok: boolean;
         };
+        /** HerramientasModelo */
+        HerramientasModelo: {
+            /**
+             * Keyword
+             * @default false
+             */
+            keyword: boolean;
+            /**
+             * Respuesta Automatica
+             * @default false
+             */
+            respuesta_automatica: boolean;
+            /**
+             * Blacklist Indecopi
+             * @default false
+             */
+            blacklist_indecopi: boolean;
+            /**
+             * Speech Optimizado
+             * @default false
+             */
+            speech_optimizado: boolean;
+        };
+        /** HerramientasRespuesta */
+        HerramientasRespuesta: {
+            /** Keyword */
+            keyword: boolean;
+            /** Respuesta Automatica */
+            respuesta_automatica: boolean;
+            /** Blacklist Indecopi */
+            blacklist_indecopi: boolean;
+            /** Speech Optimizado */
+            speech_optimizado: boolean;
+        };
         /** IncidenciaRespuesta */
         IncidenciaRespuesta: {
             /** Fila */
@@ -790,6 +1282,17 @@ export interface components {
             codigo: components["schemas"]["CodigoMowaMes"] | null;
             /** Ejemplo */
             ejemplo: string | null;
+        };
+        /** ListaCampanasRespuesta */
+        ListaCampanasRespuesta: {
+            /** Total */
+            total: number;
+            /** Limite */
+            limite: number;
+            /** Desplazamiento */
+            desplazamiento: number;
+            /** Campanas */
+            campanas: components["schemas"]["CampanaRespuesta"][];
         };
         /** MetricasRespuesta */
         MetricasRespuesta: {
@@ -840,6 +1343,17 @@ export interface components {
          * @enum {string}
          */
         OrigenDia: "ley" | "agregado";
+        /** PaginaExclusionesRespuesta */
+        PaginaExclusionesRespuesta: {
+            /** Total */
+            total: number;
+            /** Limite */
+            limite: number;
+            /** Desplazamiento */
+            desplazamiento: number;
+            /** Exclusiones */
+            exclusiones: components["schemas"]["ExclusionRespuesta"][];
+        };
         /** PaginaRespuesta */
         PaginaRespuesta: {
             /** Total */
@@ -884,6 +1398,69 @@ export interface components {
             /** Usa Whatsapp */
             usa_whatsapp: boolean;
         };
+        /** PeticionCampanaEntrada */
+        PeticionCampanaEntrada: {
+            /**
+             * Fecha Corte
+             * Format: date
+             */
+            fecha_corte: string;
+            /**
+             * Filtros
+             * @default []
+             */
+            filtros: string[];
+            /** Orden */
+            orden?: string | null;
+            /** Cantidad */
+            cantidad: number;
+            /**
+             * Seleccion Id
+             * @description Referencia informativa a la seleccion guardada de origen
+             */
+            seleccion_id?: number | null;
+            /** @default masiva */
+            tipo_carga: components["schemas"]["TipoCarga"];
+            /**
+             * Descripcion
+             * @description Sin descripcion se usa la sugerida
+             */
+            descripcion?: string | null;
+            /** @default numero_largo */
+            salida: components["schemas"]["Salida"];
+            /**
+             * @default {
+             *       "keyword": false,
+             *       "respuesta_automatica": false,
+             *       "blacklist_indecopi": false,
+             *       "speech_optimizado": false
+             *     }
+             */
+            herramientas: components["schemas"]["HerramientasModelo"];
+            /** @default hora_determinada */
+            programacion: components["schemas"]["Programacion"];
+            /**
+             * Envios
+             * @description Fechas y horas de envio; sin zona horaria se toman en America/Lima
+             * @default []
+             */
+            envios: string[];
+            /**
+             * Speech Id
+             * @description Sin id se usa el Speech original
+             */
+            speech_id?: number | null;
+            /**
+             * Whatsapp
+             * @description Sin numero se usa el de la configuracion
+             */
+            whatsapp?: string | null;
+            /**
+             * Supervisores
+             * @description Sin lista se usa la configurada por defecto
+             */
+            supervisores?: components["schemas"]["SupervisorCampanaEntrada"][] | null;
+        };
         /** PeticionGeneracion */
         PeticionGeneracion: {
             /**
@@ -907,6 +1484,63 @@ export interface components {
              */
             cantidad: number;
             opciones?: components["schemas"]["OpcionesEntrada"] | null;
+        };
+        /** PrevisualizacionCampanaRespuesta */
+        PrevisualizacionCampanaRespuesta: {
+            /** Descripcion */
+            descripcion: string;
+            /** Descripcion Sugerida */
+            descripcion_sugerida: string;
+            /**
+             * Fecha Generacion
+             * Format: date
+             */
+            fecha_generacion: string;
+            /**
+             * Fecha Envio
+             * Format: date
+             */
+            fecha_envio: string;
+            speech: components["schemas"]["SpeechCampanaRespuesta"];
+            /** Whatsapp */
+            whatsapp: string | null;
+            /** Supervisores */
+            supervisores: components["schemas"]["SupervisorAsignadoRespuesta"][];
+            /** Disponibles */
+            disponibles: number;
+            /** Solicitados */
+            solicitados: number;
+            /** Evaluados */
+            evaluados: number;
+            /** Productos Cargados */
+            productos_cargados: number;
+            /** Supervision Cargados */
+            supervision_cargados: number;
+            /** Total Cargados */
+            total_cargados: number;
+            /** Excluidos */
+            excluidos: number;
+            /** Exclusiones Por Codigo */
+            exclusiones_por_codigo: components["schemas"]["CodigoConteoRespuesta"][];
+            /** Advertencias Por Codigo */
+            advertencias_por_codigo: components["schemas"]["CodigoConteoRespuesta"][];
+            /** Productos Por Segmento */
+            productos_por_segmento: components["schemas"]["SegmentoConteoRespuesta"][];
+            /** Muestra */
+            muestra: components["schemas"]["FilaMuestraRespuesta"][];
+            exclusiones: components["schemas"]["PaginaExclusionesRespuesta"];
+            /**
+             * Archivos Previstos Por Filas
+             * @description Estimacion solo por filas: al crear pueden salir mas archivos por el tope de bytes
+             */
+            archivos_previstos_por_filas: components["schemas"]["ArchivoPrevistoRespuesta"][];
+            limite: components["schemas"]["ConsumoLimiteRespuesta"];
+            /** Advertencias */
+            advertencias: components["schemas"]["AvisoCampanaRespuesta"][];
+            /** Errores */
+            errores: components["schemas"]["AvisoCampanaRespuesta"][];
+            /** Puede Crear */
+            puede_crear: boolean;
         };
         /** PrevisualizacionEntrada */
         PrevisualizacionEntrada: {
@@ -934,6 +1568,26 @@ export interface components {
             /** Detalle */
             detalle: string;
         };
+        /**
+         * Programacion
+         * @description Modalidades de envio de RF-MM-07.
+         * @enum {string}
+         */
+        Programacion: "enviar_ahora" | "hora_determinada" | "diferentes_horas";
+        /** ReporteImportadoRespuesta */
+        ReporteImportadoRespuesta: {
+            /** Mes Id */
+            mes_id: number;
+            /** Nombre Archivo */
+            nombre_archivo: string;
+            /** Filas */
+            filas: number;
+            /**
+             * Importado En
+             * Format: date-time
+             */
+            importado_en: string;
+        };
         /** ResumenRespuesta */
         ResumenRespuesta: {
             /** Disponibles */
@@ -952,6 +1606,11 @@ export interface components {
             /** Problemas */
             problemas: components["schemas"]["ProblemaRespuesta"][];
         };
+        /**
+         * Salida
+         * @enum {string}
+         */
+        Salida: "numero_largo" | "numero_corto" | "numero_corto_flash";
         /** SegmentacionRespuesta */
         SegmentacionRespuesta: {
             /** Campo */
@@ -964,6 +1623,14 @@ export interface components {
          * @enum {string}
          */
         Segmento: "preventiva" | "1_a_8" | "9_a_30" | "31_a_60" | "61_a_90" | "91_a_120";
+        /** SegmentoConteoRespuesta */
+        SegmentoConteoRespuesta: {
+            segmento: components["schemas"]["Segmento"];
+            /** Etiqueta */
+            etiqueta: string;
+            /** Cantidad */
+            cantidad: number;
+        };
         /** SeleccionEntrada */
         SeleccionEntrada: {
             /** Nombre */
@@ -1031,6 +1698,15 @@ export interface components {
              */
             fecha: string;
         };
+        /** SpeechCampanaRespuesta */
+        SpeechCampanaRespuesta: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Huella */
+            huella: string;
+        };
         /** SpeechEdicionEntrada */
         SpeechEdicionEntrada: {
             /** Nombre */
@@ -1050,6 +1726,29 @@ export interface components {
             /** Partes */
             partes: components["schemas"]["PartesEntrada"][];
         };
+        /** SpeechRegistradoRespuesta */
+        SpeechRegistradoRespuesta: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+        };
+        /** SupervisorAsignadoRespuesta */
+        SupervisorAsignadoRespuesta: {
+            /** Numero */
+            numero: string;
+            /** Procedencia */
+            procedencia: string;
+            /** Documento */
+            documento: string;
+        };
+        /** SupervisorCampanaEntrada */
+        SupervisorCampanaEntrada: {
+            /** Numero */
+            numero: string;
+            /** Procedencia */
+            procedencia: string;
+        };
         /** SupervisorEntrada */
         SupervisorEntrada: {
             /** Numero */
@@ -1066,6 +1765,16 @@ export interface components {
             /** Documento */
             documento: string;
         };
+        /**
+         * TipoCarga
+         * @enum {string}
+         */
+        TipoCarga: "masiva" | "personalizada";
+        /**
+         * TipoCodigo
+         * @enum {string}
+         */
+        TipoCodigo: "exclusion" | "advertencia" | "error";
         /**
          * TipoExcepcion
          * @enum {string}
@@ -2611,6 +3320,431 @@ export interface operations {
             };
             /** @description La operacion choca con el estado actual */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    previsualizar_campana_mowa_mes_campanas_previsualizacion_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeticionCampanaEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrevisualizacionCampanaRespuesta"];
+                };
+            };
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_campanas_mowa_mes_campanas_get: {
+        parameters: {
+            query?: {
+                limite?: number;
+                desplazamiento?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaCampanasRespuesta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    crear_campana_mowa_mes_campanas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreacionCampanaEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampanaRespuesta"];
+                };
+            };
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description La operacion choca con el estado actual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtener_campana_mowa_mes_campanas__campana_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campana_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampanaRespuesta"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_exclusiones_mowa_mes_campanas__campana_id__exclusiones_get: {
+        parameters: {
+            query?: {
+                codigo?: components["schemas"]["CodigoMowaMes"] | null;
+                limite?: number;
+                desplazamiento?: number;
+            };
+            header?: never;
+            path: {
+                campana_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaExclusionesRespuesta"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    descargar_archivo_mowa_mes_campanas__campana_id__archivos__numero__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campana_id: number;
+                numero: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Archivo de carga de MOWA MES */
+            200: {
+                headers: {
+                    /** @description attachment; filename="<nombre>.xlsx" */
+                    "Content-Disposition"?: string;
+                    /** @description Id de la campana */
+                    "X-Mowa-Mes-Campana"?: string;
+                    /** @description Numero de este archivo, desde 1 */
+                    "X-Mowa-Mes-Archivo"?: string;
+                    /** @description Cantidad de archivos de la campana */
+                    "X-Mowa-Mes-Archivos-Total"?: string;
+                    /** @description Filas de este archivo, supervision incluida */
+                    "X-Mowa-Mes-Filas"?: string;
+                    /** @description Registros de supervision en este archivo */
+                    "X-Mowa-Mes-Supervision"?: string;
+                    /** @description Tamano del archivo en bytes */
+                    "X-Mowa-Mes-Bytes"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    limite_mensual_mowa_mes_limite_mensual_get: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM; sin mes, el actual */
+                mes?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsumoLimiteRespuesta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    importar_reporte_mowa_mes_campanas__campana_id__reportes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campana_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_importar_reporte_mowa_mes_campanas__campana_id__reportes_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConciliacionRespuesta"];
+                };
+            };
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description La operacion choca con el estado actual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description El archivo supera el tamano maximo */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    conciliacion_mowa_mes_campanas__campana_id__conciliacion_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campana_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConciliacionRespuesta"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -24,6 +24,8 @@ from app.api.cargas import router as cargas_router
 from app.api.cartera import router as cartera_router
 from app.api.health import router as health_router
 from app.api.mowa_mes import router as mowa_mes_router
+from app.api.mowa_mes_campanas import CABECERAS_ARCHIVO
+from app.api.mowa_mes_campanas import router as mowa_mes_campanas_router
 from app.api.selecciones import router as selecciones_router
 from app.api.supervisores import router as supervisores_router
 from app.core.config import get_settings
@@ -65,7 +67,7 @@ def configurar_cors(aplicacion: FastAPI, origenes: list[str]) -> None:
         allow_headers=["Content-Type"],
         # Sin esto el navegador no deja leer el nombre del archivo generado ni
         # el resumen de la carga cuando el frontend corre en otro origen.
-        expose_headers=["Content-Disposition", *CABECERAS_RESUMEN],
+        expose_headers=["Content-Disposition", *CABECERAS_RESUMEN, *CABECERAS_ARCHIVO],
     )
     logger.info("CORS habilitado para %s", origenes)
 
@@ -91,3 +93,4 @@ app.include_router(selecciones_router)
 app.include_router(calendario_router)
 app.include_router(supervisores_router)
 app.include_router(mowa_mes_router)
+app.include_router(mowa_mes_campanas_router)

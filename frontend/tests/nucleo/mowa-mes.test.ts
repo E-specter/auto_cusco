@@ -15,6 +15,7 @@ import {
   modoGuardado,
   moverElemento,
   nivelLargo,
+  problemasConfiguracion,
   problemasSupervision,
   rangoSegmento,
   renombrarProcedencia,
@@ -216,6 +217,38 @@ describe('traducción de códigos', () => {
   it('un código desconocido cae en la frase del servidor', () => {
     setLanguageForTests('es');
     expect(traducirCodigo('codigo_que_no_existe', 'Frase del servidor')).toBe('Frase del servidor');
+  });
+});
+
+describe('configuración del conector (RF-MM-11)', () => {
+  const validos = { limite_mensual: '2500000', registros_por_archivo: '50000', bytes_por_archivo: '2000000' };
+
+  it('los valores de la plataforma son válidos', () => {
+    expect(problemasConfiguracion(validos)).toEqual([]);
+  });
+
+  it('los límites por archivo solo bajan: pasar de 50 000 filas o 2 000 000 bytes no se acepta', () => {
+    expect(
+      problemasConfiguracion({ ...validos, registros_por_archivo: '50001', bytes_por_archivo: '2000001' }),
+    ).toEqual(['registros_por_archivo', 'bytes_por_archivo']);
+  });
+
+  it('respeta los mínimos en los bordes', () => {
+    expect(problemasConfiguracion({ ...validos, registros_por_archivo: '1', bytes_por_archivo: '100000' })).toEqual([]);
+    expect(problemasConfiguracion({ ...validos, registros_por_archivo: '0', bytes_por_archivo: '99999' })).toEqual([
+      'registros_por_archivo',
+      'bytes_por_archivo',
+    ]);
+  });
+
+  it('rechaza lo que no es un entero, sin convertirlo', () => {
+    expect(problemasConfiguracion({ ...validos, limite_mensual: '2.5e6' })).toEqual(['limite_mensual']);
+    expect(problemasConfiguracion({ ...validos, limite_mensual: '' })).toEqual(['limite_mensual']);
+    expect(problemasConfiguracion({ ...validos, registros_por_archivo: '-5' })).toEqual(['registros_por_archivo']);
+  });
+
+  it('tolera espacios alrededor', () => {
+    expect(problemasConfiguracion({ ...validos, registros_por_archivo: ' 40000 ' })).toEqual([]);
   });
 });
 

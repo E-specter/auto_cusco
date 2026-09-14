@@ -1746,7 +1746,7 @@
           "mowa-mes"
         ],
         "summary": "Guardar Configuracion",
-        "description": "Limite mensual (RF-MM-01) y WhatsApp de contacto por defecto (RF-MM-16), que sigue RF-02.",
+        "description": "Limite mensual (RF-MM-01), WhatsApp de contacto (RF-MM-16) y limites por archivo.\n\nLos limites por archivo son opcionales y solo pueden bajar del maximo de la plataforma.",
         "operationId": "guardar_configuracion_mowa_mes_configuracion_put",
         "requestBody": {
           "content": {
@@ -2071,10 +2071,750 @@
           }
         }
       }
+    },
+    "/mowa-mes/campanas/previsualizacion": {
+      "post": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Previsualizar Campana",
+        "description": "La campana calculada sin guardar nada. Los errores de campana no son 4xx: se listan.\n\n`speech.huella` es lo que la creacion tiene que enviar como `speech_huella`.",
+        "operationId": "previsualizar_campana_mowa_mes_campanas_previsualizacion_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionCampanaEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrevisualizacionCampanaRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mowa-mes/campanas": {
+      "post": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Crear Campana",
+        "description": "Genera los archivos y guarda la campana. 400 si tiene errores (los de la\nprevisualizacion), 409 si supera el limite sin `confirmar_limite` o si el speech\ncambio desde la previsualizacion.",
+        "operationId": "crear_campana_mowa_mes_campanas_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreacionCampanaEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampanaRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operacion choca con el estado actual",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Listar Campanas",
+        "operationId": "listar_campanas_mowa_mes_campanas_get",
+        "parameters": [
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limite"
+            }
+          },
+          {
+            "name": "desplazamiento",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Desplazamiento"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaCampanasRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mowa-mes/campanas/{campana_id}": {
+      "get": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Obtener Campana",
+        "operationId": "obtener_campana_mowa_mes_campanas__campana_id__get",
+        "parameters": [
+          {
+            "name": "campana_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campana Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampanaRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mowa-mes/campanas/{campana_id}/exclusiones": {
+      "get": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Listar Exclusiones",
+        "operationId": "listar_exclusiones_mowa_mes_campanas__campana_id__exclusiones_get",
+        "parameters": [
+          {
+            "name": "campana_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campana Id"
+            }
+          },
+          {
+            "name": "codigo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CodigoMowaMes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Codigo"
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limite"
+            }
+          },
+          {
+            "name": "desplazamiento",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Desplazamiento"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaExclusionesRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mowa-mes/campanas/{campana_id}/archivos/{numero}": {
+      "get": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Descargar Archivo",
+        "description": "Los bytes guardados al crear la campana: la misma descarga siempre (C-6).",
+        "operationId": "descargar_archivo_mowa_mes_campanas__campana_id__archivos__numero__get",
+        "parameters": [
+          {
+            "name": "campana_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campana Id"
+            }
+          },
+          {
+            "name": "numero",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Numero"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Archivo de carga de MOWA MES",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Content-Disposition": {
+                "description": "attachment; filename=\"<nombre>.xlsx\"",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Mowa-Mes-Campana": {
+                "description": "Id de la campana",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              },
+              "X-Mowa-Mes-Archivo": {
+                "description": "Numero de este archivo, desde 1",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              },
+              "X-Mowa-Mes-Archivos-Total": {
+                "description": "Cantidad de archivos de la campana",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              },
+              "X-Mowa-Mes-Filas": {
+                "description": "Filas de este archivo, supervision incluida",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              },
+              "X-Mowa-Mes-Supervision": {
+                "description": "Registros de supervision en este archivo",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              },
+              "X-Mowa-Mes-Bytes": {
+                "description": "Tamano del archivo en bytes",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mowa-mes/limite-mensual": {
+      "get": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Limite Mensual",
+        "description": "Cargados del mes (productos y supervision) respecto del limite (RF-MM-01, S-MM-7).",
+        "operationId": "limite_mensual_mowa_mes_limite_mensual_get",
+        "parameters": [
+          {
+            "name": "mes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM; sin mes, el actual",
+              "title": "Mes"
+            },
+            "description": "YYYY-MM; sin mes, el actual"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsumoLimiteRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mowa-mes/campanas/{campana_id}/reportes": {
+      "post": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Importar Reporte",
+        "description": "Asocia cada `id` de MES del archivo a la campana y devuelve la conciliacion.",
+        "operationId": "importar_reporte_mowa_mes_campanas__campana_id__reportes_post",
+        "parameters": [
+          {
+            "name": "campana_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campana Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_importar_reporte_mowa_mes_campanas__campana_id__reportes_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConciliacionRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operacion choca con el estado actual",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "El archivo supera el tamano maximo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mowa-mes/campanas/{campana_id}/conciliacion": {
+      "get": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Conciliacion",
+        "operationId": "conciliacion_mowa_mes_campanas__campana_id__conciliacion_get",
+        "parameters": [
+          {
+            "name": "campana_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campana Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConciliacionRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdvertenciaReporteRespuesta": {
+        "properties": {
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoMowaMes"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoCodigo"
+          },
+          "mes_id": {
+            "type": "integer",
+            "title": "Mes Id"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "tipo",
+          "mes_id",
+          "detalle"
+        ],
+        "title": "AdvertenciaReporteRespuesta"
+      },
+      "ArchivoPrevistoRespuesta": {
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "title": "Numero"
+          },
+          "filas": {
+            "type": "integer",
+            "title": "Filas"
+          },
+          "supervision": {
+            "type": "integer",
+            "title": "Supervision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "filas",
+          "supervision"
+        ],
+        "title": "ArchivoPrevistoRespuesta"
+      },
+      "ArchivoRespuesta": {
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "title": "Numero"
+          },
+          "filas": {
+            "type": "integer",
+            "title": "Filas"
+          },
+          "supervision": {
+            "type": "integer",
+            "title": "Supervision"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "filas",
+          "supervision",
+          "bytes"
+        ],
+        "title": "ArchivoRespuesta"
+      },
+      "AvisoCampanaRespuesta": {
+        "properties": {
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoMowaMes"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoCodigo"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "tipo",
+          "detalle"
+        ],
+        "title": "AvisoCampanaRespuesta"
+      },
       "BloqueRespuesta": {
         "properties": {
           "metricas": {
@@ -2097,6 +2837,27 @@
           "segmentacion"
         ],
         "title": "BloqueRespuesta"
+      },
+      "Body_importar_reporte_mowa_mes_campanas__campana_id__reportes_post": {
+        "properties": {
+          "archivo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "description": "Reporte 'Campanas de enviados' de MES (.xlsx)"
+          },
+          "reemplazar": {
+            "type": "boolean",
+            "title": "Reemplazar",
+            "description": "Reemplazar los id de MES que ya estaban importados",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_importar_reporte_mowa_mes_campanas__campana_id__reportes_post"
       },
       "Body_subir_sabana_cargas_post": {
         "properties": {
@@ -2124,6 +2885,182 @@
           "archivo"
         ],
         "title": "Body_subir_sabana_cargas_post"
+      },
+      "CampanaRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "fecha_corte": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Corte"
+          },
+          "filtros": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Filtros"
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          },
+          "cantidad": {
+            "type": "integer",
+            "title": "Cantidad"
+          },
+          "seleccion_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seleccion Id"
+          },
+          "tipo_carga": {
+            "$ref": "#/components/schemas/TipoCarga"
+          },
+          "descripcion": {
+            "type": "string",
+            "title": "Descripcion"
+          },
+          "salida": {
+            "$ref": "#/components/schemas/Salida"
+          },
+          "herramientas": {
+            "$ref": "#/components/schemas/HerramientasRespuesta"
+          },
+          "programacion": {
+            "$ref": "#/components/schemas/Programacion"
+          },
+          "envios": {
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "type": "array",
+            "title": "Envios"
+          },
+          "fecha_envio": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Envio"
+          },
+          "mes_imputacion": {
+            "type": "string",
+            "title": "Mes Imputacion",
+            "description": "YYYY-MM"
+          },
+          "speech": {
+            "$ref": "#/components/schemas/SpeechRegistradoRespuesta"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp"
+          },
+          "supervisores": {
+            "items": {
+              "$ref": "#/components/schemas/SupervisorAsignadoRespuesta"
+            },
+            "type": "array",
+            "title": "Supervisores"
+          },
+          "disponibles": {
+            "type": "integer",
+            "title": "Disponibles"
+          },
+          "evaluados": {
+            "type": "integer",
+            "title": "Evaluados"
+          },
+          "productos_cargados": {
+            "type": "integer",
+            "title": "Productos Cargados"
+          },
+          "supervision_cargados": {
+            "type": "integer",
+            "title": "Supervision Cargados"
+          },
+          "total_cargados": {
+            "type": "integer",
+            "title": "Total Cargados"
+          },
+          "excluidos": {
+            "type": "integer",
+            "title": "Excluidos"
+          },
+          "advertencias": {
+            "type": "integer",
+            "title": "Advertencias"
+          },
+          "confirmo_limite": {
+            "type": "boolean",
+            "title": "Confirmo Limite"
+          },
+          "archivos": {
+            "items": {
+              "$ref": "#/components/schemas/ArchivoRespuesta"
+            },
+            "type": "array",
+            "title": "Archivos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "creado_en",
+          "fecha_corte",
+          "filtros",
+          "orden",
+          "cantidad",
+          "seleccion_id",
+          "tipo_carga",
+          "descripcion",
+          "salida",
+          "herramientas",
+          "programacion",
+          "envios",
+          "fecha_envio",
+          "mes_imputacion",
+          "speech",
+          "whatsapp",
+          "supervisores",
+          "disponibles",
+          "evaluados",
+          "productos_cargados",
+          "supervision_cargados",
+          "total_cargados",
+          "excluidos",
+          "advertencias",
+          "confirmo_limite",
+          "archivos"
+        ],
+        "title": "CampanaRespuesta"
       },
       "CampoEntrada": {
         "properties": {
@@ -2237,6 +3174,81 @@
         ],
         "title": "CargaCreadaRespuesta"
       },
+      "CifrasGrupoRespuesta": {
+        "properties": {
+          "cargados": {
+            "type": "integer",
+            "title": "Cargados"
+          },
+          "enviados": {
+            "type": "integer",
+            "title": "Enviados"
+          },
+          "no_enviados": {
+            "type": "integer",
+            "title": "No Enviados"
+          },
+          "por_estado": {
+            "items": {
+              "$ref": "#/components/schemas/EstadoConteoRespuesta"
+            },
+            "type": "array",
+            "title": "Por Estado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cargados",
+          "enviados",
+          "no_enviados",
+          "por_estado"
+        ],
+        "title": "CifrasGrupoRespuesta"
+      },
+      "CifrasIdRespuesta": {
+        "properties": {
+          "mes_id": {
+            "type": "integer",
+            "title": "Mes Id"
+          },
+          "filas": {
+            "type": "integer",
+            "title": "Filas"
+          },
+          "con_correspondencia": {
+            "type": "integer",
+            "title": "Con Correspondencia"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mes_id",
+          "filas",
+          "con_correspondencia"
+        ],
+        "title": "CifrasIdRespuesta"
+      },
+      "CodigoConteoRespuesta": {
+        "properties": {
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoMowaMes"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoCodigo"
+          },
+          "cantidad": {
+            "type": "integer",
+            "title": "Cantidad"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "tipo",
+          "cantidad"
+        ],
+        "title": "CodigoConteoRespuesta"
+      },
       "CodigoMowaMes": {
         "type": "string",
         "enum": [
@@ -2247,10 +3259,77 @@
           "falta_vencimiento",
           "mensaje_excede_160",
           "mensaje_excede_150",
-          "limite_mensual_excedido"
+          "documento_no_estandar",
+          "limite_mensual_excedido",
+          "id_sin_correspondencia",
+          "falta_whatsapp",
+          "sin_supervisores",
+          "sin_productos_cargables"
         ],
         "title": "CodigoMowaMes",
-        "description": "Motivos de exclusion y advertencias, en el orden en que se evaluan.\n\nUn producto excluido lleva un solo motivo: el primero que falla en este orden."
+        "description": "Catalogo de codigos que el frontend traduce como `mowaMes.codigo.<codigo>`.\n\nLas exclusiones van en el orden en que se evaluan: un producto excluido lleva\nun solo motivo, el primero que falla. Un codigo por linea, con la forma\n`NOMBRE = \"codigo\"`: la prueba espejo del frontend lee esta clase."
+      },
+      "ConciliacionRespuesta": {
+        "properties": {
+          "campana_id": {
+            "type": "integer",
+            "title": "Campana Id"
+          },
+          "reportes": {
+            "items": {
+              "$ref": "#/components/schemas/ReporteImportadoRespuesta"
+            },
+            "type": "array",
+            "title": "Reportes"
+          },
+          "productos": {
+            "$ref": "#/components/schemas/CifrasGrupoRespuesta"
+          },
+          "supervision": {
+            "$ref": "#/components/schemas/CifrasGrupoRespuesta"
+          },
+          "total": {
+            "$ref": "#/components/schemas/CifrasGrupoRespuesta"
+          },
+          "sin_correspondencia": {
+            "type": "integer",
+            "title": "Sin Correspondencia"
+          },
+          "sin_correspondencia_por_estado": {
+            "items": {
+              "$ref": "#/components/schemas/EstadoConteoRespuesta"
+            },
+            "type": "array",
+            "title": "Sin Correspondencia Por Estado"
+          },
+          "por_id": {
+            "items": {
+              "$ref": "#/components/schemas/CifrasIdRespuesta"
+            },
+            "type": "array",
+            "title": "Por Id"
+          },
+          "advertencias": {
+            "items": {
+              "$ref": "#/components/schemas/AdvertenciaReporteRespuesta"
+            },
+            "type": "array",
+            "title": "Advertencias"
+          }
+        },
+        "type": "object",
+        "required": [
+          "campana_id",
+          "reportes",
+          "productos",
+          "supervision",
+          "total",
+          "sin_correspondencia",
+          "sin_correspondencia_por_estado",
+          "por_id",
+          "advertencias"
+        ],
+        "title": "ConciliacionRespuesta"
       },
       "ConfiguracionEntrada": {
         "properties": {
@@ -2271,6 +3350,34 @@
               }
             ],
             "title": "Whatsapp Contacto"
+          },
+          "registros_por_archivo": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 50000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registros Por Archivo",
+            "description": "Filas por archivo (RF-MM-11); sin valor se conserva el actual"
+          },
+          "bytes_por_archivo": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2000000.0,
+                "minimum": 100000.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes Por Archivo",
+            "description": "Bytes por archivo (RF-MM-11); sin valor se conserva el actual"
           }
         },
         "type": "object",
@@ -2307,13 +3414,23 @@
               }
             ],
             "title": "Actualizado En"
+          },
+          "registros_por_archivo": {
+            "type": "integer",
+            "title": "Registros Por Archivo"
+          },
+          "bytes_por_archivo": {
+            "type": "integer",
+            "title": "Bytes Por Archivo"
           }
         },
         "type": "object",
         "required": [
           "limite_mensual",
           "whatsapp_contacto",
-          "actualizado_en"
+          "actualizado_en",
+          "registros_por_archivo",
+          "bytes_por_archivo"
         ],
         "title": "ConfiguracionRespuesta"
       },
@@ -2366,6 +3483,202 @@
           "supervisores"
         ],
         "title": "ConfiguracionSupervisionRespuesta"
+      },
+      "ConsumoLimiteRespuesta": {
+        "properties": {
+          "mes": {
+            "type": "string",
+            "title": "Mes",
+            "description": "YYYY-MM"
+          },
+          "limite": {
+            "type": "integer",
+            "title": "Limite"
+          },
+          "cargados_mes": {
+            "type": "integer",
+            "title": "Cargados Mes"
+          },
+          "esta_campana": {
+            "type": "integer",
+            "title": "Esta Campana"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "disponible": {
+            "type": "integer",
+            "title": "Disponible"
+          },
+          "excedido": {
+            "type": "boolean",
+            "title": "Excedido"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mes",
+          "limite",
+          "cargados_mes",
+          "esta_campana",
+          "total",
+          "disponible",
+          "excedido"
+        ],
+        "title": "ConsumoLimiteRespuesta"
+      },
+      "CreacionCampanaEntrada": {
+        "properties": {
+          "fecha_corte": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Corte"
+          },
+          "filtros": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Filtros",
+            "default": []
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          },
+          "cantidad": {
+            "type": "integer",
+            "maximum": 120000.0,
+            "minimum": 1.0,
+            "title": "Cantidad"
+          },
+          "seleccion_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seleccion Id",
+            "description": "Referencia informativa a la seleccion guardada de origen"
+          },
+          "tipo_carga": {
+            "$ref": "#/components/schemas/TipoCarga",
+            "default": "masiva"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion",
+            "description": "Sin descripcion se usa la sugerida"
+          },
+          "salida": {
+            "$ref": "#/components/schemas/Salida",
+            "default": "numero_largo"
+          },
+          "herramientas": {
+            "$ref": "#/components/schemas/HerramientasModelo",
+            "default": {
+              "keyword": false,
+              "respuesta_automatica": false,
+              "blacklist_indecopi": false,
+              "speech_optimizado": false
+            }
+          },
+          "programacion": {
+            "$ref": "#/components/schemas/Programacion",
+            "default": "hora_determinada"
+          },
+          "envios": {
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Envios",
+            "description": "Fechas y horas de envio; sin zona horaria se toman en America/Lima",
+            "default": []
+          },
+          "speech_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speech Id",
+            "description": "Sin id se usa el Speech original"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp",
+            "description": "Sin numero se usa el de la configuracion"
+          },
+          "supervisores": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SupervisorCampanaEntrada"
+                },
+                "type": "array",
+                "maxItems": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supervisores",
+            "description": "Sin lista se usa la configurada por defecto"
+          },
+          "speech_huella": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Speech Huella",
+            "description": "La huella del speech que devolvio la previsualizacion; si cambio, 409"
+          },
+          "confirmar_limite": {
+            "type": "boolean",
+            "title": "Confirmar Limite",
+            "description": "Crear aunque la campana supere el limite mensual (S-MM-2)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "fecha_corte",
+          "cantidad",
+          "speech_huella"
+        ],
+        "title": "CreacionCampanaEntrada"
       },
       "DefinicionEntrada": {
         "properties": {
@@ -2465,6 +3778,24 @@
         "title": "EstadoCarga",
         "description": "Estado de procesamiento de una version (la ingesta corre en segundo plano)."
       },
+      "EstadoConteoRespuesta": {
+        "properties": {
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "cantidad": {
+            "type": "integer",
+            "title": "Cantidad"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estado",
+          "cantidad"
+        ],
+        "title": "EstadoConteoRespuesta"
+      },
       "ExcepcionEntrada": {
         "properties": {
           "fecha": {
@@ -2526,6 +3857,23 @@
         ],
         "title": "ExcepcionRespuesta"
       },
+      "ExclusionRespuesta": {
+        "properties": {
+          "pagare": {
+            "type": "string",
+            "title": "Pagare"
+          },
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoMowaMes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pagare",
+          "codigo"
+        ],
+        "title": "ExclusionRespuesta"
+      },
       "FeriadosRespuesta": {
         "properties": {
           "anio": {
@@ -2546,6 +3894,70 @@
           "dias"
         ],
         "title": "FeriadosRespuesta"
+      },
+      "FilaMuestraRespuesta": {
+        "properties": {
+          "numero": {
+            "type": "string",
+            "title": "Numero"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          },
+          "dni": {
+            "type": "string",
+            "title": "Dni"
+          },
+          "supervision": {
+            "type": "boolean",
+            "title": "Supervision"
+          },
+          "pagare": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagare"
+          },
+          "segmento": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Segmento"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "largo": {
+            "type": "integer",
+            "title": "Largo"
+          },
+          "advertencias": {
+            "items": {
+              "$ref": "#/components/schemas/CodigoMowaMes"
+            },
+            "type": "array",
+            "title": "Advertencias"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "mensaje",
+          "dni",
+          "supervision",
+          "pagare",
+          "segmento",
+          "largo",
+          "advertencias"
+        ],
+        "title": "FilaMuestraRespuesta"
       },
       "FormatoArchivo": {
         "type": "string",
@@ -2665,6 +4077,60 @@
           "ok"
         ],
         "title": "HealthRespuesta"
+      },
+      "HerramientasModelo": {
+        "properties": {
+          "keyword": {
+            "type": "boolean",
+            "title": "Keyword",
+            "default": false
+          },
+          "respuesta_automatica": {
+            "type": "boolean",
+            "title": "Respuesta Automatica",
+            "default": false
+          },
+          "blacklist_indecopi": {
+            "type": "boolean",
+            "title": "Blacklist Indecopi",
+            "default": false
+          },
+          "speech_optimizado": {
+            "type": "boolean",
+            "title": "Speech Optimizado",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "HerramientasModelo"
+      },
+      "HerramientasRespuesta": {
+        "properties": {
+          "keyword": {
+            "type": "boolean",
+            "title": "Keyword"
+          },
+          "respuesta_automatica": {
+            "type": "boolean",
+            "title": "Respuesta Automatica"
+          },
+          "blacklist_indecopi": {
+            "type": "boolean",
+            "title": "Blacklist Indecopi"
+          },
+          "speech_optimizado": {
+            "type": "boolean",
+            "title": "Speech Optimizado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "keyword",
+          "respuesta_automatica",
+          "blacklist_indecopi",
+          "speech_optimizado"
+        ],
+        "title": "HerramientasRespuesta"
       },
       "IncidenciaRespuesta": {
         "properties": {
@@ -2800,6 +4266,37 @@
         ],
         "title": "LargoSegmentoRespuesta"
       },
+      "ListaCampanasRespuesta": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limite": {
+            "type": "integer",
+            "title": "Limite"
+          },
+          "desplazamiento": {
+            "type": "integer",
+            "title": "Desplazamiento"
+          },
+          "campanas": {
+            "items": {
+              "$ref": "#/components/schemas/CampanaRespuesta"
+            },
+            "type": "array",
+            "title": "Campanas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "limite",
+          "desplazamiento",
+          "campanas"
+        ],
+        "title": "ListaCampanasRespuesta"
+      },
       "MetricasRespuesta": {
         "properties": {
           "cuentas": {
@@ -2904,6 +4401,37 @@
           "agregado"
         ],
         "title": "OrigenDia"
+      },
+      "PaginaExclusionesRespuesta": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limite": {
+            "type": "integer",
+            "title": "Limite"
+          },
+          "desplazamiento": {
+            "type": "integer",
+            "title": "Desplazamiento"
+          },
+          "exclusiones": {
+            "items": {
+              "$ref": "#/components/schemas/ExclusionRespuesta"
+            },
+            "type": "array",
+            "title": "Exclusiones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "limite",
+          "desplazamiento",
+          "exclusiones"
+        ],
+        "title": "PaginaExclusionesRespuesta"
       },
       "PaginaRespuesta": {
         "properties": {
@@ -3026,6 +4554,144 @@
         ],
         "title": "PartesRespuesta"
       },
+      "PeticionCampanaEntrada": {
+        "properties": {
+          "fecha_corte": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Corte"
+          },
+          "filtros": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Filtros",
+            "default": []
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          },
+          "cantidad": {
+            "type": "integer",
+            "maximum": 120000.0,
+            "minimum": 1.0,
+            "title": "Cantidad"
+          },
+          "seleccion_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seleccion Id",
+            "description": "Referencia informativa a la seleccion guardada de origen"
+          },
+          "tipo_carga": {
+            "$ref": "#/components/schemas/TipoCarga",
+            "default": "masiva"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion",
+            "description": "Sin descripcion se usa la sugerida"
+          },
+          "salida": {
+            "$ref": "#/components/schemas/Salida",
+            "default": "numero_largo"
+          },
+          "herramientas": {
+            "$ref": "#/components/schemas/HerramientasModelo",
+            "default": {
+              "keyword": false,
+              "respuesta_automatica": false,
+              "blacklist_indecopi": false,
+              "speech_optimizado": false
+            }
+          },
+          "programacion": {
+            "$ref": "#/components/schemas/Programacion",
+            "default": "hora_determinada"
+          },
+          "envios": {
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Envios",
+            "description": "Fechas y horas de envio; sin zona horaria se toman en America/Lima",
+            "default": []
+          },
+          "speech_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speech Id",
+            "description": "Sin id se usa el Speech original"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp",
+            "description": "Sin numero se usa el de la configuracion"
+          },
+          "supervisores": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SupervisorCampanaEntrada"
+                },
+                "type": "array",
+                "maxItems": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supervisores",
+            "description": "Sin lista se usa la configurada por defecto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fecha_corte",
+          "cantidad"
+        ],
+        "title": "PeticionCampanaEntrada"
+      },
       "PeticionGeneracion": {
         "properties": {
           "fecha_corte": {
@@ -3083,6 +4749,165 @@
           "definicion"
         ],
         "title": "PeticionGeneracion"
+      },
+      "PrevisualizacionCampanaRespuesta": {
+        "properties": {
+          "descripcion": {
+            "type": "string",
+            "title": "Descripcion"
+          },
+          "descripcion_sugerida": {
+            "type": "string",
+            "title": "Descripcion Sugerida"
+          },
+          "fecha_generacion": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Generacion"
+          },
+          "fecha_envio": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Envio"
+          },
+          "speech": {
+            "$ref": "#/components/schemas/SpeechCampanaRespuesta"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp"
+          },
+          "supervisores": {
+            "items": {
+              "$ref": "#/components/schemas/SupervisorAsignadoRespuesta"
+            },
+            "type": "array",
+            "title": "Supervisores"
+          },
+          "disponibles": {
+            "type": "integer",
+            "title": "Disponibles"
+          },
+          "solicitados": {
+            "type": "integer",
+            "title": "Solicitados"
+          },
+          "evaluados": {
+            "type": "integer",
+            "title": "Evaluados"
+          },
+          "productos_cargados": {
+            "type": "integer",
+            "title": "Productos Cargados"
+          },
+          "supervision_cargados": {
+            "type": "integer",
+            "title": "Supervision Cargados"
+          },
+          "total_cargados": {
+            "type": "integer",
+            "title": "Total Cargados"
+          },
+          "excluidos": {
+            "type": "integer",
+            "title": "Excluidos"
+          },
+          "exclusiones_por_codigo": {
+            "items": {
+              "$ref": "#/components/schemas/CodigoConteoRespuesta"
+            },
+            "type": "array",
+            "title": "Exclusiones Por Codigo"
+          },
+          "advertencias_por_codigo": {
+            "items": {
+              "$ref": "#/components/schemas/CodigoConteoRespuesta"
+            },
+            "type": "array",
+            "title": "Advertencias Por Codigo"
+          },
+          "productos_por_segmento": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentoConteoRespuesta"
+            },
+            "type": "array",
+            "title": "Productos Por Segmento"
+          },
+          "muestra": {
+            "items": {
+              "$ref": "#/components/schemas/FilaMuestraRespuesta"
+            },
+            "type": "array",
+            "title": "Muestra"
+          },
+          "exclusiones": {
+            "$ref": "#/components/schemas/PaginaExclusionesRespuesta"
+          },
+          "archivos_previstos_por_filas": {
+            "items": {
+              "$ref": "#/components/schemas/ArchivoPrevistoRespuesta"
+            },
+            "type": "array",
+            "title": "Archivos Previstos Por Filas",
+            "description": "Estimacion solo por filas: al crear pueden salir mas archivos por el tope de bytes"
+          },
+          "limite": {
+            "$ref": "#/components/schemas/ConsumoLimiteRespuesta"
+          },
+          "advertencias": {
+            "items": {
+              "$ref": "#/components/schemas/AvisoCampanaRespuesta"
+            },
+            "type": "array",
+            "title": "Advertencias"
+          },
+          "errores": {
+            "items": {
+              "$ref": "#/components/schemas/AvisoCampanaRespuesta"
+            },
+            "type": "array",
+            "title": "Errores"
+          },
+          "puede_crear": {
+            "type": "boolean",
+            "title": "Puede Crear"
+          }
+        },
+        "type": "object",
+        "required": [
+          "descripcion",
+          "descripcion_sugerida",
+          "fecha_generacion",
+          "fecha_envio",
+          "speech",
+          "whatsapp",
+          "supervisores",
+          "disponibles",
+          "solicitados",
+          "evaluados",
+          "productos_cargados",
+          "supervision_cargados",
+          "total_cargados",
+          "excluidos",
+          "exclusiones_por_codigo",
+          "advertencias_por_codigo",
+          "productos_por_segmento",
+          "muestra",
+          "exclusiones",
+          "archivos_previstos_por_filas",
+          "limite",
+          "advertencias",
+          "errores",
+          "puede_crear"
+        ],
+        "title": "PrevisualizacionCampanaRespuesta"
       },
       "PrevisualizacionEntrada": {
         "properties": {
@@ -3164,6 +4989,45 @@
         ],
         "title": "ProblemaSpeechRespuesta"
       },
+      "Programacion": {
+        "type": "string",
+        "enum": [
+          "enviar_ahora",
+          "hora_determinada",
+          "diferentes_horas"
+        ],
+        "title": "Programacion",
+        "description": "Modalidades de envio de RF-MM-07."
+      },
+      "ReporteImportadoRespuesta": {
+        "properties": {
+          "mes_id": {
+            "type": "integer",
+            "title": "Mes Id"
+          },
+          "nombre_archivo": {
+            "type": "string",
+            "title": "Nombre Archivo"
+          },
+          "filas": {
+            "type": "integer",
+            "title": "Filas"
+          },
+          "importado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Importado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mes_id",
+          "nombre_archivo",
+          "filas",
+          "importado_en"
+        ],
+        "title": "ReporteImportadoRespuesta"
+      },
       "ResumenRespuesta": {
         "properties": {
           "disponibles": {
@@ -3230,6 +5094,15 @@
         ],
         "title": "RevisionRespuesta"
       },
+      "Salida": {
+        "type": "string",
+        "enum": [
+          "numero_largo",
+          "numero_corto",
+          "numero_corto_flash"
+        ],
+        "title": "Salida"
+      },
       "SegmentacionRespuesta": {
         "properties": {
           "campo": {
@@ -3262,6 +5135,28 @@
           "91_a_120"
         ],
         "title": "Segmento"
+      },
+      "SegmentoConteoRespuesta": {
+        "properties": {
+          "segmento": {
+            "$ref": "#/components/schemas/Segmento"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta"
+          },
+          "cantidad": {
+            "type": "integer",
+            "title": "Cantidad"
+          }
+        },
+        "type": "object",
+        "required": [
+          "segmento",
+          "etiqueta",
+          "cantidad"
+        ],
+        "title": "SegmentoConteoRespuesta"
       },
       "SeleccionEntrada": {
         "properties": {
@@ -3431,6 +5326,29 @@
         ],
         "title": "SiguienteDiaRespuesta"
       },
+      "SpeechCampanaRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "huella": {
+            "type": "string",
+            "title": "Huella"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "huella"
+        ],
+        "title": "SpeechCampanaRespuesta"
+      },
       "SpeechEdicionEntrada": {
         "properties": {
           "nombre": {
@@ -3494,6 +5412,67 @@
         ],
         "title": "SpeechNuevoEntrada"
       },
+      "SpeechRegistradoRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "SpeechRegistradoRespuesta"
+      },
+      "SupervisorAsignadoRespuesta": {
+        "properties": {
+          "numero": {
+            "type": "string",
+            "title": "Numero"
+          },
+          "procedencia": {
+            "type": "string",
+            "title": "Procedencia"
+          },
+          "documento": {
+            "type": "string",
+            "title": "Documento"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "procedencia",
+          "documento"
+        ],
+        "title": "SupervisorAsignadoRespuesta"
+      },
+      "SupervisorCampanaEntrada": {
+        "properties": {
+          "numero": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Numero"
+          },
+          "procedencia": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Procedencia"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "procedencia"
+        ],
+        "title": "SupervisorCampanaEntrada"
+      },
       "SupervisorEntrada": {
         "properties": {
           "numero": {
@@ -3536,6 +5515,23 @@
           "documento"
         ],
         "title": "SupervisorRespuesta"
+      },
+      "TipoCarga": {
+        "type": "string",
+        "enum": [
+          "masiva",
+          "personalizada"
+        ],
+        "title": "TipoCarga"
+      },
+      "TipoCodigo": {
+        "type": "string",
+        "enum": [
+          "exclusion",
+          "advertencia",
+          "error"
+        ],
+        "title": "TipoCodigo"
       },
       "TipoExcepcion": {
         "type": "string",

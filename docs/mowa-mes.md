@@ -2,7 +2,7 @@
 
 Conector SMS de MOWA MES. Requerimientos en [requerimientos-mowa-mes.md](requerimientos-mowa-mes.md) (RF-MM-01 a RF-MM-22) y RF-37 a RF-41 de [atomics-requirements.md](atomics-requirements.md). Plan del coordinador en `docs/agents/coordinador_modulo_mowa_mes/plan.md`.
 
-Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6a) — configuración.** Campaña, archivos, reporte de enviados y conciliación (B4, B5, B6b) se agregan aquí cuando se entreguen.
+Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6a, commit `7849ef0`) y segundo corte (B4, B5 y B6b: campaña, archivos, reporte de enviados y conciliación, secciones 9 a 14).**
 
 ## 1. Piezas
 
@@ -84,3 +84,95 @@ Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6
 | `tests/test_speech_original.py` | Contrato: semilla de la migración ↔ tabla de RF-MM-18 |
 | `tests/test_api_mowa_mes_configuracion.py` | API con `TestClient` y repositorios en memoria |
 | `tests/test_mowa_mes_configuracion_postgres.py` | Integración y HTTP de punta a punta contra PostgreSQL (fechas 2099, prefijo propio, estado único restituido) |
+
+## 9. Campaña (B4, RF-MM-01 a RF-MM-13)
+
+| Pieza | Ruta |
+|---|---|
+| Recorrido paginado compartido (C-2) | `app/core/services/seleccion_cartera/recorrido.py` (`SeleccionPaginada`, antes privada en `generacion_cargas/servicio.py`) |
+| Entidades | `app/core/entities/mowa_mes_campana.py` |
+| Caso de uso | `app/core/services/plataformas/mowa_mes/campana.py` (`CampanasMowaMesService`, `evaluar_producto`, `huella_speech`, `descripcion_sugerida`) |
+| División | `app/core/services/plataformas/mowa_mes/division.py` |
+| Archivo `.xlsx` | `app/adapters/output/plataformas/mowa_mes/archivo_carga.py` (sobre el exportador XLSX) |
+| Persistencia | `app/adapters/persistence/repositorio_campanas_mowa_mes_postgres.py`, migración `7a91278726ae` |
+| API | `app/api/mowa_mes_campanas.py` |
+
+- **Selección (RF-MM-09):** `fecha_corte`, `filtros`, `orden` y `cantidad` en la sintaxis de `/cartera`, recorridos con `SeleccionPaginada` (mismo orden y desempate que `/cartera` y el resumen). `seleccion_id` es una referencia informativa; la campaña guarda la copia de filtros, orden y cantidad.
+- **Opciones deshabilitadas (RF-MM-03, 05, 06):** solo `masiva`, `numero_largo` y respuesta automática apagada; lo demás responde `400`.
+- **Fecha de envío (RF-MM-15, S-MM-5):** `enviar_ahora` usa la fecha de generación en Lima y no lleva fechas; `hora_determinada` una; `diferentes_horas` la más temprana. Una fecha y hora sin zona se toma como hora de Lima.
+- **Exclusiones (RF-MM-13):** `evaluar_producto` revisa en el orden del catálogo y devuelve un solo motivo: `telefono_invalido` (regla N-4), `falta_documento` (S-MM-8), `sin_speech`, `falta_titular`, `falta_vencimiento`, `mensaje_excede_160`. Un mensaje de más de 150 se carga con la advertencia `mensaje_excede_150`. Un teléfono repetido no excluye.
+- **`dni` (decisión E-2):** el `documento_numero` normalizado por la ingesta, tal cual. Si no es DNI ni RUC, **se carga igual** y lleva la advertencia `documento_no_estandar` (no es exclusión). Criterio (`documento_estandar`): con el tipo de la ingesta (regla N-3) manda el tipo, así que `extranjero` es no estándar; sin tipo, es estándar solo si son dígitos de 8 u 11. Un producto puede llevar a la vez `mensaje_excede_150` y `documento_no_estandar`: cada fila guarda la lista (`mowa_mes_fila_cargada.advertencias`) y la muestra de la previsualización trae `advertencias` como lista.
+- **WhatsApp:** si un producto cae en un segmento que usa `[whatsapp]` y no hay número (ni de la campaña ni configurado), no se carga ni se excluye: la campaña lleva el error `falta_whatsapp` con el conteo por segmento.
+- **Supervisión (RF-37 a RF-41, RF-MM-12):** los supervisores de la campaña o, sin lista, los configurados, validados contra las procedencias configuradas. Conservan el orden de la lista, cada uno con su DNI por procedencia. La plantilla es la primera fila cargada y las filas de supervisión van al inicio de la carga, en el orden de asignación del DNI. Sin supervisores, error `sin_supervisores`; sin productos cargables, `sin_productos_cargables` y no hay supervisión.
+- **Errores de campaña:** la previsualización los lista con `puede_crear: false` y responde `200`; la creación responde `400`.
+- **Límite mensual (RF-MM-01, S-MM-2, S-MM-7):** `cargados_mes` suma `total_cargados` (productos y supervisión) de las campañas con el mismo `mes_imputacion`, que es el mes de la fecha de envío. Superarlo es la advertencia `limite_mensual_excedido`; crear sin `confirmar_limite` responde `409`.
+- **Speech cambiado:** la previsualización devuelve `speech.huella` (SHA-256 de las partes) y la creación la exige como `speech_huella`. Si no coincide, `409`. En PostgreSQL la versión se bloquea con `FOR UPDATE`, se compara la huella y se marca `usada_en` en la misma transacción que guarda la campaña.
+- **División (RF-MM-11):** primero por `registros_por_archivo` (supervisión contada en el primer archivo); después se escribe cada tramo y, si su tamaño real pasa de `bytes_por_archivo`, se parte en proporción y se vuelve a medir. Los dos límites están en `mowa_mes_configuracion` (50 000 y 2 000 000 por defecto); el `PUT` solo permite bajarlos y un `CHECK` de la base lo impone. La previsualización devuelve `archivos_previstos_por_filas`, que es una estimación solo por filas.
+- **Archivos guardados (C-6):** los bytes de cada `.xlsx` van en `mowa_mes_archivo`; la descarga entrega siempre esos bytes.
+- **Descripción sugerida (RF-MM-04):** `CajaCusco` más un resumen de los filtros, por ejemplo `CajaCusco 9 <= dias atraso <= 90, saldo capital pendiente > 5000`. Sin largo máximo (S-MM-3).
+
+## 10. Reporte de enviados y conciliación (B5, RF-MM-20 a RF-MM-22)
+
+- **Lectura:** `app/adapters/input/lector_reporte_mowa_mes.py` con `python-calamine`, primera hoja. Exige las 8 columnas (sin distinguir mayúsculas, tildes ni espacios); si falta una o no hay filas, `400` con el motivo. `celular` y `dni` guardados como número vuelven a texto (un `dni` numérico de menos de 8 dígitos recupera los ceros); una fecha real se escribe `dd/mm/yy`.
+- **Importación (C-5):** `app/core/services/plataformas/mowa_mes/reportes.py`. Las filas se agrupan por `id` de MES y cada `id` se asocia a la campaña elegida (`mowa_mes_reporte`, `mes_id` único). Si algún `id` ya estaba importado, `409` salvo `reemplazar=true`, que lo reemplaza en una transacción.
+- **Conciliación:** `app/core/services/plataformas/mowa_mes/conciliacion.py`. Emparejamiento multiconjunto por (`numero`, `dni`, mensaje normalizado): cada fila del reporte cuenta para una sola fila cargada. La normalización (NFD sin marcas combinantes y sin espacios en los extremos) se aplica igual a los dos lados (C-3), así la `ñ` queda `n`.
+- **Cifras:** productos, supervisión y total, cada uno con cargados, enviados (decisión E-1: fila cargada emparejada con estado `enviado`, sin distinguir mayúsculas ni espacios), no enviados (las cargadas sin fila en el reporte y las emparejadas con cualquier otro estado) y conteo por `estado` de las emparejadas; filas del reporte sin correspondencia con su conteo por estado; y por `id`, sus filas y cuántas coincidieron con cualquier estado: esa cifra dice si el `id` es de la campaña, no cuánto se envió. Un `id` sin ninguna coincidencia lleva la advertencia `id_sin_correspondencia`.
+
+## 11. API del segundo corte (B6b)
+
+| Método y ruta | Respuesta | Errores |
+|---|---|---|
+| `POST /mowa-mes/campanas/previsualizacion` | Cifras, `speech` con `huella`, supervisores con DNI, muestra de 20 filas, primera página de exclusiones (100), conteos por código y segmento, `archivos_previstos_por_filas`, `limite`, `advertencias`, `errores`, `puede_crear` | 400, 404 (sin versión vigente o speech inexistente) |
+| `POST /mowa-mes/campanas` | `201` con la campaña y sus archivos reales | 400 (errores de campaña, opciones o inputs), 404, 409 (límite sin confirmar o speech cambiado) |
+| `GET /mowa-mes/campanas?limite=&desplazamiento=` | Las más recientes primero | |
+| `GET /mowa-mes/campanas/{id}` | La campaña con la copia de sus inputs y cifras | 404 |
+| `GET /mowa-mes/campanas/{id}/exclusiones?codigo=&limite=&desplazamiento=` | Página de exclusiones en el orden de la selección | 404 |
+| `GET /mowa-mes/campanas/{id}/archivos/{n}` | El `.xlsx`, con `Content-Disposition` y las cabeceras `X-Mowa-Mes-Campana`, `-Archivo`, `-Archivos-Total`, `-Filas`, `-Supervision` y `-Bytes` | 404 |
+| `GET /mowa-mes/limite-mensual?mes=YYYY-MM` | Consumo del mes; sin `mes`, el actual en Lima | 422 |
+| `POST /mowa-mes/campanas/{id}/reportes` (multipart `archivo`, `reemplazar`) | `201` con la conciliación | 400, 404, 409, 413 (32 MB) |
+| `GET /mowa-mes/campanas/{id}/conciliacion` | Reportes importados y cifras | 404 |
+
+- Las cabeceras de la descarga salen de `CABECERAS_ARCHIVO`, la misma lista que declara el contrato y que CORS expone (`app/main.py`). Una prueba comprueba que las enviadas son exactamente las declaradas.
+- `PUT /mowa-mes/configuracion` acepta además `registros_por_archivo` y `bytes_por_archivo`, opcionales (sin valor se conservan), y la respuesta los incluye.
+
+## 12. Catálogo de códigos (completo)
+
+`CodigoMowaMes` y `TIPO_CODIGO` en `app/core/entities/mowa_mes.py`, un código por línea (la prueba espejo del frontend lee esa clase):
+
+| Tipo | Códigos |
+|---|---|
+| exclusión (en orden de evaluación) | `telefono_invalido`, `falta_documento`, `sin_speech`, `falta_titular`, `falta_vencimiento`, `mensaje_excede_160` |
+| advertencia | `mensaje_excede_150`, `documento_no_estandar`, `limite_mensual_excedido`, `id_sin_correspondencia` |
+| error | `falta_whatsapp`, `sin_supervisores`, `sin_productos_cargables` |
+
+El frontend traduce cada uno con la clave plana `mowaMes.codigo.<codigo>` en `frontend/src/i18n/es.json` y `en.json`; `tests/test_codigos_mowa_mes.py` falla si falta alguna. Las agrega `dev_frontend_modulo_mowa_mes`.
+
+## 13. Rendimiento (medido el 2026-09-14)
+
+`scripts/medir_campana_mowa_mes.py` con una sábana sintética de 46 000 filas (`scripts/generar_sabana_sintetica.py --filas 46000`), campaña completa con el Speech original:
+
+| Paso | Tiempo |
+|---|---|
+| Ingesta | 6,4 s |
+| Previsualización (recorrer y evaluar 45 999 productos) | 5,5 s, memoria pico de Python 79 MB |
+| Crear (armar, dividir, escribir el `.xlsx` y guardar campaña, archivo, 45 851 filas y 153 exclusiones) | 5,2 s |
+| Descargar el archivo | 0,01 s |
+| Guardar un reporte de 45 851 filas | 0,9 s |
+| Conciliar (leer las dos tablas y emparejar) | 1,6 s |
+
+- Resultado: 45 846 productos y 5 de supervisión en **un solo archivo de 1,53 MB**; 153 excluidos (`telefono_invalido`); 45 851 de 45 851 conciliados.
+- **Filas del Speech original que entran en 2 000 000 bytes:** unas **60 000** (33 bytes por fila, porque el `.xlsx` comparte los textos repetidos del speech). Es más que el tope de 50 000 filas, así que con el Speech original la división por bytes es un caso teórico y manda el límite de filas. Puede aparecer con un speech de textos muy variados o mensajes largos, y está cubierta por pruebas.
+- Las 12 677 advertencias `mensaje_excede_150` salen de la distribución de días de la sábana sintética (segmento `9 a 30`, que mide 156), no de un dato real.
+
+## 14. Pruebas del segundo corte
+
+| Archivo | Nivel |
+|---|---|
+| `tests/test_mowa_mes_campana.py` | Núcleo: exclusiones en orden, largo, segmento, supervisión, WhatsApp, límite, huella, división al crear, opciones, reporte |
+| `tests/test_mowa_mes_division.py` | Núcleo de la división y adaptador `.xlsx` (releído con openpyxl) |
+| `tests/test_mowa_mes_conciliacion.py` | Núcleo de la conciliación y la normalización |
+| `tests/test_lector_reporte_mowa_mes.py` | Adaptador del reporte, con archivos generados en memoria |
+| `tests/test_codigos_mowa_mes.py` | Contrato: catálogo ↔ i18n del frontend |
+| `tests/test_api_mowa_mes_campanas.py` | API con `TestClient`: previsualización, creación, consulta, descarga y sus cabeceras, límite, reporte |
+| `tests/test_mowa_mes_campanas_postgres.py` | Integración de punta a punta por HTTP contra PostgreSQL: sábana → campaña → descarga → reporte → conciliación; división real; límite; speech cambiado sin escribir nada; sin WhatsApp |
+| `tests/test_generacion_cargas_postgres.py` | La prueba de paginación real ahora parchea `recorrido.LIMITE_MAXIMO` (C-2) |

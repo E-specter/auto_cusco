@@ -149,6 +149,8 @@ test.describe('speech (RF-MM-17)', () => {
     await expect(page.getByText(/Falta el WhatsApp de contacto y hay segmentos que usan/)).toBeHidden();
     expect(pedidosA(api, 'PUT', '/mowa-mes/configuracion')[0].cuerpo).toEqual({
       limite_mensual: 2500000,
+      registros_por_archivo: 50000,
+      bytes_por_archivo: 2000000,
       whatsapp_contacto: '900000555',
     });
   });
@@ -176,6 +178,43 @@ test.describe('plataforma', () => {
     await page.getByRole('button', { name: 'Guardar plataforma' }).click();
 
     await expect(page.locator('[data-plataforma-error]')).toHaveText('Escribe un número entero entre 1 y 1 000 000 000.');
+    expect(pedidosA(api, 'PUT', '/mowa-mes/configuracion')).toEqual([]);
+  });
+});
+
+test.describe('límites por archivo (C1b, RF-MM-11)', () => {
+  test('se muestran y guardan bajando los límites de la plataforma', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+
+    await expect(page.getByLabel('Filas por archivo')).toHaveValue('50000');
+    await expect(page.getByLabel('Tamaño máximo por archivo (bytes)')).toHaveValue('2000000');
+
+    await page.getByLabel('Filas por archivo').fill('40000');
+    await page.getByLabel('Tamaño máximo por archivo (bytes)').fill('1500000');
+    await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+
+    await expect(page.getByText('Guardado.')).toBeVisible();
+    expect(pedidosA(api, 'PUT', '/mowa-mes/configuracion')[0].cuerpo).toMatchObject({
+      registros_por_archivo: 40000,
+      bytes_por_archivo: 1500000,
+    });
+  });
+
+  test('por encima del máximo de la plataforma no viaja y se señala cada campo', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+
+    await page.getByLabel('Filas por archivo').fill('50001');
+    await page.getByLabel('Tamaño máximo por archivo (bytes)').fill('2000001');
+    await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+
+    await expect(page.locator('[data-plataforma-error]')).toHaveText(
+      'Las filas por archivo van de 1 a 50 000. El tamaño por archivo va de 100 000 a 2 000 000 bytes.',
+    );
+    await expect(page.getByLabel('Filas por archivo')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByLabel('Tamaño máximo por archivo (bytes)')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByLabel('Filas por archivo')).toBeFocused();
     expect(pedidosA(api, 'PUT', '/mowa-mes/configuracion')).toEqual([]);
   });
 });

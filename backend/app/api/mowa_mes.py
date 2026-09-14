@@ -21,10 +21,13 @@ from app.adapters.persistence.repositorio_mowa_mes_postgres import RepositorioMo
 from app.api.errores import respuestas_de_error
 from app.api.respuestas import ModeloRespuesta
 from app.core.entities.mowa_mes import (
+    BYTES_POR_ARCHIVO,
+    BYTES_POR_ARCHIVO_MINIMO,
     LARGO_ADVERTENCIA,
     LARGO_MAXIMO,
     LARGO_MAXIMO_NOMBRE_SPEECH,
     RANGOS_SEGMENTO,
+    REGISTROS_POR_ARCHIVO,
     CodigoMowaMes,
     ConfiguracionInvalida,
     ConfiguracionMowaMes,
@@ -58,12 +61,26 @@ def obtener_servicio_mowa_mes() -> ConfiguracionMowaMesService:
 class ConfiguracionEntrada(BaseModel):
     limite_mensual: int = Field(ge=1, le=LIMITE_MENSUAL_MAXIMO)
     whatsapp_contacto: str | None = Field(default=None, max_length=20)
+    registros_por_archivo: int | None = Field(
+        default=None,
+        ge=1,
+        le=REGISTROS_POR_ARCHIVO,
+        description="Filas por archivo (RF-MM-11); sin valor se conserva el actual",
+    )
+    bytes_por_archivo: int | None = Field(
+        default=None,
+        ge=BYTES_POR_ARCHIVO_MINIMO,
+        le=BYTES_POR_ARCHIVO,
+        description="Bytes por archivo (RF-MM-11); sin valor se conserva el actual",
+    )
 
 
 class ConfiguracionRespuesta(ModeloRespuesta):
     limite_mensual: int
     whatsapp_contacto: str | None
     actualizado_en: datetime | None
+    registros_por_archivo: int
+    bytes_por_archivo: int
 
 
 def _configuracion(configuracion: ConfiguracionMowaMes) -> ConfiguracionRespuesta:
@@ -71,6 +88,8 @@ def _configuracion(configuracion: ConfiguracionMowaMes) -> ConfiguracionRespuest
         limite_mensual=configuracion.limite_mensual,
         whatsapp_contacto=configuracion.whatsapp_contacto,
         actualizado_en=configuracion.actualizado_en,
+        registros_por_archivo=configuracion.registros_por_archivo,
+        bytes_por_archivo=configuracion.bytes_por_archivo,
     )
 
 
@@ -88,11 +107,21 @@ def guardar_configuracion(
     entrada: ConfiguracionEntrada,
     servicio: ConfiguracionMowaMesService = Depends(obtener_servicio_mowa_mes),
 ) -> ConfiguracionRespuesta:
-    """Limite mensual (RF-MM-01) y WhatsApp de contacto por defecto (RF-MM-16), que sigue RF-02."""
+    """Limite mensual (RF-MM-01), WhatsApp de contacto (RF-MM-16) y limites por archivo.
+
+    Los limites por archivo son opcionales y solo pueden bajar del maximo de la plataforma.
+    """
+    actual = servicio.obtener_configuracion()
     try:
         return _configuracion(
             servicio.guardar_configuracion(
-                ConfiguracionMowaMes(entrada.limite_mensual, entrada.whatsapp_contacto)
+                ConfiguracionMowaMes(
+                    limite_mensual=entrada.limite_mensual,
+                    whatsapp_contacto=entrada.whatsapp_contacto,
+                    registros_por_archivo=entrada.registros_por_archivo
+                    or actual.registros_por_archivo,
+                    bytes_por_archivo=entrada.bytes_por_archivo or actual.bytes_por_archivo,
+                )
             )
         )
     except ConfiguracionInvalida as exc:

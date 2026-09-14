@@ -295,5 +295,16 @@
   "mowaMes.speech.resumen.excede.uno": "1 segment is longer than 160 characters.",
   "mowaMes.speech.resumen.excede": "{n} segments are longer than 160 characters.",
   "mowaMes.speech.resumen.advertencia.uno": "1 segment is longer than 150 characters.",
-  "mowaMes.speech.resumen.advertencia": "{n} segments are longer than 150 characters."
+  "mowaMes.speech.resumen.advertencia": "{n} segments are longer than 150 characters.",
+  "mowaMes.codigo.id_sin_correspondencia": "A MES id in the report matches no loaded row of this campaign: it probably belongs to another one.",
+  "mowaMes.codigo.falta_whatsapp": "A segment with products uses [whatsapp] and there is no contact WhatsApp number.",
+  "mowaMes.codigo.sin_supervisores": "The campaign has no supervisors: it cannot be created without them.",
+  "mowaMes.codigo.sin_productos_cargables": "No product made it into the load: there is nothing to send.",
+  "mowaMes.codigo.documento_no_estandar": "The document is neither a DNI nor a RUC: it is loaded anyway, but it is worth checking.",
+  "mowaMes.plataforma.registros": "Rows per file",
+  "mowaMes.plataforma.registros.hint": "Up to {max} rows per file; supervision counts within the first one.",
+  "mowaMes.plataforma.registros.rango": "Rows per file range from 1 to 50,000.",
+  "mowaMes.plataforma.bytes": "Maximum size per file (bytes)",
+  "mowaMes.plataforma.bytes.hint": "Between {min} and {max} bytes. Now: {actual}.",
+  "mowaMes.plataforma.bytes.rango": "Size per file ranges from 100,000 to 2,000,000 bytes."
 }

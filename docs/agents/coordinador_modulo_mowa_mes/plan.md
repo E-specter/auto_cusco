@@ -129,6 +129,12 @@ Frontend: F1 (hecho vía designer) │                                          
 - **C-5:** cada `id` se asocia a la campaña elegida, con su conteo por separado. Un `id` que no coincide con ninguna fila cargada de la campaña se advierte.
 - **C-6:** los archivos se guardan en PostgreSQL.
 
+**Decisiones del usuario del 2026-09-14 (vía `architec`):**
+
+- **E-1:** enviados = filas emparejadas con estado `enviado`. Cualquier otro estado cuenta como cargado no enviado y va en `por_estado`.
+- **E-2:** un documento que no sea DNI (8) ni RUC (11) se carga igual y se advierte con el código `documento_no_estandar` y su cantidad. No es exclusión. El catálogo pasa a 13 códigos.
+- **S-MM-7 y S-MM-8:** confirmados.
+
 Consultas originales:
 
 | ID | Pregunta | Propuesta del coordinador | Bloquea |

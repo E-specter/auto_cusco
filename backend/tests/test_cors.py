@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.archivos_carga import CABECERAS_RESUMEN
+from app.api.mowa_mes_campanas import CABECERAS_ARCHIVO
 from app.core.config import Settings
 from app.main import app, configurar_cors
 
@@ -61,7 +62,7 @@ def test_el_navegador_puede_leer_el_nombre_y_el_resumen_de_la_descarga() -> None
     respuesta = _cliente_con_cors([ORIGEN]).get("/prueba", headers={"Origin": ORIGEN})
 
     expuestas = {c.strip() for c in respuesta.headers["access-control-expose-headers"].split(",")}
-    assert expuestas == {"Content-Disposition", *CABECERAS_RESUMEN}
+    assert expuestas == {"Content-Disposition", *CABECERAS_RESUMEN, *CABECERAS_ARCHIVO}
 
 
 def test_los_origenes_se_leen_separados_por_comas() -> None:

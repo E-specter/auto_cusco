@@ -32,6 +32,7 @@ from app.core.entities.cartera import Filtro, Operador, Orden
 from app.core.entities.mapeo import CampoSalida, DefinicionCarga, TipoSalida
 from app.core.services.generacion_cargas import servicio as generacion
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService
+from app.core.services.seleccion_cartera import recorrido
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
 from app.main import app
 from tests.test_sabana_cabeceras import CABECERAS_10_09
@@ -185,7 +186,7 @@ def test_la_paginacion_real_no_repite_ni_salta_productos(generador, monkeypatch)
     servicio, _ = generador
     # Se achica la pagina en vez de ingestar miles de filas: lo que se prueba es
     # el LIMIT/OFFSET real y el desempate por pagare, no el tamano del lote.
-    monkeypatch.setattr(generacion, "LIMITE_MAXIMO", 2)
+    monkeypatch.setattr(recorrido, "LIMITE_MAXIMO", 2)
     desplazamientos = _espiar_paginas(monkeypatch)
 
     resultado = servicio.generar(FECHA, DEFINICION, cantidad=5)

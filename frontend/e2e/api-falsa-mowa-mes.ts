@@ -174,18 +174,12 @@ export interface ApiFalsaMowaMes {
   pedidos: Array<{ metodo: string; ruta: string; cuerpo: unknown }>;
 }
 
-/**
- * Per-file limits (RF-MM-11) that the configuration gains with B6b. Spread from
- * a constant rather than written in the literal, so this fake compiles against
- * the contract both before and after that cut lands.
- */
-const LIMITES_POR_ARCHIVO = { registros_por_archivo: 50_000, bytes_por_archivo: 2_000_000 };
-
 export function apiMowaMes(): ApiFalsaMowaMes {
   return {
     configuracion: {
-      ...LIMITES_POR_ARCHIVO,
       limite_mensual: 2_500_000,
+      registros_por_archivo: 50_000,
+      bytes_por_archivo: 2_000_000,
       whatsapp_contacto: '900000999',
       actualizado_en: '2026-09-13T10:00:00-05:00',
     },

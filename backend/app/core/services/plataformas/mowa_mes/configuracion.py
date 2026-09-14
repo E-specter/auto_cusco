@@ -8,6 +8,9 @@ dos crea una version nueva.
 import re
 
 from app.core.entities.mowa_mes import (
+    BYTES_POR_ARCHIVO,
+    BYTES_POR_ARCHIVO_MINIMO,
+    REGISTROS_POR_ARCHIVO,
     ConfiguracionInvalida,
     ConfiguracionMowaMes,
     DatosSpeech,
@@ -52,9 +55,21 @@ class ConfiguracionMowaMesService:
             raise ConfiguracionInvalida(
                 "El WhatsApp de contacto debe tener 9 digitos y empezar con 9"
             )
+        if not 1 <= configuracion.registros_por_archivo <= REGISTROS_POR_ARCHIVO:
+            raise ConfiguracionInvalida(
+                f"Las filas por archivo deben estar entre 1 y {REGISTROS_POR_ARCHIVO}"
+            )
+        if not BYTES_POR_ARCHIVO_MINIMO <= configuracion.bytes_por_archivo <= BYTES_POR_ARCHIVO:
+            raise ConfiguracionInvalida(
+                f"Los bytes por archivo deben estar entre {BYTES_POR_ARCHIVO_MINIMO} y "
+                f"{BYTES_POR_ARCHIVO}"
+            )
         return self._repositorio.guardar_configuracion(
             ConfiguracionMowaMes(
-                limite_mensual=configuracion.limite_mensual, whatsapp_contacto=whatsapp
+                limite_mensual=configuracion.limite_mensual,
+                whatsapp_contacto=whatsapp,
+                registros_por_archivo=configuracion.registros_por_archivo,
+                bytes_por_archivo=configuracion.bytes_por_archivo,
             )
         )
 

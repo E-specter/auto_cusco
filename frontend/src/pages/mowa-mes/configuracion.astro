@@ -64,6 +64,40 @@ import '../../styles/mowa-mes.css';
             </div>
 
             <div class="field">
+              <label class="field__label" for="mm-registros" data-i18n="mowaMes.plataforma.registros">Filas por archivo</label>
+              <input
+                class="input"
+                id="mm-registros"
+                name="registros_por_archivo"
+                type="number"
+                inputmode="numeric"
+                min="1"
+                max="50000"
+                step="1"
+                required
+                aria-describedby="mm-registros-hint"
+              />
+              <p class="field__hint" id="mm-registros-hint" data-registros-hint></p>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="mm-bytes" data-i18n="mowaMes.plataforma.bytes">Tamaño máximo por archivo (bytes)</label>
+              <input
+                class="input"
+                id="mm-bytes"
+                name="bytes_por_archivo"
+                type="number"
+                inputmode="numeric"
+                min="100000"
+                max="2000000"
+                step="1"
+                required
+                aria-describedby="mm-bytes-hint"
+              />
+              <p class="field__hint" id="mm-bytes-hint" data-bytes-hint></p>
+            </div>
+
+            <div class="field">
               <label class="field__label" for="mm-whatsapp" data-i18n="mowaMes.plataforma.whatsapp">WhatsApp de contacto</label>
               <input
                 class="input"
@@ -364,7 +398,7 @@ import '../../styles/mowa-mes.css';
     type VersionSpeech,
   } from '../../lib/api-mowa-mes';
   import { openWhenFree } from '../../lib/dialogs';
-  import { formatDate, formatDateTime, formatNumber, parseApiDate } from '../../lib/format';
+  import { formatBytes, formatDate, formatDateTime, formatNumber, parseApiDate } from '../../lib/format';
   import { applyTranslations, locale, t } from '../../lib/i18n';
   import {
     accionDia,
@@ -379,7 +413,10 @@ import '../../styles/mowa-mes.css';
     rangoSegmento,
     renombrarProcedencia,
     resumenNiveles,
+    RANGOS_CONFIGURACION,
+    problemasConfiguracion,
     supervisionCambio,
+    type CampoConfiguracion,
     traducirCodigo,
     type BorradorSupervision,
     type ProblemaSupervision,
@@ -473,12 +510,26 @@ import '../../styles/mowa-mes.css';
 
   const formPlataforma = $<HTMLFormElement>('[data-form-plataforma]');
   const inputLimite = $<HTMLInputElement>('#mm-limite');
+  const inputRegistros = $<HTMLInputElement>('#mm-registros');
+  const inputBytes = $<HTMLInputElement>('#mm-bytes');
   const inputWhatsapp = $<HTMLInputElement>('#mm-whatsapp');
+  const controlesPlataforma: Record<CampoConfiguracion, HTMLInputElement> = {
+    limite_mensual: inputLimite,
+    registros_por_archivo: inputRegistros,
+    bytes_por_archivo: inputBytes,
+  };
+  const ERROR_DE_CAMPO: Record<CampoConfiguracion, string> = {
+    limite_mensual: 'mowaMes.plataforma.limite.rango',
+    registros_por_archivo: 'mowaMes.plataforma.registros.rango',
+    bytes_por_archivo: 'mowaMes.plataforma.bytes.rango',
+  };
 
   function pintarPlataforma(): void {
     const config = estado.configuracion;
     if (!config) return;
     inputLimite.value = String(config.limite_mensual);
+    inputRegistros.value = String(config.registros_por_archivo);
+    inputBytes.value = String(config.bytes_por_archivo);
     inputWhatsapp.value = config.whatsapp_contacto ?? '';
     pintarMetaPlataforma();
   }
@@ -489,6 +540,15 @@ import '../../styles/mowa-mes.css';
     $<HTMLElement>('[data-limite-hint]').textContent = Number.isInteger(limite) && limite > 0
       ? t('mowaMes.plataforma.limite.hint', { n: formatNumber(limite) })
       : t('mowaMes.plataforma.limite.rango');
+    $<HTMLElement>('[data-registros-hint]').textContent = t('mowaMes.plataforma.registros.hint', {
+      max: formatNumber(RANGOS_CONFIGURACION.registros_por_archivo.maximo),
+    });
+    const bytes = Number(inputBytes.value);
+    $<HTMLElement>('[data-bytes-hint]').textContent = t('mowaMes.plataforma.bytes.hint', {
+      min: formatNumber(RANGOS_CONFIGURACION.bytes_por_archivo.minimo),
+      max: formatNumber(RANGOS_CONFIGURACION.bytes_por_archivo.maximo),
+      actual: Number.isInteger(bytes) && bytes > 0 ? formatBytes(bytes) : '—',
+    });
     $<HTMLElement>('[data-plataforma-meta]').textContent = config?.actualizado_en
       ? t('mowaMes.actualizado', { fecha: formatDateTime(config.actualizado_en) })
       : '';
@@ -497,14 +557,16 @@ import '../../styles/mowa-mes.css';
 
   function limpiarErrorPlataforma(): void {
     $<HTMLElement>('[data-plataforma-error]').textContent = '';
-    [inputLimite, inputWhatsapp].forEach((control) => {
+    [inputLimite, inputRegistros, inputBytes, inputWhatsapp].forEach((control) => {
       control.removeAttribute('aria-invalid');
     });
   }
 
-  inputLimite.addEventListener('input', () => {
-    limpiarErrorPlataforma();
-    pintarMetaPlataforma();
+  [inputLimite, inputRegistros, inputBytes].forEach((control) => {
+    control.addEventListener('input', () => {
+      limpiarErrorPlataforma();
+      pintarMetaPlataforma();
+    });
   });
   inputWhatsapp.addEventListener('input', limpiarErrorPlataforma);
 
@@ -513,11 +575,15 @@ import '../../styles/mowa-mes.css';
     limpiarErrorPlataforma();
     const error = $<HTMLElement>('[data-plataforma-error]');
 
-    const limite = Number(inputLimite.value);
-    if (!inputLimite.value || !Number.isInteger(limite) || limite < 1 || limite > 1_000_000_000) {
-      error.textContent = t('mowaMes.plataforma.limite.rango');
-      inputLimite.setAttribute('aria-invalid', 'true');
-      inputLimite.focus();
+    const invalidos = problemasConfiguracion({
+      limite_mensual: inputLimite.value,
+      registros_por_archivo: inputRegistros.value,
+      bytes_por_archivo: inputBytes.value,
+    });
+    if (invalidos.length > 0) {
+      error.textContent = invalidos.map((campo) => t(ERROR_DE_CAMPO[campo])).join(' ');
+      invalidos.forEach((campo) => controlesPlataforma[campo].setAttribute('aria-invalid', 'true'));
+      controlesPlataforma[invalidos[0]].focus();
       return;
     }
 
@@ -526,7 +592,9 @@ import '../../styles/mowa-mes.css';
     ocupado(guardar, true);
     try {
       estado.configuracion = await guardarConfiguracion({
-        limite_mensual: limite,
+        limite_mensual: Number(inputLimite.value.trim()),
+        registros_por_archivo: Number(inputRegistros.value.trim()),
+        bytes_por_archivo: Number(inputBytes.value.trim()),
         whatsapp_contacto: whatsapp === '' ? null : whatsapp,
       });
       pintarPlataforma();

@@ -63,12 +63,15 @@ class Programacion(StrEnum):
 class TipoCodigo(StrEnum):
     EXCLUSION = "exclusion"
     ADVERTENCIA = "advertencia"
+    ERROR = "error"
 
 
 class CodigoMowaMes(StrEnum):
-    """Motivos de exclusion y advertencias, en el orden en que se evaluan.
+    """Catalogo de codigos que el frontend traduce como `mowaMes.codigo.<codigo>`.
 
-    Un producto excluido lleva un solo motivo: el primero que falla en este orden.
+    Las exclusiones van en el orden en que se evaluan: un producto excluido lleva
+    un solo motivo, el primero que falla. Un codigo por linea, con la forma
+    `NOMBRE = "codigo"`: la prueba espejo del frontend lee esta clase.
     """
 
     TELEFONO_INVALIDO = "telefono_invalido"
@@ -78,7 +81,12 @@ class CodigoMowaMes(StrEnum):
     FALTA_VENCIMIENTO = "falta_vencimiento"
     MENSAJE_EXCEDE_160 = "mensaje_excede_160"
     MENSAJE_EXCEDE_150 = "mensaje_excede_150"
+    DOCUMENTO_NO_ESTANDAR = "documento_no_estandar"
     LIMITE_MENSUAL_EXCEDIDO = "limite_mensual_excedido"
+    ID_SIN_CORRESPONDENCIA = "id_sin_correspondencia"
+    FALTA_WHATSAPP = "falta_whatsapp"
+    SIN_SUPERVISORES = "sin_supervisores"
+    SIN_PRODUCTOS_CARGABLES = "sin_productos_cargables"
 
 
 TIPO_CODIGO: dict[CodigoMowaMes, TipoCodigo] = {
@@ -89,8 +97,18 @@ TIPO_CODIGO: dict[CodigoMowaMes, TipoCodigo] = {
     CodigoMowaMes.FALTA_VENCIMIENTO: TipoCodigo.EXCLUSION,
     CodigoMowaMes.MENSAJE_EXCEDE_160: TipoCodigo.EXCLUSION,
     CodigoMowaMes.MENSAJE_EXCEDE_150: TipoCodigo.ADVERTENCIA,
+    CodigoMowaMes.DOCUMENTO_NO_ESTANDAR: TipoCodigo.ADVERTENCIA,
     CodigoMowaMes.LIMITE_MENSUAL_EXCEDIDO: TipoCodigo.ADVERTENCIA,
+    CodigoMowaMes.ID_SIN_CORRESPONDENCIA: TipoCodigo.ADVERTENCIA,
+    CodigoMowaMes.FALTA_WHATSAPP: TipoCodigo.ERROR,
+    CodigoMowaMes.SIN_SUPERVISORES: TipoCodigo.ERROR,
+    CodigoMowaMes.SIN_PRODUCTOS_CARGABLES: TipoCodigo.ERROR,
 }
+
+# RF-MM-11. Son el maximo de la plataforma: la configuracion solo puede bajarlos.
+REGISTROS_POR_ARCHIVO = 50_000
+BYTES_POR_ARCHIVO = 2_000_000  # 2 MB, lectura conservadora
+BYTES_POR_ARCHIVO_MINIMO = 100_000
 
 
 @dataclass(frozen=True)
@@ -100,6 +118,8 @@ class ConfiguracionMowaMes:
     limite_mensual: int
     whatsapp_contacto: str | None
     actualizado_en: datetime | None = None
+    registros_por_archivo: int = REGISTROS_POR_ARCHIVO
+    bytes_por_archivo: int = BYTES_POR_ARCHIVO
 
 
 @dataclass(frozen=True)

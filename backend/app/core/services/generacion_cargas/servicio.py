@@ -9,19 +9,18 @@ El resultado se entrega como `Tabla`, lista para que un exportador la escriba
 en XLSX, CSV o JSON (RF-13). Este servicio no elige el formato.
 """
 
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
-from typing import Any
 
 from app.core.entities.cartera import ConsultaInvalida, Filtro, Orden
 from app.core.entities.exportacion import Tabla
 from app.core.entities.mapeo import DefinicionCarga, ErrorGeneracion
 from app.core.services.mapeo_campos.generador import GeneradorCargas
 from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA
+from app.core.services.seleccion_cartera.recorrido import SeleccionPaginada
 from app.core.services.seleccion_cartera.servicio import (
     CANTIDAD_MAXIMA,
-    LIMITE_MAXIMO,
     ConsultaCarteraService,
 )
 
@@ -69,58 +68,11 @@ class GeneracionCargasService:
         # Compilar antes de consultar: una plantilla mal escrita se rechaza sin
         # haber tocado la base de datos.
         generador = GeneradorCargas(definicion, CAMPOS_CARTERA)
-        seleccion = _SeleccionPaginada(self._consulta, fecha_corte, filtros, orden, cantidad)
+        seleccion = SeleccionPaginada(self._consulta, fecha_corte, filtros, orden, cantidad)
         carga = generador.generar(seleccion)
         return ResultadoGeneracion(
             tabla=Tabla(nombre=definicion.nombre, cabeceras=carga.cabeceras, filas=carga.filas),
             disponibles=seleccion.disponibles,
             solicitados=cantidad,
             errores=carga.errores,
-        )
-
-
-class _SeleccionPaginada:
-    """Recorre la seleccion en paginas del tamano que admite la consulta.
-
-    La consulta ya ordena con un desempate estable por pagare, asi que paginar
-    no repite ni salta productos.
-    """
-
-    def __init__(
-        self,
-        consulta: ConsultaCarteraService,
-        fecha_corte: date,
-        filtros: Sequence[Filtro],
-        orden: Orden | None,
-        cantidad: int,
-    ) -> None:
-        self._consulta = consulta
-        self._fecha_corte = fecha_corte
-        self._filtros = tuple(filtros)
-        self._orden = orden
-        self._cantidad = cantidad
-        # Primera pagina por adelantado: valida la consulta y deja el total
-        # disponible a la vista antes de generar nada.
-        self._primera = self._pagina(desplazamiento=0)
-        self.disponibles: int = self._primera.total
-
-    def __iter__(self) -> Iterator[Mapping[str, Any]]:
-        entregados = 0
-        pagina = self._primera
-        while pagina.filas:
-            for fila in pagina.filas:
-                yield fila
-                entregados += 1
-            if entregados >= min(self._cantidad, self.disponibles):
-                return
-            pagina = self._pagina(desplazamiento=entregados)
-
-    def _pagina(self, desplazamiento: int):
-        limite = min(self._cantidad - desplazamiento, LIMITE_MAXIMO)
-        return self._consulta.consultar(
-            self._fecha_corte,
-            self._filtros,
-            self._orden,
-            limite=max(limite, 1),
-            desplazamiento=desplazamiento,
         )
