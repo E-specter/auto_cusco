@@ -1,0 +1,319 @@
+/*
+ * MOWA MES connector screens.
+ *
+ * Global for the same reason as console.css: supervisor rows, speech parts
+ * and calendar days are built by the page script at runtime. Every class is
+ * prefixed `mm` so nothing here reaches another screen.
+ */
+
+.mm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-inline-size: var(--shell-max);
+  margin-inline: auto;
+  padding: var(--space-4) var(--shell-gutter) var(--space-6);
+}
+
+.mm__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.mm__title {
+  font-size: var(--text-lg);
+  font-weight: 800;
+  line-height: var(--leading-heading);
+  letter-spacing: var(--tracking-heading);
+  text-wrap: balance;
+}
+
+.mm__intro {
+  max-inline-size: 70ch;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.mm__contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.mm__grid {
+  display: grid;
+  align-items: start;
+  gap: var(--space-4);
+}
+
+@media (min-width: 64rem) {
+  /* The golden split: the short settings on the narrow side, the list that
+     grows on the wide one. */
+  .mm__grid {
+    grid-template-columns: var(--phi-minor) 1fr;
+  }
+}
+
+.mm__grid > .panel {
+  min-inline-size: 0;
+}
+
+.mm__meta {
+  font-size: var(--text-xs);
+}
+
+/* ---- Forms inside panels ------------------------------------------------- */
+
+.mm-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+.mm-form__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.mm-form__foot > p:empty {
+  display: none;
+}
+
+.mm-grupo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  padding: 0;
+  border: 0;
+}
+
+.mm-grupo > :not(legend, button) {
+  align-self: stretch;
+}
+
+.mm-grupo > legend {
+  margin-block-end: var(--space-1);
+}
+
+/* ---- Ordered procedencias --------------------------------------------------- */
+
+.mm-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.mm-fila {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mm-fila__orden {
+  min-inline-size: 2ch;
+  text-align: end;
+}
+
+.mm-fila__acciones {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.mm-fila > .mm-fila__acciones {
+  grid-column: 2;
+}
+
+@media (min-width: 48rem) {
+  .mm-fila {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .mm-fila > .mm-fila__acciones {
+    grid-column: auto;
+  }
+}
+
+/* A move that cannot happen keeps its slot, so the row's buttons stay aligned. */
+.mm-mover:disabled {
+  visibility: hidden;
+}
+
+/* ---- Supervisors table ------------------------------------------------------- */
+
+.mm-supervisores__tabla td {
+  vertical-align: middle;
+}
+
+.mm-supervisores__tabla .input {
+  min-inline-size: 11ch;
+}
+
+.mm-supervisores__numero {
+  inline-size: 14ch;
+}
+
+/* ---- Speech ------------------------------------------------------------------ */
+
+.mm-speech__version {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mm-speech__version .input {
+  min-inline-size: 16ch;
+}
+
+.mm-speech__tabla {
+  table-layout: fixed;
+  min-inline-size: 56rem;
+}
+
+/* The status column carries the worst-case example too, so it takes a share
+   of the width the two parts used to split. */
+.mm-speech__tabla th:nth-child(1) { inline-size: 12%; }
+.mm-speech__tabla th:nth-child(2) { inline-size: 26%; }
+.mm-speech__tabla th:nth-child(3) { inline-size: 26%; }
+.mm-speech__tabla th:nth-child(4) { inline-size: 8%; }
+.mm-speech__tabla th:nth-child(5) { inline-size: 28%; }
+
+.mm-speech__tabla tbody th,
+.mm-speech__tabla tbody td {
+  vertical-align: top;
+}
+
+.mm-speech__segmento {
+  display: block;
+  font-weight: 700;
+}
+
+.mm-speech__rango {
+  display: block;
+  font-size: var(--text-xs);
+}
+
+.mm-speech__parte {
+  inline-size: 100%;
+  resize: vertical;
+  /* Spaces at the edges are message text; a visible field keeps them honest. */
+  white-space: pre-wrap;
+}
+
+.mm-speech__largo {
+  font-weight: 700;
+}
+
+.mm-speech__tabla tr[data-nivel-largo='advertencia'] .mm-speech__largo {
+  color: var(--color-warning-text);
+}
+
+.mm-speech__tabla tr[data-nivel-largo='excede'] .mm-speech__largo,
+.mm-speech__tabla tr[data-nivel-largo='falta_whatsapp'] .mm-speech__largo {
+  color: var(--color-danger-text);
+}
+
+.mm-speech__nivel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.mm-speech__detalle {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* The worst-case example, at the hint scale, under the segment's status. */
+.mm-speech__ejemplo {
+  margin-block-start: var(--space-2);
+  font-size: var(--text-xs);
+  line-height: var(--leading-data);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.mm-speech__ejemplo:empty {
+  display: none;
+}
+
+/* Secondary lines read at the scale of the project's field hints. */
+.mm-nota,
+.mm-speech__calculo {
+  font-size: var(--text-xs);
+  line-height: var(--leading-data);
+}
+
+.mm-speech__resumen {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.mm-speech__resumen:empty {
+  display: none;
+}
+
+.mm-form[data-calculando='true'] .mm-speech__largo {
+  opacity: 0.55;
+}
+
+.mm-speech__calculo:empty {
+  display: none;
+}
+
+.mm-speech__foot {
+  align-items: flex-end;
+}
+
+.mm-speech__nombre {
+  flex: 1 1 16rem;
+  max-inline-size: 28rem;
+}
+
+.mm-problemas {
+  margin-block-start: var(--space-1);
+  padding-inline-start: var(--space-4);
+}
+
+/* ---- Calendar ----------------------------------------------------------------- */
+
+.mm-calendario__anio {
+  gap: var(--space-1);
+}
+
+.mm-calendario__valor {
+  min-inline-size: 5ch;
+  text-align: center;
+  font-weight: 700;
+}
+
+.mm-calendario__siguiente {
+  font-size: var(--text-sm);
+}
+
+.mm-calendario__siguiente:empty {
+  display: none;
+}
+
+.mm-calendario__tabla td:nth-child(2) {
+  text-transform: capitalize;
+}
+
+/* A withdrawn holiday still reads, struck through, so the year's exception is
+   visible where the holiday would have been. */
+.mm-calendario__tabla tr[data-retirado='true'] .mm-calendario__descripcion {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
