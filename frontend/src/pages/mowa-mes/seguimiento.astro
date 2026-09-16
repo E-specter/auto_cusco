@@ -1,0 +1,1006 @@
+---
+/**
+ * MOWA MES follow-up (T-MM-F3): what happened after a campaign was generated.
+ * The month's consumption of the SMS limit, the campaigns with their files and
+ * exclusions, and the sent report MES returns, reconciled against the load.
+ *
+ * "Sent" is only what MES reports with status "enviado" (decision E-1). The
+ * per-id match count says whether an id belongs to the campaign, never how
+ * much was sent, so the screen never labels it as sent.
+ */
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import '../../styles/mowa-mes.css';
+---
+
+<Shell
+  title="Seguimiento de MOWA MES — auto_cusco"
+  description="Campañas generadas para MOWA MES, sus archivos y exclusiones, la conciliación del reporte de enviados y el consumo del límite mensual."
+>
+  <div class="mm">
+    <header class="mm__head">
+      <p class="eyebrow" data-i18n="mowaMes.eyebrow">Canales · MOWA MES</p>
+      <h1 class="mm__title" data-i18n="mowaMes.seguimiento.title">Seguimiento de MOWA MES</h1>
+      <p class="mm__intro" data-i18n="mowaMes.seguimiento.intro">
+        Las campañas generadas, sus archivos, el reporte de enviados que devuelve MES y el consumo del límite mensual.
+      </p>
+    </header>
+
+    <section class="standIn" data-offline hidden aria-labelledby="mm-offline-title">
+      <h2 class="standIn__title" id="mm-offline-title" data-i18n="console.offline.title">Sin conexión con la API</h2>
+      <p class="standIn__body" data-i18n="console.offline.body">
+        No se pudo contactar con el backend. Comprueba que esté en marcha y vuelve a intentarlo.
+      </p>
+      <button type="button" class="btn btn--primary" data-reintentar>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span class="btn__label" data-i18n="console.offline.retry">Reintentar</span>
+      </button>
+    </section>
+
+    <div class="mm__contenido" data-contenido hidden>
+      <!-- ---- Monthly SMS limit (RF-MM-01) ---------------------------------- -->
+      <section class="panel" aria-labelledby="mm-limite-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="mm-limite-title" data-i18n="mowaMes.seguimiento.limite.title">Límite mensual</h2>
+          <div class="row mm-mes">
+            <button
+              type="button"
+              class="btn btn--sm btn--icon"
+              data-mes-anterior
+              data-i18n-attr="aria-label:mowaMes.seguimiento.limite.anterior,title:mowaMes.seguimiento.limite.anterior"
+              aria-label="Mes anterior"
+              title="Mes anterior"
+            >
+              <Icon name="chevron-left" size={16} />
+            </button>
+            <output class="mono mm-mes__valor" data-mes aria-live="polite"></output>
+            <button
+              type="button"
+              class="btn btn--sm btn--icon"
+              data-mes-siguiente
+              data-i18n-attr="aria-label:mowaMes.seguimiento.limite.siguiente,title:mowaMes.seguimiento.limite.siguiente"
+              aria-label="Mes siguiente"
+              title="Mes siguiente"
+            >
+              <Icon name="chevron-right" size={16} />
+            </button>
+          </div>
+        </div>
+        <div class="panel__body mm-form">
+          <dl class="mm-cifras" data-limite-cifras></dl>
+          <p class="notice notice--danger" data-limite-excedido hidden>
+            <Icon name="triangle-alert" size={20} />
+            <span data-limite-excedido-texto></span>
+          </p>
+          <p class="field__hint" data-i18n="mowaMes.seguimiento.limite.nota">
+            Cada campaña cuenta en el mes de su fecha de envío, con productos y supervisión.
+          </p>
+        </div>
+      </section>
+
+      <!-- ---- Campaigns ------------------------------------------------------ -->
+      <section class="panel" aria-labelledby="mm-campanas-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="mm-campanas-title" data-i18n="mowaMes.seguimiento.campanas.title">Campañas</h2>
+          <p class="mono muted mm-nota" data-campanas-cuenta aria-live="polite"></p>
+        </div>
+        <div data-campanas>
+          <p class="empty" data-i18n="common.loading">Cargando</p>
+        </div>
+        <div class="mm-pager" data-campanas-pager hidden>
+          <button type="button" class="btn btn--sm" data-anterior>
+            <Icon name="chevron-left" size={16} />
+            <span data-i18n="console.incidencias.prev">Anteriores</span>
+          </button>
+          <p class="mono muted" data-rango></p>
+          <button type="button" class="btn btn--sm" data-siguiente>
+            <span data-i18n="console.incidencias.next">Siguientes</span>
+            <Icon name="chevron-right" size={16} />
+          </button>
+        </div>
+      </section>
+
+      <!-- ---- Selected campaign -------------------------------------------- -->
+      <section class="panel" aria-labelledby="mm-detalle-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="mm-detalle-title" data-detalle-titulo data-i18n="mowaMes.seguimiento.detalle.titleNinguna">
+            Detalle de la campaña
+          </h2>
+          <p class="mono muted mm-nota" data-detalle-meta></p>
+        </div>
+
+        <div class="panel__body">
+          <p class="empty" data-detalle-vacio data-i18n="mowaMes.seguimiento.detalle.vacio">
+            Elige una campaña para ver su detalle.
+          </p>
+
+          <div class="mm-detalle" data-detalle-cuerpo hidden>
+            <dl class="mm-cifras" data-detalle-cifras></dl>
+
+            <h3 class="mm-subtitulo" data-i18n="mowaMes.seguimiento.archivos.title">Archivos de carga</h3>
+            <div data-archivos></div>
+            <p class="mono muted mm-nota" data-descarga-estado role="status"></p>
+
+            <h3 class="mm-subtitulo" data-i18n="mowaMes.seguimiento.reporte.title">Reporte de enviados</h3>
+            <form class="mm-form" data-form-reporte novalidate>
+              <p class="field__hint" data-i18n="mowaMes.seguimiento.reporte.intro">
+                Sube el reporte que descargas de MES para esta campaña. Cada id de MES del archivo queda asociado a ella.
+              </p>
+              <div class="field">
+                <span class="field__label" id="mm-reporte-label" data-i18n="mowaMes.seguimiento.reporte.archivo">
+                  Archivo del reporte
+                </span>
+                <div class="filepick">
+                  <input
+                    class="filepick__input"
+                    id="mm-reporte"
+                    name="archivo"
+                    type="file"
+                    accept=".xlsx"
+                    aria-labelledby="mm-reporte-label"
+                    aria-describedby="mm-reporte-hint"
+                  />
+                  <label class="filepick__button" for="mm-reporte" data-i18n="mowaMes.seguimiento.reporte.elegir">
+                    Elegir archivo
+                  </label>
+                  <span class="filepick__name mono" data-reporte-nombre data-i18n="mowaMes.seguimiento.reporte.sinArchivo">
+                    Ningún archivo elegido
+                  </span>
+                </div>
+                <p class="field__hint" id="mm-reporte-hint" data-i18n="mowaMes.seguimiento.reporte.hint">
+                  El .xlsx que descargas de MES, hasta 32 MB.
+                </p>
+              </div>
+              <p class="field__error" id="mm-reporte-error" data-reporte-error role="alert"></p>
+              <div class="mm-form__foot">
+                <button type="submit" class="btn btn--primary" data-reporte-importar>
+                  <span class="btn__spinner" aria-hidden="true"></span>
+                  <span class="btn__label" data-i18n="mowaMes.seguimiento.reporte.importar">Importar reporte</span>
+                </button>
+                <p class="mono muted" data-reporte-estado role="status"></p>
+              </div>
+            </form>
+
+            <h3 class="mm-subtitulo" data-i18n="mowaMes.seguimiento.conciliacion.title">Conciliación</h3>
+            <div class="mm-detalle" data-conciliacion></div>
+
+            <h3 class="mm-subtitulo" data-i18n="mowaMes.seguimiento.exclusiones.title">Exclusiones</h3>
+            <div class="mm-exclusiones__controles">
+              <label class="field__label" for="mm-exclusiones-filtro" data-i18n="mowaMes.seguimiento.exclusiones.filtro">Motivo</label>
+              <select class="input" id="mm-exclusiones-filtro" data-exclusiones-filtro></select>
+              <p class="mono muted mm-nota" data-exclusiones-cuenta aria-live="polite"></p>
+            </div>
+            <div data-exclusiones></div>
+            <div class="mm-pager" data-exclusiones-pager hidden>
+              <button type="button" class="btn btn--sm" data-anterior>
+                <Icon name="chevron-left" size={16} />
+                <span data-i18n="console.incidencias.prev">Anteriores</span>
+              </button>
+              <p class="mono muted" data-rango></p>
+              <button type="button" class="btn btn--sm" data-siguiente>
+                <span data-i18n="console.incidencias.next">Siguientes</span>
+                <Icon name="chevron-right" size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ---- A MES id already imported: replace it? ------------------------ -->
+  <dialog class="dialog" data-dialog="reemplazar" aria-labelledby="mm-reemplazar-title">
+    <div class="dialog__head">
+      <div>
+        <h2 id="mm-reemplazar-title" data-i18n="mowaMes.seguimiento.reemplazar.title">Este reporte ya estaba importado</h2>
+        <p class="muted dialog__intro" data-i18n="mowaMes.seguimiento.reemplazar.body">
+          Si reemplazas, las filas de ese id de MES se sustituyen por las del archivo nuevo y la conciliación se recalcula.
+        </p>
+      </div>
+    </div>
+    <div class="dialog__body">
+      <p class="notice notice--warning">
+        <Icon name="triangle-alert" size={20} />
+        <span data-reemplazar-detalle></span>
+      </p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn" data-close data-reemplazar-cancelar data-i18n="mowaMes.seguimiento.reemplazar.cancelar">
+        No reemplazar
+      </button>
+      <button type="button" class="btn btn--danger" data-reemplazar-confirmar data-i18n="mowaMes.seguimiento.reemplazar.confirmar">
+        Reemplazar
+      </button>
+    </div>
+  </dialog>
+
+  <!-- ---- Generic failure ---------------------------------------------- -->
+  <dialog class="dialog" data-dialog="error" aria-labelledby="mm-error-title">
+    <div class="dialog__head">
+      <h2 id="mm-error-title" data-i18n="common.error">Algo salió mal</h2>
+    </div>
+    <div class="dialog__body">
+      <p class="notice notice--danger">
+        <Icon name="circle-alert" size={20} />
+        <span data-error-body></span>
+      </p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn btn--primary" data-close data-i18n="common.close">Cerrar</button>
+    </div>
+  </dialog>
+</Shell>
+
+<script>
+  import { ApiError, NetworkError } from '../../lib/api';
+  import {
+    consumoLimite,
+    descargarArchivoCampana,
+    importarReporte,
+    listarCampanas,
+    listarExclusiones,
+    obtenerConciliacion,
+    type ArchivoCampana,
+    type Campana,
+    type CodigoMowaMes,
+    type Conciliacion,
+    type ConsumoLimite,
+    type EstadoConteo,
+    type ListaCampanas,
+    type PaginaExclusiones,
+  } from '../../lib/api-mowa-mes';
+  import { guardarArchivo } from '../../lib/descargas';
+  import { openWhenFree } from '../../lib/dialogs';
+  import { formatBytes, formatDate, formatDateTime, formatNumber } from '../../lib/format';
+  import { applyTranslations, locale, t } from '../../lib/i18n';
+  import { traducirCodigo } from '../../lib/mowa-mes';
+  import {
+    CODIGOS_EXCLUSION,
+    filasConciliacion,
+    leerResumenDescarga,
+    mesDe,
+    moverMes,
+    nombreArchivo,
+    ordenarEstados,
+    rangoPagina,
+    usoDelLimite,
+  } from '../../lib/mowa-mes-seguimiento';
+
+  const POR_PAGINA_CAMPANAS = 20;
+  const POR_PAGINA_EXCLUSIONES = 50;
+
+  const $ = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
+
+  const estado = {
+    mes: mesDe(new Date()),
+    consumo: null as ConsumoLimite | null,
+    campanas: null as ListaCampanas | null,
+    desplazamientoCampanas: 0,
+    campanaId: null as number | null,
+    conciliacion: null as Conciliacion | null,
+    exclusiones: null as PaginaExclusiones | null,
+    codigo: '' as CodigoMowaMes | '',
+    desplazamientoExclusiones: 0,
+  };
+
+  const dialogos = {
+    reemplazar: $<HTMLDialogElement>('[data-dialog="reemplazar"]'),
+    error: $<HTMLDialogElement>('[data-dialog="error"]'),
+  };
+
+  document.querySelectorAll<HTMLElement>('[data-close]').forEach((boton) => {
+    boton.addEventListener('click', () => boton.closest('dialog')?.close());
+  });
+
+  // ---- Shared helpers -----------------------------------------------------------
+
+  function mensajeDeError(error: unknown): string {
+    if (error instanceof NetworkError) return t('console.upload.error.network');
+    if (error instanceof ApiError && error.detail) return error.detail;
+    return t('common.errorBody');
+  }
+
+  function mostrarError(error: unknown): void {
+    $<HTMLElement>('[data-error-body]').textContent = mensajeDeError(error);
+    void openWhenFree(dialogos.error);
+  }
+
+  function ocupado(boton: HTMLButtonElement, si: boolean): void {
+    boton.dataset.loading = String(si);
+    boton.disabled = si;
+  }
+
+  function avisar(nodo: HTMLElement, texto: string): void {
+    nodo.textContent = texto;
+    window.setTimeout(() => {
+      if (nodo.textContent === texto) nodo.textContent = '';
+    }, 4000);
+  }
+
+  function vacio(texto: string): HTMLElement {
+    const bloque = document.createElement('p');
+    bloque.className = 'empty';
+    bloque.textContent = texto;
+    return bloque;
+  }
+
+  function celda(etiqueta: 'td' | 'th', texto: string, clase = ''): HTMLTableCellElement {
+    const nodo = document.createElement(etiqueta);
+    nodo.textContent = texto;
+    if (clase) nodo.className = clase;
+    if (etiqueta === 'th') nodo.scope = 'row';
+    return nodo;
+  }
+
+  /** A dense table in its scroll container, headers from translation keys. */
+  function tabla(clase: string, columnas: Array<[string, boolean]>): { envoltorio: HTMLElement; cuerpo: HTMLTableSectionElement } {
+    const envoltorio = document.createElement('div');
+    envoltorio.className = 'table-scroll';
+    const nodo = document.createElement('table');
+    nodo.className = `table ${clase}`;
+    const cabeza = document.createElement('thead');
+    const fila = document.createElement('tr');
+    columnas.forEach(([clave, numerica]) => {
+      const th = document.createElement('th');
+      th.scope = 'col';
+      if (numerica) th.className = 'num';
+      th.textContent = t(clave);
+      fila.append(th);
+    });
+    cabeza.append(fila);
+    const cuerpo = document.createElement('tbody');
+    nodo.append(cabeza, cuerpo);
+    envoltorio.append(nodo);
+    return { envoltorio, cuerpo };
+  }
+
+  function cifra(etiqueta: string, valor: string): HTMLElement {
+    const bloque = document.createElement('div');
+    bloque.className = 'stat';
+    const nombre = document.createElement('dt');
+    nombre.className = 'stat__label';
+    nombre.textContent = etiqueta;
+    const numero = document.createElement('dd');
+    numero.className = 'stat__value';
+    numero.textContent = valor;
+    bloque.append(nombre, numero);
+    return bloque;
+  }
+
+  function textoEstados(estados: readonly EstadoConteo[]): string {
+    return estados.length === 0
+      ? '—'
+      : ordenarEstados(estados)
+          .map((e) => `${e.estado} ${formatNumber(e.cantidad)}`)
+          .join('  ·  ');
+  }
+
+  function pintarPaginador(
+    paginador: HTMLElement,
+    pagina: { total: number; limite: number; desplazamiento: number },
+    enPagina: number,
+  ): void {
+    const rango = rangoPagina(pagina.desplazamiento, enPagina, pagina.total);
+    paginador.hidden = pagina.total <= pagina.limite || !rango;
+    if (!rango) return;
+    paginador.querySelector<HTMLElement>('[data-rango]')!.textContent = t('console.incidencias.range', {
+      desde: formatNumber(rango.desde),
+      hasta: formatNumber(rango.hasta),
+      total: formatNumber(pagina.total),
+    });
+    paginador.querySelector<HTMLButtonElement>('[data-anterior]')!.disabled = pagina.desplazamiento === 0;
+    paginador.querySelector<HTMLButtonElement>('[data-siguiente]')!.disabled = rango.hasta >= pagina.total;
+  }
+
+  // ---- Monthly limit -----------------------------------------------------------
+
+  function etiquetaMes(mes: string): string {
+    const [anio, numero] = mes.split('-').map(Number);
+    return new Intl.DateTimeFormat(locale(), { month: 'long', year: 'numeric' }).format(new Date(anio, numero - 1, 1));
+  }
+
+  function pintarLimite(): void {
+    $<HTMLElement>('[data-mes]').textContent = etiquetaMes(estado.mes);
+    const host = $<HTMLElement>('[data-limite-cifras]');
+    host.replaceChildren();
+    const consumo = estado.consumo;
+    if (!consumo) return;
+
+    const uso = new Intl.NumberFormat(locale(), { style: 'percent', maximumFractionDigits: 1 }).format(
+      usoDelLimite(consumo),
+    );
+    host.append(
+      cifra(t('mowaMes.seguimiento.limite.cargados'), formatNumber(consumo.cargados_mes)),
+      cifra(t('mowaMes.seguimiento.limite.limite'), formatNumber(consumo.limite)),
+      cifra(t('mowaMes.seguimiento.limite.disponible'), formatNumber(consumo.disponible)),
+      cifra(t('mowaMes.seguimiento.limite.uso'), uso),
+    );
+
+    $<HTMLElement>('[data-limite-excedido]').hidden = !consumo.excedido;
+    $<HTMLElement>('[data-limite-excedido-texto]').textContent = t('mowaMes.seguimiento.limite.excedido', {
+      cargados: formatNumber(consumo.cargados_mes),
+      limite: formatNumber(consumo.limite),
+    });
+  }
+
+  async function cambiarMes(delta: -1 | 1): Promise<void> {
+    const mes = moverMes(estado.mes, delta);
+    estado.mes = mes;
+    $<HTMLElement>('[data-mes]').textContent = etiquetaMes(mes);
+    try {
+      const consumo = await consumoLimite(mes);
+      // A quick double click may have moved on; paint only the month in view.
+      if (estado.mes !== mes) return;
+      estado.consumo = consumo;
+      pintarLimite();
+    } catch (caido) {
+      mostrarError(caido);
+    }
+  }
+
+  $<HTMLButtonElement>('[data-mes-anterior]').addEventListener('click', () => void cambiarMes(-1));
+  $<HTMLButtonElement>('[data-mes-siguiente]').addEventListener('click', () => void cambiarMes(1));
+
+  // ---- Campaigns ---------------------------------------------------------------
+
+  const campanaActual = (): Campana | null =>
+    estado.campanas?.campanas.find((c) => c.id === estado.campanaId) ?? null;
+
+  function pintarCampanas(): void {
+    const host = $<HTMLElement>('[data-campanas]');
+    const cuenta = $<HTMLElement>('[data-campanas-cuenta]');
+    const paginador = $<HTMLElement>('[data-campanas-pager]');
+    host.replaceChildren();
+    const pagina = estado.campanas;
+    if (!pagina) return;
+
+    cuenta.textContent =
+      pagina.total === 1
+        ? t('mowaMes.seguimiento.campanas.cuentaUno')
+        : t('mowaMes.seguimiento.campanas.cuenta', { total: formatNumber(pagina.total) });
+
+    if (pagina.campanas.length === 0) {
+      host.append(vacio(t('mowaMes.seguimiento.campanas.vacio')));
+      paginador.hidden = true;
+      return;
+    }
+
+    const { envoltorio, cuerpo } = tabla('mm-campanas__tabla', [
+      ['mowaMes.seguimiento.campanas.col.id', true],
+      ['mowaMes.seguimiento.campanas.col.creada', false],
+      ['mowaMes.seguimiento.campanas.col.descripcion', false],
+      ['mowaMes.seguimiento.campanas.col.envio', false],
+      ['mowaMes.seguimiento.campanas.col.productos', true],
+      ['mowaMes.seguimiento.campanas.col.supervision', true],
+      ['mowaMes.seguimiento.campanas.col.total', true],
+      ['mowaMes.seguimiento.campanas.col.excluidos', true],
+      ['mowaMes.seguimiento.campanas.col.archivos', true],
+      ['mowaMes.seguimiento.campanas.col.accion', false],
+    ]);
+
+    pagina.campanas.forEach((campana) => {
+      const fila = document.createElement('tr');
+      fila.dataset.seleccionada = String(campana.id === estado.campanaId);
+
+      const ver = document.createElement('button');
+      ver.type = 'button';
+      ver.className = 'btn btn--sm';
+      ver.textContent = t('mowaMes.seguimiento.campanas.ver');
+      ver.setAttribute('aria-label', t('mowaMes.seguimiento.campanas.verAria', { id: campana.id }));
+      ver.setAttribute('aria-pressed', String(campana.id === estado.campanaId));
+      ver.addEventListener('click', () => void elegirCampana(campana.id));
+      const accion = document.createElement('td');
+      accion.append(ver);
+
+      fila.append(
+        celda('td', String(campana.id), 'num'),
+        celda('td', formatDateTime(campana.creado_en), 'mono'),
+        celda('td', campana.descripcion),
+        celda('td', formatDate(campana.fecha_envio), 'mono'),
+        celda('td', formatNumber(campana.productos_cargados), 'num'),
+        celda('td', formatNumber(campana.supervision_cargados), 'num'),
+        celda('td', formatNumber(campana.total_cargados), 'num'),
+        celda('td', formatNumber(campana.excluidos), 'num'),
+        celda('td', formatNumber(campana.archivos.length), 'num'),
+        accion,
+      );
+      cuerpo.append(fila);
+    });
+
+    host.append(envoltorio);
+    pintarPaginador(paginador, pagina, pagina.campanas.length);
+  }
+
+  async function cargarCampanas(): Promise<void> {
+    estado.campanas = await listarCampanas({
+      limite: POR_PAGINA_CAMPANAS,
+      desplazamiento: estado.desplazamientoCampanas,
+    });
+    pintarCampanas();
+  }
+
+  async function moverCampanas(delta: -1 | 1): Promise<void> {
+    estado.desplazamientoCampanas = Math.max(0, estado.desplazamientoCampanas + delta * POR_PAGINA_CAMPANAS);
+    try {
+      await cargarCampanas();
+    } catch (caido) {
+      mostrarError(caido);
+    }
+  }
+
+  const paginadorCampanas = $<HTMLElement>('[data-campanas-pager]');
+  paginadorCampanas.querySelector('[data-anterior]')!.addEventListener('click', () => void moverCampanas(-1));
+  paginadorCampanas.querySelector('[data-siguiente]')!.addEventListener('click', () => void moverCampanas(1));
+
+  // ---- Selected campaign -------------------------------------------------------
+
+  function pintarDetalle(): void {
+    const campana = campanaActual();
+    const titulo = $<HTMLElement>('[data-detalle-titulo]');
+    $<HTMLElement>('[data-detalle-vacio]').hidden = Boolean(campana);
+    $<HTMLElement>('[data-detalle-cuerpo]').hidden = !campana;
+
+    if (!campana) {
+      titulo.dataset.i18n = 'mowaMes.seguimiento.detalle.titleNinguna';
+      titulo.textContent = t('mowaMes.seguimiento.detalle.titleNinguna');
+      $<HTMLElement>('[data-detalle-meta]').textContent = '';
+      return;
+    }
+
+    // Interpolated, so the generic re-translation pass must leave it alone.
+    delete titulo.dataset.i18n;
+    titulo.textContent = t('mowaMes.seguimiento.detalle.title', { id: campana.id });
+    $<HTMLElement>('[data-detalle-meta]').textContent = t('mowaMes.seguimiento.detalle.meta', {
+      corte: formatDate(campana.fecha_corte),
+      envio: formatDate(campana.fecha_envio),
+      mes: etiquetaMes(campana.mes_imputacion),
+      speech: campana.speech.nombre,
+    });
+
+    const cifras = $<HTMLElement>('[data-detalle-cifras]');
+    cifras.replaceChildren(
+      cifra(t('mowaMes.seguimiento.detalle.productos'), formatNumber(campana.productos_cargados)),
+      cifra(t('mowaMes.seguimiento.detalle.supervision'), formatNumber(campana.supervision_cargados)),
+      cifra(t('mowaMes.seguimiento.detalle.total'), formatNumber(campana.total_cargados)),
+      cifra(t('mowaMes.seguimiento.detalle.excluidos'), formatNumber(campana.excluidos)),
+      cifra(t('mowaMes.seguimiento.detalle.advertencias'), formatNumber(campana.advertencias)),
+    );
+
+    pintarArchivos(campana);
+  }
+
+  function pintarArchivos(campana: Campana): void {
+    const host = $<HTMLElement>('[data-archivos]');
+    host.replaceChildren();
+    const { envoltorio, cuerpo } = tabla('mm-archivos__tabla', [
+      ['mowaMes.seguimiento.archivos.col.numero', true],
+      ['mowaMes.seguimiento.archivos.col.filas', true],
+      ['mowaMes.seguimiento.archivos.col.supervision', true],
+      ['mowaMes.seguimiento.archivos.col.bytes', true],
+      ['mowaMes.seguimiento.archivos.col.accion', false],
+    ]);
+
+    campana.archivos.forEach((archivo) => {
+      const fila = document.createElement('tr');
+      const boton = document.createElement('button');
+      boton.type = 'button';
+      boton.className = 'btn btn--sm';
+      const spinner = document.createElement('span');
+      spinner.className = 'btn__spinner';
+      spinner.setAttribute('aria-hidden', 'true');
+      const etiqueta = document.createElement('span');
+      etiqueta.className = 'btn__label';
+      etiqueta.textContent = t('mowaMes.seguimiento.archivos.descargar');
+      boton.append(spinner, etiqueta);
+      boton.setAttribute('aria-label', t('mowaMes.seguimiento.archivos.descargarAria', { n: archivo.numero }));
+      boton.addEventListener('click', () => void descargar(campana, archivo, boton));
+      const accion = document.createElement('td');
+      accion.append(boton);
+
+      fila.append(
+        celda('td', String(archivo.numero), 'num'),
+        celda('td', formatNumber(archivo.filas), 'num'),
+        celda('td', formatNumber(archivo.supervision), 'num'),
+        celda('td', formatBytes(archivo.bytes), 'num'),
+        accion,
+      );
+      cuerpo.append(fila);
+    });
+
+    host.append(envoltorio);
+  }
+
+  async function descargar(campana: Campana, archivo: ArchivoCampana, boton: HTMLButtonElement): Promise<void> {
+    ocupado(boton, true);
+    try {
+      const descargado = await descargarArchivoCampana(campana.id, archivo.numero);
+      guardarArchivo(descargado.blob, nombreArchivo(descargado.nombre, campana.id, archivo.numero));
+      const resumen = leerResumenDescarga(descargado.resumen);
+      avisar(
+        $<HTMLElement>('[data-descarga-estado]'),
+        t('mowaMes.seguimiento.archivos.descargado', {
+          archivo: resumen.archivo ?? archivo.numero,
+          total: resumen.total ?? campana.archivos.length,
+          filas: formatNumber(resumen.filas ?? archivo.filas),
+          supervision: formatNumber(resumen.supervision ?? archivo.supervision),
+        }),
+      );
+    } catch (caido) {
+      mostrarError(caido);
+    } finally {
+      ocupado(boton, false);
+    }
+  }
+
+  async function elegirCampana(id: number): Promise<void> {
+    estado.campanaId = id;
+    estado.conciliacion = null;
+    estado.exclusiones = null;
+    estado.codigo = '';
+    estado.desplazamientoExclusiones = 0;
+    selectFiltro.value = '';
+    reiniciarReporte();
+    pintarCampanas();
+    pintarDetalle();
+    pintarConciliacion();
+    pintarExclusiones();
+
+    try {
+      const [conciliacion] = await Promise.all([obtenerConciliacion(id), cargarExclusiones()]);
+      if (estado.campanaId !== id) return;
+      estado.conciliacion = conciliacion;
+      pintarConciliacion();
+    } catch (caido) {
+      mostrarError(caido);
+    }
+  }
+
+  // ---- Sent report -------------------------------------------------------------
+
+  const formReporte = $<HTMLFormElement>('[data-form-reporte]');
+  const inputReporte = $<HTMLInputElement>('#mm-reporte');
+  const nombreReporte = $<HTMLElement>('[data-reporte-nombre]');
+  const errorReporte = $<HTMLElement>('[data-reporte-error]');
+
+  function limpiarErrorReporte(): void {
+    errorReporte.textContent = '';
+    inputReporte.removeAttribute('aria-invalid');
+    inputReporte.setAttribute('aria-describedby', 'mm-reporte-hint');
+  }
+
+  function fallarReporte(texto: string): void {
+    errorReporte.textContent = texto;
+    inputReporte.setAttribute('aria-invalid', 'true');
+    inputReporte.setAttribute('aria-describedby', 'mm-reporte-hint mm-reporte-error');
+  }
+
+  function reiniciarReporte(): void {
+    formReporte.reset();
+    nombreReporte.dataset.i18n = 'mowaMes.seguimiento.reporte.sinArchivo';
+    nombreReporte.textContent = t('mowaMes.seguimiento.reporte.sinArchivo');
+    limpiarErrorReporte();
+  }
+
+  inputReporte.addEventListener('change', () => {
+    limpiarErrorReporte();
+    const archivo = inputReporte.files?.[0];
+    if (!archivo) return;
+    nombreReporte.textContent = archivo.name;
+    delete nombreReporte.dataset.i18n;
+  });
+
+  async function importar(reemplazar: boolean): Promise<void> {
+    const id = estado.campanaId;
+    if (id === null) return;
+    limpiarErrorReporte();
+
+    const archivo = inputReporte.files?.[0];
+    if (!archivo) {
+      fallarReporte(t('mowaMes.seguimiento.reporte.error.archivo'));
+      inputReporte.focus();
+      return;
+    }
+
+    const boton = $<HTMLButtonElement>('[data-reporte-importar]');
+    ocupado(boton, true);
+    try {
+      const conciliacion = await importarReporte(id, archivo, reemplazar);
+      if (estado.campanaId !== id) return;
+      estado.conciliacion = conciliacion;
+      pintarConciliacion();
+      avisar($<HTMLElement>('[data-reporte-estado]'), t('mowaMes.seguimiento.reporte.importado'));
+    } catch (caido) {
+      if (caido instanceof ApiError && caido.status === 409 && !reemplazar) {
+        $<HTMLElement>('[data-reemplazar-detalle]').textContent = caido.detail;
+        // Replacing overwrites imported rows, so keeping them is what Enter does.
+        void openWhenFree(dialogos.reemplazar).then(() =>
+          $<HTMLButtonElement>('[data-reemplazar-cancelar]').focus(),
+        );
+      } else if (caido instanceof ApiError && caido.status === 413) {
+        fallarReporte(t('mowaMes.seguimiento.reporte.error.grande'));
+      } else if (caido instanceof ApiError && caido.status === 400) {
+        fallarReporte(caido.detail || t('common.errorBody'));
+      } else {
+        fallarReporte(mensajeDeError(caido));
+      }
+    } finally {
+      ocupado(boton, false);
+    }
+  }
+
+  formReporte.addEventListener('submit', (evento) => {
+    evento.preventDefault();
+    void importar(false);
+  });
+
+  $<HTMLButtonElement>('[data-reemplazar-confirmar]').addEventListener('click', () => {
+    dialogos.reemplazar.close();
+    void importar(true);
+  });
+
+  // ---- Reconciliation ----------------------------------------------------------
+
+  function pintarConciliacion(): void {
+    const host = $<HTMLElement>('[data-conciliacion]');
+    host.replaceChildren();
+    const conciliacion = estado.conciliacion;
+    if (!conciliacion) {
+      host.append(vacio(t('common.loading')));
+      return;
+    }
+    if (conciliacion.reportes.length === 0) {
+      host.append(vacio(t('mowaMes.seguimiento.conciliacion.vacio')));
+      return;
+    }
+
+    conciliacion.advertencias.forEach((advertencia) => {
+      const aviso = document.createElement('p');
+      aviso.className = 'notice notice--warning';
+      aviso.textContent = t('mowaMes.seguimiento.conciliacion.advertenciaId', {
+        motivo: traducirCodigo(advertencia.codigo, advertencia.detalle),
+        id: advertencia.mes_id,
+      });
+      host.append(aviso);
+    });
+
+    const grupos = tabla('mm-conciliacion__tabla', [
+      ['mowaMes.seguimiento.conciliacion.col.grupo', false],
+      ['mowaMes.seguimiento.conciliacion.col.cargados', true],
+      ['mowaMes.seguimiento.conciliacion.col.enviados', true],
+      ['mowaMes.seguimiento.conciliacion.col.noEnviados', true],
+      ['mowaMes.seguimiento.conciliacion.col.estados', false],
+    ]);
+    filasConciliacion(conciliacion).forEach(({ grupo, cifras }) => {
+      const fila = document.createElement('tr');
+      fila.dataset.grupo = grupo;
+      fila.append(
+        celda('th', t(`mowaMes.seguimiento.conciliacion.grupo.${grupo}`)),
+        celda('td', formatNumber(cifras.cargados), 'num'),
+        celda('td', formatNumber(cifras.enviados), 'num'),
+        celda('td', formatNumber(cifras.no_enviados), 'num'),
+        celda('td', textoEstados(cifras.por_estado), 'mono mm-estados'),
+      );
+      grupos.cuerpo.append(fila);
+    });
+    host.append(grupos.envoltorio);
+
+    const nota = document.createElement('p');
+    nota.className = 'field__hint';
+    nota.textContent = t('mowaMes.seguimiento.conciliacion.nota');
+    host.append(nota);
+
+    const sin = document.createElement('p');
+    sin.className = 'mm-conciliacion__sin';
+    sin.textContent = t('mowaMes.seguimiento.conciliacion.sinCorrespondencia', {
+      n: formatNumber(conciliacion.sin_correspondencia),
+    });
+    if (conciliacion.sin_correspondencia > 0) {
+      const estados = document.createElement('span');
+      estados.className = 'mono mm-estados';
+      estados.textContent = `  ${textoEstados(conciliacion.sin_correspondencia_por_estado)}`;
+      sin.append(estados);
+    }
+    host.append(sin);
+
+    const ids = tabla('mm-ids__tabla', [
+      ['mowaMes.seguimiento.conciliacion.col.mesId', false],
+      ['mowaMes.seguimiento.conciliacion.col.filas', true],
+      ['mowaMes.seguimiento.conciliacion.col.coinciden', true],
+    ]);
+    conciliacion.por_id.forEach((porId) => {
+      const fila = document.createElement('tr');
+      fila.append(
+        celda('td', String(porId.mes_id), 'mono'),
+        celda('td', formatNumber(porId.filas), 'num'),
+        celda('td', formatNumber(porId.con_correspondencia), 'num'),
+      );
+      ids.cuerpo.append(fila);
+    });
+    const tituloIds = document.createElement('h4');
+    tituloIds.className = 'field__label';
+    tituloIds.textContent = t('mowaMes.seguimiento.conciliacion.ids');
+    const notaIds = document.createElement('p');
+    notaIds.className = 'field__hint';
+    notaIds.textContent = t('mowaMes.seguimiento.conciliacion.idsNota');
+    host.append(tituloIds, ids.envoltorio, notaIds);
+
+    const tituloReportes = document.createElement('h4');
+    tituloReportes.className = 'field__label';
+    tituloReportes.textContent = t('mowaMes.seguimiento.conciliacion.reportes');
+    const lista = document.createElement('ul');
+    lista.className = 'mono mm-reportes';
+    conciliacion.reportes.forEach((reporte) => {
+      const item = document.createElement('li');
+      item.textContent = t('mowaMes.seguimiento.conciliacion.reporte', {
+        id: reporte.mes_id,
+        archivo: reporte.nombre_archivo,
+        filas: formatNumber(reporte.filas),
+        fecha: formatDateTime(reporte.importado_en),
+      });
+      lista.append(item);
+    });
+    host.append(tituloReportes, lista);
+  }
+
+  // ---- Exclusions --------------------------------------------------------------
+
+  const selectFiltro = $<HTMLSelectElement>('[data-exclusiones-filtro]');
+
+  function pintarFiltro(): void {
+    const elegido = selectFiltro.value;
+    selectFiltro.replaceChildren();
+    const todos = document.createElement('option');
+    todos.value = '';
+    todos.textContent = t('mowaMes.seguimiento.exclusiones.todos');
+    selectFiltro.append(todos);
+    CODIGOS_EXCLUSION.forEach((codigo) => {
+      const opcion = document.createElement('option');
+      opcion.value = codigo;
+      opcion.textContent = t(`mowaMes.seguimiento.exclusiones.motivo.${codigo}`);
+      selectFiltro.append(opcion);
+    });
+    selectFiltro.value = elegido;
+  }
+
+  function pintarExclusiones(): void {
+    const host = $<HTMLElement>('[data-exclusiones]');
+    const cuenta = $<HTMLElement>('[data-exclusiones-cuenta]');
+    const paginador = $<HTMLElement>('[data-exclusiones-pager]');
+    host.replaceChildren();
+    const pagina = estado.exclusiones;
+    if (!pagina) {
+      cuenta.textContent = '';
+      paginador.hidden = true;
+      return;
+    }
+
+    cuenta.textContent =
+      pagina.total === 1
+        ? t('mowaMes.seguimiento.exclusiones.cuentaUno')
+        : t('mowaMes.seguimiento.exclusiones.cuenta', { total: formatNumber(pagina.total) });
+
+    if (pagina.exclusiones.length === 0) {
+      host.append(
+        vacio(t(estado.codigo ? 'mowaMes.seguimiento.exclusiones.vacioFiltro' : 'mowaMes.seguimiento.exclusiones.vacio')),
+      );
+      paginador.hidden = true;
+      return;
+    }
+
+    const { envoltorio, cuerpo } = tabla('mm-exclusiones__tabla', [
+      ['mowaMes.seguimiento.exclusiones.col.pagare', false],
+      ['mowaMes.seguimiento.exclusiones.col.motivo', false],
+      ['mowaMes.seguimiento.exclusiones.col.detalle', false],
+    ]);
+    pagina.exclusiones.forEach((exclusion) => {
+      const fila = document.createElement('tr');
+      const motivo = document.createElement('td');
+      const tag = document.createElement('span');
+      tag.className = 'tag tag--error';
+      tag.textContent = t(`mowaMes.seguimiento.exclusiones.motivo.${exclusion.codigo}`);
+      motivo.append(tag);
+      fila.append(
+        celda('td', exclusion.pagare, 'mono'),
+        motivo,
+        celda('td', traducirCodigo(exclusion.codigo, exclusion.codigo)),
+      );
+      cuerpo.append(fila);
+    });
+    host.append(envoltorio);
+    pintarPaginador(paginador, pagina, pagina.exclusiones.length);
+  }
+
+  async function cargarExclusiones(): Promise<void> {
+    const id = estado.campanaId;
+    if (id === null) return;
+    const pagina = await listarExclusiones(id, {
+      codigo: estado.codigo || undefined,
+      limite: POR_PAGINA_EXCLUSIONES,
+      desplazamiento: estado.desplazamientoExclusiones,
+    });
+    if (estado.campanaId !== id) return;
+    estado.exclusiones = pagina;
+    pintarExclusiones();
+  }
+
+  async function recargarExclusiones(): Promise<void> {
+    try {
+      await cargarExclusiones();
+    } catch (caido) {
+      mostrarError(caido);
+    }
+  }
+
+  selectFiltro.addEventListener('change', () => {
+    estado.codigo = selectFiltro.value as CodigoMowaMes | '';
+    estado.desplazamientoExclusiones = 0;
+    void recargarExclusiones();
+  });
+
+  const paginadorExclusiones = $<HTMLElement>('[data-exclusiones-pager]');
+  paginadorExclusiones.querySelector('[data-anterior]')!.addEventListener('click', () => {
+    estado.desplazamientoExclusiones = Math.max(0, estado.desplazamientoExclusiones - POR_PAGINA_EXCLUSIONES);
+    void recargarExclusiones();
+  });
+  paginadorExclusiones.querySelector('[data-siguiente]')!.addEventListener('click', () => {
+    estado.desplazamientoExclusiones += POR_PAGINA_EXCLUSIONES;
+    void recargarExclusiones();
+  });
+
+  // ---- Boot --------------------------------------------------------------------
+
+  function sinConexion(si: boolean): void {
+    $<HTMLElement>('[data-offline]').hidden = !si;
+    $<HTMLElement>('[data-contenido]').hidden = si;
+    document.dispatchEvent(new CustomEvent('healthchanged'));
+  }
+
+  async function arrancar(): Promise<void> {
+    try {
+      const [consumo, campanas] = await Promise.all([
+        consumoLimite(estado.mes),
+        listarCampanas({ limite: POR_PAGINA_CAMPANAS, desplazamiento: estado.desplazamientoCampanas }),
+      ]);
+      estado.consumo = consumo;
+      estado.campanas = campanas;
+      sinConexion(false);
+      pintarFiltro();
+      pintarLimite();
+      pintarCampanas();
+      pintarDetalle();
+      // The most recent campaign is the one a follow-up usually starts from.
+      const primera = campanas.campanas[0];
+      if (primera && estado.campanaId === null) await elegirCampana(primera.id);
+    } catch (caido) {
+      if (caido instanceof NetworkError) {
+        sinConexion(true);
+      } else {
+        sinConexion(false);
+        mostrarError(caido);
+      }
+    }
+  }
+
+  const reintentar = $<HTMLButtonElement>('[data-reintentar]');
+  reintentar.addEventListener('click', async () => {
+    ocupado(reintentar, true);
+    try {
+      await arrancar();
+    } finally {
+      ocupado(reintentar, false);
+    }
+  });
+
+  // A language switch repaints what the script drew.
+  document.addEventListener('languagechange', () => {
+    applyTranslations();
+    pintarFiltro();
+    pintarLimite();
+    pintarCampanas();
+    pintarDetalle();
+    pintarConciliacion();
+    pintarExclusiones();
+  });
+
+  void arrancar();
+</script>

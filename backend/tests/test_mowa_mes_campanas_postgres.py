@@ -395,3 +395,66 @@ def test_un_documento_no_estandar_se_carga_se_advierte_y_se_guarda(cliente) -> N
     assert [(f.dni, f.advertencias) for f in cargadas if not f.supervision] == [
         ("ZZCE123456", (CodigoMowaMes.DOCUMENTO_NO_ESTANDAR,))
     ]
+
+
+def test_cadena_completa_con_estados_distintos_de_enviado(cliente) -> None:
+    # E-1 de punta a punta: lo que MES reporta con otro estado empareja, pero no
+    # cuenta como enviado; las cifras por id siguen contando lo emparejado.
+    client, _ = cliente
+    previa = _previsualizar(client)
+    campana = _crear(client, previa["speech"]["huella"]).json()
+    filas = _filas_xlsx(client.get(f"/mowa-mes/campanas/{campana['id']}/archivos/1").content)
+    libro = openpyxl.Workbook()
+    hoja = libro.active
+    hoja.title = "Hoja1"
+    hoja.append(list(COLUMNAS_REPORTE))
+    for posicion, (numero, mensaje, dni) in enumerate(filas):
+        estado = "enviado" if posicion < 5 else ("fallido" if posicion % 2 else "Enviado ")
+        hoja.append(
+            [MES_IDS[0], str(numero), _como_mes(mensaje), "02/06/99", dni, estado, "L", "u"]
+        )
+    buffer = io.BytesIO()
+    libro.save(buffer)
+
+    importado = client.post(
+        f"/mowa-mes/campanas/{campana['id']}/reportes",
+        files={"archivo": ("reporte.xlsx", buffer.getvalue())},
+    )
+    conciliacion = client.get(f"/mowa-mes/campanas/{campana['id']}/conciliacion").json()
+
+    assert importado.status_code == 201, importado.text
+    assert (conciliacion["supervision"]["cargados"], conciliacion["supervision"]["enviados"]) == (
+        5,
+        5,
+    )
+    assert (
+        conciliacion["productos"]["cargados"],
+        conciliacion["productos"]["enviados"],
+        conciliacion["productos"]["no_enviados"],
+    ) == (6, 3, 3)
+    assert conciliacion["productos"]["por_estado"] == [
+        {"estado": "Enviado", "cantidad": 3},
+        {"estado": "fallido", "cantidad": 3},
+    ]
+    assert (conciliacion["total"]["enviados"], conciliacion["total"]["no_enviados"]) == (8, 3)
+    assert conciliacion["sin_correspondencia"] == 0
+    assert conciliacion["por_id"] == [
+        {"mes_id": MES_IDS[0], "filas": 11, "con_correspondencia": 11}
+    ]
+    assert conciliacion["advertencias"] == []
+
+
+def test_limite_mensual_de_un_mes_sin_campanas(cliente) -> None:
+    client, _ = cliente
+
+    cuerpo = client.get("/mowa-mes/limite-mensual", params={"mes": "2099-07"}).json()
+
+    assert cuerpo == {
+        "mes": "2099-07",
+        "limite": 2_500_000,
+        "cargados_mes": 0,
+        "esta_campana": 0,
+        "total": 0,
+        "disponible": 2_500_000,
+        "excedido": False,
+    }

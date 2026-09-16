@@ -7,6 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../../src/lib/api';
 import {
+  consumoLimite,
+  descargarArchivoCampana,
+  importarReporte,
+  listarCampanas,
+  listarExclusiones,
+  obtenerConciliacion,
   crearExcepcion,
   crearSpeech,
   editarSpeech,
@@ -123,6 +129,95 @@ describe('speech', () => {
     expect(opciones.method).toBe('POST');
     expect(opciones.signal).toBe(control.signal);
     expect(cuerpoDe(opciones)).toEqual({ partes: PARTES });
+  });
+});
+
+describe('campañas y seguimiento', () => {
+  it('lista campañas paginando con límite y desplazamiento', async () => {
+    const falso = responderCon(200, { total: 0, limite: 20, desplazamiento: 40, campanas: [] });
+
+    await listarCampanas({ limite: 20, desplazamiento: 40 });
+
+    const url = new URL(llamada(falso).url, 'http://x');
+    expect(url.pathname).toBe('/api/mowa-mes/campanas');
+    expect(url.searchParams.get('limite')).toBe('20');
+    expect(url.searchParams.get('desplazamiento')).toBe('40');
+  });
+
+  it('las exclusiones mandan `codigo` solo cuando hay filtro', async () => {
+    const sinFiltro = responderCon(200, {});
+    await listarExclusiones(7);
+    const url = new URL(llamada(sinFiltro).url, 'http://x');
+    expect(url.pathname).toBe('/api/mowa-mes/campanas/7/exclusiones');
+    expect(url.searchParams.has('codigo')).toBe(false);
+
+    const conFiltro = responderCon(200, {});
+    await listarExclusiones(7, { codigo: 'telefono_invalido', desplazamiento: 50 });
+    const filtrada = new URL(llamada(conFiltro).url, 'http://x');
+    expect(filtrada.searchParams.get('codigo')).toBe('telefono_invalido');
+    expect(filtrada.searchParams.get('desplazamiento')).toBe('50');
+  });
+
+  it('el consumo del límite manda el mes solo si se indica', async () => {
+    const actual = responderCon(200, {});
+    await consumoLimite();
+    expect(llamada(actual).url).toBe('/api/mowa-mes/limite-mensual');
+
+    const otro = responderCon(200, {});
+    await consumoLimite('2099-01');
+    expect(new URL(llamada(otro).url, 'http://x').searchParams.get('mes')).toBe('2099-01');
+  });
+
+  it('descarga el archivo y lee su resumen con el prefijo X-Mowa-Mes-', async () => {
+    const falso = vi.fn(
+      async () =>
+        new Response('xlsx sintetico', {
+          status: 200,
+          headers: {
+            'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'content-disposition': 'attachment; filename="CAMPANA_7_ARCHIVO_2.xlsx"',
+            'x-mowa-mes-archivo': '2',
+            'x-mowa-mes-filas': '45851',
+            'x-otra-cabecera': 'no',
+          },
+        }),
+    );
+    vi.stubGlobal('fetch', falso);
+
+    const descargado = await descargarArchivoCampana(7, 2);
+
+    expect(llamada(falso).url).toBe('/api/mowa-mes/campanas/7/archivos/2');
+    expect(descargado.nombre).toBe('CAMPANA_7_ARCHIVO_2.xlsx');
+    expect(descargado.resumen).toEqual({ archivo: '2', filas: '45851' });
+  });
+
+  it('importa el reporte como multipart con archivo y reemplazar', async () => {
+    const falso = responderCon(201, {});
+    const archivo = new File(['reporte sintetico'], 'REPORTE_SINTETICO.xlsx');
+
+    await importarReporte(7, archivo, true);
+
+    const { url, opciones } = llamada(falso);
+    expect(url).toBe('/api/mowa-mes/campanas/7/reportes');
+    expect(opciones.method).toBe('POST');
+    const cuerpo = opciones.body as FormData;
+    expect((cuerpo.get('archivo') as File).name).toBe('REPORTE_SINTETICO.xlsx');
+    expect(cuerpo.get('reemplazar')).toBe('true');
+  });
+
+  it('un id ya importado llega como 409 con el motivo', async () => {
+    responderCon(409, { detail: 'El id de MES 990000001 ya estaba importado' });
+
+    const fallo = await importarReporte(7, new File(['x'], 'r.xlsx')).catch((error: unknown) => error);
+
+    expect((fallo as ApiError).status).toBe(409);
+    expect((fallo as ApiError).detail).toBe('El id de MES 990000001 ya estaba importado');
+  });
+
+  it('pide la conciliación de su campaña', async () => {
+    const falso = responderCon(200, {});
+    await obtenerConciliacion(7);
+    expect(llamada(falso).url).toBe('/api/mowa-mes/campanas/7/conciliacion');
   });
 });
 

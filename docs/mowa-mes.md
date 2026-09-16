@@ -133,7 +133,7 @@ Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6
 | `GET /mowa-mes/campanas/{id}/conciliacion` | Reportes importados y cifras | 404 |
 
 - Las cabeceras de la descarga salen de `CABECERAS_ARCHIVO`, la misma lista que declara el contrato y que CORS expone (`app/main.py`). Una prueba comprueba que las enviadas son exactamente las declaradas.
-- `PUT /mowa-mes/configuracion` acepta además `registros_por_archivo` y `bytes_por_archivo`, opcionales (sin valor se conservan), y la respuesta los incluye.
+- `PUT /mowa-mes/configuracion` acepta además `registros_por_archivo` y `bytes_por_archivo`, y la respuesta los incluye. **Es una actualización parcial sobre PUT, no un reemplazo completo** (decisión del coordinador y de architec, 2026-09-14): un campo omitido conserva su valor, así un cliente que olvida el campo no borra el número sin avisar. `whatsapp_contacto: null` explícito borra el número. `registros_por_archivo` y `bytes_por_archivo` no admiten null: un null explícito responde 422 y no se trata como omitido. `limite_mensual` es obligatorio (`{}` responde 422). La regla está también en la descripción del endpoint en el contrato y es propia de este endpoint: `PUT /supervisores` sigue reemplazando la lista completa.
 
 ## 12. Catálogo de códigos (completo)
 

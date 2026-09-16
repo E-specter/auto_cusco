@@ -8,6 +8,7 @@
 
 import { request } from './api';
 import type { components } from './contrato-api';
+import { descargarArchivo, type ArchivoDescargado } from './descargas';
 
 type Esquemas = components['schemas'];
 
@@ -32,6 +33,18 @@ export type TipoExcepcion = Esquemas['TipoExcepcion'];
 export type Excepcion = Esquemas['ExcepcionRespuesta'];
 export type ExcepcionEntrada = Esquemas['ExcepcionEntrada'];
 export type SiguienteDia = Esquemas['SiguienteDiaRespuesta'];
+export type Campana = Esquemas['CampanaRespuesta'];
+export type ListaCampanas = Esquemas['ListaCampanasRespuesta'];
+export type ArchivoCampana = Esquemas['ArchivoRespuesta'];
+export type PaginaExclusiones = Esquemas['PaginaExclusionesRespuesta'];
+export type Exclusion = Esquemas['ExclusionRespuesta'];
+export type ConsumoLimite = Esquemas['ConsumoLimiteRespuesta'];
+export type Conciliacion = Esquemas['ConciliacionRespuesta'];
+export type CifrasGrupo = Esquemas['CifrasGrupoRespuesta'];
+export type EstadoConteo = Esquemas['EstadoConteoRespuesta'];
+export type CifrasId = Esquemas['CifrasIdRespuesta'];
+export type AdvertenciaReporte = Esquemas['AdvertenciaReporteRespuesta'];
+export type ReporteImportado = Esquemas['ReporteImportadoRespuesta'];
 
 function conJson(method: string, cuerpo: unknown, signal?: AbortSignal): RequestInit {
   return {
@@ -105,6 +118,64 @@ export function eliminarExcepcion(fecha: string): Promise<void> {
   return request<void>(`/calendario/excepciones/${encodeURIComponent(fecha)}`, {
     method: 'DELETE',
   });
+}
+
+// ---- Campaigns, files, sent reports and reconciliation (B6b) --------------------
+
+/** Most recent first. */
+export function listarCampanas(
+  params: { limite?: number; desplazamiento?: number } = {},
+): Promise<ListaCampanas> {
+  const query = new URLSearchParams({
+    limite: String(params.limite ?? 20),
+    desplazamiento: String(params.desplazamiento ?? 0),
+  });
+  return request<ListaCampanas>(`/mowa-mes/campanas?${query}`);
+}
+
+export function obtenerCampana(id: number): Promise<Campana> {
+  return request<Campana>(`/mowa-mes/campanas/${id}`);
+}
+
+/** In the selection's order; without `codigo`, every reason. */
+export function listarExclusiones(
+  id: number,
+  params: { codigo?: CodigoMowaMes; limite?: number; desplazamiento?: number } = {},
+): Promise<PaginaExclusiones> {
+  const query = new URLSearchParams();
+  if (params.codigo) query.set('codigo', params.codigo);
+  query.set('limite', String(params.limite ?? 50));
+  query.set('desplazamiento', String(params.desplazamiento ?? 0));
+  return request<PaginaExclusiones>(`/mowa-mes/campanas/${id}/exclusiones?${query}`);
+}
+
+/** Prefix of the summary headers a load file carries (docs/mowa-mes.md §11). */
+export const PREFIJO_RESUMEN_ARCHIVO = 'X-Mowa-Mes-';
+
+/** The stored `.xlsx`: body, name from `Content-Disposition`, summary from `X-Mowa-Mes-*`. */
+export function descargarArchivoCampana(id: number, numero: number): Promise<ArchivoDescargado> {
+  return descargarArchivo(`/mowa-mes/campanas/${id}/archivos/${numero}`, {}, PREFIJO_RESUMEN_ARCHIVO);
+}
+
+/** Consumption of a month (`YYYY-MM`); without it, the current month in Lima. */
+export function consumoLimite(mes?: string): Promise<ConsumoLimite> {
+  const query = mes ? `?${new URLSearchParams({ mes })}` : '';
+  return request<ConsumoLimite>(`/mowa-mes/limite-mensual${query}`);
+}
+
+/**
+ * Upload MES's sent report for a campaign. A MES id already imported answers
+ * 409 unless `reemplazar` is true, which replaces it.
+ */
+export function importarReporte(id: number, archivo: File, reemplazar = false): Promise<Conciliacion> {
+  const body = new FormData();
+  body.set('archivo', archivo);
+  body.set('reemplazar', String(reemplazar));
+  return request<Conciliacion>(`/mowa-mes/campanas/${id}/reportes`, { method: 'POST', body });
+}
+
+export function obtenerConciliacion(id: number): Promise<Conciliacion> {
+  return request<Conciliacion>(`/mowa-mes/campanas/${id}/conciliacion`);
 }
 
 /** Without `desde`, the API starts from today in America/Lima. */

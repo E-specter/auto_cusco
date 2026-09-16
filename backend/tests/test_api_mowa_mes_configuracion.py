@@ -268,3 +268,96 @@ def test_previsualizacion_con_whatsapp_y_problemas(cliente) -> None:
     ]
     assert all(not s["falta_whatsapp"] for s in cuerpo["segmentos"])
     assert invalido.status_code == 400
+
+
+GUARDADA = {
+    "limite_mensual": 2_500_000,
+    "whatsapp_contacto": "900000123",
+    "registros_por_archivo": 40_000,
+    "bytes_por_archivo": 1_500_000,
+}
+
+
+def _guardada(client: TestClient) -> None:
+    assert client.put("/mowa-mes/configuracion", json=GUARDADA).status_code == 200
+
+
+# PUT /mowa-mes/configuracion es una actualizacion parcial: omitido conserva.
+
+
+@pytest.mark.parametrize(
+    "campo", ["whatsapp_contacto", "registros_por_archivo", "bytes_por_archivo"]
+)
+def test_un_campo_omitido_conserva_su_valor(cliente, campo) -> None:
+    client, _ = cliente
+    _guardada(client)
+    cuerpo = {k: v for k, v in GUARDADA.items() if k != campo}
+
+    respuesta = client.put("/mowa-mes/configuracion", json=cuerpo)
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()[campo] == GUARDADA[campo]
+
+
+@pytest.mark.parametrize(
+    ("campo", "valor"),
+    [
+        ("whatsapp_contacto", "900000456"),
+        ("registros_por_archivo", 30_000),
+        ("bytes_por_archivo", 1_000_000),
+    ],
+)
+def test_un_campo_con_valor_lo_cambia(cliente, campo, valor) -> None:
+    client, _ = cliente
+    _guardada(client)
+
+    respuesta = client.put("/mowa-mes/configuracion", json={**GUARDADA, campo: valor})
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()[campo] == valor
+
+
+def test_whatsapp_null_explicito_borra_el_numero(cliente) -> None:
+    client, _ = cliente
+    _guardada(client)
+
+    cuerpo = client.put(
+        "/mowa-mes/configuracion", json={**GUARDADA, "whatsapp_contacto": None}
+    ).json()
+
+    assert cuerpo["whatsapp_contacto"] is None
+    assert (cuerpo["registros_por_archivo"], cuerpo["bytes_por_archivo"]) == (40_000, 1_500_000)
+
+
+@pytest.mark.parametrize("campo", ["registros_por_archivo", "bytes_por_archivo"])
+def test_null_en_un_campo_que_no_lo_admite_responde_422_sin_tratarse_como_omitido(
+    cliente, campo
+) -> None:
+    client, repositorio = cliente
+    _guardada(client)
+
+    respuesta = client.put("/mowa-mes/configuracion", json={**GUARDADA, campo: None})
+
+    assert respuesta.status_code == 422
+    assert getattr(repositorio.configuracion, campo) == GUARDADA[campo]
+
+
+def test_limite_mensual_es_obligatorio(cliente) -> None:
+    client, _ = cliente
+
+    assert client.put("/mowa-mes/configuracion", json={}).status_code == 422
+    assert (
+        client.put("/mowa-mes/configuracion", json={**GUARDADA, "limite_mensual": None}).status_code
+        == 422
+    )
+
+
+@pytest.mark.parametrize("vacio", ["", "   "])
+def test_whatsapp_vacio_o_en_blanco_borra_el_numero_igual_que_null(cliente, vacio) -> None:
+    client, _ = cliente
+    _guardada(client)
+
+    respuesta = client.put("/mowa-mes/configuracion", json={**GUARDADA, "whatsapp_contacto": vacio})
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["whatsapp_contacto"] is None

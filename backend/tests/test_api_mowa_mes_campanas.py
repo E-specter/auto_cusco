@@ -378,3 +378,42 @@ def test_un_estado_distinto_de_enviado_no_cuenta_en_la_conciliacion() -> None:
     }
     assert (cuerpo["total"]["enviados"], cuerpo["total"]["no_enviados"]) == (5, 1)
     assert cuerpo["por_id"] == [{"mes_id": 990002, "filas": 6, "con_correspondencia": 6}]
+
+
+# --- Revision de la API falsa de F3 (T-MM-B7) ---------------------------
+
+
+def test_exclusiones_por_codigo_fuera_del_catalogo_o_que_no_es_exclusion() -> None:
+    client = _cliente(Entorno())
+    campana_id = _crear(client).json()["id"]
+    ruta = f"/mowa-mes/campanas/{campana_id}/exclusiones"
+
+    inventado = client.get(ruta, params={"codigo": "codigo_inventado"})
+    advertencia = client.get(ruta, params={"codigo": "mensaje_excede_150"})
+
+    assert inventado.status_code == 422
+    assert isinstance(inventado.json()["detail"], list)
+    assert advertencia.status_code == 200
+    assert (advertencia.json()["total"], advertencia.json()["exclusiones"]) == (0, [])
+
+
+def test_la_conciliacion_sin_reporte_da_todo_cargado_y_nada_enviado() -> None:
+    client = _cliente(Entorno())
+    campana = _crear(client).json()
+
+    cuerpo = client.get(f"/mowa-mes/campanas/{campana['id']}/conciliacion").json()
+
+    assert cuerpo["reportes"] == []
+    for grupo, cargados in (
+        ("productos", campana["productos_cargados"]),
+        ("supervision", campana["supervision_cargados"]),
+        ("total", campana["total_cargados"]),
+    ):
+        assert cuerpo[grupo] == {
+            "cargados": cargados,
+            "enviados": 0,
+            "no_enviados": cargados,
+            "por_estado": [],
+        }
+    assert (cuerpo["sin_correspondencia"], cuerpo["sin_correspondencia_por_estado"]) == (0, [])
+    assert (cuerpo["por_id"], cuerpo["advertencias"]) == ([], [])

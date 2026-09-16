@@ -45,7 +45,7 @@ test.describe('carga inicial', () => {
     await expect(fila.getByRole('rowheader')).toHaveText('9 a 30(9–30 días)');
     // El ejemplo del peor caso describe las partes de su segmento.
     await expect(page.getByLabel('Parte 2 del segmento 9 a 30')).toHaveAccessibleDescription(
-      /^Ejemplo en el peor caso: TITULAR8 Caja Cusco te informa/,
+      /^Ejemplo en el peor caso: XXXXXXXX Caja Cusco te informa que tu cuota venció el dd\/mm\/yyyy/,
     );
     await expect(page.locator('[data-speech-resumen]')).toHaveAttribute('role', 'status');
     await expect(page.locator('[data-speech-resumen]')).toHaveText('1 segmento pasa de 150 caracteres.');
@@ -168,6 +168,20 @@ test.describe('plataforma', () => {
 
     await expect(page.getByText('El numero no cumple RF-02')).toBeVisible();
     await expect(whatsapp).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  test('vaciar el WhatsApp manda null explícito, porque omitirlo conservaría el número', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+
+    await page.getByLabel('WhatsApp de contacto').fill('');
+    await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+
+    await expect(page.getByText('Guardado.')).toBeVisible();
+    const [guardado] = pedidosA(api, 'PUT', '/mowa-mes/configuracion');
+    expect(guardado.cuerpo).toHaveProperty('whatsapp_contacto', null);
+    expect(api.configuracion.whatsapp_contacto).toBeNull();
+    await expect(page.getByText('Sin WhatsApp de contacto, los segmentos del speech que lo usan no se pueden generar.')).toBeVisible();
   });
 
   test('un límite que no es un entero positivo no viaja', async ({ page }) => {

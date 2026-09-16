@@ -311,6 +311,84 @@
   text-transform: capitalize;
 }
 
+/* ---- Follow-up (/mowa-mes/seguimiento) ------------------------------------- */
+
+.mm-mes {
+  gap: var(--space-1);
+}
+
+.mm-mes__valor {
+  min-inline-size: 16ch;
+  text-align: center;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.mm-cifras {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-3);
+}
+
+.mm-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+.mm-subtitulo {
+  margin-block-start: var(--space-4);
+  font-size: var(--text-base);
+  font-weight: 800;
+  letter-spacing: var(--tracking-heading);
+}
+
+.mm-detalle > .mm-subtitulo:first-of-type {
+  margin-block-start: var(--space-2);
+}
+
+.mm-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-block-start: 1px solid var(--color-border-subtle);
+}
+
+/* The selected campaign carries the system's inset selection bar. */
+.mm-campanas__tabla tr[data-seleccionada='true'] > :first-child {
+  box-shadow: inset 3px 0 0 0 var(--color-text);
+}
+
+.mm-estados {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.mm-conciliacion__sin {
+  font-size: var(--text-sm);
+}
+
+.mm-reportes {
+  padding-inline-start: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.mm-exclusiones__controles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.mm-exclusiones__controles .input {
+  min-inline-size: 16ch;
+}
+
 /* A withdrawn holiday still reads, struck through, so the year's exception is
    visible where the holiday would have been. */
 .mm-calendario__tabla tr[data-retirado='true'] .mm-calendario__descripcion {

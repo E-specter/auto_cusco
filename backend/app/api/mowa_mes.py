@@ -60,19 +60,29 @@ def obtener_servicio_mowa_mes() -> ConfiguracionMowaMesService:
 
 class ConfiguracionEntrada(BaseModel):
     limite_mensual: int = Field(ge=1, le=LIMITE_MENSUAL_MAXIMO)
-    whatsapp_contacto: str | None = Field(default=None, max_length=20)
-    registros_por_archivo: int | None = Field(
+    whatsapp_contacto: str | None = Field(
+        default=None,
+        max_length=20,
+        description="Sin el campo se conserva el actual; null lo borra (queda sin numero)",
+    )
+    # Sin null: el defecto None solo marca "omitido" (no se valida); un null explicito
+    # no es un entero y responde 422.
+    registros_por_archivo: int = Field(
         default=None,
         ge=1,
         le=REGISTROS_POR_ARCHIVO,
-        description="Filas por archivo (RF-MM-11); sin valor se conserva el actual",
+        description="Filas por archivo (RF-MM-11). Sin el campo se conserva el actual; null: 422",
     )
-    bytes_por_archivo: int | None = Field(
+    bytes_por_archivo: int = Field(
         default=None,
         ge=BYTES_POR_ARCHIVO_MINIMO,
         le=BYTES_POR_ARCHIVO,
-        description="Bytes por archivo (RF-MM-11); sin valor se conserva el actual",
+        description="Bytes por archivo (RF-MM-11). Sin el campo se conserva el actual; null: 422",
     )
+
+    def valor(self, campo: str, actual: ConfiguracionMowaMes):
+        """El valor enviado o, si el campo no vino, el guardado (actualizacion parcial)."""
+        return getattr(self if campo in self.model_fields_set else actual, campo)
 
 
 class ConfiguracionRespuesta(ModeloRespuesta):
@@ -101,15 +111,24 @@ def obtener_configuracion(
 
 
 @router.put(
-    "/configuracion", response_model=ConfiguracionRespuesta, responses=respuestas_de_error(400)
+    "/configuracion",
+    summary="Actualizar la configuracion del conector (parcial)",
+    response_model=ConfiguracionRespuesta,
+    responses=respuestas_de_error(400),
 )
 def guardar_configuracion(
     entrada: ConfiguracionEntrada,
     servicio: ConfiguracionMowaMesService = Depends(obtener_servicio_mowa_mes),
 ) -> ConfiguracionRespuesta:
-    """Limite mensual (RF-MM-01), WhatsApp de contacto (RF-MM-16) y limites por archivo.
+    """Actualizacion parcial sobre PUT, no un reemplazo completo.
 
-    Los limites por archivo son opcionales y solo pueden bajar del maximo de la plataforma.
+    - `limite_mensual` es obligatorio (RF-MM-01).
+    - Cualquier otro campo omitido conserva el valor guardado.
+    - `whatsapp_contacto: null` borra el numero de contacto (RF-MM-16).
+    - `registros_por_archivo` y `bytes_por_archivo` no admiten null (422) y solo pueden
+      bajar del maximo de la plataforma (RF-MM-11).
+
+    Esta regla es propia de este endpoint: `PUT /supervisores` reemplaza la lista completa.
     """
     actual = servicio.obtener_configuracion()
     try:
@@ -117,10 +136,9 @@ def guardar_configuracion(
             servicio.guardar_configuracion(
                 ConfiguracionMowaMes(
                     limite_mensual=entrada.limite_mensual,
-                    whatsapp_contacto=entrada.whatsapp_contacto,
-                    registros_por_archivo=entrada.registros_por_archivo
-                    or actual.registros_por_archivo,
-                    bytes_por_archivo=entrada.bytes_por_archivo or actual.bytes_por_archivo,
+                    whatsapp_contacto=entrada.valor("whatsapp_contacto", actual),
+                    registros_por_archivo=entrada.valor("registros_por_archivo", actual),
+                    bytes_por_archivo=entrada.valor("bytes_por_archivo", actual),
                 )
             )
         )

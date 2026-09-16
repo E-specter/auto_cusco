@@ -447,10 +447,16 @@ export interface paths {
         /** Obtener Configuracion */
         get: operations["obtener_configuracion_mowa_mes_configuracion_get"];
         /**
-         * Guardar Configuracion
-         * @description Limite mensual (RF-MM-01), WhatsApp de contacto (RF-MM-16) y limites por archivo.
+         * Actualizar la configuracion del conector (parcial)
+         * @description Actualizacion parcial sobre PUT, no un reemplazo completo.
          *
-         *     Los limites por archivo son opcionales y solo pueden bajar del maximo de la plataforma.
+         *     - `limite_mensual` es obligatorio (RF-MM-01).
+         *     - Cualquier otro campo omitido conserva el valor guardado.
+         *     - `whatsapp_contacto: null` borra el numero de contacto (RF-MM-16).
+         *     - `registros_por_archivo` y `bytes_por_archivo` no admiten null (422) y solo pueden
+         *       bajar del maximo de la plataforma (RF-MM-11).
+         *
+         *     Esta regla es propia de este endpoint: `PUT /supervisores` reemplaza la lista completa.
          */
         put: operations["guardar_configuracion_mowa_mes_configuracion_put"];
         post?: never;
@@ -918,18 +924,21 @@ export interface components {
         ConfiguracionEntrada: {
             /** Limite Mensual */
             limite_mensual: number;
-            /** Whatsapp Contacto */
+            /**
+             * Whatsapp Contacto
+             * @description Sin el campo se conserva el actual; null lo borra (queda sin numero)
+             */
             whatsapp_contacto?: string | null;
             /**
              * Registros Por Archivo
-             * @description Filas por archivo (RF-MM-11); sin valor se conserva el actual
+             * @description Filas por archivo (RF-MM-11). Sin el campo se conserva el actual; null: 422
              */
-            registros_por_archivo?: number | null;
+            registros_por_archivo?: number;
             /**
              * Bytes Por Archivo
-             * @description Bytes por archivo (RF-MM-11); sin valor se conserva el actual
+             * @description Bytes por archivo (RF-MM-11). Sin el campo se conserva el actual; null: 422
              */
-            bytes_por_archivo?: number | null;
+            bytes_por_archivo?: number;
         };
         /** ConfiguracionRespuesta */
         ConfiguracionRespuesta: {

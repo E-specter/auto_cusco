@@ -1745,8 +1745,8 @@
         "tags": [
           "mowa-mes"
         ],
-        "summary": "Guardar Configuracion",
-        "description": "Limite mensual (RF-MM-01), WhatsApp de contacto (RF-MM-16) y limites por archivo.\n\nLos limites por archivo son opcionales y solo pueden bajar del maximo de la plataforma.",
+        "summary": "Actualizar la configuracion del conector (parcial)",
+        "description": "Actualizacion parcial sobre PUT, no un reemplazo completo.\n\n- `limite_mensual` es obligatorio (RF-MM-01).\n- Cualquier otro campo omitido conserva el valor guardado.\n- `whatsapp_contacto: null` borra el numero de contacto (RF-MM-16).\n- `registros_por_archivo` y `bytes_por_archivo` no admiten null (422) y solo pueden\n  bajar del maximo de la plataforma (RF-MM-11).\n\nEsta regla es propia de este endpoint: `PUT /supervisores` reemplaza la lista completa.",
         "operationId": "guardar_configuracion_mowa_mes_configuracion_put",
         "requestBody": {
           "content": {
@@ -3349,35 +3349,22 @@
                 "type": "null"
               }
             ],
-            "title": "Whatsapp Contacto"
+            "title": "Whatsapp Contacto",
+            "description": "Sin el campo se conserva el actual; null lo borra (queda sin numero)"
           },
           "registros_por_archivo": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 50000.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "integer",
+            "maximum": 50000.0,
+            "minimum": 1.0,
             "title": "Registros Por Archivo",
-            "description": "Filas por archivo (RF-MM-11); sin valor se conserva el actual"
+            "description": "Filas por archivo (RF-MM-11). Sin el campo se conserva el actual; null: 422"
           },
           "bytes_por_archivo": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 2000000.0,
-                "minimum": 100000.0
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "integer",
+            "maximum": 2000000.0,
+            "minimum": 100000.0,
             "title": "Bytes Por Archivo",
-            "description": "Bytes por archivo (RF-MM-11); sin valor se conserva el actual"
+            "description": "Bytes por archivo (RF-MM-11). Sin el campo se conserva el actual; null: 422"
           }
         },
         "type": "object",
