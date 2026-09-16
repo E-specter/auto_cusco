@@ -95,7 +95,7 @@ El esqueleto real de este enfoque ya existe en `backend/app/` (`core/{entities,p
 ## 10. Frontend (`frontend/`)
 
 - Responsabilidad: UI para selección/filtrado de productos, configuración de cargas, visualización de métricas en tiempo real, y definición/generación de reportes (RF-34: interfaz intuitiva y clara, priorizando claridad sobre estética).
-- Estado: **Fase 1 implementada y con pruebas automáticas.** Dos pantallas Astro estáticas que hablan con la API REST desde el navegador; sin framework de UI ni estado de servidor.
+- Estado: **Fase 1 y pantalla de selección de la Fase 2 implementadas, con pruebas automáticas.** Tres pantallas Astro estáticas que hablan con la API REST desde el navegador; sin framework de UI ni estado de servidor. Pendiente: la pantalla de generación de cargas (Fase 3).
 - Pruebas: Vitest (`frontend/tests/nucleo/` y `frontend/tests/dom/`) y Playwright (`frontend/e2e/`), las herramientas que recomienda la documentación de Astro. Ver `docs/testing.md` secciones 2, 4 y 7.
 - Convenciones propias: ver `frontend/AGENTS.md`.
 
@@ -105,11 +105,15 @@ El esqueleto real de este enfoque ya existe en `backend/app/` (`core/{entities,p
 |---|---|
 | `src/pages/index.astro` | Bienvenida. **Única pantalla bloqueada a `100dvh` sin scroll** (regla del brand guide). Diagrama de nodos que dibuja el mecanismo del producto y cifras en vivo leídas de `GET /cargas` |
 | `src/pages/cargas.astro` | Consola de cargas. Una fecha de corte a la vez: regla de fechas, versiones del día, resumen e incidencias. Aquí viven los diálogos de V-4, V-6, V-7 y V-8 |
-| `src/layouts/Shell.astro` | Cabecera común: pulso de `GET /health`, selector de idioma y de tema, y el script en línea que aplica la apariencia **antes del primer pintado** |
-| `src/lib/api.ts` | Cliente tipado de la API. Distingue `ApiError` (el servidor respondió que no) de `NetworkError` (no se pudo contactar) |
+| `src/pages/cartera.astro` | Selección de cartera (Fase 2). El selector a la izquierda; a la derecha el embudo universo → primeros n, métricas lado a lado y segmentación; debajo, los productos de la selección |
+| `src/components/SelectorSeleccion.astro` + `src/scripts/selector-seleccion.ts` | Fecha de corte y selección guardada, y en modo `completo` el editor de filtros, orden, cantidad e indicadores con guardar y borrar. **Reutilizable**: la página lo monta y escucha `seleccioncambiada`. El modo `compacto` es para pantallas que consumen una selección sin editarla (campaña de MOWA MES) |
+| `src/layouts/Shell.astro` | Cabecera común: navegación entre secciones, pulso de `GET /health`, selector de idioma y de tema, y el script en línea que aplica la apariencia **antes del primer pintado** |
+| `src/lib/api.ts` | Cliente tipado de la API, con los tipos generados del contrato. Distingue `ApiError` (el servidor respondió que no) de `NetworkError` (no se pudo contactar). Exporta `request` y `requestRespuesta` para los clientes de cada módulo (`api-<modulo>.ts`) |
+| `src/lib/seleccion.ts` | Sintaxis de la selección (`campo:operador:valor`, `-campo`, `nombre:funcion:campo`) sobre borradores estructurados: lo incompleto no llega a la API |
+| `src/lib/descargas.ts` | Descarga binaria compartida: cuerpo, nombre desde `Content-Disposition` y resumen desde cabeceras `X-*` |
 | `src/lib/i18n.ts` | i18n vanilla es/en por atributos `data-i18n`; ambos diccionarios viajan en el bundle |
-| `src/lib/format.ts` | Fechas, números y tamaños; incluye la sugerencia de fecha de corte desde el nombre del archivo (`DD.MM.YYYY`) |
-| `src/styles/` | `tokens.css` (única fuente de verdad visual), `base.css`, `ui.css` (vocabulario compartido) y `console.css` |
+| `src/lib/format.ts` | Fechas, números, tamaños y montos; incluye la sugerencia de fecha de corte desde el nombre del archivo (`DD.MM.YYYY`) |
+| `src/styles/` | `tokens.css` (única fuente de verdad visual), `base.css`, `ui.css` (vocabulario compartido), `console.css`, `selector.css` y `cartera.css` |
 | `src/components/Icon.astro` | Inserta iconos lucide en línea en tiempo de compilación, sin fuente de iconos ni peticiones extra |
 
 ### Decisiones de esta fase
@@ -122,7 +126,15 @@ El esqueleto real de este enfoque ya existe en `backend/app/` (`core/{entities,p
 - **Fuentes autohospedadas** (Inter variable y JetBrains Mono 400/500/700) en `public/fonts/`, precargadas.
 - **Los mensajes de incidencia se traducen por código, no por texto.** El backend escribe `detalle` en español; la interfaz resuelve `incidencia.<codigo>` en el diccionario y usa la frase del servidor como respaldo para cualquier código que todavía no conozca. Si se agrega un código nuevo en `backend/app/core/services/ingesta_sabana/`, añade su clave en `src/i18n/es.json` y `en.json`.
 - **Selector de archivo propio.** El botón nativo de `<input type="file">` toma su texto del idioma del navegador, no del de la página, así que no se puede traducir. El input real sigue existiendo y siendo enfocable; la etiqueta visible es un `<label for>` traducido, y el recuadro acepta además arrastrar y soltar. Por eso ese campo se valida desde el código y no con `required`: el navegador no puede anclar su globo de validación a un control personalizado.
-- **Un solo bloque de reemplazo** (`.standIn`) cubre los dos estados en que la consola no tiene de qué hablar: primera ejecución y API inalcanzable. En ambos, la regla de fechas, su leyenda y los paneles se retiran, y al no haber API el botón de subir queda deshabilitado.
+- **Un solo bloque de reemplazo** (`.standIn`, ahora en `ui.css`) cubre los estados en que una pantalla no tiene de qué hablar: primera ejecución y API inalcanzable en la consola; sin sábanas, fecha sin vigente y selección que no aplica en la cartera. En la consola, la regla de fechas, su leyenda y los paneles se retiran, y al no haber API el botón de subir queda deshabilitado.
+
+Decisiones de la pantalla de selección (Fase 2):
+
+- **Montos como texto hasta la pantalla.** `formatMonto` redondea sobre las cifras con `BigInt` y nunca pasa un importe por `Number()`. Solo la columna "Del universo" divide con números, porque un porcentaje con un decimal no pierde nada que el analista lea.
+- **Un pedido por cambio (RF-28).** Espera de 400 ms, el pedido anterior se cancela con `AbortController` y las cifras se atenúan en su sitio mientras llega la respuesta. Una fecha sin vigente (404) muestra "no tiene cartera", distinto de una selección vacía.
+- **Lo incompleto no se envía.** Un filtro a medio escribir se marca con borde punteado y queda fuera de la consulta. Las partes que la API rechaza (revisión en vivo con `POST /selecciones/revision`) se marcan en rojo-naranja, y mientras existan **no se calcula nada**: el resultado describiría una selección que nadie escribió.
+- **Selecciones compartidas (C-3).** Cualquiera guarda, reemplaza o borra. Cambiar de selección con cambios sin guardar pregunta primero, con "Seguir editando" enfocado; borrar pregunta con "Cancelar" enfocado. Un nombre repetido (409) se marca junto al nombre.
+- **Columnas de productos.** Por defecto solo las operativas (pagaré, segmento, días de atraso, saldo de capital, cuota). El analista puede sumar cualquier campo del catálogo, incluidos los personales; la elección vive en `localStorage` de ese navegador.
 
 ## Convención para nuevos módulos
 

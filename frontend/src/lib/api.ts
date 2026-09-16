@@ -24,6 +24,28 @@ export type Incidencia = Esquemas['IncidenciaRespuesta'];
 export type IncidenciasPagina = Esquemas['IncidenciasRespuesta'];
 export type Health = Esquemas['HealthRespuesta'];
 
+export type Campo = Esquemas['CampoRespuesta'];
+/** Every queryable field, keyed by name (`GET /cartera/campos`). */
+export type Campos = Record<string, Campo>;
+export type Resumen = Esquemas['ResumenRespuesta'];
+export type Bloque = Esquemas['BloqueRespuesta'];
+export type Metricas = Esquemas['MetricasRespuesta'];
+export type Segmentacion = Esquemas['SegmentacionRespuesta'];
+export type Grupo = Esquemas['GrupoRespuesta'];
+export type PaginaCartera = Esquemas['PaginaRespuesta'];
+export type SeleccionGuardada = Esquemas['SeleccionRespuesta'];
+export type SeleccionEntrada = Esquemas['SeleccionEntrada'];
+export type Revision = Esquemas['RevisionRespuesta'];
+export type Problema = Esquemas['ProblemaRespuesta'];
+
+/** Filters, order, top n and indicators, already in the API's text syntax. */
+export interface ConsultaCartera {
+  filtros: string[];
+  orden: string | null;
+  cantidad?: number | null;
+  indicadores?: string[];
+}
+
 /** An API response that arrived but said no. `detail` is the server's reason. */
 export class ApiError extends Error {
   constructor(
@@ -126,6 +148,84 @@ export function subirSabana(input: {
 
 export function asignarVigente(id: number): Promise<Version> {
   return request<Version>(`/cargas/${id}/vigente`, { method: 'POST' });
+}
+
+// ---- Portfolio (docs/consulta-cartera.md) ---------------------------------------
+
+export function listarCampos(): Promise<Campos> {
+  return request<Campos>('/cartera/campos');
+}
+
+/** Repeated parameters, the way FastAPI reads `list[str]` from a query. */
+function parametrosConsulta(fechaCorte: string, consulta: ConsultaCartera): URLSearchParams {
+  const query = new URLSearchParams({ fecha_corte: fechaCorte });
+  consulta.filtros.forEach((filtro) => query.append('filtro', filtro));
+  if (consulta.orden) query.set('orden', consulta.orden);
+  return query;
+}
+
+/**
+ * The universe that meets the filters and its first n, side by side, in one
+ * call (RF-28). A 404 means the date has no current version: there is no
+ * portfolio to read, which is not the same as an empty one.
+ */
+export function resumirCartera(
+  fechaCorte: string,
+  consulta: ConsultaCartera,
+  segmento: string | null,
+  signal?: AbortSignal,
+): Promise<Resumen> {
+  const query = parametrosConsulta(fechaCorte, consulta);
+  if (consulta.cantidad) query.set('cantidad', String(consulta.cantidad));
+  (consulta.indicadores ?? []).forEach((indicador) => query.append('indicador', indicador));
+  if (segmento) query.set('segmento', segmento);
+  return request<Resumen>(`/cartera/resumen?${query}`, { signal });
+}
+
+export function consultarCartera(
+  fechaCorte: string,
+  consulta: ConsultaCartera,
+  pagina: { limite: number; desplazamiento: number },
+  signal?: AbortSignal,
+): Promise<PaginaCartera> {
+  const query = parametrosConsulta(fechaCorte, consulta);
+  query.set('limite', String(pagina.limite));
+  query.set('desplazamiento', String(pagina.desplazamiento));
+  return request<PaginaCartera>(`/cartera?${query}`, { signal });
+}
+
+// ---- Saved selections (docs/selecciones-guardadas.md) ---------------------------
+
+const json = (method: string, cuerpo: unknown, signal?: AbortSignal): RequestInit => ({
+  method,
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(cuerpo),
+  signal,
+});
+
+export function listarSelecciones(): Promise<SeleccionGuardada[]> {
+  return request<SeleccionGuardada[]>('/selecciones');
+}
+
+/** 201 with the saved selection; 400 if a part does not apply, 409 on a taken name. */
+export function crearSeleccion(entrada: SeleccionEntrada): Promise<SeleccionGuardada> {
+  return request<SeleccionGuardada>('/selecciones', json('POST', entrada));
+}
+
+export function actualizarSeleccion(
+  id: number,
+  entrada: SeleccionEntrada,
+): Promise<SeleccionGuardada> {
+  return request<SeleccionGuardada>(`/selecciones/${id}`, json('PUT', entrada));
+}
+
+/** Which parts would not apply, without saving anything. */
+export function revisarSeleccion(entrada: SeleccionEntrada, signal?: AbortSignal): Promise<Revision> {
+  return request<Revision>('/selecciones/revision', json('POST', entrada, signal));
+}
+
+export function eliminarSeleccion(id: number): Promise<void> {
+  return request<void>(`/selecciones/${id}`, { method: 'DELETE' });
 }
 
 export function eliminarVersion(

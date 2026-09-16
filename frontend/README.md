@@ -16,6 +16,7 @@ uv run fastapi dev app/main.py
 # terminal 2 — interfaz
 cd frontend
 npm install
+npm run dev # pruebas
 npx astro dev --background     # gestión: astro dev stop | status | logs
 ```
 
@@ -32,18 +33,22 @@ El navegador **nunca** habla con `127.0.0.1:8000` directamente: pide a un prefij
 |---|---|
 | `/` | Bienvenida. La **única** pantalla bloqueada a `100dvh` sin scroll, por regla del brand guide. Sus cifras son reales: salen de `GET /cargas` |
 | `/cargas` | Consola de cargas. Una fecha de corte a la vez: regla de fechas, versiones del día, resumen e incidencias, más los diálogos de V-4, V-6, V-7 y V-8 |
+| `/cartera` | Selección de cartera. Filtros, orden, primeros n e indicadores propios; métricas del universo y de la selección lado a lado, segmentación, productos y selecciones guardadas compartidas |
 
 ## Dónde tocar qué
 
 ```
 src/
-├── pages/        index.astro (bienvenida) · cargas.astro (consola)
-├── layouts/      Shell.astro — cabecera, pulso de la API, idioma y tema
-├── components/   Icon.astro — inserta iconos lucide en compilación
-├── styles/       tokens.css · base.css · ui.css · console.css
-├── lib/          api.ts (cliente) · i18n.ts · format.ts
+├── pages/        index.astro (bienvenida) · cargas.astro (consola) · cartera.astro (selección)
+├── layouts/      Shell.astro — navegación, pulso de la API, idioma y tema
+├── components/   Icon.astro · SelectorSeleccion.astro (fecha + selección, reutilizable)
+├── scripts/      selector-seleccion.ts — comportamiento del selector; la página lo monta
+├── styles/       tokens.css · base.css · ui.css · console.css · selector.css · cartera.css
+├── lib/          api.ts (cliente) · seleccion.ts · descargas.ts · i18n.ts · format.ts
 └── i18n/         es.json · en.json
 ```
+
+- **Reusar el selector de selección.** Renderiza `<SelectorSeleccion modo="compacto" />` (o `completo`), escucha `seleccioncambiada` en su raíz y **después** llama a `montarSelector(raiz)`. El evento trae fecha de corte, la consulta en la sintaxis de la API, si es aplicable y la selección guardada cargada.
 
 - **`tokens.css` es la única fuente de verdad visual.** Deriva de `docs/design_ui/brand_guide.json`. Ninguna regla de componente escribe un hex ni un px a mano: todo sale de un token.
 - **`console.css` es global, no con ámbito de Astro**, a propósito: la consola construye la regla de fechas, las filas de versión, las cifras y la tabla de incidencias desde el script en tiempo de ejecución, y los estilos con ámbito no alcanzan al DOM que crea el script. Si agregas estilos para algo que dibuja el script, van ahí.
@@ -63,9 +68,9 @@ O por separado: `npm run contrato:comprobar`, `npx astro check`, `npm run test`,
 
 | Carpeta | Qué cubre | Entorno |
 |---|---|---|
-| `tests/nucleo/` | Fecha sugerida desde el nombre del archivo, formatos, cliente de API y el contrato de traducción de incidencias | `node` |
+| `tests/nucleo/` | Fecha sugerida desde el nombre del archivo, formatos y montos, sintaxis de la selección, cliente de API, descargas y el contrato de traducción de incidencias | `node` |
 | `tests/dom/` | Cola de diálogos (V-6 → V-4) y cambio de idioma | `jsdom` |
-| `e2e/` | Las pantallas contra el sitio construido | Chromium |
+| `e2e/` | Las pantallas contra el sitio construido, y accesibilidad automatizada con axe (`accesibilidad.spec.ts`, WCAG 2.1 A y AA en tema claro y oscuro y en estados con diálogos y errores) | Chromium |
 
 Dos cosas que conviene saber antes de tocarlas:
 

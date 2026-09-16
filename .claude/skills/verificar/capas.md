@@ -95,9 +95,9 @@ Detalle de las capas que complementan a las clásicas de [SKILL.md](SKILL.md). P
 
 | Herramienta | Estado |
 |---|---|
-| `@axe-core/playwright` dentro de las pruebas de extremo a extremo | No configurado |
+| `@axe-core/playwright` dentro de las pruebas de extremo a extremo | **Configurado** en `frontend/e2e/accesibilidad.spec.ts`: bienvenida, consola y cartera en tema claro y oscuro, más la cartera con el diálogo de guardar en error y con una selección que no aplica. Corre en CI con el resto de Playwright |
 
-En Fase 1 el contraste y el foco se verificaron con un script propio y a mano. Eso no se repite solo en el siguiente cambio; axe sí.
+**Al agregar una pantalla o un estado con riesgo** (diálogo, error de formulario, tabla generada por script), se suma su caso a ese archivo. En Fase 1 el contraste y el foco se verificaron con un script propio y a mano; eso no se repetía solo en el siguiente cambio, axe sí.
 
 **Cuidado:** axe detecta alrededor de un tercio de los problemas de accesibilidad. No sustituye la revisión con teclado ni con lector de pantalla; sustituye la parte que se olvida.
 

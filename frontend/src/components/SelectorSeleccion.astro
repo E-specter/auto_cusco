@@ -1,0 +1,235 @@
+---
+/**
+ * Markup for the selection picker. Behaviour lives in
+ * `scripts/selector-seleccion.ts`; the page that renders this imports
+ * `montarSelector`, subscribes to `seleccioncambiada` and mounts it.
+ *
+ * `completo` carries the editor (filters, order, top n, indicators, save and
+ * delete). `compacto` is only the cut-off date and a saved selection, for
+ * screens that consume a selection without building one.
+ */
+import Icon from './Icon.astro';
+import '../styles/selector.css';
+
+interface Props {
+  modo?: 'completo' | 'compacto';
+  id?: string;
+}
+
+const { modo = 'completo', id = 'selector' } = Astro.props;
+---
+
+<section class="panel selector" id={id} data-selector data-modo={modo} aria-labelledby={`${id}-title`}>
+  <div class="panel__head">
+    <h2 class="panel__title" id={`${id}-title`} data-i18n="selector.title">Selección</h2>
+  </div>
+
+  <div class="selector__base">
+    <div class="field">
+      <label class="field__label" for={`${id}-fecha`} data-i18n="selector.fecha">Fecha de corte</label>
+      <select class="input" id={`${id}-fecha`} data-selector-fecha></select>
+    </div>
+    <div class="field">
+      <label class="field__label" for={`${id}-guardada`} data-i18n="selector.guardada">Selección guardada</label>
+      <select class="input" id={`${id}-guardada`} data-selector-guardada></select>
+    </div>
+    <p class="selector__estado mono" data-selector-estado aria-live="polite"></p>
+  </div>
+
+  <div class="notice notice--danger selector__problemas" data-selector-problemas hidden>
+    <Icon name="triangle-alert" size={20} />
+    <div>
+      <p data-i18n="selector.problemas.titulo">
+        Estas partes no aplican con el catálogo actual y la selección no se calcula hasta corregirlas o quitarlas:
+      </p>
+      <ul class="selector__problemasLista" data-selector-problemas-lista></ul>
+    </div>
+  </div>
+
+  {
+    modo === 'completo' && (
+      <div class="selector__editor" data-editor>
+        <template data-icono-quitar>
+          <Icon name="x" size={16} />
+        </template>
+
+        <fieldset class="selector__grupo">
+          <legend class="selector__leyenda" data-i18n="selector.filtros">Filtros</legend>
+          <p class="selector__vacio" data-filtros-vacio data-i18n="selector.filtros.vacio">
+            Sin filtros: se considera toda la cartera del día.
+          </p>
+          <ul class="filas" data-filtros />
+          <button type="button" class="btn btn--sm selector__agregar" data-agregar-filtro>
+            <Icon name="plus" size={16} />
+            <span data-i18n="selector.filtros.agregar">Agregar filtro</span>
+          </button>
+        </fieldset>
+
+        <fieldset class="selector__grupo">
+          <legend class="selector__leyenda" data-i18n="selector.orden">Orden y cantidad</legend>
+          <div class="selector__orden">
+            <div class="field">
+              <label class="field__label" for={`${id}-orden`} data-i18n="selector.orden.campo">Ordenar por</label>
+              <select class="input" id={`${id}-orden`} data-orden-campo />
+            </div>
+            <div
+              class="segmented selector__direccion"
+              role="group"
+              data-i18n-attr="aria-label:selector.orden.direccion"
+              aria-label="Dirección"
+            >
+              <button
+                type="button"
+                class="segmented__item"
+                data-orden-dir="desc"
+                aria-pressed="false"
+                data-i18n-attr="title:selector.orden.descLargo"
+                title="Descendente"
+              >
+                <Icon name="arrow-down-wide-narrow" size={16} />
+                <span data-i18n="selector.orden.desc">Mayor primero</span>
+              </button>
+              <button
+                type="button"
+                class="segmented__item"
+                data-orden-dir="asc"
+                aria-pressed="false"
+                data-i18n-attr="title:selector.orden.ascLargo"
+                title="Ascendente"
+              >
+                <Icon name="arrow-up-narrow-wide" size={16} />
+                <span data-i18n="selector.orden.asc">Menor primero</span>
+              </button>
+            </div>
+            <div class="field selector__cantidad">
+              <label class="field__label" for={`${id}-cantidad`} data-i18n="selector.cantidad">Cantidad (primeros n)</label>
+              <input
+                class="input mono"
+                id={`${id}-cantidad`}
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                data-cantidad
+                data-i18n-attr="placeholder:selector.cantidad.placeholder"
+                placeholder="Todos"
+                aria-describedby={`${id}-cantidad-hint ${id}-cantidad-error`}
+              />
+              <p class="field__hint" id={`${id}-cantidad-hint`} data-i18n="selector.cantidad.hint">
+                Los primeros n según el orden. Vacío: todo lo que cumple los filtros.
+              </p>
+              <p class="field__error" id={`${id}-cantidad-error`} data-cantidad-error role="alert" />
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="selector__grupo">
+          <legend class="selector__leyenda" data-i18n="selector.indicadores">Indicadores propios</legend>
+          <p class="selector__vacio" data-indicadores-vacio data-i18n="selector.indicadores.vacio">
+            Además de cuentas, capital y cuotas, puedes calcular los tuyos.
+          </p>
+          <ul class="filas" data-indicadores />
+          <button type="button" class="btn btn--sm selector__agregar" data-agregar-indicador>
+            <Icon name="plus" size={16} />
+            <span data-i18n="selector.indicadores.agregar">Agregar indicador</span>
+          </button>
+        </fieldset>
+
+        <div class="selector__acciones">
+          <button type="button" class="btn btn--primary" data-guardar hidden>
+            <span class="btn__spinner" aria-hidden="true" />
+            <Icon name="save" size={16} />
+            <span class="btn__label" data-i18n="selector.guardar">Guardar cambios</span>
+          </button>
+          <button type="button" class="btn" data-guardar-como>
+            <span data-i18n="selector.guardarComo">Guardar como nueva</span>
+          </button>
+          <button type="button" class="btn btn--quiet" data-descartar hidden>
+            <span data-i18n="selector.descartar">Descartar cambios</span>
+          </button>
+          <button type="button" class="btn btn--sm btn--danger selector__borrar" data-borrar hidden>
+            <Icon name="trash-2" size={16} />
+            <span data-i18n="selector.borrar">Borrar</span>
+          </button>
+        </div>
+        <p class="field__error selector__error" data-selector-error role="alert" />
+
+        <dialog class="dialog" data-dialog="guardar-como" aria-labelledby={`${id}-guardar-title`}>
+          <form method="dialog" novalidate>
+            <div class="dialog__head">
+              <div>
+                <h2 id={`${id}-guardar-title`} data-i18n="selector.guardarComo.titulo">Guardar la selección</h2>
+                <p class="muted selector__dialogIntro" data-i18n="selector.guardarComo.intro">
+                  Queda compartida con el equipo y sirve para cualquier fecha de corte.
+                </p>
+              </div>
+            </div>
+            <div class="dialog__body">
+              <div class="field">
+                <label class="field__label" for={`${id}-nombre`} data-i18n="selector.guardarComo.nombre">Nombre</label>
+                <input
+                  class="input"
+                  id={`${id}-nombre`}
+                  type="text"
+                  maxlength="120"
+                  autocomplete="off"
+                  data-nombre
+                  aria-describedby={`${id}-nombre-error`}
+                />
+                <p class="field__error" id={`${id}-nombre-error`} data-nombre-error role="alert" />
+              </div>
+            </div>
+            <div class="dialog__foot">
+              <button type="button" class="btn" data-cerrar data-i18n="common.cancel">Cancelar</button>
+              <button type="submit" class="btn btn--primary">
+                <span class="btn__spinner" aria-hidden="true" />
+                <span class="btn__label" data-i18n="selector.guardarComo.confirmar">Guardar</span>
+              </button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog class="dialog" data-dialog="borrar-seleccion" aria-labelledby={`${id}-borrar-title`}>
+          <form method="dialog">
+            <div class="dialog__head">
+              <h2 id={`${id}-borrar-title`} data-borrar-titulo />
+            </div>
+            <div class="dialog__body">
+              <p data-i18n="selector.borrar.cuerpo">
+                Se borra para todo el equipo. Lo que tienes en pantalla se queda como una selección nueva sin guardar.
+              </p>
+              <p class="field__error" data-borrar-error role="alert" />
+            </div>
+            <div class="dialog__foot">
+              <button type="button" class="btn" data-cerrar autofocus data-i18n="common.cancel">Cancelar</button>
+              <button type="submit" class="btn btn--danger">
+                <span class="btn__spinner" aria-hidden="true" />
+                <span class="btn__label" data-i18n="selector.borrar.confirmar">Borrar selección</span>
+              </button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog class="dialog" data-dialog="descartar" aria-labelledby={`${id}-descartar-title`}>
+          <form method="dialog">
+            <div class="dialog__head">
+              <h2 id={`${id}-descartar-title`} data-i18n="selector.descartar.titulo">Hay cambios sin guardar</h2>
+            </div>
+            <div class="dialog__body">
+              <p data-i18n="selector.descartar.cuerpo">
+                Si cargas otra selección, los cambios de ahora se pierden.
+              </p>
+            </div>
+            <div class="dialog__foot">
+              <button type="button" class="btn" data-cerrar autofocus data-i18n="selector.descartar.mantener">
+                Seguir editando
+              </button>
+              <button type="submit" class="btn btn--danger" data-i18n="selector.descartar.confirmar">
+                Descartar y cargar
+              </button>
+            </div>
+          </form>
+        </dialog>
+      </div>
+    )
+  }
+</section>

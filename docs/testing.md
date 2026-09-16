@@ -20,9 +20,10 @@ Para tenerlo presente durante el trabajo y no solo al final, la versión corta d
 | Integración | Flujo completo contra PostgreSQL real, incluida la cadena ingesta → selección → generación → archivo entrando por HTTP | `backend/tests/test_repositorio_cargas_postgres.py`, `test_repositorio_cartera_postgres.py`, `test_generacion_cargas_postgres.py` | Base migrada y la variable `AUTO_CUSCO_DB_TESTS` |
 | Volumen sintético | Tiempo y memoria de la generación de cargas con 60 000 y 120 000 filas | `backend/scripts/medir_generacion.py`, resultados en `docs/generacion-cargas.md` | Base migrada y una sábana del generador sintético |
 | Verificación con volumen real | Rendimiento y conteos con una sábana de verdad | Local, no se versiona | Sábana real con los datos personales reemplazados en memoria |
-| Núcleo del frontend | Lógica pura de la interfaz: fecha sugerida desde el nombre del archivo, formatos, cliente de API y el contrato con el catálogo de códigos de incidencia | `frontend/tests/nucleo/` | Nada. `fetch` se sustituye por un doble |
+| Núcleo del frontend | Lógica pura de la interfaz: fecha sugerida desde el nombre del archivo, formatos y montos exactos, sintaxis de la selección, cliente de API, descargas y el contrato con el catálogo de códigos de incidencia | `frontend/tests/nucleo/` | Nada. `fetch` se sustituye por un doble |
 | DOM del frontend | Lógica que toca el documento: cola de diálogos (V-6 → V-4) y cambio de idioma | `frontend/tests/dom/` | Nada. Entorno `jsdom` |
-| Extremo a extremo | Las pantallas contra el sitio construido: camino de subida, confirmaciones de V-4 y V-8, API caída y la regla de no-scroll de la bienvenida | `frontend/e2e/` | Navegador. Playwright levanta `npm run preview`; **ni backend ni PostgreSQL** |
+| Extremo a extremo | Las pantallas contra el sitio construido: camino de subida, confirmaciones de V-4 y V-8, API caída, la regla de no-scroll de la bienvenida, y en la cartera el recálculo con un solo pedido, el aviso de insuficiencia, la fecha sin vigente y las selecciones guardadas | `frontend/e2e/` | Navegador. Playwright levanta `npm run preview`; **ni backend ni PostgreSQL** |
+| Accesibilidad automatizada | Reglas WCAG 2.1 A y AA de axe-core en cada pantalla, en tema claro y oscuro, y en estados con diálogo abierto o partes marcadas como error | `frontend/e2e/accesibilidad.spec.ts` | Lo mismo que extremo a extremo; corre dentro de `npm run test:e2e` |
 
 La arquitectura de puertos y adaptadores es lo que permite el primer nivel: el núcleo depende de interfaces, así que en las pruebas se sustituyen por dobles y no hace falta ni base de datos ni archivos.
 
@@ -128,5 +129,5 @@ Si un trabajo falla, se corrige antes de seguir. La integración continua no ree
 
 ## 8. Pendientes
 
-- **Capas avanzadas sin configurar.** El proyecto tiene las capas clásicas y dos contratos, pero no tipos estáticos en el backend, pruebas basadas en propiedades, mutación, cobertura, accesibilidad automatizada, regresión visual, auditoría de seguridad ni el contrato entre el esquema de la API y los tipos del frontend. Qué atrapa cada una, dónde rinde aquí y con qué herramienta encaja está en `.claude/skills/verificar/capas.md`. Configurar cualquiera de ellas es una decisión del usuario.
+- **Capas avanzadas sin configurar.** El proyecto tiene las capas clásicas, tres contratos (incluido el del esquema de la API con los tipos del frontend) y accesibilidad automatizada con axe, pero no tipos estáticos en el backend, pruebas basadas en propiedades, mutación, cobertura, regresión visual ni auditoría de seguridad. Qué atrapa cada una, dónde rinde aquí y con qué herramienta encaja está en `.claude/skills/verificar/capas.md`. Configurar cualquiera de ellas es una decisión del usuario.
 - **Pruebas de carga** según volumen real, previstas en la Fase 7 de `docs/planning.md`.

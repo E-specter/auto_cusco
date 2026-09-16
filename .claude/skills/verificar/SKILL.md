@@ -43,7 +43,7 @@ Atrapan lo que las clásicas dejan pasar. **Ninguna está configurada todavía s
 | Basadas en propiedades | ¿La regla se cumple para *cualquier* entrada, no solo las que imaginé? | Normalización (N-1 a N-8), mapeo de campos, fecha desde el nombre | No |
 | Mutación | ¿Mis pruebas fallarían si el código estuviera mal? | Núcleo de ingesta, versionado, mapeo | Solo a mano ("romper a propósito") |
 | Cobertura | ¿Qué código no ejecuta ninguna prueba? | Todo, como señal y no como meta | No |
-| Accesibilidad automatizada | ¿La pantalla cumple WCAG AA sin revisarla a ojo? | Cada pantalla | No (se verificó a mano en Fase 1) |
+| Accesibilidad automatizada | ¿La pantalla cumple WCAG AA sin revisarla a ojo? | Cada pantalla | Sí: axe en `frontend/e2e/accesibilidad.spec.ts`, dentro de `npm run test:e2e`. Una pantalla nueva agrega ahí sus estados |
 | Regresión visual | ¿Cambió cómo se ve algo que nadie quería cambiar? | Pantallas, reglas del brand guide | No |
 | Seguridad | ¿Hay dependencias vulnerables, secretos o patrones inseguros? | Todo, con más peso por los datos de cobranza | No |
 | Rendimiento y volumen | ¿Aguanta el volumen real en el tiempo esperado? | Ingesta, consultas de cartera, generación de cargas | Solo a mano con volumen sintético |

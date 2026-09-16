@@ -1,0 +1,269 @@
+/*
+ * Selection picker (components/SelectorSeleccion.astro).
+ *
+ * Global on purpose: the filter and indicator rows are built by the script at
+ * runtime, beyond the reach of Astro's scoped styles. Every class is prefixed
+ * by the component so a page that mounts the picker cannot collide with it.
+ */
+
+.selector {
+  min-inline-size: 0;
+}
+
+.selector__base {
+  display: grid;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-4);
+  border-block-end: var(--color-border-hairline) solid var(--color-border);
+}
+
+@media (min-width: 30rem) {
+  .selector__base {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.selector__estado {
+  grid-column: 1 / -1;
+  font-size: var(--text-xs);
+  line-height: var(--leading-data);
+  color: var(--color-text-muted);
+}
+
+.selector__problemas {
+  margin: var(--space-4) var(--space-4) 0;
+}
+
+.selector__problemasLista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding-inline-start: var(--space-4);
+  font-family: var(--font-secondary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-data);
+  overflow-wrap: anywhere;
+}
+
+.selector__problemasLista code {
+  font-family: inherit;
+  color: var(--color-text);
+}
+
+.selector__grupo {
+  min-inline-size: 0;
+  margin: 0;
+  padding: var(--space-4);
+  border: 0;
+  border-block-end: var(--color-border-hairline) solid var(--color-border-subtle);
+}
+
+.selector__leyenda {
+  float: left;
+  inline-size: 100%;
+  margin-block-end: var(--space-3);
+  padding: 0;
+  font-family: var(--font-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+/* Everything after the floated legend starts below it. Clearing only the next
+   sibling is not enough: the empty-state line before a list is often hidden,
+   and the list would then squeeze in beside the float. */
+.selector__grupo > :not(legend) {
+  clear: both;
+}
+
+.selector__vacio {
+  margin-block-end: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.selector__agregar {
+  margin-block-start: var(--space-3);
+}
+
+/* ---- Rows ------------------------------------------------------------------
+   One row per filter or indicator. A row being written wears a dashed edge,
+   the same "in progress" mark the upload ruler gives a processing date; a row
+   the API rejected wears the danger wash. */
+
+.filas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fila {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: var(--color-border-hairline) solid var(--color-border-subtle);
+  background-color: var(--color-bg);
+  transition:
+    border-color var(--duration-micro) var(--ease-default),
+    background-color var(--duration-micro) var(--ease-default);
+}
+
+.fila[data-estado='incompleta'] {
+  border-style: dashed;
+  border-color: var(--color-text-muted);
+}
+
+.fila[data-estado='problema'] {
+  border-color: var(--color-danger-text);
+  background-color: var(--color-signal-wash);
+}
+
+.fila__valores {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+.fila__valores .input {
+  flex: 1 1 0;
+}
+
+.fila__y {
+  flex: none;
+  font-family: var(--font-secondary);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.fila__quitar {
+  justify-self: end;
+}
+
+.fila__nota {
+  grid-column: 1 / -1;
+  font-family: var(--font-secondary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-data);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.fila__nota:empty {
+  display: none;
+}
+
+.fila[data-estado='problema'] .fila__nota {
+  font-weight: 500;
+  color: var(--color-danger-text);
+}
+
+/* Indicator rows: the name leads with the remove control beside it, and the
+   function and field share the line below. */
+.fila--indicador {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) auto;
+}
+
+.fila--indicador .fila__nombre {
+  grid-column: 1 / 3;
+}
+
+.fila--indicador .fila__funcion {
+  grid-column: 1;
+}
+
+.fila--indicador .fila__campoIndicador {
+  grid-column: 2 / -1;
+}
+
+/* On a phone each select needs the full width to show its words: the field
+   takes the first line beside the remove control, the operator the next. */
+@media (max-width: 30rem) {
+  .fila--filtro {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .fila--filtro .fila__operador {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .fila--indicador .fila__funcion,
+  .fila--indicador .fila__campoIndicador {
+    grid-column: 1 / -1;
+  }
+}
+
+textarea.input {
+  min-block-size: 3.5rem;
+  resize: vertical;
+}
+
+/* ---- Order and top n ----------------------------------------------------- */
+
+.selector__orden {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: end;
+  gap: var(--space-3);
+}
+
+@media (min-width: 30rem) {
+  .selector__orden {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .selector__cantidad {
+    grid-column: 1 / -1;
+  }
+}
+
+.selector__direccion {
+  justify-self: start;
+}
+
+.selector__direccion .segmented__item {
+  padding-block: var(--space-2);
+}
+
+.selector__direccion .segmented__item:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.selector__cantidad .input {
+  max-inline-size: 12rem;
+}
+
+/* ---- Actions --------------------------------------------------------------- */
+
+.selector__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-surface);
+}
+
+.selector__borrar {
+  margin-inline-start: auto;
+}
+
+.selector__error {
+  margin: 0 var(--space-4) var(--space-4);
+}
+
+.selector__dialogIntro {
+  margin-block-start: var(--space-2);
+  font-size: var(--text-sm);
+}

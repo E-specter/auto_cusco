@@ -1,0 +1,739 @@
+---
+/**
+ * Portfolio selection (Fase 2). The screen reads left to right as a funnel:
+ * what the analyst asks for (the selection) against what it yields — every
+ * product that meets the filters, then the first n that go to work.
+ *
+ * One call to `/cartera/resumen` answers both metric blocks (RF-28), so every
+ * change recalculates with a single request. Like the upload console, this
+ * surface scrolls and keeps the same tokens.
+ */
+import Shell from '../layouts/Shell.astro';
+import Icon from '../components/Icon.astro';
+import SelectorSeleccion from '../components/SelectorSeleccion.astro';
+import '../styles/cartera.css';
+---
+
+<Shell
+  title="Selección de cartera — auto_cusco"
+  description="Filtra la cartera vigente, elige los primeros n productos y compara sus métricas con el universo filtrado."
+>
+  <div class="cartera">
+    <header class="cartera__head">
+      <h1 class="cartera__title" data-i18n="cartera.title">Selección de cartera</h1>
+      <p class="cartera__intro" data-i18n="cartera.intro">
+        Filtra la cartera vigente del día, elige cuántos productos van a gestión y compara lo que llevas con todo lo que cumple los filtros.
+      </p>
+    </header>
+
+    <section class="standIn" data-offline hidden aria-labelledby="offline-title">
+      <h2 class="standIn__title" id="offline-title" data-i18n="console.offline.title">Sin conexión con la API</h2>
+      <p class="standIn__body" data-i18n="console.offline.body">
+        No se pudo contactar con el backend. Comprueba que esté en marcha y vuelve a intentarlo.
+      </p>
+      <button type="button" class="btn btn--primary" data-reintentar>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span class="btn__label" data-i18n="console.offline.retry">Reintentar</span>
+      </button>
+    </section>
+
+    <div class="cartera__grid" data-contenido>
+      <SelectorSeleccion modo="completo" id="seleccion" />
+
+      <div class="resultados">
+        <section class="standIn" data-aviso hidden aria-labelledby="aviso-title">
+          <h2 class="standIn__title" id="aviso-title" data-aviso-titulo></h2>
+          <p class="standIn__body" data-aviso-cuerpo></p>
+          <a class="btn btn--primary" href="/cargas" data-aviso-cargas hidden>
+            <span data-i18n="cartera.aviso.irCargas">Ir a la consola de cargas</span>
+          </a>
+        </section>
+
+        <section class="panel metricas" data-metricas aria-labelledby="metricas-title">
+          <div class="panel__head">
+            <h2 class="panel__title" id="metricas-title" data-i18n="cartera.metricas">Métricas</h2>
+            <p class="calculo" data-calculo aria-live="polite">
+              <span class="dot" aria-hidden="true"></span>
+              <span data-calculo-texto></span>
+            </p>
+          </div>
+
+          <div class="flujo" data-flujo data-suficiente="true" data-sin-tope="true">
+            <p class="flujo__nodo">
+              <span class="flujo__cifra" data-disponibles>—</span>
+              <span class="flujo__etiqueta" data-i18n="cartera.flujo.universo">cumplen los filtros</span>
+            </p>
+            <span class="flujo__conector" aria-hidden="true"></span>
+            <p class="flujo__nodo flujo__nodo--seleccion">
+              <span class="flujo__cifra" data-solicitados>—</span>
+              <span class="flujo__etiqueta" data-flujo-seleccion></span>
+            </p>
+          </div>
+
+          <p class="notice notice--danger metricas__aviso" data-insuficiente role="status" hidden>
+            <Icon name="triangle-alert" size={20} />
+            <span data-insuficiente-texto></span>
+          </p>
+
+          <div class="table-scroll">
+            <table class="table metricas__tabla" data-tabla-metricas data-sin-seleccion="true">
+              <thead>
+                <tr>
+                  <th scope="col" data-i18n="cartera.col.metrica">Métrica</th>
+                  <th scope="col" class="num" data-i18n="cartera.col.universo">Universo</th>
+                  <th scope="col" class="num col-seleccion" data-i18n="cartera.col.seleccion">Selección</th>
+                  <th scope="col" class="num col-participacion" data-i18n="cartera.col.participacion">Del universo</th>
+                </tr>
+              </thead>
+              <tbody data-metricas-filas></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel segmentos" data-segmentos aria-labelledby="segmentos-title">
+          <div class="panel__head">
+            <h2 class="panel__title" id="segmentos-title" data-i18n="cartera.segmentos">Segmentación</h2>
+            <div class="segmentos__control">
+              <label class="field__label" for="segmento" data-i18n="cartera.segmentos.campo">Segmentar por</label>
+              <select class="input" id="segmento" data-segmento></select>
+            </div>
+          </div>
+          <div data-segmentos-cuerpo></div>
+        </section>
+      </div>
+    </div>
+
+    <section class="panel productos" data-productos aria-labelledby="productos-title">
+      <div class="panel__head">
+        <h2 class="panel__title" id="productos-title" data-i18n="cartera.productos">Productos de la selección</h2>
+        <div class="productos__controles">
+          <p class="mono muted productos__cuenta" data-productos-cuenta aria-live="polite"></p>
+          <details class="columnas" data-columnas>
+            <summary class="btn btn--sm">
+              <Icon name="columns-3" size={16} />
+              <span data-i18n="cartera.productos.columnas">Columnas</span>
+            </summary>
+            <fieldset class="columnas__lista" data-columnas-lista>
+              <legend class="visually-hidden" data-i18n="cartera.productos.columnasTitulo">Columnas visibles</legend>
+            </fieldset>
+          </details>
+        </div>
+      </div>
+      <div data-productos-cuerpo></div>
+      <div class="pager" data-pager hidden>
+        <button type="button" class="btn btn--sm" data-page-prev>
+          <Icon name="chevron-left" size={16} />
+          <span data-i18n="console.incidencias.prev">Anteriores</span>
+        </button>
+        <p class="mono muted" data-page-range></p>
+        <button type="button" class="btn btn--sm" data-page-next>
+          <span data-i18n="console.incidencias.next">Siguientes</span>
+          <Icon name="chevron-right" size={16} />
+        </button>
+      </div>
+    </section>
+  </div>
+</Shell>
+
+<script>
+  import {
+    ApiError,
+    NetworkError,
+    consultarCartera,
+    resumirCartera,
+    type PaginaCartera,
+    type Resumen,
+  } from '../lib/api';
+  import { applyTranslations, t } from '../lib/i18n';
+  import {
+    formatDate,
+    formatDateCompact,
+    formatMonto,
+    formatNumber,
+    formatParticipacion,
+  } from '../lib/format';
+  import { humanizarCampo, leerIndicador, tipoDe, type TipoCampo } from '../lib/seleccion';
+  import {
+    EVENTO_SELECCION,
+    montarSelector,
+    type EstadoSeleccion,
+  } from '../scripts/selector-seleccion';
+
+  /** Long enough to let a value be typed, short enough to feel live (RF-28). */
+  const ESPERA_RECALCULO = 400;
+  const PAGINA = 50;
+  const CLAVE_COLUMNAS = 'cartera:columnas';
+  const SEGMENTO_POR_DEFECTO = 'segmento_financiero';
+  /** Operational columns only: nothing personal is on screen unless asked for. */
+  const COLUMNAS_POR_DEFECTO = [
+    'pagare',
+    'segmento_financiero',
+    'dias_atraso',
+    'saldo_capital_pendiente',
+    'monto_cuota',
+  ];
+
+  const $ = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
+
+  const estado = {
+    seleccion: null as EstadoSeleccion | null,
+    segmento: null as string | null,
+    segmentoListo: false,
+    columnas: [] as string[],
+    clave: null as string | null,
+    resumen: null as Resumen | null,
+    pagina: null as PaginaCartera | null,
+    desplazamiento: 0,
+  };
+
+  let temporizador = 0;
+  let controlResumen: AbortController | null = null;
+  let controlProductos: AbortController | null = null;
+
+  const esCancelado = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
+
+  // ---- Formatting cells ---------------------------------------------------------
+
+  function formatValor(valor: unknown, tipo: TipoCampo | null): string {
+    if (valor === null || valor === undefined || valor === '') return '—';
+    if (tipo === 'booleano' || typeof valor === 'boolean') {
+      return valor === true || valor === 'true' ? t('selector.filtro.si') : t('selector.filtro.no');
+    }
+    if (typeof valor === 'number') return formatNumber(valor);
+    // Amounts arrive as text on purpose; they never pass through a float.
+    if (tipo === 'numero' && typeof valor === 'string') return formatMonto(valor);
+    if (tipo === 'fecha' && typeof valor === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+      return formatDateCompact(valor);
+    }
+    return String(valor);
+  }
+
+  function celda(etiqueta: 'td' | 'th', texto: string, clase = ''): HTMLTableCellElement {
+    const nodo = document.createElement(etiqueta);
+    nodo.textContent = texto;
+    if (clase) nodo.className = clase;
+    return nodo;
+  }
+
+  function vacio(texto: string): HTMLElement {
+    const bloque = document.createElement('p');
+    bloque.className = 'empty';
+    bloque.textContent = texto;
+    return bloque;
+  }
+
+  // ---- Stand-ins -----------------------------------------------------------------
+
+  type Aviso = 'sinFechas' | 'sinVigente' | 'noAplica' | 'consulta' | null;
+
+  function mostrarAviso(tipo: Aviso, detalle = ''): void {
+    const aviso = $<HTMLElement>('[data-aviso]');
+    const hayAviso = tipo !== null;
+    aviso.hidden = !hayAviso;
+    $<HTMLElement>('[data-metricas]').hidden = hayAviso;
+    $<HTMLElement>('[data-segmentos]').hidden = hayAviso;
+    $<HTMLElement>('[data-productos]').hidden = hayAviso;
+    if (!tipo) return;
+
+    const fecha = estado.seleccion?.fechaCorte;
+    $<HTMLElement>('[data-aviso-titulo]').textContent = t(`cartera.aviso.${tipo}.titulo`, {
+      fecha: fecha ? formatDate(fecha) : '',
+    });
+    $<HTMLElement>('[data-aviso-cuerpo]').textContent =
+      tipo === 'consulta' && detalle ? detalle : t(`cartera.aviso.${tipo}.cuerpo`);
+    $<HTMLElement>('[data-aviso-cargas]').hidden = tipo !== 'sinFechas' && tipo !== 'sinVigente';
+  }
+
+  function pintarCalculando(calculando: boolean): void {
+    const panel = $<HTMLElement>('[data-metricas]');
+    panel.dataset.calculando = String(calculando);
+    panel.setAttribute('aria-busy', String(calculando));
+    $<HTMLElement>('[data-calculo] .dot').classList.toggle('dot--pulse', calculando);
+    const texto = $<HTMLElement>('[data-calculo-texto]');
+    const fecha = estado.seleccion?.fechaCorte;
+    texto.textContent = calculando
+      ? t('cartera.calculando')
+      : fecha
+        ? t('cartera.calculado', { fecha: formatDate(fecha) })
+        : '';
+  }
+
+  // ---- Recalculation ---------------------------------------------------------------
+
+  function programar(): void {
+    window.clearTimeout(temporizador);
+    temporizador = window.setTimeout(() => void recalcular(), ESPERA_RECALCULO);
+  }
+
+  async function recalcular(forzar = false): Promise<void> {
+    const sel = estado.seleccion;
+    if (!sel) return;
+
+    if (!sel.fechaCorte) {
+      estado.clave = null;
+      mostrarAviso('sinFechas');
+      return;
+    }
+    if (!sel.aplicable) {
+      // Nothing is computed over a part that does not apply: the result would
+      // describe a selection nobody wrote.
+      controlResumen?.abort();
+      estado.clave = null;
+      mostrarAviso('noAplica');
+      return;
+    }
+
+    const clave = JSON.stringify([sel.fechaCorte, sel.consulta, estado.segmento]);
+    if (clave === estado.clave && !forzar) return;
+    estado.clave = clave;
+
+    controlResumen?.abort();
+    const control = new AbortController();
+    controlResumen = control;
+    pintarCalculando(true);
+
+    try {
+      const resumen = await resumirCartera(sel.fechaCorte, sel.consulta, estado.segmento, control.signal);
+      if (control.signal.aborted) return;
+      estado.resumen = resumen;
+      mostrarAviso(null);
+      pintarResumen();
+      estado.desplazamiento = 0;
+      void cargarProductos();
+    } catch (error) {
+      if (esCancelado(error)) return;
+      estado.clave = null;
+      if (error instanceof ApiError && error.status === 404) {
+        mostrarAviso('sinVigente');
+      } else if (error instanceof ApiError && error.status === 400) {
+        mostrarAviso('consulta', error.detail);
+      } else if (error instanceof NetworkError) {
+        ponerOffline(true);
+      } else {
+        mostrarAviso('consulta', t('common.errorBody'));
+      }
+    } finally {
+      if (controlResumen === control) pintarCalculando(false);
+    }
+  }
+
+  // ---- Metrics ----------------------------------------------------------------------
+
+  function pintarResumen(): void {
+    const resumen = estado.resumen;
+    const sel = estado.seleccion;
+    if (!resumen || !sel) return;
+
+    const conTope = resumen.seleccion !== null;
+    const flujo = $<HTMLElement>('[data-flujo]');
+    flujo.dataset.suficiente = String(resumen.suficiente);
+    flujo.dataset.sinTope = String(!conTope);
+    $<HTMLElement>('[data-disponibles]').textContent = formatNumber(resumen.disponibles);
+    $<HTMLElement>('[data-solicitados]').textContent =
+      conTope && resumen.solicitados !== null ? formatNumber(resumen.solicitados) : t('cartera.flujo.todos');
+    $<HTMLElement>('[data-flujo-seleccion]').textContent = conTope
+      ? t('cartera.flujo.seleccion')
+      : t('cartera.flujo.sinTope');
+
+    // The one authored moment: the connector draws again once figures land.
+    const conector = $<HTMLElement>('.flujo__conector');
+    conector.classList.remove('flujo__conector--dibujo');
+    void conector.offsetWidth;
+    conector.classList.add('flujo__conector--dibujo');
+
+    const insuficiente = $<HTMLElement>('[data-insuficiente]');
+    insuficiente.hidden = resumen.suficiente;
+    if (!resumen.suficiente && resumen.solicitados !== null) {
+      $<HTMLElement>('[data-insuficiente-texto]').textContent = t('cartera.insuficiente', {
+        solicitados: formatNumber(resumen.solicitados),
+        disponibles: formatNumber(resumen.disponibles),
+      });
+    }
+
+    const u = resumen.universo.metricas;
+    const s = resumen.seleccion?.metricas ?? null;
+    $<HTMLElement>('[data-tabla-metricas]').dataset.sinSeleccion = String(!s);
+
+    const filas: Array<[string, string, string, string]> = [
+      [
+        t('cartera.m.cuentas'),
+        formatNumber(u.cuentas),
+        s ? formatNumber(s.cuentas) : '—',
+        s ? formatParticipacion(s.cuentas, u.cuentas) : '—',
+      ],
+      [
+        t('cartera.m.capital'),
+        formatMonto(u.capital_total),
+        s ? formatMonto(s.capital_total) : '—',
+        s ? formatParticipacion(s.capital_total, u.capital_total) : '—',
+      ],
+      [t('cartera.m.cuotaMin'), formatMonto(u.cuota_minima), s ? formatMonto(s.cuota_minima) : '—', ''],
+      [t('cartera.m.cuotaMax'), formatMonto(u.cuota_maxima), s ? formatMonto(s.cuota_maxima) : '—', ''],
+    ];
+
+    sel.consulta.indicadores.map(leerIndicador).forEach((indicador) => {
+      const tipo = tipoDe(sel.campos, indicador.campo);
+      filas.push([
+        indicador.nombre,
+        formatValor(u.adicionales[indicador.nombre], tipo),
+        s ? formatValor(s.adicionales[indicador.nombre], tipo) : '—',
+        '',
+      ]);
+    });
+
+    $<HTMLElement>('[data-metricas-filas]').replaceChildren(
+      ...filas.map(([etiqueta, universo, seleccion, participacion]) => {
+        const fila = document.createElement('tr');
+        const cabecera = celda('th', etiqueta);
+        cabecera.scope = 'row';
+        fila.append(
+          cabecera,
+          celda('td', universo, 'num'),
+          celda('td', seleccion, 'num col-seleccion'),
+          celda('td', participacion, 'num col-participacion'),
+        );
+        return fila;
+      }),
+    );
+
+    pintarSegmentos();
+  }
+
+  // ---- Segmentation --------------------------------------------------------------------
+
+  function renderOpcionesSegmento(): void {
+    const sel = estado.seleccion;
+    if (!sel) return;
+    const select = $<HTMLSelectElement>('[data-segmento]');
+    const nombres = Object.keys(sel.campos).sort((a, b) => humanizarCampo(a).localeCompare(humanizarCampo(b)));
+    select.replaceChildren(
+      ...[['', t('cartera.segmentos.ninguno')], ...nombres.map((n) => [n, humanizarCampo(n)])].map(
+        ([value, texto]) => {
+          const opcion = document.createElement('option');
+          opcion.value = value;
+          opcion.textContent = texto;
+          opcion.selected = value === (estado.segmento ?? '');
+          return opcion;
+        },
+      ),
+    );
+  }
+
+  function pintarSegmentos(): void {
+    const cuerpo = $<HTMLElement>('[data-segmentos-cuerpo]');
+    const resumen = estado.resumen;
+    const universo = resumen?.universo.segmentacion ?? null;
+    if (!estado.segmento || !universo || !estado.seleccion) {
+      cuerpo.replaceChildren(vacio(t('cartera.segmentos.vacio')));
+      return;
+    }
+
+    const tipo = tipoDe(estado.seleccion.campos, universo.campo);
+    const seleccion = resumen?.seleccion?.segmentacion ?? null;
+    const clave = (valor: unknown) => (valor === null || valor === undefined || valor === '' ? ' ' : String(valor));
+    const deSeleccion = new Map((seleccion?.grupos ?? []).map((grupo) => [clave(grupo.valor), grupo]));
+
+    const tabla = document.createElement('table');
+    tabla.className = 'table segmentos__tabla';
+    tabla.dataset.sinSeleccion = String(!seleccion);
+
+    const head = document.createElement('thead');
+    const grupos = document.createElement('tr');
+    const esquina = celda('th', '');
+    esquina.scope = 'col';
+    const cabU = celda('th', t('cartera.col.universo'), 'segmentos__grupo');
+    cabU.colSpan = 2;
+    cabU.scope = 'colgroup';
+    const cabS = celda('th', t('cartera.col.seleccion'), 'segmentos__grupo col-seleccion');
+    cabS.colSpan = 2;
+    cabS.scope = 'colgroup';
+    grupos.append(esquina, cabU, cabS);
+
+    const nombres = document.createElement('tr');
+    (
+      [
+        ['cartera.col.valor', ''],
+        ['cartera.col.cuentas', 'num'],
+        ['cartera.col.capital', 'num'],
+        ['cartera.col.cuentas', 'num col-seleccion'],
+        ['cartera.col.capital', 'num col-seleccion'],
+      ] as const
+    ).forEach(([key, clase]) => {
+      const th = celda('th', t(key), clase);
+      th.scope = 'col';
+      nombres.append(th);
+    });
+    head.append(grupos, nombres);
+
+    const body = document.createElement('tbody');
+    universo.grupos.forEach((grupo) => {
+      const fila = document.createElement('tr');
+      const enSeleccion = deSeleccion.get(clave(grupo.valor));
+      const etiqueta =
+        clave(grupo.valor) === ' ' ? t('cartera.segmentos.sinValor') : formatValor(grupo.valor, tipo === 'numero' ? null : tipo);
+      const th = celda('th', etiqueta);
+      th.scope = 'row';
+      fila.append(
+        th,
+        celda('td', formatNumber(grupo.cuentas), 'num'),
+        celda('td', formatMonto(grupo.capital), 'num'),
+        celda('td', formatNumber(enSeleccion?.cuentas ?? 0), 'num col-seleccion'),
+        celda('td', formatMonto(enSeleccion?.capital ?? '0'), 'num col-seleccion'),
+      );
+      body.append(fila);
+    });
+
+    tabla.append(head, body);
+    const scroll = document.createElement('div');
+    scroll.className = 'table-scroll';
+    scroll.append(tabla);
+    cuerpo.replaceChildren(scroll);
+  }
+
+  $<HTMLSelectElement>('[data-segmento]').addEventListener('change', (event) => {
+    estado.segmento = (event.currentTarget as HTMLSelectElement).value || null;
+    void recalcular();
+  });
+
+  // ---- Products ----------------------------------------------------------------------
+
+  function leerColumnasGuardadas(): string[] | null {
+    try {
+      const crudo = localStorage.getItem(CLAVE_COLUMNAS);
+      const lista = crudo ? (JSON.parse(crudo) as unknown) : null;
+      return Array.isArray(lista) && lista.every((x) => typeof x === 'string') ? lista : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function guardarColumnas(): void {
+    try {
+      localStorage.setItem(CLAVE_COLUMNAS, JSON.stringify(estado.columnas));
+    } catch {
+      /* Blocked storage: the choice still holds for this visit. */
+    }
+  }
+
+  function renderColumnas(): void {
+    const sel = estado.seleccion;
+    if (!sel) return;
+    const lista = $<HTMLElement>('[data-columnas-lista]');
+    const leyenda = lista.querySelector('legend')!;
+    const nombres = Object.keys(sel.campos).sort((a, b) => humanizarCampo(a).localeCompare(humanizarCampo(b)));
+    lista.replaceChildren(
+      leyenda,
+      ...nombres.map((nombre) => {
+        const etiqueta = document.createElement('label');
+        etiqueta.className = 'columnas__opcion';
+        const casilla = document.createElement('input');
+        casilla.type = 'checkbox';
+        casilla.value = nombre;
+        casilla.checked = estado.columnas.includes(nombre);
+        // The key is what traces a product back to its row in the sheet.
+        casilla.disabled = nombre === 'pagare';
+        casilla.addEventListener('change', () => {
+          estado.columnas = casilla.checked
+            ? nombres.filter((n) => n === nombre || estado.columnas.includes(n))
+            : estado.columnas.filter((n) => n !== nombre);
+          if (!estado.columnas.includes('pagare')) estado.columnas.unshift('pagare');
+          estado.columnas = ['pagare', ...estado.columnas.filter((n) => n !== 'pagare')];
+          guardarColumnas();
+          pintarProductos();
+        });
+        etiqueta.append(casilla, document.createTextNode(humanizarCampo(nombre)));
+        return etiqueta;
+      }),
+    );
+  }
+
+  /** How many products the list walks: the top n, capped by what exists. */
+  function tope(): number {
+    const resumen = estado.resumen;
+    if (!resumen) return 0;
+    const cantidad = estado.seleccion?.consulta.cantidad ?? null;
+    return cantidad ? Math.min(cantidad, resumen.disponibles) : resumen.disponibles;
+  }
+
+  async function cargarProductos(): Promise<void> {
+    const sel = estado.seleccion;
+    if (!sel?.fechaCorte || !estado.resumen) return;
+    const total = tope();
+    const cuerpo = $<HTMLElement>('[data-productos-cuerpo]');
+
+    controlProductos?.abort();
+    if (total === 0) {
+      estado.pagina = null;
+      pintarProductos();
+      return;
+    }
+
+    const control = new AbortController();
+    controlProductos = control;
+    if (!estado.pagina) cuerpo.replaceChildren(vacio(t('cartera.productos.cargando')));
+
+    try {
+      estado.pagina = await consultarCartera(
+        sel.fechaCorte,
+        { filtros: sel.consulta.filtros, orden: sel.consulta.orden },
+        { limite: Math.min(PAGINA, total - estado.desplazamiento), desplazamiento: estado.desplazamiento },
+        control.signal,
+      );
+      if (control.signal.aborted) return;
+      pintarProductos();
+    } catch (error) {
+      if (esCancelado(error)) return;
+      if (error instanceof NetworkError) {
+        ponerOffline(true);
+        return;
+      }
+      cuerpo.replaceChildren(vacio(error instanceof ApiError && error.detail ? error.detail : t('common.errorBody')));
+    }
+  }
+
+  function pintarProductos(): void {
+    const sel = estado.seleccion;
+    const cuerpo = $<HTMLElement>('[data-productos-cuerpo]');
+    const cuenta = $<HTMLElement>('[data-productos-cuenta]');
+    const pager = $<HTMLElement>('[data-pager]');
+    const total = tope();
+
+    cuenta.textContent =
+      total === 1 ? t('cartera.productos.cuentaUna') : t('cartera.productos.cuenta', { n: formatNumber(total) });
+
+    if (!sel || total === 0 || !estado.pagina) {
+      cuerpo.replaceChildren(vacio(t('cartera.productos.vacio')));
+      pager.hidden = true;
+      return;
+    }
+
+    const columnas = estado.columnas.filter((nombre) => nombre in sel.campos);
+    const tabla = document.createElement('table');
+    tabla.className = 'table productos__tabla';
+
+    const head = document.createElement('thead');
+    const filaHead = document.createElement('tr');
+    columnas.forEach((nombre) => {
+      const th = celda('th', humanizarCampo(nombre), tipoDe(sel.campos, nombre) === 'numero' ? 'num' : '');
+      th.scope = 'col';
+      filaHead.append(th);
+    });
+    head.append(filaHead);
+
+    const body = document.createElement('tbody');
+    estado.pagina.productos.forEach((producto) => {
+      const fila = document.createElement('tr');
+      columnas.forEach((nombre) => {
+        const tipo = tipoDe(sel.campos, nombre);
+        fila.append(celda('td', formatValor(producto[nombre], tipo), tipo === 'numero' ? 'num' : ''));
+      });
+      body.append(fila);
+    });
+
+    tabla.append(head, body);
+    const scroll = document.createElement('div');
+    scroll.className = 'table-scroll';
+    scroll.tabIndex = 0;
+    scroll.setAttribute('role', 'region');
+    scroll.setAttribute('aria-labelledby', 'productos-title');
+    scroll.append(tabla);
+    cuerpo.replaceChildren(scroll);
+
+    pager.hidden = total <= PAGINA;
+    if (!pager.hidden) {
+      const desde = estado.desplazamiento + 1;
+      const hasta = Math.min(estado.desplazamiento + estado.pagina.productos.length, total);
+      $<HTMLElement>('[data-page-range]').textContent = t('console.incidencias.range', {
+        desde: formatNumber(desde),
+        hasta: formatNumber(hasta),
+        total: formatNumber(total),
+      });
+      $<HTMLButtonElement>('[data-page-prev]').disabled = estado.desplazamiento === 0;
+      $<HTMLButtonElement>('[data-page-next]').disabled = hasta >= total;
+    }
+  }
+
+  $<HTMLButtonElement>('[data-page-prev]').addEventListener('click', () => {
+    estado.desplazamiento = Math.max(0, estado.desplazamiento - PAGINA);
+    void cargarProductos();
+  });
+
+  $<HTMLButtonElement>('[data-page-next]').addEventListener('click', () => {
+    estado.desplazamiento += PAGINA;
+    void cargarProductos();
+  });
+
+  // ---- Wiring ------------------------------------------------------------------------
+
+  const raiz = $<HTMLElement>('[data-selector]');
+
+  raiz.addEventListener(EVENTO_SELECCION, (event) => {
+    const sel = (event as CustomEvent<EstadoSeleccion>).detail;
+    estado.seleccion = sel;
+
+    if (!estado.segmentoListo) {
+      estado.segmentoListo = true;
+      estado.segmento = SEGMENTO_POR_DEFECTO in sel.campos ? SEGMENTO_POR_DEFECTO : null;
+      const guardadas = leerColumnasGuardadas();
+      estado.columnas = (guardadas ?? COLUMNAS_POR_DEFECTO).filter((nombre) => nombre in sel.campos);
+      if (!estado.columnas.includes('pagare') && 'pagare' in sel.campos) estado.columnas.unshift('pagare');
+      renderOpcionesSegmento();
+      renderColumnas();
+    }
+
+    if (!sel.fechaCorte || !sel.aplicable) {
+      void recalcular();
+      return;
+    }
+    // Figures dim at once, so the analyst sees the edit was heard.
+    const clave = JSON.stringify([sel.fechaCorte, sel.consulta, estado.segmento]);
+    if (clave !== estado.clave) pintarCalculando(true);
+    programar();
+  });
+
+  function ponerOffline(offline: boolean): void {
+    $<HTMLElement>('[data-offline]').hidden = !offline;
+    $<HTMLElement>('[data-contenido]').hidden = offline;
+    $<HTMLElement>('[data-productos]').hidden = offline;
+    document.dispatchEvent(new CustomEvent('healthchanged'));
+  }
+
+  let montado = false;
+
+  async function arrancar(): Promise<void> {
+    try {
+      if (!montado) {
+        await montarSelector(raiz);
+        montado = true;
+      } else {
+        await recalcular(true);
+      }
+      ponerOffline(false);
+    } catch {
+      ponerOffline(true);
+    }
+  }
+
+  const reintentar = $<HTMLButtonElement>('[data-reintentar]');
+  reintentar.addEventListener('click', async () => {
+    reintentar.dataset.loading = 'true';
+    reintentar.disabled = true;
+    try {
+      await arrancar();
+    } finally {
+      reintentar.dataset.loading = 'false';
+      reintentar.disabled = false;
+    }
+  });
+
+  document.addEventListener('languagechange', () => {
+    applyTranslations();
+    renderOpcionesSegmento();
+    renderColumnas();
+    pintarResumen();
+    pintarProductos();
+    pintarCalculando(false);
+  });
+
+  void arrancar();
+</script>

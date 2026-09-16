@@ -6,7 +6,14 @@
  */
 import type { Page, Route } from '@playwright/test';
 
-import type { Incidencia, Version } from '../src/lib/api';
+import type {
+  Campos,
+  Incidencia,
+  Resumen,
+  Revision,
+  SeleccionGuardada,
+  Version,
+} from '../src/lib/api';
 
 /**
  * Fake responses are typed against the real contract, so a fake the backend
@@ -50,7 +57,103 @@ export interface ApiFalsa {
   /** Statuses `GET /cargas/{id}` walks through while following a load. */
   seguimiento: VersionFalsa[];
   /** Requests the page actually made, for asserting on the call itself. */
-  pedidos: Array<{ metodo: string; url: string }>;
+  pedidos: Array<{ metodo: string; url: string; cuerpo?: string | null }>;
+  /** The portfolio catalogue `GET /cartera/campos` returns. */
+  campos: Campos;
+  /** Answers `GET /cartera/resumen`, given the request URL. */
+  resumen: (url: URL) => { estado: number; cuerpo: unknown };
+  /** Products `GET /cartera` pages through. */
+  productos: Array<Record<string, unknown>>;
+  /** Saved selections `GET /selecciones` lists. */
+  selecciones: SeleccionGuardada[];
+  /** Answers `POST /selecciones/revision`. */
+  revision: Revision;
+  /** Answers `POST /selecciones` in order; the last one repeats. */
+  respuestasCrearSeleccion: Array<{ estado: number; cuerpo: unknown }>;
+}
+
+/** A synthetic catalogue: the operational fields plus one text field. */
+export function camposSinteticos(): Campos {
+  const numero = { tipo: 'numero', operadores: ['igual', 'mayor', 'menor', 'entre', 'vacio', 'no_vacio'] };
+  const texto = { tipo: 'texto', operadores: ['igual', 'distinto', 'en', 'contiene', 'vacio', 'no_vacio'] };
+  return {
+    pagare: texto,
+    segmento_financiero: texto,
+    region: texto,
+    dias_atraso: numero,
+    saldo_capital_pendiente: numero,
+    monto_cuota: numero,
+  };
+}
+
+const metricas = (cuentas: number, capital: string) => ({
+  cuentas,
+  capital_total: capital,
+  cuota_minima: '85.10',
+  cuota_maxima: '4210.75',
+  cuentas_por_segmento: {},
+  adicionales: {},
+});
+
+/**
+ * A summary that honours the request: 3 200 products meet any filter, and the
+ * selection block exists only when a count was asked for (RF-08).
+ */
+export function resumenSintetico(url: URL, disponibles = 3200): Resumen {
+  const cantidad = url.searchParams.get('cantidad');
+  const solicitados = cantidad ? Number(cantidad) : null;
+  const segmento = url.searchParams.get('segmento');
+  const segmentacion = (a: number, b: number) =>
+    segmento
+      ? {
+          campo: segmento,
+          grupos: [
+            { valor: '1. Preventiva', cuentas: a, capital: '120000.00' },
+            { valor: null, cuentas: b, capital: '5000.50' },
+          ],
+        }
+      : null;
+  return {
+    disponibles,
+    solicitados,
+    suficiente: solicitados === null || solicitados <= disponibles,
+    // The universe carries an amount no JavaScript number can hold exactly.
+    universo: { metricas: metricas(disponibles, '9007199254740993.01'), segmentacion: segmentacion(3000, 200) },
+    seleccion: solicitados
+      ? {
+          metricas: metricas(Math.min(solicitados, disponibles), '4812345.67'),
+          segmentacion: segmentacion(Math.min(solicitados, disponibles), 0),
+        }
+      : null,
+  };
+}
+
+/** Synthetic products: no names, documents or phones, ever. */
+export function productosSinteticos(n: number): Array<Record<string, unknown>> {
+  return Array.from({ length: n }, (_, i) => ({
+    pagare: String(100 + i).padStart(18, '0'),
+    segmento_financiero: '1. Preventiva',
+    region: 'REGION SINTETICA',
+    dias_atraso: i % 90,
+    saldo_capital_pendiente: `${1500 + i}.50`,
+    monto_cuota: '120.00',
+  }));
+}
+
+export function seleccionGuardada(parcial: Partial<SeleccionGuardada> = {}): SeleccionGuardada {
+  return {
+    id: 1,
+    nombre: 'Preventiva mayor saldo',
+    filtros: ['segmento_financiero:igual:1. Preventiva'],
+    orden: '-saldo_capital_pendiente',
+    cantidad: 500,
+    indicadores: [],
+    creado_en: '2026-09-10T08:15:00-05:00',
+    actualizado_en: '2026-09-10T08:15:00-05:00',
+    aplicable: true,
+    problemas: [],
+    ...parcial,
+  };
 }
 
 export function apiVacia(): ApiFalsa {
@@ -61,6 +164,12 @@ export function apiVacia(): ApiFalsa {
     respuestasEliminar: [],
     seguimiento: [],
     pedidos: [],
+    campos: camposSinteticos(),
+    resumen: (url) => ({ estado: 200, cuerpo: resumenSintetico(url) }),
+    productos: productosSinteticos(120),
+    selecciones: [],
+    revision: { aplicable: true, problemas: [] },
+    respuestasCrearSeleccion: [],
   };
 }
 
@@ -83,10 +192,56 @@ export async function montarApi(page: Page, estado: ApiFalsa): Promise<void> {
     const url = new URL(pedido.url());
     const ruta = url.pathname.replace(/^\/api/, '');
     const metodo = pedido.method();
-    estado.pedidos.push({ metodo, url: pedido.url() });
+    estado.pedidos.push({ metodo, url: pedido.url(), cuerpo: pedido.postData() });
 
     if (ruta === '/health') {
       return json(route, 200, { api: true, database: true, ok: true });
+    }
+
+    if (ruta === '/cartera/campos') return json(route, 200, estado.campos);
+
+    if (ruta === '/cartera/resumen') {
+      const respuesta = estado.resumen(url);
+      return json(route, respuesta.estado, respuesta.cuerpo);
+    }
+
+    if (ruta === '/cartera') {
+      const limite = Number(url.searchParams.get('limite') ?? 50);
+      const desplazamiento = Number(url.searchParams.get('desplazamiento') ?? 0);
+      return json(route, 200, {
+        total: estado.productos.length,
+        limite,
+        desplazamiento,
+        suficiente: estado.productos.length >= limite + desplazamiento,
+        productos: estado.productos.slice(desplazamiento, desplazamiento + limite),
+      });
+    }
+
+    if (ruta === '/selecciones' && metodo === 'GET') return json(route, 200, estado.selecciones);
+
+    if (ruta === '/selecciones/revision') return json(route, 200, estado.revision);
+
+    if (ruta === '/selecciones' && metodo === 'POST') {
+      const entrada = JSON.parse(pedido.postData() ?? '{}') as Partial<SeleccionGuardada>;
+      const respuesta = siguiente(estado.respuestasCrearSeleccion) ?? {
+        estado: 201,
+        cuerpo: seleccionGuardada({ ...entrada, id: 99 }),
+      };
+      if (respuesta.estado === 201) estado.selecciones.push(respuesta.cuerpo as SeleccionGuardada);
+      return json(route, respuesta.estado, respuesta.cuerpo);
+    }
+
+    const seleccion = ruta.match(/^\/selecciones\/(\d+)$/);
+    if (seleccion && metodo === 'PUT') {
+      const id = Number(seleccion[1]);
+      const entrada = JSON.parse(pedido.postData() ?? '{}') as Partial<SeleccionGuardada>;
+      const actualizada = seleccionGuardada({ ...entrada, id });
+      estado.selecciones = estado.selecciones.map((s) => (s.id === id ? actualizada : s));
+      return json(route, 200, actualizada);
+    }
+    if (seleccion && metodo === 'DELETE') {
+      estado.selecciones = estado.selecciones.filter((s) => s.id !== Number(seleccion[1]));
+      return route.fulfill({ status: 204, body: '' });
     }
 
     if (ruta === '/cargas' && metodo === 'GET') {

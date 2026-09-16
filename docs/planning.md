@@ -70,7 +70,7 @@ Avance:
 - [x] Endpoints `GET /cartera`, `/cartera/campos`, `/cartera/metricas` y `/cartera/segmentacion`, probados contra PostgreSQL.
 - [x] Métricas del universo filtrado y de los primeros n lado a lado, en un solo llamado (`GET /cartera/resumen`), con el mismo orden y desempate que la lista y el archivo de carga. Pedido por la pantalla de selección.
 - [x] Selecciones guardadas y compartidas (filtros, orden, cantidad e indicadores, sin fecha de corte): se rechazan inválidas al guardar y se devuelven marcadas si pierden validez al cargar. Ver `docs/selecciones-guardadas.md`.
-- [ ] Pantalla de selección, filtros y métricas en el frontend, con recálculo automático al cambiar la selección (RF-28).
+- [x] Pantalla de selección, filtros y métricas en el frontend (`/cartera`), con recálculo automático al cambiar la selección (RF-28): un solo pedido a `/cartera/resumen` por cambio, universo y primeros n lado a lado, aviso explícito de insuficiencia, segmentación, lista paginada de productos con columnas elegibles y selecciones guardadas compartidas con revisión en vivo. El selector de fecha y selección es un componente reutilizable (`SelectorSeleccion.astro` + `scripts/selector-seleccion.ts`).
 - [ ] **Bloqueado — RF-07, control de gestiones multicanal:** requiere que existan las gestiones (VoIP, SMS, WhatsApp, correo) y sus fuentes. Se retoma cuando haya un modelo de gestiones, previsiblemente junto con la Fase 5.
 
 Alcance:
