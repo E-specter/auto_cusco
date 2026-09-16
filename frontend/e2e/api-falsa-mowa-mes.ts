@@ -9,11 +9,15 @@
 import type { Page, Route } from '@playwright/test';
 
 import type {
+  AvisoCampana,
   Campana,
   CodigoMowaMes,
   Conciliacion,
   ConsumoLimite,
+  CreacionCampanaEntrada,
   Exclusion,
+  PeticionCampanaEntrada,
+  PrevisualizacionCampana,
   ConfiguracionMowaMes,
   ConfiguracionSupervision,
   ConfiguracionSupervisionEntrada,
@@ -307,6 +311,119 @@ export function exclusionesSinteticas(n: number): Exclusion[] {
   }));
 }
 
+// ---- Campaign preview and creation (T-MM-F2, part A) --------------------------------
+
+const SIN_ERRORES_NI_ADVERTENCIAS: { errores: AvisoCampana[]; advertencias: AvisoCampana[] } = {
+  errores: [],
+  advertencias: [],
+};
+
+/**
+ * A happy-path preview built from the request: 2% of the evaluated products
+ * excluded, 2 supervisors, one file. Override any field with `parcial`, the
+ * same pattern as `campanaSintetica` and `conciliacionSintetica` — this does
+ * not simulate the backend's rules (whatsapp missing, no supervisors, huella,
+ * the limit), which a scenario states explicitly through `parcial` instead.
+ */
+export function previsualizacionCampanaSintetica(
+  entrada: PeticionCampanaEntrada,
+  parcial: Partial<PrevisualizacionCampana> = {},
+): PrevisualizacionCampana {
+  const cantidad = entrada.cantidad;
+  const excluidos = Math.min(20, Math.max(0, Math.floor(cantidad * 0.02)));
+  const evaluados = cantidad;
+  const productos = evaluados - excluidos;
+  const supervision = 2;
+  const totalCargados = productos + supervision;
+  const speechId = entrada.speech_id ?? 1;
+  const descripcionSugerida = 'CajaCusco 9 <= dias atraso <= 30';
+
+  return {
+    descripcion: entrada.descripcion?.trim() || descripcionSugerida,
+    descripcion_sugerida: descripcionSugerida,
+    fecha_generacion: '2026-09-16',
+    fecha_envio: '2026-09-17',
+    speech: { id: speechId, nombre: speechId === 1 ? 'Speech original' : `Speech ${speechId}`, huella: 'a'.repeat(64) },
+    whatsapp: entrada.whatsapp?.trim() || '900000999',
+    supervisores: (
+      entrada.supervisores ?? [
+        { numero: '900000101', procedencia: 'Procedencia A' },
+        { numero: '900000102', procedencia: 'Procedencia B' },
+      ]
+    ).map((s, i) => ({ ...s, documento: String(i + 1).padStart(8, '0') })),
+    disponibles: Math.max(cantidad, 1200),
+    solicitados: cantidad,
+    evaluados,
+    productos_cargados: productos,
+    supervision_cargados: supervision,
+    total_cargados: totalCargados,
+    excluidos,
+    exclusiones_por_codigo: excluidos > 0 ? [{ codigo: 'telefono_invalido', tipo: 'exclusion', cantidad: excluidos }] : [],
+    advertencias_por_codigo: [],
+    productos_por_segmento: [{ segmento: '9_a_30', etiqueta: '9 a 30', cantidad: productos }],
+    muestra: [],
+    exclusiones: {
+      total: excluidos,
+      limite: 100,
+      desplazamiento: 0,
+      exclusiones: exclusionesSinteticas(Math.min(excluidos, 5)),
+    },
+    archivos_previstos_por_filas: [{ numero: 1, filas: totalCargados, supervision }],
+    limite: consumoSintetico('2026-09', { esta_campana: totalCargados, total: 982 + totalCargados }),
+    ...SIN_ERRORES_NI_ADVERTENCIAS,
+    puede_crear: true,
+    ...parcial,
+  };
+}
+
+/**
+ * The campaign a successful `POST /mowa-mes/campanas` would answer with,
+ * built from the same happy-path preview so the two stay consistent. As with
+ * the other generators, override anything through `parcial`.
+ */
+export function campanaDesdeEntrada(
+  entrada: CreacionCampanaEntrada,
+  id: number,
+  parcial: Partial<Campana> = {},
+): Campana {
+  const previa = previsualizacionCampanaSintetica(entrada);
+  return {
+    id,
+    creado_en: '2026-09-16T15:00:00+00:00',
+    fecha_corte: entrada.fecha_corte,
+    filtros: entrada.filtros ?? [],
+    orden: entrada.orden ?? null,
+    cantidad: entrada.cantidad,
+    seleccion_id: entrada.seleccion_id ?? null,
+    tipo_carga: entrada.tipo_carga ?? 'masiva',
+    descripcion: entrada.descripcion?.trim() || previa.descripcion_sugerida,
+    salida: entrada.salida ?? 'numero_largo',
+    herramientas: {
+      keyword: entrada.herramientas?.keyword ?? false,
+      respuesta_automatica: false,
+      blacklist_indecopi: entrada.herramientas?.blacklist_indecopi ?? false,
+      speech_optimizado: false,
+    },
+    programacion: entrada.programacion ?? 'hora_determinada',
+    envios: entrada.envios ?? [],
+    fecha_envio: previa.fecha_envio,
+    mes_imputacion: previa.fecha_envio.slice(0, 7),
+    speech: { id: previa.speech.id, nombre: previa.speech.nombre },
+    whatsapp: previa.whatsapp,
+    supervisores: previa.supervisores,
+    disponibles: previa.disponibles,
+    evaluados: previa.evaluados,
+    productos_cargados: previa.productos_cargados,
+    supervision_cargados: previa.supervision_cargados,
+    total_cargados: previa.total_cargados,
+    excluidos: previa.excluidos,
+    advertencias: previa.advertencias_por_codigo.reduce((total, c) => total + c.cantidad, 0),
+    confirmo_limite: entrada.confirmar_limite ?? false,
+    archivos: previa.archivos_previstos_por_filas.map((archivo) => ({ ...archivo, bytes: archivo.filas * 60 })),
+    ...parcial,
+  };
+}
+
 export interface ApiFalsaMowaMes {
   configuracion: ConfiguracionMowaMes;
   supervision: ConfiguracionSupervision;
@@ -330,6 +447,8 @@ export interface ApiFalsaMowaMes {
     editarSpeech: Respuesta[];
     crearExcepcion: Respuesta[];
     importarReporte: Respuesta[];
+    previsualizarCampana: Respuesta[];
+    crearCampana: Respuesta[];
   };
   /** When true, every call fails at the network level. */
   sinRed: boolean;
@@ -367,6 +486,8 @@ export function apiMowaMes(): ApiFalsaMowaMes {
       editarSpeech: [],
       crearExcepcion: [],
       importarReporte: [],
+      previsualizarCampana: [],
+      crearCampana: [],
     },
     sinRed: false,
     pedidos: [],
@@ -631,6 +752,48 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
     if (ruta === '/mowa-mes/campanas' && metodo === 'GET') {
       const { elementos, ...resto } = pagina(estado.campanas, 50);
       return json(route, 200, { ...resto, campanas: elementos });
+    }
+
+    if (ruta === '/mowa-mes/campanas/previsualizacion' && metodo === 'POST') {
+      const guion = siguiente(estado.respuestas.previsualizarCampana);
+      if (guion) return json(route, guion.estado, guion.cuerpo ?? {});
+      const entrada = cuerpo as PeticionCampanaEntrada;
+      // Same order and text as the backend's `_validar_opciones` (docs/mowa-mes.md §9).
+      if (entrada.tipo_carga && entrada.tipo_carga !== 'masiva') {
+        return json(route, 400, { detail: 'El tipo de carga Personalizada todavia no esta habilitado' });
+      }
+      if (entrada.salida && entrada.salida !== 'numero_largo') {
+        return json(route, 400, { detail: 'Solo la salida Numero largo esta habilitada' });
+      }
+      if (entrada.herramientas?.respuesta_automatica) {
+        return json(route, 400, { detail: 'La respuesta automatica todavia no esta habilitada' });
+      }
+      // `cantidad` is bounded by FastAPI's own field validation (ge=1, le=120000)
+      // before the request ever reaches the service, so out-of-range values are
+      // a 422 there, not the core's 400 — and PeticionCampanaEntrada['cantidad']
+      // is `number` in the generated types, so this route should not need to
+      // reject it at all. A scenario that must simulate the 422 scripts it
+      // through `respuestas.previsualizarCampana`.
+      if (entrada.speech_id != null && !estado.versiones.some((v) => v.id === entrada.speech_id)) {
+        return json(route, 404, { detail: `No existe la version ${entrada.speech_id}` });
+      }
+      return json(route, 200, previsualizacionCampanaSintetica(entrada));
+    }
+
+    if (ruta === '/mowa-mes/campanas' && metodo === 'POST') {
+      const guion = siguiente(estado.respuestas.crearCampana);
+      if (guion) return json(route, guion.estado, guion.cuerpo ?? {});
+      const entrada = cuerpo as CreacionCampanaEntrada;
+      if (!entrada.speech_huella) {
+        return json(route, 422, { detail: [{ loc: ['body', 'speech_huella'], msg: 'Field required', type: 'missing' }] });
+      }
+      // A stale huella or an exceeded limit are scripted through
+      // `respuestas.crearCampana`, not modeled here: this default is the
+      // happy path, like `previsualizacionCampanaSintetica`.
+      const id = Math.max(0, ...estado.campanas.map((c) => c.id)) + 1;
+      const nueva = campanaDesdeEntrada(entrada, id);
+      estado.campanas = [nueva, ...estado.campanas];
+      return json(route, 201, nueva);
     }
 
     if (ruta === '/mowa-mes/limite-mensual' && metodo === 'GET') {

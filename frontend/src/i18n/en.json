@@ -401,5 +401,9 @@
   "mowaMes.seguimiento.exclusiones.motivo.sin_speech": "No speech",
   "mowaMes.seguimiento.exclusiones.motivo.falta_titular": "No holder",
   "mowaMes.seguimiento.exclusiones.motivo.falta_vencimiento": "No due date",
-  "mowaMes.seguimiento.exclusiones.motivo.mensaje_excede_160": "Over 160"
+  "mowaMes.seguimiento.exclusiones.motivo.mensaje_excede_160": "Over 160",
+  "mowaMes.campana.resumen.sinProblemas": "No errors or warnings: the campaign can be created.",
+  "mowaMes.campana.archivoPrevisto": "File {n} of {total} (estimated): {filas} rows, {supervision} of supervision.",
+  "mowaMes.campana.archivoPrevisto.nota": "Estimate by rows only: the real byte size can split a file further.",
+  "mowaMes.campana.limite.excedido": "The campaign would exceed the monthly limit: {cargados} of {limite}. Creating it requires confirmation."
 }

@@ -45,6 +45,21 @@ export type EstadoConteo = Esquemas['EstadoConteoRespuesta'];
 export type CifrasId = Esquemas['CifrasIdRespuesta'];
 export type AdvertenciaReporte = Esquemas['AdvertenciaReporteRespuesta'];
 export type ReporteImportado = Esquemas['ReporteImportadoRespuesta'];
+export type PeticionCampanaEntrada = Esquemas['PeticionCampanaEntrada'];
+export type CreacionCampanaEntrada = Esquemas['CreacionCampanaEntrada'];
+export type PrevisualizacionCampana = Esquemas['PrevisualizacionCampanaRespuesta'];
+export type AvisoCampana = Esquemas['AvisoCampanaRespuesta'];
+export type ArchivoPrevisto = Esquemas['ArchivoPrevistoRespuesta'];
+export type CodigoConteo = Esquemas['CodigoConteoRespuesta'];
+export type FilaMuestra = Esquemas['FilaMuestraRespuesta'];
+export type SegmentoConteo = Esquemas['SegmentoConteoRespuesta'];
+export type SupervisorAsignado = Esquemas['SupervisorAsignadoRespuesta'];
+export type SpeechCampana = Esquemas['SpeechCampanaRespuesta'];
+export type HerramientasEntrada = Esquemas['HerramientasModelo'];
+export type ProgramacionCampana = Esquemas['Programacion'];
+export type TipoCarga = Esquemas['TipoCarga'];
+export type Salida = Esquemas['Salida'];
+export type SupervisorCampanaEntrada = Esquemas['SupervisorCampanaEntrada'];
 
 function conJson(method: string, cuerpo: unknown, signal?: AbortSignal): RequestInit {
   return {
@@ -182,4 +197,29 @@ export function obtenerConciliacion(id: number): Promise<Conciliacion> {
 export function siguienteDiaGestionable(desde?: string): Promise<SiguienteDia> {
   const query = desde ? `?${new URLSearchParams({ desde })}` : '';
   return request<SiguienteDia>(`/calendario/siguiente-dia-gestionable${query}`);
+}
+
+/**
+ * Preview a campaign without persisting it. Answers 200 even when it cannot be
+ * created (`puede_crear: false`, with `errores`); 400 for disabled options or
+ * an out-of-range quantity; 404 without a current sheet version or an unknown
+ * speech id.
+ */
+export function previsualizarCampana(
+  entrada: PeticionCampanaEntrada,
+  signal?: AbortSignal,
+): Promise<PrevisualizacionCampana> {
+  return request<PrevisualizacionCampana>(
+    '/mowa-mes/campanas/previsualizacion',
+    conJson('POST', entrada, signal),
+  );
+}
+
+/**
+ * Create a campaign. `speech_huella` must be the one the last preview
+ * returned; a 409 means either the speech changed since (huella mismatch) or
+ * the month's limit is exceeded and `confirmar_limite` was not sent.
+ */
+export function crearCampana(entrada: CreacionCampanaEntrada): Promise<Campana> {
+  return request<Campana>('/mowa-mes/campanas', conJson('POST', entrada));
 }

@@ -401,5 +401,9 @@
   "mowaMes.seguimiento.exclusiones.motivo.sin_speech": "Sin speech",
   "mowaMes.seguimiento.exclusiones.motivo.falta_titular": "Sin titular",
   "mowaMes.seguimiento.exclusiones.motivo.falta_vencimiento": "Sin vencimiento",
-  "mowaMes.seguimiento.exclusiones.motivo.mensaje_excede_160": "Más de 160"
+  "mowaMes.seguimiento.exclusiones.motivo.mensaje_excede_160": "Más de 160",
+  "mowaMes.campana.resumen.sinProblemas": "Sin errores ni advertencias: la campaña se puede crear.",
+  "mowaMes.campana.archivoPrevisto": "Archivo {n} de {total} (estimado): {filas} filas, {supervision} de supervisión.",
+  "mowaMes.campana.archivoPrevisto.nota": "Estimación solo por filas: el tamaño real en bytes puede dividir un archivo en más.",
+  "mowaMes.campana.limite.excedido": "La campaña superaría el límite mensual: {cargados} de {limite}. Crearla exige confirmación."
 }
