@@ -395,3 +395,45 @@
   color: var(--color-text-muted);
   text-decoration: line-through;
 }
+
+/* ---- Campaign (/mowa-mes/campana) ------------------------------------------- */
+
+.mm-campana__previsualizacion .panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mm-campana__resumen {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.mm-campana__resumen:empty {
+  display: none;
+}
+
+.mm-programacion__multiples {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mm-archivos-previstos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-inline-start: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+/* The synthetic message column reads like data, and is the one column allowed
+   to grow: the analyst compares it against the 160-character SMS limit. */
+.mm-muestra__tabla td:nth-last-child(2) {
+  max-inline-size: 32ch;
+  overflow-wrap: anywhere;
+}
+
+.mm-muestra__tabla .tag {
+  margin-inline-end: var(--space-1);
+}
