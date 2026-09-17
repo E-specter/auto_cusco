@@ -1,8 +1,10 @@
 r"""Mide una campana de MOWA MES con una sabana sintetica de volumen real.
 
-Uso, desde backend/ y con la base migrada:
+Uso, desde backend/ y con la base de pruebas migrada (nunca la de trabajo: el script
+se detiene si DB_NAME no termina en _test):
 
     uv run python scripts/generar_sabana_sintetica.py sabana_46k.xlsx --filas 46000
+    $env:DB_NAME = "auto_cusco_test"
     uv run python scripts/medir_campana_mowa_mes.py sabana_46k.xlsx
 
 Ingesta la sabana en una fecha de 2099, arma la campana completa (todos los
@@ -48,6 +50,7 @@ from app.adapters.persistence.repositorio_mowa_mes_postgres import (  # noqa: E4
 from app.adapters.persistence.repositorio_supervision_postgres import (  # noqa: E402
     RepositorioSupervisionPostgres,
 )
+from app.core.config import exigir_base_de_pruebas, get_settings  # noqa: E402
 from app.core.entities.gestiones_digitales import ConfiguracionSupervision, Supervisor  # noqa: E402
 from app.core.entities.mowa_mes import Programacion  # noqa: E402
 from app.core.entities.mowa_mes_campana import PeticionCampana  # noqa: E402
@@ -87,6 +90,9 @@ def _medir(nombre: str, accion):
 
 
 def main() -> None:
+    motivo = exigir_base_de_pruebas(get_settings())
+    if motivo:
+        sys.exit(motivo)
     sabana = Path(sys.argv[1])
     engine = get_engine()
     supervision = RepositorioSupervisionPostgres(engine)

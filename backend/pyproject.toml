@@ -33,7 +33,7 @@ ignore = ["B008"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    "postgres: integracion contra el PostgreSQL de /.env; solo corre con AUTO_CUSCO_DB_TESTS=1",
+    "postgres: integracion contra la base de pruebas (DB_NAME con sufijo _test); solo corre con AUTO_CUSCO_DB_TESTS=1",
 ]
 
 [build-system]

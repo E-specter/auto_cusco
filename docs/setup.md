@@ -114,8 +114,8 @@ curl http://127.0.0.1:8000/cargas/1
 # Tests (no requieren PostgreSQL real)
 uv run pytest
 
-# Integración opcional contra la base de /.env (requiere el paso 6; usa la fecha 2099 y borra lo que crea)
-$env:AUTO_CUSCO_DB_TESTS = "1"; uv run pytest -m postgres; Remove-Item Env:AUTO_CUSCO_DB_TESTS
+# Integración contra la base de pruebas auto_cusco_test, nunca la de /.env (requiere el paso 6)
+.\scripts\verificar.ps1 -ConBase
 
 # Lint
 uv run ruff check .
@@ -133,7 +133,9 @@ El motor es **PostgreSQL** (ver `architecture.md`). Si ya tienes PostgreSQL corr
 & "C:\Program Files\PostgreSQL\<version>\bin\psql.exe" -U postgres -h localhost -f backend\scripts\init_db.sql
 ```
 
-Esto crea el rol `auto_cusco_app` (contraseña por defecto `changeme`) y la base de datos `auto_cusco`. Luego:
+Esto crea el rol `auto_cusco_app` (contraseña por defecto `changeme`), la base de datos de trabajo `auto_cusco` y la base de pruebas `auto_cusco_test`. Si ya tenías la de trabajo, vuelve a ejecutarlo: solo crea lo que falta.
+
+La base de pruebas existe porque las pruebas `postgres` escriben filas únicas que la app usa al trabajar (configuración de MOWA MES, supervisores, Speech original). Si corrieran contra `auto_cusco`, mientras corren la pantalla vería datos de prueba y lo que guardaras en ese intervalo quedaría pisado al restituir. Por eso `verificar.ps1 -ConBase` usa `auto_cusco_test` y las pruebas se niegan a correr contra una base sin sufijo `_test`. Luego:
 
 1. Cambia la contraseña por defecto. Lo más seguro es `\password auto_cusco_app` desde `psql` como superusuario: la pide por teclado sin mostrarla y no tiene problemas con comillas. Alternativa: `ALTER ROLE auto_cusco_app WITH PASSWORD '<tu-contraseña>';` (si la contraseña lleva una comilla simple `'`, hay que escribirla duplicada `''`).
 2. Copia `.env.example` a `.env` (si no existe todavía) y ajusta `DB_PASSWORD` con esa misma contraseña. **Antes de elegirla, revisa la sección 6.1.**
@@ -144,6 +146,8 @@ Esto crea el rol `auto_cusco_app` (contraseña por defecto `changeme`) y la base
    ```
 
    Es seguro repetirlo: solo aplica las migraciones pendientes. Para ver en qué versión está tu base usa `uv run alembic current`. El diseño de las tablas está en `docs/versionado-sabanas.md`.
+
+   La base de pruebas no hace falta migrarla a mano: `.\scripts\verificar.ps1 -ConBase` la migra cada vez. Para trabajar con ella fuera del script, fija la base en esa terminal: `$env:DB_NAME = "auto_cusco_test"`.
 
 ### 6.1 Caracteres especiales en la contraseña
 

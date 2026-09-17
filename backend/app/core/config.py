@@ -14,6 +14,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _ENV_FILE = _REPO_ROOT / ".env"
 
+# Las pruebas `postgres` y los scripts de medicion escriben filas unicas (configuracion
+# de MOWA MES, supervisores, Speech original): solo corren contra una base con este
+# sufijo, nunca contra la que se usa para trabajar. Ver docs/testing.md, seccion 4.
+SUFIJO_BASE_PRUEBAS = "_test"
+
 
 class Settings(BaseSettings):
     """Variables de entorno del backend."""
@@ -41,6 +46,19 @@ class Settings(BaseSettings):
             f"postgresql+psycopg://{self.db_user}:{self.db_password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
+
+
+def exigir_base_de_pruebas(settings: Settings) -> str | None:
+    """None si `settings` apunta a una base de pruebas; si no, el motivo para no seguir."""
+    if settings.db_name.endswith(SUFIJO_BASE_PRUEBAS):
+        return None
+    return (
+        f"La base configurada es '{settings.db_name}', que no termina en "
+        f"'{SUFIJO_BASE_PRUEBAS}'. Las pruebas postgres y los scripts de medicion escriben "
+        "filas que se usan al trabajar en la app: apunta DB_NAME a la base de pruebas "
+        "(p. ej. $env:DB_NAME = 'auto_cusco_test') o usa .\\scripts\\verificar.ps1 -ConBase. "
+        "Ver docs/testing.md, seccion 4."
+    )
 
 
 @lru_cache

@@ -1,8 +1,10 @@
 r"""Mide tiempo y memoria de la generacion de cargas con una sabana sintetica.
 
-Uso, desde backend/ y con la base migrada:
+Uso, desde backend/ y con la base de pruebas migrada (nunca la de trabajo: el script
+se detiene si DB_NAME no termina en _test):
 
     uv run python scripts/generar_sabana_sintetica.py sabana_120k.xlsx --filas 120000
+    $env:DB_NAME = "auto_cusco_test"
     uv run python scripts/medir_generacion.py sabana_120k.xlsx 60000,120000
 
 Ingesta la sabana en una fecha de 2099, genera con una definicion corta (6
@@ -32,6 +34,7 @@ from app.adapters.persistence.repositorio_cargas_postgres import (  # noqa: E402
 from app.adapters.persistence.repositorio_cartera_postgres import (  # noqa: E402
     RepositorioCarteraPostgres,
 )
+from app.core.config import exigir_base_de_pruebas, get_settings  # noqa: E402
 from app.core.entities.mapeo import CampoSalida, DefinicionCarga, TipoSalida  # noqa: E402
 from app.core.services.generacion_cargas import servicio as generacion  # noqa: E402
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService  # noqa: E402
@@ -73,6 +76,9 @@ def _limpiar(engine) -> None:
 
 
 def main() -> None:
+    motivo = exigir_base_de_pruebas(get_settings())
+    if motivo:
+        sys.exit(motivo)
     sabana = Path(sys.argv[1])
     cantidades = [int(x) for x in sys.argv[2].split(",")]
     engine = get_engine()

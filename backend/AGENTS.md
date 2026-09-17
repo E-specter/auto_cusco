@@ -16,8 +16,7 @@ No edites `uv.lock` a mano; se regenera con `uv sync` / `uv add` / `uv lock`. Co
 ```powershell
 uv run fastapi dev app/main.py   # servidor de desarrollo con recarga automatica
 uv run pytest                    # tests (no requieren PostgreSQL real, ver tests/)
-$env:AUTO_CUSCO_DB_TESTS = "1"; uv run pytest -m postgres   # integracion opcional con la base de /.env (fecha 2099, se limpia sola)
-.\scripts\verificar.ps1          # verificacion antes de cerrar una tarea (-ConBase agrega migraciones e integracion)
+.\scripts\verificar.ps1          # verificacion antes de cerrar una tarea (-ConBase agrega migraciones e integracion contra auto_cusco_test)
 uv run ruff check .              # lint
 uv run ruff format .             # formateo
 ```
@@ -25,6 +24,8 @@ uv run ruff format .             # formateo
 ## Base de datos
 
 El motor es PostgreSQL (ver `docs/architecture.md`). La primera vez, crea el rol y la base de datos ejecutando `backend/scripts/init_db.sql` como superusuario (instrucciones en el propio script) y completa `DB_PASSWORD` en tu `/.env` local. La configuracion se lee en `app/core/config.py`.
+
+**Dos bases: trabajo y pruebas.** `/.env` apunta a `auto_cusco`, la que usa la app al trabajar y revisar en el navegador. Las pruebas `postgres` y los scripts de medicion escriben filas unicas (configuracion de MOWA MES, supervisores, Speech original), asi que corren solo contra `auto_cusco_test`: `tests/conftest.py` y los scripts se detienen si `DB_NAME` no termina en `_test`, y `.\scripts\verificar.ps1 -ConBase` pone `DB_NAME` en la base de pruebas, la migra y corre la integracion. Nunca corras integracion ni mediciones contra `auto_cusco`, ni restituyas a mano valores que no reconoces: reportalos.
 
 Cuidado con la contrasena: `database_url` inserta `DB_PASSWORD` sin codificar dentro de la URL, asi que `@` y `%` seguido de dos hexadecimales la corrompen; ademas, al leer `.env`, `${...}` se expande y ` #` corta el valor. Detalle y pruebas en `docs/setup.md`, seccion 6.1. Si cambias como se arma la URL, usa `sqlalchemy.engine.URL.create(...)` y actualiza esa seccion.
 

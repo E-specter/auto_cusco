@@ -17,8 +17,8 @@ Para tenerlo presente durante el trabajo y no solo al final, la versión corta d
 |---|---|---|---|
 | Núcleo | Reglas de negocio y casos de uso: normalización, mapeo de cabeceras, versionado | `backend/tests/test_sabana_*.py`, `test_ingesta_servicio.py` | Nada. Se usan dobles de prueba en lugar de infraestructura |
 | Adaptadores | Lectura de archivos y forma de las tablas | `backend/tests/test_lector_calamine.py`, `test_modelos_persistencia.py` | Archivos generados en memoria |
-| Integración | Flujo completo contra PostgreSQL real, incluida la cadena ingesta → selección → generación → archivo entrando por HTTP | `backend/tests/test_repositorio_cargas_postgres.py`, `test_repositorio_cartera_postgres.py`, `test_generacion_cargas_postgres.py` | Base migrada y la variable `AUTO_CUSCO_DB_TESTS` |
-| Volumen sintético | Tiempo y memoria de la generación de cargas con 60 000 y 120 000 filas | `backend/scripts/medir_generacion.py`, resultados en `docs/generacion-cargas.md` | Base migrada y una sábana del generador sintético |
+| Integración | Flujo completo contra PostgreSQL real, incluida la cadena ingesta → selección → generación → archivo entrando por HTTP | `backend/tests/test_repositorio_cargas_postgres.py`, `test_repositorio_cartera_postgres.py`, `test_generacion_cargas_postgres.py` | La base de pruebas `auto_cusco_test` y la variable `AUTO_CUSCO_DB_TESTS`; `verificar.ps1 -ConBase` pone las dos |
+| Volumen sintético | Tiempo y memoria de la generación de cargas con 60 000 y 120 000 filas | `backend/scripts/medir_generacion.py`, resultados en `docs/generacion-cargas.md` | La base de pruebas migrada (`$env:DB_NAME = "auto_cusco_test"`) y una sábana del generador sintético |
 | Verificación con volumen real | Rendimiento y conteos con una sábana de verdad | Local, no se versiona | Sábana real con los datos personales reemplazados en memoria |
 | Núcleo del frontend | Lógica pura de la interfaz: fecha sugerida desde el nombre del archivo, formatos y montos exactos, sintaxis de la selección, cliente de API, descargas y el contrato con el catálogo de códigos de incidencia | `frontend/tests/nucleo/` | Nada. `fetch` se sustituye por un doble |
 | DOM del frontend | Lógica que toca el documento: cola de diálogos (V-6 → V-4) y cambio de idioma | `frontend/tests/dom/` | Nada. Entorno `jsdom` |
@@ -34,6 +34,7 @@ En el frontend el equivalente es el cliente de API: las pruebas de extremo a ext
 - **Ubicación y nombre.** Un archivo por pieza en `backend/tests/`, con el nombre del área que cubre. Las funciones describen el comportamiento esperado en español.
 - **Estructura.** Preparar, ejecutar y comprobar, separados por una línea en blanco. Una sola idea por prueba.
 - **Sin base de datos por defecto.** Las pruebas que la necesitan llevan el marcador `postgres`, se saltan solas y limpian lo que crean.
+- **Nunca contra la base de trabajo.** Las pruebas `postgres` y los scripts de medición escriben filas únicas que la app usa al trabajar (configuración de MOWA MES, supervisores, Speech original). Corren solo contra una base con sufijo `_test`: `tests/conftest.py` y los scripts se detienen si no, y lo comprueba `tests/test_base_pruebas.py`. Si encuentras en una base valores que no reconoces, repórtalos: no los restituyas.
 - **Datos de prueba.** Se reutilizan los generadores sintéticos que ya existen en las pruebas del normalizador y de cabeceras, en lugar de inventar filas nuevas cada vez.
 - **Sábanas de prueba completas.** Para probar a mano la ingesta o la interfaz, genera una sábana inventada en vez de usar una real, desde `backend/`:
 
@@ -53,7 +54,7 @@ Desde `backend/`:
 
 ```powershell
 .\scripts\verificar.ps1            # formato, lint y pruebas
-.\scripts\verificar.ps1 -ConBase   # agrega migraciones e integración con PostgreSQL
+.\scripts\verificar.ps1 -ConBase   # agrega migraciones e integración contra la base de pruebas
 ```
 
 El script equivale a correr, en orden:
@@ -63,8 +64,11 @@ El script equivale a correr, en orden:
 | Formato | `uv run ruff format --check app tests migrations` | Siempre |
 | Lint | `uv run ruff check .` | Siempre |
 | Pruebas | `uv run pytest -q` | Siempre |
-| Migraciones | `uv run alembic check` | Si tocaste modelos o migraciones |
-| Integración | `uv run pytest -m postgres -q` | Si tocaste persistencia |
+| Migraciones (aplicar) | `uv run alembic upgrade head` con `DB_NAME=auto_cusco_test` | Con `-ConBase` |
+| Migraciones | `uv run alembic check` con `DB_NAME=auto_cusco_test` | Si tocaste modelos o migraciones |
+| Integración | `uv run pytest -m postgres -q` con `DB_NAME=auto_cusco_test` y `AUTO_CUSCO_DB_TESTS=1` | Si tocaste persistencia |
+
+Con `-ConBase` el script nunca usa la base de `/.env`: fija `DB_NAME` en `auto_cusco_test` (o en `$env:AUTO_CUSCO_DB_PRUEBAS`, que también debe terminar en `_test`) solo mientras corre y lo restituye al terminar. La base se crea una vez con `init_db.sql` ([setup.md](setup.md), sección 6). Así puedes seguir usando la app en el navegador mientras un agente verifica.
 
 Desde `frontend/`, cuando la tarea tocó la interfaz:
 
@@ -118,7 +122,7 @@ Son cosas distintas y se tratan distinto.
 `.github/workflows/backend.yml` corre en cada subida a la rama principal y en cada pull request, con dos trabajos:
 
 - **Formato, lint y pruebas,** sin base de datos.
-- **Migraciones e integración,** que levanta un PostgreSQL temporal, aplica las migraciones, verifica que no haya cambios sin migrar y corre las pruebas marcadas. La contraseña que aparece ahí es de una base desechable que vive solo durante la ejecución, no es un secreto del proyecto.
+- **Migraciones e integración,** que levanta un PostgreSQL temporal con la base `auto_cusco_test`, aplica las migraciones, verifica que no haya cambios sin migrar y corre las pruebas marcadas. La contraseña que aparece ahí es de una base desechable que vive solo durante la ejecución, no es un secreto del proyecto.
 
 `.github/workflows/frontend.yml` corre con los mismos disparadores, también con dos trabajos:
 

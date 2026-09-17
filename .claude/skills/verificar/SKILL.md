@@ -74,7 +74,7 @@ Desde `backend/`:
 
 ```powershell
 .\scripts\verificar.ps1            # formato, lint y pruebas
-.\scripts\verificar.ps1 -ConBase   # agrega migraciones e integración con PostgreSQL
+.\scripts\verificar.ps1 -ConBase   # agrega migraciones e integración contra auto_cusco_test
 ```
 
 Desde `frontend/`, cuando la tarea tocó la interfaz:
@@ -84,6 +84,8 @@ npm run verificar                  # contrato, tipos, build, núcleo/DOM y extre
 ```
 
 Las pruebas `postgres` se saltan solas sin `AUTO_CUSCO_DB_TESTS=1`; que el resumen diga "9 skipped" **no** es que estén en verde.
+
+La integración y los scripts de medición corren **solo contra la base de pruebas** (`DB_NAME` con sufijo `_test`); pytest y los scripts se detienen si no. Nunca contra `auto_cusco`, que es la que el usuario usa en el navegador. Si encuentras en una base valores que no reconoces, repórtalos: no los restituyas.
 
 Los comandos de las capas avanzadas, para cuando se configuren, están en [capas.md](capas.md).
 

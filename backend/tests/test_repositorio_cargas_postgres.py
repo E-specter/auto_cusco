@@ -1,10 +1,10 @@
-"""Integracion del caso de uso con PostgreSQL real (opcional).
+r"""Integracion del caso de uso con PostgreSQL real (opcional).
 
-Corre solo con AUTO_CUSCO_DB_TESTS=1 y la base de /.env migrada
-(`uv run alembic upgrade head`). Usa una fecha de corte del ano 2099 y datos
-sinteticos, y al terminar borra todo lo que creo, incluida la auditoria.
+Corre solo con AUTO_CUSCO_DB_TESTS=1 y la base de pruebas migrada (sufijo _test;
+conftest.py se niega a correr contra otra). Usa una fecha de corte del ano 2099 y
+datos sinteticos, y al terminar borra todo lo que creo, incluida la auditoria.
 
-    PowerShell:  $env:AUTO_CUSCO_DB_TESTS = "1"; uv run pytest -m postgres
+    PowerShell:  .\scripts\verificar.ps1 -ConBase
 """
 
 import io

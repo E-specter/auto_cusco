@@ -7,8 +7,10 @@
 --
 --   psql -U postgres -h localhost -f backend/scripts/init_db.sql
 --
--- Crea un rol de aplicacion dedicado (no el superusuario) y la base de
--- datos del proyecto, si todavia no existen. Cambia la contrasena por
+-- Crea un rol de aplicacion dedicado (no el superusuario), la base de
+-- datos del proyecto y la base de pruebas (auto_cusco_test, la que usan
+-- verificar.ps1 -ConBase y las pruebas postgres), si todavia no existen.
+-- Es seguro volver a ejecutarlo: lo que ya existe no se toca. Cambia la contrasena por
 -- defecto antes o despues de ejecutar este script, y reflejala en tu
 -- .env local (nunca versionado) en la variable DB_PASSWORD.
 
@@ -23,4 +25,8 @@ $$;
 
 SELECT 'CREATE DATABASE auto_cusco OWNER auto_cusco_app'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'auto_cusco')
+\gexec
+
+SELECT 'CREATE DATABASE auto_cusco_test OWNER auto_cusco_app'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'auto_cusco_test')
 \gexec
