@@ -174,5 +174,5 @@ El frontend traduce cada uno con la clave plana `mowaMes.codigo.<codigo>` en `fr
 | `tests/test_lector_reporte_mowa_mes.py` | Adaptador del reporte, con archivos generados en memoria |
 | `tests/test_codigos_mowa_mes.py` | Contrato: catálogo ↔ i18n del frontend |
 | `tests/test_api_mowa_mes_campanas.py` | API con `TestClient`: previsualización, creación, consulta, descarga y sus cabeceras, límite, reporte |
-| `tests/test_mowa_mes_campanas_postgres.py` | Integración de punta a punta por HTTP contra PostgreSQL: sábana → campaña → descarga → reporte → conciliación; división real; límite; speech cambiado sin escribir nada; sin WhatsApp |
+| `tests/test_mowa_mes_campanas_postgres.py` | Integración de punta a punta por HTTP contra PostgreSQL: sábana → campaña → descarga → reporte → conciliación; división real; límite; speech cambiado sin escribir nada; sin WhatsApp; documento no estándar; estados distintos de "enviado". 2026-09-16 (revisión B7 contra P1–P9 de F2): `muestra` de la previsualización con la supervisión primero (no solo el archivo ya escrito); `sin_supervisores` y `sin_productos_cargables` como error de previsualización (200) y 400 al crear; fecha de corte sin versión vigente, 404 contra el repositorio real |
 | `tests/test_generacion_cargas_postgres.py` | La prueba de paginación real ahora parchea `recorrido.LIMITE_MAXIMO` (C-2) |

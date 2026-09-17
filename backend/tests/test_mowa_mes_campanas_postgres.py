@@ -458,3 +458,70 @@ def test_limite_mensual_de_un_mes_sin_campanas(cliente) -> None:
         "disponible": 2_500_000,
         "excedido": False,
     }
+
+
+def test_la_muestra_de_la_previsualizacion_trae_la_supervision_primero(cliente) -> None:
+    # P1: lo que ve la pantalla antes de crear nada, no el archivo ya escrito.
+    client, _ = cliente
+
+    previa = _previsualizar(client)
+    muestra = previa["muestra"]
+
+    assert len(muestra) == 11  # 5 de supervision + 6 productos, todo cabe en la muestra de 20
+    assert [f["supervision"] for f in muestra] == [True] * 5 + [False] * 6
+    assert [f["dni"] for f in muestra[:5]] == [f"0000000{i}" for i in range(1, 6)]
+    assert {f["mensaje"] for f in muestra[:5]} == {muestra[5]["mensaje"]}
+    assert all(f["largo"] == len(f["mensaje"]) for f in muestra)
+    assert muestra[5]["pagare"] == "000000000000000001"
+
+
+def test_sin_supervisores_la_previsualizacion_avisa_y_la_creacion_responde_400(cliente) -> None:
+    # P2: la campana no se crea sin supervisores (RF-37), pero la previsualizacion no es 4xx.
+    client, _ = cliente
+    assert (
+        client.put(
+            "/supervisores",
+            json={"procedencias": ["Caja Cusco", "nuestra empresa"], "supervisores": []},
+        ).status_code
+        == 200
+    )
+
+    previa = _previsualizar(client)
+    creada = _crear(client, previa["speech"]["huella"])
+
+    assert previa["puede_crear"] is False
+    assert [e["codigo"] for e in previa["errores"]] == ["sin_supervisores"]
+    assert previa["supervision_cargados"] == 0
+    assert creada.status_code == 400
+
+
+def test_sin_productos_cargables_la_previsualizacion_avisa_y_la_creacion_responde_400(
+    cliente,
+) -> None:
+    # P2: una seleccion sin ningun producto cargable tampoco genera supervision (RF-37).
+    client, _ = cliente
+    sin_productos = {"filtros": ["pagare:igual:999999999999999999"]}
+
+    previa = _previsualizar(client, **sin_productos)
+    creada = _crear(client, previa["speech"]["huella"], **sin_productos)
+
+    assert (previa["disponibles"], previa["evaluados"]) == (0, 0)
+    assert previa["puede_crear"] is False
+    assert [e["codigo"] for e in previa["errores"]] == ["sin_productos_cargables"]
+    assert previa["muestra"] == []
+    assert creada.status_code == 400
+
+
+def test_sin_version_vigente_para_la_fecha_de_corte_responde_404(cliente) -> None:
+    # P8: una fecha de corte sin ingesta, contra el repositorio de cartera real.
+    client, _ = cliente
+    sin_sabana = date(2099, 8, 1)
+    assert sin_sabana != FECHA
+
+    respuesta = client.post(
+        "/mowa-mes/campanas/previsualizacion",
+        json={**CUERPO, "fecha_corte": sin_sabana.isoformat()},
+    )
+
+    assert respuesta.status_code == 404
+    assert str(sin_sabana) in respuesta.json()["detail"]
