@@ -345,6 +345,50 @@ test.describe('calendario', () => {
   });
 });
 
+test.describe('anchos (T-MM-F5, hallazgos 1 y 2)', () => {
+  test('a 360 px, las tablas de speech y supervisores se apilan sin desbordar la página', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 900 });
+    const api = apiMowaMes();
+    await abrir(page, api);
+
+    const desborda = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+    expect(desborda).toBe(false);
+
+    // The speech table stacks below 64rem (`.table--apilable-ancha`): its
+    // head is visually hidden and Largo/Estado read as labelled blocks,
+    // visible in the viewport without scrolling sideways.
+    // No horizontal overflow means a cell either sits at x=0 (full width,
+    // like a stacked block) or does not exist off to the right at all — a
+    // scrolling page is fine, a scrolling table (the pre-F5 behaviour) is not.
+    const sinDesbordeHorizontal = async (locator: ReturnType<Page['locator']>) => {
+      await locator.scrollIntoViewIfNeeded();
+      const caja = await locator.boundingBox();
+      expect(caja).not.toBeNull();
+      expect(caja!.x).toBeGreaterThanOrEqual(0);
+      expect(caja!.x + caja!.width).toBeLessThanOrEqual(361);
+    };
+
+    const filaSpeech = page.locator('[data-speech-filas] tr[data-segmento="preventiva"]');
+    const largoEtiqueta = await filaSpeech.locator('[data-largo]').evaluate(
+      (el) => getComputedStyle(el, '::before').content,
+    );
+    expect(largoEtiqueta).toContain('Largo máximo');
+    await sinDesbordeHorizontal(filaSpeech.locator('[data-largo]'));
+
+    // The supervisors table stacks below 48rem (`.table--apilable`):
+    // Procedencia and Documento, cut off before F5, are now full rows.
+    const filaSupervisor = page.locator('.mm-supervisores__tabla tbody tr').first();
+    const procedenciaEtiqueta = await filaSupervisor
+      .locator('select')
+      .evaluateHandle((el) => el.closest('td'))
+      .then((handle) => handle.evaluate((td) => getComputedStyle(td as Element, '::before').content));
+    expect(procedenciaEtiqueta).toContain('Procedencia');
+    await sinDesbordeHorizontal(filaSupervisor.locator('select'));
+    const celdaDocumento = filaSupervisor.locator('td').filter({ hasText: '00000001' });
+    await sinDesbordeHorizontal(celdaDocumento);
+  });
+});
+
 test.describe('idioma', () => {
   test('en inglés traduce lo que dibuja el script, incluidos los códigos', async ({ page }) => {
     await page.addInitScript(() => {
@@ -361,6 +405,5 @@ test.describe('idioma', () => {
   });
 });
 
-// Accessibility (axe) for this screen joins e2e/accesibilidad.spec.ts once
-// that file and its @axe-core/playwright dependency are committed, so this
-// spec does not depend on uncommitted work.
+// Accessibility (axe) for this screen lives in e2e/accesibilidad.spec.ts,
+// alongside the other MOWA MES screens (T-MM-F5).

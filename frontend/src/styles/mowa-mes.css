@@ -160,8 +160,12 @@
   min-inline-size: 11ch;
 }
 
-.mm-supervisores__numero {
-  inline-size: 14ch;
+/* A fixed width belongs to the row layout above 48rem; stacked below it, the
+   input takes the same full-width block as the rest of the row. */
+@media (min-width: 48rem) {
+  .mm-supervisores__numero {
+    inline-size: 14ch;
+  }
 }
 
 /* ---- Speech ------------------------------------------------------------------ */
@@ -178,7 +182,15 @@
 
 .mm-speech__tabla {
   table-layout: fixed;
-  min-inline-size: 56rem;
+}
+
+/* Below 64rem `.table--apilable-ancha` takes over and this table stacks, so
+   the fixed layout and its column shares apply only at the width they were
+   sized for. */
+@media (min-width: 64rem) {
+  .mm-speech__tabla {
+    min-inline-size: 56rem;
+  }
 }
 
 /* The status column carries the worst-case example too, so it takes a share
@@ -346,16 +358,6 @@
 
 .mm-detalle > .mm-subtitulo:first-of-type {
   margin-block-start: var(--space-2);
-}
-
-.mm-pager {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-block-start: 1px solid var(--color-border-subtle);
 }
 
 /* The selected campaign carries the system's inset selection bar. */

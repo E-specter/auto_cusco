@@ -227,7 +227,7 @@ import '../../styles/mowa-mes.css';
           <p class="mm-speech__resumen" role="status" data-speech-resumen></p>
 
           <div class="table-scroll">
-            <table class="table mm-speech__tabla">
+            <table class="table mm-speech__tabla table--apilable table--apilable-ancha">
               <thead>
                 <tr>
                   <th scope="col" data-i18n="mowaMes.speech.col.segmento">Segmento</th>
@@ -718,7 +718,7 @@ import '../../styles/mowa-mes.css';
     const scroll = document.createElement('div');
     scroll.className = 'table-scroll';
     const tabla = document.createElement('table');
-    tabla.className = 'table mm-supervisores__tabla';
+    tabla.className = 'table mm-supervisores__tabla table--apilable';
 
     const cabeza = document.createElement('thead');
     const filaCabeza = document.createElement('tr');
@@ -745,9 +745,11 @@ import '../../styles/mowa-mes.css';
 
       const orden = document.createElement('td');
       orden.className = 'num';
+      orden.dataset.etiqueta = t('mowaMes.supervisores.col.orden');
       orden.textContent = String(indice + 1);
 
       const celdaNumero = document.createElement('td');
+      celdaNumero.dataset.etiqueta = t('mowaMes.supervisores.col.numero');
       const numero = document.createElement('input');
       numero.className = 'input mm-supervisores__numero';
       numero.type = 'text';
@@ -766,6 +768,7 @@ import '../../styles/mowa-mes.css';
       celdaNumero.append(numero);
 
       const celdaProcedencia = document.createElement('td');
+      celdaProcedencia.dataset.etiqueta = t('mowaMes.supervisores.col.procedencia');
       const select = document.createElement('select');
       select.className = 'input';
       select.setAttribute('aria-label', t('mowaMes.supervisores.procedenciaDe', { n: indice + 1 }));
@@ -788,9 +791,14 @@ import '../../styles/mowa-mes.css';
 
       const documento = document.createElement('td');
       documento.className = 'mono';
+      documento.dataset.etiqueta = t('mowaMes.supervisores.col.documento');
+      // The document is a consequence of numero/procedencia, not typed
+      // directly: it rises to the top of the stacked block with them in view.
+      documento.dataset.orden = '1';
       documento.textContent = sinCambios ? (guardada?.supervisores[indice]?.documento ?? '—') : '—';
 
       const acciones = document.createElement('td');
+      acciones.dataset.etiqueta = t('mowaMes.supervisores.col.acciones');
       const envoltorio = document.createElement('span');
       envoltorio.className = 'mm-fila__acciones';
       const subir = botonIcono(t('mowaMes.supervisores.subir', { n: indice + 1 }), 'arriba');
@@ -1025,6 +1033,7 @@ import '../../styles/mowa-mes.css';
 
       const celdas = (['parte_1', 'parte_2'] as const).map((campo) => {
         const celda = document.createElement('td');
+        celda.dataset.etiqueta = t(campo === 'parte_1' ? 'mowaMes.speech.col.parte1' : 'mowaMes.speech.col.parte2');
         const area = document.createElement('textarea');
         area.className = 'input mm-speech__parte';
         area.rows = 3;
@@ -1053,9 +1062,15 @@ import '../../styles/mowa-mes.css';
       const largo = document.createElement('td');
       largo.className = 'num mm-speech__largo';
       largo.dataset.largo = '';
+      largo.dataset.etiqueta = t('mowaMes.speech.col.largo');
+      // What the analyst watches while typing rises to the top of the stacked
+      // block, ahead of the parts themselves.
+      largo.dataset.orden = '1';
       largo.textContent = '—';
 
       const nivel = document.createElement('td');
+      nivel.dataset.etiqueta = t('mowaMes.speech.col.estado');
+      nivel.dataset.orden = '1';
       const tags = document.createElement('span');
       tags.className = 'mm-speech__nivel';
       tags.dataset.nivelTags = '';

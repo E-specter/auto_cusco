@@ -21,25 +21,7 @@ import {
   resumenProblemasCampana,
   type CampanaBorrador,
 } from '../../src/lib/mowa-mes-campana';
-import { setLanguage, type Language } from '../../src/lib/i18n';
-
-/**
- * Switch the interface language inside a `node` test. `setLanguage` also
- * touches the document, which does not exist here, so this stub gives it just
- * enough of one.
- *
- * PROVISIONAL: a copy of `tests/nucleo/idioma.ts` from designer, which is not
- * committed yet. Replace it with that import once it is (T-MM-F5).
- */
-function setLanguageForTests(language: Language): void {
-  const global = globalThis as { document?: unknown };
-  const teniaDocumento = 'document' in global;
-  if (!teniaDocumento) {
-    global.document = { documentElement: {}, querySelectorAll: () => [], dispatchEvent: () => true };
-  }
-  setLanguage(language, { querySelectorAll: () => [] } as unknown as ParentNode);
-  if (!teniaDocumento) delete global.document;
-}
+import { setLanguageForTests } from './idioma';
 
 function borrador(parcial: Partial<CampanaBorrador> = {}): CampanaBorrador {
   return {
