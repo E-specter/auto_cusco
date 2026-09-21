@@ -83,6 +83,8 @@ Desde `frontend/`, cuando la tarea tocó la interfaz:
 npm run verificar                  # contrato, tipos, build, núcleo/DOM y extremo a extremo
 ```
 
+**Si otra sesión puede estar verificando a la vez,** dale a la corrida su propio puerto con `$env:PLAYWRIGHT_PUERTO = "4331"` (cualquiera libre). Sin eso, Playwright reutiliza el `preview` que encuentre en el 4321, que puede servir otra compilación: la corrida falla en masa por un motivo ajeno al cambio.
+
 Las pruebas `postgres` se saltan solas sin `AUTO_CUSCO_DB_TESTS=1`; que el resumen diga "9 skipped" **no** es que estén en verde.
 
 La integración y los scripts de medición corren **solo contra la base de pruebas** (`DB_NAME` con sufijo `_test`); pytest y los scripts se detienen si no. Nunca contra `auto_cusco`, que es la que el usuario usa en el navegador. Si encuentras en una base valores que no reconoces, repórtalos: no los restituyas.

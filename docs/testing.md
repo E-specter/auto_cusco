@@ -86,6 +86,13 @@ Equivale a, en orden:
 | Núcleo y DOM | `npm run test` | Siempre |
 | Extremo a extremo | `npm run test:e2e` | Siempre. Playwright construye y levanta `preview` por su cuenta |
 
+**Cuando varias sesiones verifican a la vez,** dale a la corrida su propio puerto: en el puerto por defecto una reutiliza el `preview` de otra —con otra compilación— y aparecen fallos que no tienen nada que ver con el cambio.
+
+```powershell
+$env:PLAYWRIGHT_PUERTO = "4331"   # cualquiera libre; sin la variable, todo sigue igual
+npm run verificar
+```
+
 La primera vez hace falta `npx playwright install chromium` para bajar el navegador.
 
 Además, antes de cerrar:
