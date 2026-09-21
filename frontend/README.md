@@ -40,14 +40,15 @@ El navegador **nunca** habla con `127.0.0.1:8000` directamente: pide a un prefij
 ```
 src/
 ├── pages/        index.astro (bienvenida) · cargas.astro (consola) · cartera.astro (selección)
-├── layouts/      Shell.astro — navegación, pulso de la API, idioma y tema
-├── components/   Icon.astro · SelectorSeleccion.astro (fecha + selección, reutilizable)
+├── layouts/      Shell.astro — cabecera adhesiva, pulso de la API, idioma y tema
+├── components/   Icon.astro · Navegacion.astro · SelectorSeleccion.astro (fecha + selección, reutilizable)
 ├── scripts/      selector-seleccion.ts — comportamiento del selector; la página lo monta
 ├── styles/       tokens.css · base.css · ui.css · console.css · selector.css · cartera.css
 ├── lib/          api.ts (cliente) · seleccion.ts · descargas.ts · i18n.ts · format.ts
 └── i18n/         es.json · en.json
 ```
 
+- **Agregar un módulo o una ruta al menú** es editar `NAVEGACION` en `src/lib/navegacion.ts`: su sección, su prefijo y sus enlaces, con clave i18n y texto de respaldo en español. Las claves van en los dos diccionarios; `tests/nucleo/navegacion.test.ts` falla si falta una traducción o si una ruta apunta a una página que no existe.
 - **Reusar el selector de selección.** Renderiza `<SelectorSeleccion modo="compacto" />` (o `completo`), escucha `seleccioncambiada` en su raíz y **después** llama a `montarSelector(raiz)`. El evento trae fecha de corte, la consulta en la sintaxis de la API, si es aplicable y la selección guardada cargada.
 
 - **`tokens.css` es la única fuente de verdad visual.** Deriva de `docs/design_ui/brand_guide.json`. Ninguna regla de componente escribe un hex ni un px a mano: todo sale de un token.

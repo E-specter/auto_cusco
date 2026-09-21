@@ -1,9 +1,13 @@
 {
   "nav.skip": "Skip to content",
   "nav.label": "Sections",
+  "nav.seccion.flujo": "Daily flow",
+  "nav.seccion.canales": "Channels",
   "nav.cargas": "Uploads",
   "nav.cartera": "Portfolio",
   "nav.mowaMes": "MOWA MES",
+  "nav.mowaMes.campana": "Campaign",
+  "nav.mowaMes.campanaLargo": "MOWA MES: campaign",
   "nav.mowaMes.seguimiento": "Tracking",
   "nav.mowaMes.seguimientoLargo": "MOWA MES: tracking",
   "nav.mowaMes.configuracion": "Settings",

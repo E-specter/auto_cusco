@@ -1,0 +1,373 @@
+---
+/**
+ * The top navigation, rendered from `lib/navegacion.ts`.
+ *
+ * Sections are separated by a divider and entries inside a section by a
+ * middle dot; both are decoration, hidden from assistive tech, while each
+ * section is a labelled list so a screen reader still hears the grouping.
+ *
+ * A module opens its routes in a dropdown. It follows the disclosure pattern
+ * the WAI-ARIA practices recommend for site navigation — a real <button>
+ * with aria-expanded that shows a list of links — not role="menu", which
+ * promises application-menu keyboard behaviour a nav does not need.
+ */
+import Icon from './Icon.astro';
+import { NAVEGACION, enlaceActivo, moduloActivo } from '../lib/navegacion';
+
+interface Props {
+  /** The current path, from Astro.url. */
+  actual: string;
+}
+
+const { actual } = Astro.props;
+---
+
+<nav class="nav" data-navegacion data-i18n-attr="aria-label:nav.label" aria-label="Secciones">
+  {
+    NAVEGACION.map((seccion, i) => (
+      <Fragment>
+        {i > 0 && (
+          <span class="nav__divisor" aria-hidden="true">
+            |
+          </span>
+        )}
+        <ul class="nav__seccion" data-i18n-attr={`aria-label:${seccion.i18n}`} aria-label={seccion.texto}>
+          {seccion.entradas.map((entrada, j) => (
+            <li class="nav__entrada">
+              {j > 0 && (
+                <span class="nav__punto" aria-hidden="true">
+                  ·
+                </span>
+              )}
+              {entrada.tipo === 'enlace' ? (
+                <a
+                  class="nav__enlace"
+                  href={entrada.enlace.ruta}
+                  aria-current={enlaceActivo(entrada.enlace, actual) ? 'page' : undefined}
+                >
+                  <span data-i18n={entrada.enlace.i18n}>{entrada.enlace.texto}</span>
+                </a>
+              ) : (
+                <div
+                  class="nav__modulo"
+                  data-modulo={entrada.modulo.id}
+                  data-activo={moduloActivo(entrada.modulo, actual) ? 'true' : undefined}
+                >
+                  <button
+                    type="button"
+                    class="nav__disparador"
+                    aria-expanded="false"
+                    aria-controls={`nav-${entrada.modulo.id}`}
+                    data-disparador
+                  >
+                    <span data-i18n={entrada.modulo.i18n}>{entrada.modulo.texto}</span>
+                    <span class="nav__chevron" aria-hidden="true">
+                      <Icon name="chevron-down" size={16} />
+                    </span>
+                  </button>
+                  <ul class="nav__panel" id={`nav-${entrada.modulo.id}`} hidden data-panel>
+                    {entrada.modulo.enlaces.map((enlace) => (
+                      <li>
+                        <a
+                          class="nav__item"
+                          href={enlace.ruta}
+                          aria-current={enlaceActivo(enlace, actual) ? 'page' : undefined}
+                          data-i18n-attr={enlace.aria ? `aria-label:${enlace.aria.i18n}` : undefined}
+                          aria-label={enlace.aria?.texto}
+                        >
+                          <span data-i18n={enlace.i18n}>{enlace.texto}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      </Fragment>
+    ))
+  }
+</nav>
+
+<script>
+  /*
+   * Dropdown behaviour. Click (or Enter/Space, which a <button> gives for
+   * free) toggles; a mouse hovering opens and leaving closes, with short
+   * delays so crossing the gap to the panel does not flicker. A click on a
+   * hover-opened module pins it open instead of closing it under the
+   * pointer. Escape closes and returns focus to the button; focus leaving
+   * the module or a press anywhere else closes it too.
+   */
+  const ESPERA_ABRIR = 80;
+  const ESPERA_CERRAR = 220;
+  const conHover = window.matchMedia('(hover: hover) and (pointer: fine)');
+
+  interface Control {
+    modulo: HTMLElement;
+    boton: HTMLButtonElement;
+    panel: HTMLElement;
+    porHover: boolean;
+    temporizador: number;
+  }
+
+  const controles: Control[] = [];
+
+  function abierto(c: Control): boolean {
+    return c.boton.getAttribute('aria-expanded') === 'true';
+  }
+
+  function abrir(c: Control, porHover: boolean): void {
+    controles.forEach((otro) => {
+      if (otro !== c) cerrar(otro);
+    });
+    c.porHover = porHover;
+    c.panel.hidden = false;
+    c.boton.setAttribute('aria-expanded', 'true');
+    // A panel that would run past the right edge opens towards the left.
+    delete c.panel.dataset.alinear;
+    const caja = c.panel.getBoundingClientRect();
+    if (caja.right > document.documentElement.clientWidth) c.panel.dataset.alinear = 'fin';
+  }
+
+  function cerrar(c: Control, devolverFoco = false): void {
+    window.clearTimeout(c.temporizador);
+    if (!abierto(c)) return;
+    c.panel.hidden = true;
+    c.boton.setAttribute('aria-expanded', 'false');
+    c.porHover = false;
+    if (devolverFoco) c.boton.focus();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-navegacion] .nav__modulo').forEach((modulo) => {
+    const c: Control = {
+      modulo,
+      boton: modulo.querySelector<HTMLButtonElement>('[data-disparador]')!,
+      panel: modulo.querySelector<HTMLElement>('[data-panel]')!,
+      porHover: false,
+      temporizador: 0,
+    };
+    controles.push(c);
+
+    c.boton.addEventListener('click', () => {
+      if (abierto(c) && c.porHover) {
+        c.porHover = false;
+        return;
+      }
+      if (abierto(c)) {
+        cerrar(c);
+      } else {
+        abrir(c, false);
+      }
+    });
+
+    modulo.addEventListener('pointerenter', (event) => {
+      if (!conHover.matches || event.pointerType !== 'mouse') return;
+      window.clearTimeout(c.temporizador);
+      if (abierto(c)) return;
+      c.temporizador = window.setTimeout(() => abrir(c, true), ESPERA_ABRIR);
+    });
+
+    modulo.addEventListener('pointerleave', (event) => {
+      if (!conHover.matches || event.pointerType !== 'mouse') return;
+      window.clearTimeout(c.temporizador);
+      if (!c.porHover) return;
+      c.temporizador = window.setTimeout(() => cerrar(c), ESPERA_CERRAR);
+    });
+
+    modulo.addEventListener('keydown', (event) => {
+      const enlaces = [...c.panel.querySelectorAll<HTMLAnchorElement>('a')];
+      const actual = enlaces.indexOf(document.activeElement as HTMLAnchorElement);
+      if (event.key === 'Escape' && abierto(c)) {
+        event.preventDefault();
+        cerrar(c, true);
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        if (!abierto(c)) abrir(c, false);
+        enlaces[(actual + 1) % enlaces.length]?.focus();
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (!abierto(c)) abrir(c, false);
+        enlaces[(actual <= 0 ? enlaces.length : actual) - 1]?.focus();
+      }
+    });
+
+    modulo.addEventListener('focusout', (event) => {
+      if (!modulo.contains(event.relatedTarget as Node | null)) cerrar(c);
+    });
+  });
+
+  document.addEventListener('pointerdown', (event) => {
+    const dentro = (event.target as Element | null)?.closest('.nav__modulo');
+    controles.forEach((c) => {
+      if (c.modulo !== dentro) cerrar(c);
+    });
+  });
+</script>
+
+<style>
+  .nav {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
+    min-inline-size: 0;
+  }
+
+  .nav__seccion {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .nav__entrada {
+    display: flex;
+    align-items: center;
+  }
+
+  .nav__divisor,
+  .nav__punto {
+    font-family: var(--font-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-data);
+    color: var(--color-border-subtle);
+    user-select: none;
+  }
+
+  .nav__divisor {
+    padding-inline: var(--space-1);
+    color: var(--color-text-muted);
+  }
+
+  .nav__punto {
+    color: var(--color-text-muted);
+  }
+
+  /* One reading for every item in the bar, link or module button: mono,
+     muted until hovered, ink with an accent underline when it is where you
+     are. The underline is a fixed-height border, so no state changes the
+     bar's height. */
+  .nav__enlace,
+  .nav__disparador {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    border: 0;
+    border-block-end: 2px solid transparent;
+    background: none;
+    color: var(--color-text-muted);
+    font-family: var(--font-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-data);
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      color var(--duration-micro) var(--ease-default),
+      border-color var(--duration-micro) var(--ease-default);
+  }
+
+  .nav__enlace:hover,
+  .nav__disparador:hover,
+  .nav__disparador[aria-expanded='true'] {
+    color: var(--color-text);
+    border-block-end-color: var(--color-border-subtle);
+  }
+
+  .nav__enlace[aria-current='page'],
+  .nav__modulo[data-activo='true'] .nav__disparador {
+    color: var(--color-text);
+    font-weight: 700;
+    border-block-end-color: var(--color-accent);
+  }
+
+  .nav__chevron {
+    display: inline-flex;
+    transition: transform var(--duration-micro) var(--ease-default);
+  }
+
+  .nav__disparador[aria-expanded='true'] .nav__chevron {
+    transform: rotate(180deg);
+  }
+
+  /* ---- Dropdown -------------------------------------------------------- */
+
+  .nav__modulo {
+    position: relative;
+  }
+
+  .nav__panel {
+    position: absolute;
+    z-index: 1;
+    inset-block-start: calc(100% + var(--space-1));
+    inset-inline-start: 0;
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 13rem;
+    max-inline-size: calc(100vw - 2 * var(--shell-gutter));
+    margin: 0;
+    padding: var(--space-1) 0;
+    list-style: none;
+    border: var(--color-border-hairline) solid var(--color-border);
+    border-radius: var(--radius-structural);
+    background-color: var(--color-bg);
+  }
+
+  .nav__panel[data-alinear='fin'] {
+    inset-inline-start: auto;
+    inset-inline-end: 0;
+  }
+
+  /* An invisible bridge over the gap, so a mouse moving from the button to
+     the panel never leaves the module. */
+  .nav__panel::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 100%;
+    block-size: var(--space-2);
+  }
+
+  .nav__item {
+    display: block;
+    padding: var(--space-2) var(--space-3);
+    color: var(--color-text);
+    font-family: var(--font-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-data);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .nav__item:hover {
+    background-color: var(--color-surface);
+  }
+
+  .nav__item:focus-visible {
+    outline-offset: -2px;
+  }
+
+  /* The route you are on keeps the system's selection mark: the inset bar
+     the chosen version wears in /cargas. */
+  .nav__item[aria-current='page'] {
+    font-weight: 700;
+    background-color: var(--color-surface);
+    box-shadow: inset 3px 0 0 0 var(--color-accent);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .nav__panel:not([hidden]) {
+      animation: nav-panel var(--duration-micro) var(--ease-default);
+    }
+  }
+
+  @keyframes nav-panel {
+    from {
+      opacity: 0;
+      transform: translateY(-0.25rem);
+    }
+  }
+</style>

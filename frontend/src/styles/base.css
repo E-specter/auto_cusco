@@ -218,7 +218,9 @@ textarea {
   position: absolute;
   inset-inline-start: var(--space-3);
   inset-block-start: var(--space-3);
-  z-index: 20;
+  /* Above the pinned header (40), or keyboard users would focus a link
+     they cannot see. */
+  z-index: 50;
   padding: var(--space-2) var(--space-4);
   background-color: var(--color-bg-inverse);
   color: var(--color-text-inverse);

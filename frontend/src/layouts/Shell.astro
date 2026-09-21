@@ -5,6 +5,7 @@
  * language switch and the theme switch live.
  */
 import Icon from '../components/Icon.astro';
+import Navegacion from '../components/Navegacion.astro';
 import '../styles/tokens.css';
 import '../styles/base.css';
 import '../styles/ui.css';
@@ -75,33 +76,9 @@ const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/';
         <span class="mark__name">auto_cusco</span>
       </a>
 
-      <nav class="chrome__nav" data-i18n-attr="aria-label:nav.label" aria-label="Secciones">
-        <a class="chrome__link" href="/cargas" aria-current={currentPath === '/cargas' ? 'page' : undefined}>
-          <span data-i18n="nav.cargas">Cargas</span>
-        </a>
-        <a class="chrome__link" href="/cartera" aria-current={currentPath === '/cartera' ? 'page' : undefined}>
-          <span data-i18n="nav.cartera">Cartera</span>
-        </a>
-        <span class="chrome__grupo" aria-hidden="true" data-i18n="nav.mowaMes">MOWA MES</span>
-        <a
-          class="chrome__link"
-          href="/mowa-mes/seguimiento"
-          aria-current={currentPath === '/mowa-mes/seguimiento' ? 'page' : undefined}
-          data-i18n-attr="aria-label:nav.mowaMes.seguimientoLargo"
-          aria-label="MOWA MES: seguimiento"
-        >
-          <span data-i18n="nav.mowaMes.seguimiento">Seguimiento</span>
-        </a>
-        <a
-          class="chrome__link"
-          href="/mowa-mes/configuracion"
-          aria-current={currentPath === '/mowa-mes/configuracion' ? 'page' : undefined}
-          data-i18n-attr="aria-label:nav.mowaMes.configuracionLargo"
-          aria-label="MOWA MES: configuración"
-        >
-          <span data-i18n="nav.mowaMes.configuracion">Configuración</span>
-        </a>
-      </nav>
+      <div class="chrome__nav">
+        <Navegacion actual={currentPath} />
+      </div>
 
       <p class="chrome__health eyebrow" data-health aria-live="polite">
         <span class="dot" data-health-dot aria-hidden="true"></span>
@@ -296,9 +273,16 @@ const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/';
         overflow: hidden;
       }
 
+      /* The header stays in view while the page scrolls. Sticky, not fixed:
+         it keeps its place in the flow, so nothing below it has to reserve
+         room and nothing shifts when it pins. Its height never changes with
+         scroll, so there is no jump either. It sits above the sticky table
+         headers (z-index 1) and the column chooser (3); dialogs render in the
+         browser's top layer and stay above it regardless. */
       .chrome {
-        position: relative;
-        z-index: 2;
+        position: sticky;
+        inset-block-start: 0;
+        z-index: 40;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -333,76 +317,18 @@ const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/';
         text-underline-offset: 0.3em;
       }
 
-      /* The mark and the sections read as one group on the left. */
+      /* The mark and the sections read as one group on the left. The
+         navigation wraps instead of scrolling sideways: a scrolling box would
+         clip the dropdown panels. */
       .chrome__nav {
         display: flex;
-        align-items: center;
-        gap: var(--space-1);
+        min-inline-size: 0;
         margin-inline-end: auto;
       }
 
-      .chrome__link {
-        padding: var(--space-1) var(--space-3);
-        border-block-end: 2px solid transparent;
-        color: var(--color-text-muted);
-        font-family: var(--font-secondary);
-        font-size: var(--text-sm);
-        line-height: var(--leading-data);
-        text-decoration: none;
-        transition:
-          color var(--duration-micro) var(--ease-default),
-          border-color var(--duration-micro) var(--ease-default);
-      }
-
-      /* The workflow steps come first; each channel is a separate group after
-         a hairline, named by its platform, so a platform never reads as a
-         step of the daily flow. On a phone the name gives way to the links,
-         whose accessible names still carry it. */
-      .chrome__grupo {
-        margin-inline-start: var(--space-2);
-        padding-inline-start: var(--space-3);
-        border-inline-start: var(--color-border-hairline) solid var(--color-border-subtle);
-        font-family: var(--font-secondary);
-        font-size: var(--text-xs);
-        letter-spacing: var(--tracking-eyebrow);
-        text-transform: uppercase;
-        color: var(--color-text-muted);
-      }
-
-      /* On a phone the sections take their own line and slide sideways
-         rather than pushing links past the edge. Centred while they fit. */
-      @media (max-width: 30rem) {
-        .chrome__grupo {
-          display: none;
-        }
-
-        .chrome__nav {
-          flex: 1 0 100%;
-          justify-content: safe center;
-          margin-inline-end: 0;
-          overflow-x: auto;
-          scrollbar-width: none;
-        }
-
-        .chrome__nav::-webkit-scrollbar {
-          display: none;
-        }
-
-        .chrome__nav .chrome__link {
-          flex: none;
-          padding-inline: var(--space-2);
-        }
-      }
-
-      .chrome__link:hover {
-        color: var(--color-text);
-        border-block-end-color: var(--color-border-subtle);
-      }
-
-      .chrome__link[aria-current='page'] {
-        color: var(--color-text);
-        font-weight: 700;
-        border-block-end-color: var(--color-accent);
+      /* Anchored jumps land below the pinned header, not under it. */
+      :global(html) {
+        scroll-padding-block-start: var(--space-7);
       }
 
       .chrome__health {
@@ -438,13 +364,52 @@ const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/';
         overflow: hidden;
       }
 
+      /* On a phone a pinned header must stay short, so it packs into two
+         lines: the mark with the API pulse reduced to its dot, and the
+         appearance controls on the first; the navigation on the second. The
+         pulse's words stay in the accessibility tree. */
+      /* Below 60rem the pulse keeps only its dot, so the bar stays one line
+         on a tablet. Its words stay in the accessibility tree. */
+      @media (max-width: 59.99rem) {
+        .chrome__health {
+          padding: var(--space-1);
+          border-color: transparent;
+        }
+
+        .chrome__health > :not(.dot) {
+          position: absolute;
+          inline-size: 1px;
+          block-size: 1px;
+          overflow: hidden;
+          clip-path: inset(50%);
+          white-space: nowrap;
+        }
+      }
+
       @media (max-width: 30rem) {
         .chrome {
-          justify-content: center;
+          gap: var(--space-1) var(--space-2);
         }
 
         .chrome__health {
+          order: 1;
+        }
+
+        .chrome__controls {
+          order: 2;
+          gap: var(--space-1);
+          margin-inline-start: auto;
+        }
+
+        .chrome__controls .segmented__item {
+          padding-inline: var(--space-2);
+        }
+
+        .chrome__nav {
           order: 3;
+          flex: 1 0 100%;
+          justify-content: center;
+          margin-inline-end: 0;
         }
       }
     </style>

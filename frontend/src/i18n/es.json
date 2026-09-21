@@ -1,9 +1,13 @@
 {
   "nav.skip": "Saltar al contenido",
   "nav.label": "Secciones",
+  "nav.seccion.flujo": "Flujo diario",
+  "nav.seccion.canales": "Canales",
   "nav.cargas": "Cargas",
   "nav.cartera": "Cartera",
   "nav.mowaMes": "MOWA MES",
+  "nav.mowaMes.campana": "Campaña",
+  "nav.mowaMes.campanaLargo": "MOWA MES: campaña",
   "nav.mowaMes.seguimiento": "Seguimiento",
   "nav.mowaMes.seguimientoLargo": "MOWA MES: seguimiento",
   "nav.mowaMes.configuracion": "Configuración",
