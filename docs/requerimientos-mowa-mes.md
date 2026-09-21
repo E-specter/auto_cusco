@@ -173,6 +173,9 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Documento que no es DNI ni RUC en `dni` | Se carga y la previsualización advierte cuántos lo llevan; no se excluye (RF-MM-10, RF-MM-13) | Usuario (2026-09-14) |
 | Mes al que se imputa el límite mensual (antes S-MM-7) | El de la fecha de envío, no el de generación (RF-MM-01) | Usuario (2026-09-14) |
 | Producto sin documento de identidad (antes S-MM-8) | Se excluye con su motivo; no se carga con `dni` vacío (RF-MM-13) | Usuario (2026-09-14) |
+| Superar el límite mensual (antes S-MM-2) | Se advierte y se pide confirmación; no se bloquea (RF-MM-01) | Usuario (2026-09-21) |
+| Cuota que vence el mismo día del envío (antes S-MM-6) | `dias_ajustados = 0` es `Preventiva`, no `1 a 8` (RF-MM-15) | Usuario (2026-09-21) |
+| `Enviar en diferentes horas` (antes S-MM-5) | El segmento se calcula con la fecha más temprana, igual para todos los productos (RF-MM-15) | Usuario (2026-09-21) |
 
 ## 7. Evidencia de los ejemplos
 
@@ -199,10 +202,7 @@ Los ejemplos están en `archivos_anexo_chat/`, con prefijo `MOWA_MES_Ejemplo_`: 
 | Supuesto | Qué se asumió | Dónde aplica |
 |---|---|---|
 | S-MM-1 | Sin integración por API: se generan archivos y se importa el reporte a mano | Todo el módulo |
-| S-MM-2 | Superar el límite mensual se advierte y se confirma, no se bloquea | RF-MM-01 |
 | S-MM-3 | La descripción de campaña no tiene largo máximo mientras no se confirme el de MES | RF-MM-04 |
 | S-MM-4 | Feriados nacionales de Perú vigentes al 2026, calculados por regla para cualquier año; decretos y cambios de ley por configuración | RF-MM-08 |
-| S-MM-5 | Con `Enviar en diferentes horas`, el segmento se calcula con la fecha más temprana | RF-MM-15 |
-| S-MM-6 | `dias_ajustados = 0` es `Preventiva` | RF-MM-15 |
 
-S-MM-7 y S-MM-8 se confirmaron el 2026-09-14 y pasaron a la sección 6.
+Quedan abiertos S-MM-1, S-MM-3 y S-MM-4: los tres dependen de información externa (qué ofrece MES y qué dice la ley), no de una preferencia del usuario. S-MM-2, S-MM-5 y S-MM-6 se confirmaron el 2026-09-21, y S-MM-7 y S-MM-8 el 2026-09-14; los cinco pasaron a la sección 6.
