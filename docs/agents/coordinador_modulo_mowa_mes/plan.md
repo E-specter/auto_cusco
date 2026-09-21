@@ -55,6 +55,13 @@ Aprobada por `architec` con tres condiciones:
 - Un `null` explícito en un campo que no admite `null` (los límites) responde `422`.
 - No se extiende a otros `PUT`: `/supervisores` sigue siendo reemplazo completo.
 
+**Código en los 409 de `POST /mowa-mes/campanas` (corte propio después de F5, condiciones de `architec`, 2026-09-16):**
+
+- **Modelo de error propio del endpoint** (`detail` más `codigo`: `huella_cambiada` o `limite_excedido`), declarado en `responses` del POST. `DetalleError` no cambia, porque otros 409 ya lo consumen. Si los códigos entran en `CodigoMowaMes`, se agregan sus claves i18n y la prueba del catálogo.
+- **Orden del backend sin cambios:** primero la huella y después el límite, documentado en `mowa-mes.md`.
+- **Frontend:** decide por el código. Un 409 sin código conocido se trata como huella: bloquea Crear y pide previsualizar.
+- **Entrega conjunta:** backend y frontend en el mismo corte, con prueba y mutación de cada lado.
+
 ### 1.4 Supervisión transversal (RF-37 a RF-41), en `gestiones_digitales/`
 
 - El núcleo no conoce MOWA. Recibe la lista de supervisores de la campaña (`numero`, `procedencia`), el orden de procedencias, la primera fila válida y los nombres de las columnas de número y documento. Devuelve las filas de supervisión, con los DNIs secuenciales desde `00000001` por procedencia y los demás campos copiados de la fila plantilla.
