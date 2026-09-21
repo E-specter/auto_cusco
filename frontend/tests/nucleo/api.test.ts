@@ -156,3 +156,30 @@ describe('forma de las peticiones', () => {
     await expect(eliminarVersion(4, false)).resolves.toBeUndefined();
   });
 });
+
+describe('código del error', () => {
+  it('conserva el código cuando el cuerpo lo trae, además del motivo', async () => {
+    responderCon(409, { detail: 'La sabana cambio desde la previsualizacion', codigo: 'huella_cambiada' });
+
+    const fallo = await listarVersiones().catch((error: unknown) => error);
+
+    expect((fallo as ApiError).detail).toBe('La sabana cambio desde la previsualizacion');
+    expect((fallo as ApiError).codigo).toBe('huella_cambiada');
+  });
+
+  it('sin código en el cuerpo queda sin definir, no vacío', async () => {
+    responderCon(409, { detail: 'Ya existe una seleccion con ese nombre' });
+
+    const fallo = await listarVersiones().catch((error: unknown) => error);
+
+    expect((fallo as ApiError).codigo).toBeUndefined();
+  });
+
+  it('ignora un código que no es texto, para no propagar basura a la pantalla', async () => {
+    responderCon(400, { detail: 'x', codigo: { valor: 'limite_excedido' } });
+
+    const fallo = await listarVersiones().catch((error: unknown) => error);
+
+    expect((fallo as ApiError).codigo).toBeUndefined();
+  });
+});
