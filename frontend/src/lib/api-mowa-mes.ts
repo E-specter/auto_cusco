@@ -218,7 +218,9 @@ export function previsualizarCampana(
 /**
  * Create a campaign. `speech_huella` must be the one the last preview
  * returned; a 409 means either the speech changed since (huella mismatch) or
- * the month's limit is exceeded and `confirmar_limite` was not sent.
+ * the month's limit is exceeded and `confirmar_limite` was not sent — told
+ * apart by the shared `ApiError`'s `codigo` (`huella_cambiada` or
+ * `limite_excedido`), not by guessing from the last preview.
  */
 export function crearCampana(entrada: CreacionCampanaEntrada): Promise<Campana> {
   return request<Campana>('/mowa-mes/campanas', conJson('POST', entrada));

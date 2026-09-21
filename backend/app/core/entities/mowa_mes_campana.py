@@ -30,6 +30,20 @@ class Salida(StrEnum):
     NUMERO_CORTO_FLASH = "numero_corto_flash"  # visible y deshabilitada (RF-MM-05)
 
 
+class CodigoErrorCampana(StrEnum):
+    """Motivo del 409 de `POST /mowa-mes/campanas` (los unicos dos posibles).
+
+    Catalogo propio, aparte de `CodigoMowaMes`: `LIMITE_EXCEDIDO` aqui es la
+    creacion rechazada por no traer `confirmar_limite`, distinto del codigo
+    `limite_mensual_excedido` (advertencia) que ya devuelve la previsualizacion
+    para el mismo caso. Mezclarlos en un solo catalogo haria que un mismo
+    nombre significara "advertencia" en un endpoint y "error" en otro.
+    """
+
+    HUELLA_CAMBIADA = "huella_cambiada"
+    LIMITE_EXCEDIDO = "limite_excedido"
+
+
 @dataclass(frozen=True)
 class Herramientas:
     """RF-MM-06. `respuesta_automatica` esta deshabilitada mientras no se use."""

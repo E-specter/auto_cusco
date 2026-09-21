@@ -335,6 +335,7 @@ def test_limite_mensual_y_confirmacion(cliente) -> None:
 
     assert [a["codigo"] for a in previa["advertencias"]] == ["limite_mensual_excedido"]
     assert sin_confirmar.status_code == 409
+    assert sin_confirmar.json()["codigo"] == "limite_excedido"
     assert confirmada.status_code == 201
     assert confirmada.json()["confirmo_limite"] is True
 
@@ -358,6 +359,7 @@ def test_si_el_speech_cambia_despues_de_previsualizar_no_se_crea_nada(cliente) -
 
     assert editada.status_code == 200
     assert rechazada.status_code == 409
+    assert rechazada.json()["codigo"] == "huella_cambiada"
     with engine.connect() as cx:
         creadas = cx.execute(
             select(func.count()).select_from(_CAMPANA).where(_CAMPANA.c.fecha_corte == FECHA)

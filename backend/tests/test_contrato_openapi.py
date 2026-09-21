@@ -18,7 +18,6 @@ from app.main import app
 from tests.test_api_archivos_carga import DEFINICION, ConsultaFalsa
 
 ESQUEMA = contrato.generar()
-REFERENCIA_ERROR = "#/components/schemas/DetalleError"
 
 
 def _respuestas():
@@ -26,6 +25,27 @@ def _respuestas():
         for metodo, operacion in metodos.items():
             for codigo, respuesta in operacion["responses"].items():
                 yield f"{metodo.upper()} {ruta} -> {codigo}", codigo, respuesta
+
+
+def _resolver_propiedades(esquema: dict) -> tuple[dict, set[str]]:
+    """Sigue `$ref` y aplana `allOf`: junta las propiedades y los obligatorios
+    de un esquema y de todo lo que extiende, sin asumir que la extension se
+    declaro con `allOf` (una subclase de Pydantic sin composicion explicita
+    genera un esquema propio, plano, con sus propias `properties`)."""
+    esquemas = ESQUEMA["components"]["schemas"]
+    propiedades: dict = {}
+    requeridos: set[str] = set()
+    pendientes = [esquema]
+    while pendientes:
+        nodo = pendientes.pop()
+        referencia = nodo.get("$ref")
+        if referencia:
+            pendientes.append(esquemas[referencia.rsplit("/", 1)[-1]])
+            continue
+        pendientes.extend(nodo.get("allOf", []))
+        propiedades.update(nodo.get("properties", {}))
+        requeridos.update(nodo.get("required", []))
+    return propiedades, requeridos
 
 
 def _es_forma_libre(esquema: dict) -> bool:
@@ -68,16 +88,25 @@ def test_toda_respuesta_exitosa_declara_su_forma() -> None:
     )
 
 
-def test_los_errores_declarados_usan_el_cuerpo_comun() -> None:
-    # 422 lo declara FastAPI con su propio esquema de validacion.
-    distintos = [
-        nombre
-        for nombre, codigo, respuesta in _respuestas()
-        if codigo.startswith("4") and codigo != "422"
-        if respuesta["content"]["application/json"]["schema"] != {"$ref": REFERENCIA_ERROR}
-    ]
+def test_los_errores_declarados_traen_detail_obligatorio() -> None:
+    # 422 lo declara FastAPI con su propio esquema de validacion. Un endpoint
+    # puede declarar en el 4xx su propio modelo en vez de DetalleError (por
+    # ejemplo para agregar un `codigo`, ver mowa-mes.md §15), siempre que
+    # conserve `detail` como string obligatorio: el cliente compartido
+    # (frontend/src/lib/api.ts) lo usa para el mensaje. Sin excepciones por
+    # nombre de endpoint (docs/contrato-api.md, seccion 3).
+    sin_detail = []
+    for nombre, codigo, respuesta in _respuestas():
+        if not codigo.startswith("4") or codigo == "422":
+            continue
+        propiedades, requeridos = _resolver_propiedades(
+            respuesta["content"]["application/json"]["schema"]
+        )
+        detail = propiedades.get("detail")
+        if detail is None or detail.get("type") != "string" or "detail" not in requeridos:
+            sin_detail.append(nombre)
 
-    assert distintos == []
+    assert sin_detail == [], f"Errores sin 'detail' obligatorio de tipo string: {sin_detail}"
 
 
 def test_la_descarga_declara_el_archivo_y_su_resumen() -> None:

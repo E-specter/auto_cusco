@@ -566,8 +566,9 @@ export interface paths {
         /**
          * Crear Campana
          * @description Genera los archivos y guarda la campana. 400 si tiene errores (los de la
-         *     previsualizacion), 409 si supera el limite sin `confirmar_limite` o si el speech
-         *     cambio desde la previsualizacion.
+         *     previsualizacion); 409 con `codigo` propio (`huella_cambiada` o `limite_excedido`)
+         *     si el speech cambio desde la previsualizacion o si supera el limite sin
+         *     `confirmar_limite` — en ese orden: la huella se revisa antes que el limite.
          */
         post: operations["crear_campana_mowa_mes_campanas_post"];
         delete?: never;
@@ -893,6 +894,18 @@ export interface components {
             cantidad: number;
         };
         /**
+         * CodigoErrorCampana
+         * @description Motivo del 409 de `POST /mowa-mes/campanas` (los unicos dos posibles).
+         *
+         *     Catalogo propio, aparte de `CodigoMowaMes`: `LIMITE_EXCEDIDO` aqui es la
+         *     creacion rechazada por no traer `confirmar_limite`, distinto del codigo
+         *     `limite_mensual_excedido` (advertencia) que ya devuelve la previsualizacion
+         *     para el mismo caso. Mezclarlos en un solo catalogo haria que un mismo
+         *     nombre significara "advertencia" en un endpoint y "error" en otro.
+         * @enum {string}
+         */
+        CodigoErrorCampana: "huella_cambiada" | "limite_excedido";
+        /**
          * CodigoMowaMes
          * @description Catalogo de codigos que el frontend traduce como `mowaMes.codigo.<codigo>`.
          *
@@ -1088,6 +1101,17 @@ export interface components {
             origen: components["schemas"]["OrigenDia"];
             /** Retirado */
             retirado: boolean;
+        };
+        /**
+         * ErrorCreacionCampanaRespuesta
+         * @description 409 propio de este endpoint: distingue por `codigo` sin que el cliente
+         *     tenga que adivinar la causa por el orden en que el servicio los revisa
+         *     (huella primero, limite despues; ver `docs/mowa-mes.md`).
+         */
+        ErrorCreacionCampanaRespuesta: {
+            /** Detail */
+            detail: string;
+            codigo: components["schemas"]["CodigoErrorCampana"];
         };
         /** ErrorGeneracionRespuesta */
         ErrorGeneracionRespuesta: {
@@ -3470,13 +3494,13 @@ export interface operations {
                     "application/json": components["schemas"]["DetalleError"];
                 };
             };
-            /** @description La operacion choca con el estado actual */
+            /** @description La huella del speech cambio desde la previsualizacion, o la campana supera el limite mensual y no trae confirmar_limite */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleError"];
+                    "application/json": components["schemas"]["ErrorCreacionCampanaRespuesta"];
                 };
             };
             /** @description Validation Error */

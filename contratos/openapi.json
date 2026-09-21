@@ -2140,7 +2140,7 @@
           "mowa-mes"
         ],
         "summary": "Crear Campana",
-        "description": "Genera los archivos y guarda la campana. 400 si tiene errores (los de la\nprevisualizacion), 409 si supera el limite sin `confirmar_limite` o si el speech\ncambio desde la previsualizacion.",
+        "description": "Genera los archivos y guarda la campana. 400 si tiene errores (los de la\nprevisualizacion); 409 con `codigo` propio (`huella_cambiada` o `limite_excedido`)\nsi el speech cambio desde la previsualizacion o si supera el limite sin\n`confirmar_limite` — en ese orden: la huella se revisa antes que el limite.",
         "operationId": "crear_campana_mowa_mes_campanas_post",
         "requestBody": {
           "required": true,
@@ -2184,11 +2184,11 @@
             }
           },
           "409": {
-            "description": "La operacion choca con el estado actual",
+            "description": "La huella del speech cambio desde la previsualizacion, o la campana supera el limite mensual y no trae confirmar_limite",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DetalleError"
+                  "$ref": "#/components/schemas/ErrorCreacionCampanaRespuesta"
                 }
               }
             }
@@ -3249,6 +3249,15 @@
         ],
         "title": "CodigoConteoRespuesta"
       },
+      "CodigoErrorCampana": {
+        "type": "string",
+        "enum": [
+          "huella_cambiada",
+          "limite_excedido"
+        ],
+        "title": "CodigoErrorCampana",
+        "description": "Motivo del 409 de `POST /mowa-mes/campanas` (los unicos dos posibles).\n\nCatalogo propio, aparte de `CodigoMowaMes`: `LIMITE_EXCEDIDO` aqui es la\ncreacion rechazada por no traer `confirmar_limite`, distinto del codigo\n`limite_mensual_excedido` (advertencia) que ya devuelve la previsualizacion\npara el mismo caso. Mezclarlos en un solo catalogo haria que un mismo\nnombre significara \"advertencia\" en un endpoint y \"error\" en otro."
+      },
       "CodigoMowaMes": {
         "type": "string",
         "enum": [
@@ -3730,6 +3739,24 @@
           "retirado"
         ],
         "title": "DiaNoLaborableRespuesta"
+      },
+      "ErrorCreacionCampanaRespuesta": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoErrorCampana"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "codigo"
+        ],
+        "title": "ErrorCreacionCampanaRespuesta",
+        "description": "409 propio de este endpoint: distingue por `codigo` sin que el cliente\ntenga que adivinar la causa por el orden en que el servicio los revisa\n(huella primero, limite despues; ver `docs/mowa-mes.md`)."
       },
       "ErrorGeneracionRespuesta": {
         "properties": {

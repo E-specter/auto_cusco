@@ -240,7 +240,10 @@ test.describe('P3: límite mensual excedido', () => {
     });
     api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaExcedida }];
     api.respuestas.crearCampana = [
-      { estado: 409, cuerpo: { detail: 'La campana supera el limite mensual; confirma para continuar' } },
+      {
+        estado: 409,
+        cuerpo: { detail: 'La campana supera el limite mensual; confirma para continuar', codigo: 'limite_excedido' },
+      },
     ];
     await abrir(page, api);
     await elegirSeleccionGuardada(page);
@@ -288,26 +291,29 @@ function bodyFrom(previa: ReturnType<typeof previsualizacionCampanaSintetica>): 
 }
 
 test.describe('P4: speech cambiado', () => {
-  test('envía speech.huella como speech_huella; un 409 tras confirmar el límite bloquea Crear hasta previsualizar de nuevo', async ({
+  test('envía speech.huella como speech_huella; un 409 de huella bloquea Crear hasta previsualizar de nuevo, aunque el límite esté excedido', async ({
     page,
   }) => {
     const api = apiMowaMes();
     const previa = previsualizacionCampanaSintetica(entradaMinima(), {
       speech: { id: 1, nombre: 'Speech original', huella: 'b'.repeat(64) },
+      // Excedido a propósito: el diálogo del límite ya no depende de esta
+      // previsualización, solo del `codigo` que devuelva el 409.
       limite: { mes: '2026-09', limite: 2_500_000, cargados_mes: 2_490_000, esta_campana: 982, total: 2_490_982, disponible: 9018, excedido: true },
     });
     api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previa }];
-    api.respuestas.crearCampana = [{ estado: 409, cuerpo: { detail: 'La version del speech cambio' } }];
+    api.respuestas.crearCampana = [
+      { estado: 409, cuerpo: { detail: 'La version del speech cambio', codigo: 'huella_cambiada' } },
+    ];
     await abrir(page, api);
     await elegirSeleccionGuardada(page);
 
     await page.getByRole('button', { name: 'Crear campaña' }).click();
-    const dialogo = page.getByRole('dialog', { name: 'La campaña superaría el límite mensual' });
-    await dialogo.getByRole('button', { name: 'Crear de todas formas' }).click();
 
     const [pedido] = api.pedidos.filter((p) => p.ruta === '/mowa-mes/campanas' && p.metodo === 'POST');
     expect((pedido.cuerpo as Record<string, unknown>).speech_huella).toBe('b'.repeat(64));
 
+    await expect(page.getByRole('dialog', { name: 'La campaña superaría el límite mensual' })).toBeHidden();
     await expect(page.getByText('Vuelve a previsualizar antes de crearla', { exact: false })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Crear campaña' })).toBeDisabled();
     await expect(page.getByRole('heading', { name: /creada$/ })).toHaveCount(0);
@@ -326,10 +332,13 @@ test.describe('P4: speech cambiado', () => {
       speech: { id: 1, nombre: 'Speech original', huella: 'c'.repeat(64) },
       // The huella check runs before the limit check server-side, so a 409 on
       // the very first (unconfirmed) attempt can happen with the limit intact.
+      // The client no longer needs to know that order: `codigo` alone decides.
       limite: { mes: '2026-09', limite: 2_500_000, cargados_mes: 100, esta_campana: 982, total: 1082, disponible: 2_498_918, excedido: false },
     });
     api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previa }];
-    api.respuestas.crearCampana = [{ estado: 409, cuerpo: { detail: 'La version del speech cambio' } }];
+    api.respuestas.crearCampana = [
+      { estado: 409, cuerpo: { detail: 'La version del speech cambio', codigo: 'huella_cambiada' } },
+    ];
     await abrir(page, api);
     await elegirSeleccionGuardada(page);
 
@@ -338,6 +347,32 @@ test.describe('P4: speech cambiado', () => {
     await expect(page.getByRole('dialog', { name: 'La campaña superaría el límite mensual' })).toBeHidden();
     await expect(page.getByText('Vuelve a previsualizar antes de crearla', { exact: false })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Crear campaña' })).toBeDisabled();
+    expect(
+      api.pedidos.filter((p) => p.ruta === '/mowa-mes/campanas' && p.metodo === 'POST'),
+    ).toHaveLength(1);
+  });
+
+  test('un 409 sin código conocido se trata como huella: bloquea Crear y pide previsualizar', async ({ page }) => {
+    const api = apiMowaMes();
+    const previa = previsualizacionCampanaSintetica(entradaMinima(), {
+      speech: { id: 1, nombre: 'Speech original', huella: 'd'.repeat(64) },
+      limite: { mes: '2026-09', limite: 2_500_000, cargados_mes: 2_490_000, esta_campana: 982, total: 2_490_982, disponible: 9018, excedido: true },
+    });
+    api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previa }];
+    // A code this client does not recognize (future backend addition, typo,
+    // whatever): the safe default is the huella block, never the limit dialog.
+    api.respuestas.crearCampana = [
+      { estado: 409, cuerpo: { detail: 'Motivo nuevo que el cliente no conoce', codigo: 'motivo_desconocido' } },
+    ];
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+
+    await page.getByRole('button', { name: 'Crear campaña' }).click();
+
+    await expect(page.getByRole('dialog', { name: 'La campaña superaría el límite mensual' })).toBeHidden();
+    await expect(page.getByText('Vuelve a previsualizar antes de crearla', { exact: false })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Crear campaña' })).toBeDisabled();
+    await expect(page.getByRole('heading', { name: /creada$/ })).toHaveCount(0);
     expect(
       api.pedidos.filter((p) => p.ruta === '/mowa-mes/campanas' && p.metodo === 'POST'),
     ).toHaveLength(1);

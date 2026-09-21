@@ -18,6 +18,7 @@ Filtros y orden en la misma sintaxis que `/cartera`.
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.adapters.input.lector_reporte_mowa_mes import LectorReporteMowaMes
@@ -51,6 +52,7 @@ from app.core.entities.mowa_mes_campana import (
     CampanaInvalida,
     CampanaNoEncontrada,
     CampanaRegistrada,
+    CodigoErrorCampana,
     ConsumoLimite,
     Herramientas,
     LimiteMensualExcedido,
@@ -176,6 +178,15 @@ class PeticionCampanaEntrada(BaseModel):
             ),
             confirmar_limite=confirmar_limite,
         )
+
+
+class ErrorCreacionCampanaRespuesta(ModeloRespuesta):
+    """409 propio de este endpoint: distingue por `codigo` sin que el cliente
+    tenga que adivinar la causa por el orden en que el servicio los revisa
+    (huella primero, limite despues; ver `docs/mowa-mes.md`)."""
+
+    detail: str
+    codigo: CodigoErrorCampana
 
 
 class CreacionCampanaEntrada(PeticionCampanaEntrada):
@@ -623,26 +634,40 @@ def previsualizar_campana(
     "/campanas",
     status_code=201,
     response_model=CampanaRespuesta,
-    responses=respuestas_de_error(400, 404, 409),
+    responses={
+        **respuestas_de_error(400, 404),
+        409: {
+            "model": ErrorCreacionCampanaRespuesta,
+            "description": (
+                "La huella del speech cambio desde la previsualizacion, o la campana "
+                "supera el limite mensual y no trae confirmar_limite"
+            ),
+        },
+    },
 )
 def crear_campana(
     entrada: CreacionCampanaEntrada,
     servicio: CampanasMowaMesService = Depends(obtener_servicio_campanas),
-) -> CampanaRespuesta:
+) -> CampanaRespuesta | JSONResponse:
     """Genera los archivos y guarda la campana. 400 si tiene errores (los de la
-    previsualizacion), 409 si supera el limite sin `confirmar_limite` o si el speech
-    cambio desde la previsualizacion."""
+    previsualizacion); 409 con `codigo` propio (`huella_cambiada` o `limite_excedido`)
+    si el speech cambio desde la previsualizacion o si supera el limite sin
+    `confirmar_limite` — en ese orden: la huella se revisa antes que el limite."""
     try:
         return _campana(
             servicio.crear(entrada.peticion(entrada.speech_huella, entrada.confirmar_limite))
         )
-    except (
-        *_ERRORES_ARMADO,
-        CampanaInvalida,
-        LimiteMensualExcedido,
-        SpeechCambiado,
-        ArchivoDemasiadoGrande,
-    ) as exc:
+    except SpeechCambiado as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"detail": str(exc), "codigo": CodigoErrorCampana.HUELLA_CAMBIADA.value},
+        )
+    except LimiteMensualExcedido as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"detail": str(exc), "codigo": CodigoErrorCampana.LIMITE_EXCEDIDO.value},
+        )
+    except (*_ERRORES_ARMADO, CampanaInvalida, ArchivoDemasiadoGrande) as exc:
         raise _traducir(exc) from exc
 
 

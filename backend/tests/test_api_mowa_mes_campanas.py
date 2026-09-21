@@ -211,6 +211,34 @@ def test_respuestas_de_la_creacion(entorno, extra, estado) -> None:
     assert _crear(client, **extra).status_code == estado
 
 
+@pytest.mark.parametrize(
+    ("entorno", "extra", "codigo"),
+    [
+        ({}, {"speech_huella": "0" * 64}, "huella_cambiada"),
+        ({"cargados_mes": 2_500_000}, {}, "limite_excedido"),
+    ],
+)
+def test_el_409_de_la_creacion_trae_el_codigo_del_motivo(entorno, extra, codigo) -> None:
+    client = _cliente(Entorno(**entorno))
+
+    respuesta = _crear(client, **extra)
+
+    assert respuesta.status_code == 409
+    cuerpo = respuesta.json()
+    assert cuerpo["codigo"] == codigo
+    assert isinstance(cuerpo["detail"], str) and cuerpo["detail"]
+
+
+def test_con_huella_cambiada_y_limite_excedido_el_409_es_huella_cambiada() -> None:
+    """El orden no cambia (docs/mowa-mes.md §15): la huella se revisa antes que el limite."""
+    client = _cliente(Entorno(cargados_mes=2_500_000))
+
+    respuesta = _crear(client, speech_huella="0" * 64)
+
+    assert respuesta.status_code == 409
+    assert respuesta.json()["codigo"] == "huella_cambiada"
+
+
 def test_crear_sin_huella_no_llega_al_caso_de_uso() -> None:
     client = _cliente(Entorno())
 

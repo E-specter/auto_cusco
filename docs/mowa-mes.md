@@ -176,3 +176,18 @@ El frontend traduce cada uno con la clave plana `mowaMes.codigo.<codigo>` en `fr
 | `tests/test_api_mowa_mes_campanas.py` | API con `TestClient`: previsualización, creación, consulta, descarga y sus cabeceras, límite, reporte |
 | `tests/test_mowa_mes_campanas_postgres.py` | Integración de punta a punta por HTTP contra PostgreSQL: sábana → campaña → descarga → reporte → conciliación; división real; límite; speech cambiado sin escribir nada; sin WhatsApp; documento no estándar; estados distintos de "enviado". 2026-09-16 (revisión B7 contra P1–P9 de F2): `muestra` de la previsualización con la supervisión primero (no solo el archivo ya escrito); `sin_supervisores` y `sin_productos_cargables` como error de previsualización (200) y 400 al crear; fecha de corte sin versión vigente, 404 contra el repositorio real |
 | `tests/test_generacion_cargas_postgres.py` | La prueba de paginación real ahora parchea `recorrido.LIMITE_MAXIMO` (C-2) |
+
+## 15. 409 estructurado de `POST /mowa-mes/campanas`
+
+El `409` de creación tenía un solo motivo de texto en `detail`; el frontend no podía distinguir "huella cambiada" de "límite excedido" sin repetir la lógica del backend (eso causó un bug real en `campana.astro`, corregido en B7 — ver la fila de tareas). Desde este corte el `409` trae, además de `detail`, un `codigo`:
+
+| `codigo` | Motivo |
+|---|---|
+| `huella_cambiada` | `speech_huella` no coincide con la versión vigente al crear |
+| `limite_excedido` | La campaña supera el límite mensual y no trae `confirmar_limite` |
+
+- **Modelo:** `CodigoErrorCampana` (`app/core/entities/mowa_mes_campana.py`) y `ErrorCreacionCampanaRespuesta` (`detail` + `codigo`, en `app/api/mowa_mes_campanas.py`), declarado en `responses` del `POST` solo para el `409` — el `400`/`404` del mismo endpoint y el `409` de los demás endpoints (por ejemplo `ReporteYaImportado`) siguen con `DetalleError`, sin cambios.
+- **Catálogo separado de `CodigoMowaMes` (decisión de architec):** `limite_excedido` no es lo mismo que la advertencia `limite_mensual_excedido` de la previsualización (mismo hecho, dos endpoints distintos: uno lo previene, el otro lo impide). Ponerlos en el mismo catálogo haría que un nombre significara "advertencia" en un endpoint y "error" en otro. Por eso `CodigoErrorCampana` no entra en `CodigoMowaMes` y no le aplican las claves `mowaMes.codigo.*` ni `tests/test_codigos_mowa_mes.py`.
+- **El orden de los chequeos no cambia:** `CampanasMowaMesService.crear()` revisa la huella antes que el límite (`app/core/services/plataformas/mowa_mes/campana.py`), igual que antes de este corte. Con `confirmar_limite=True`, un `409` solo puede ser `huella_cambiada` (el chequeo del límite queda salteado); con `confirmar_limite=False`, puede ser cualquiera de los dos según cuál se dispare primero.
+- **En el frontend**, un `409` sin `codigo` reconocido se trata como `huella_cambiada` (decisión de architec, implementación de `dev_frontend_modulo_mowa_mes`).
+- **Prueba de contrato:** `tests/test_contrato_openapi.py::test_los_errores_declarados_traen_detail_obligatorio` recorre cada respuesta `4xx` salvo `422`, resuelve `$ref` y aplana `allOf`, y exige `detail` string obligatorio. No hay excepciones por nombre de endpoint: este `409` pasa porque conserva `detail`, no porque esté en una lista. La regla completa está en `docs/contrato-api.md`, sección 3 (decisión de architec).

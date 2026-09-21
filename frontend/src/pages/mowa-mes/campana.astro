@@ -1019,12 +1019,11 @@ import '../../styles/mowa-mes.css';
       pintarCreada();
     } catch (caido) {
       if (caido instanceof ApiError && caido.status === 409) {
-        // The backend checks the huella before the limit, so an unconfirmed
-        // attempt can 409 on either. It is the limit's 409 only when the last
-        // preview actually saw it exceeded; otherwise a 409 here can only be
-        // the huella, by the same guarantee that makes a *confirmed* attempt's
-        // 409 always the huella (confirmar_limite bypasses that check).
-        if (!confirmarLimite && estado.previsualizacion?.limite.excedido) {
+        // The 409's own `codigo` says which it is; a code this client does not
+        // know is treated as the huella (the safer default: it blocks Crear
+        // and asks for a fresh preview, rather than silently offering to
+        // confirm a limit that may not be the real cause).
+        if (caido.codigo === 'limite_excedido') {
           $<HTMLElement>('[data-limite-dialogo-detalle]').textContent = caido.detail || t('common.errorBody');
           void openWhenFree(dialogos.limite).then(() =>
             $<HTMLButtonElement>('[data-limite-cancelar]').focus(),

@@ -199,7 +199,10 @@ test('mowa-mes campaña: diálogo del límite mensual con error', async ({ page 
     },
   ];
   api.respuestas.crearCampana = [
-    { estado: 409, cuerpo: { detail: 'La campana supera el limite mensual; confirma para continuar' } },
+    {
+      estado: 409,
+      cuerpo: { detail: 'La campana supera el limite mensual; confirma para continuar', codigo: 'limite_excedido' },
+    },
   ];
   await montarApiMowaMes(page, api);
   await montarSeleccionCampana(page);
