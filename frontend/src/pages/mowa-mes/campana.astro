@@ -267,12 +267,37 @@ import '../../styles/mowa-mes.css';
             <p class="field__hint" data-limite-esta-campana></p>
             <p class="notice notice--danger" data-limite-excedido hidden></p>
 
-            <h3 class="mm-subtitulo" data-i18n="mowaMes.campana.exclusiones.title">Exclusiones</h3>
+            <h3 class="mm-subtitulo" tabindex="-1" data-exclusiones-titulo>
+              <span data-i18n="mowaMes.campana.exclusiones.title">Exclusiones</span>
+              <span class="mono muted" data-exclusiones-total></span>
+            </h3>
+            <p class="notice notice--info" data-exclusiones-truncadas hidden></p>
             <div data-exclusiones></div>
-            <p class="field__hint" data-exclusiones-nota></p>
+            <div class="pager" role="group" data-i18n-attr="aria-label:mowaMes.campana.exclusiones.paginacion" aria-label="Paginación de las exclusiones" data-exclusiones-pager hidden>
+              <button type="button" class="btn btn--sm" data-anterior>
+                <Icon name="chevron-left" size={16} />
+                <span data-i18n="console.incidencias.prev">Anteriores</span>
+              </button>
+              <p class="mono muted" aria-live="polite" data-rango></p>
+              <button type="button" class="btn btn--sm" data-siguiente>
+                <span data-i18n="console.incidencias.next">Siguientes</span>
+                <Icon name="chevron-right" size={16} />
+              </button>
+            </div>
 
-            <h3 class="mm-subtitulo" data-i18n="mowaMes.campana.muestra.title">Muestra de la carga</h3>
+            <h3 class="mm-subtitulo" tabindex="-1" data-muestra-titulo data-i18n="mowaMes.campana.muestra.title">Muestra de la carga</h3>
             <div data-muestra></div>
+            <div class="pager" role="group" data-i18n-attr="aria-label:mowaMes.campana.muestra.paginacion" aria-label="Paginación de la muestra" data-muestra-pager hidden>
+              <button type="button" class="btn btn--sm" data-anterior>
+                <Icon name="chevron-left" size={16} />
+                <span data-i18n="console.incidencias.prev">Anteriores</span>
+              </button>
+              <p class="mono muted" aria-live="polite" data-rango></p>
+              <button type="button" class="btn btn--sm" data-siguiente>
+                <span data-i18n="console.incidencias.next">Siguientes</span>
+                <Icon name="chevron-right" size={16} />
+              </button>
+            </div>
 
             <h3 class="mm-subtitulo" data-i18n="mowaMes.campana.archivosPrevistos.title">Archivos previstos</h3>
             <p class="field__hint" data-i18n="mowaMes.campana.archivoPrevisto.nota">
@@ -384,7 +409,7 @@ import '../../styles/mowa-mes.css';
     type ProgramacionBorrador,
     type SupervisorBorrador,
   } from '../../lib/mowa-mes-campana';
-  import { moverElemento, traducirCodigo } from '../../lib/mowa-mes';
+  import { moverElemento, paginar, traducirCodigo, type PaginaLocal } from '../../lib/mowa-mes';
   import { leerResumenDescarga, nombreArchivo } from '../../lib/mowa-mes-seguimiento';
   import { guardarArchivo } from '../../lib/descargas';
   import { openWhenFree } from '../../lib/dialogs';
@@ -406,6 +431,8 @@ import '../../styles/mowa-mes.css';
     supervisoresPropios: [] as SupervisorBorrador[],
     descripcionEditada: false,
     previsualizacion: null as PrevisualizacionCampana | null,
+    paginaExclusiones: 1,
+    paginaMuestra: 1,
     error404: null as string | null,
     huellaInvalida: false,
     campanaCreada: null as Campana | null,
@@ -824,19 +851,79 @@ import '../../styles/mowa-mes.css';
     excedido.textContent = mensajeLimiteExcedido(previa.limite);
   }
 
+  function pintarPaginador(paginador: HTMLElement, pagina: PaginaLocal<unknown>): void {
+    paginador.hidden = !pagina.hayPaginador;
+    paginador.querySelector<HTMLElement>('[data-rango]')!.textContent = t('console.incidencias.range', {
+      desde: formatNumber(pagina.desde),
+      hasta: formatNumber(pagina.hasta),
+      total: formatNumber(pagina.total),
+    });
+    paginador.querySelector<HTMLButtonElement>('[data-anterior]')!.disabled = pagina.pagina <= 1;
+    paginador.querySelector<HTMLButtonElement>('[data-siguiente]')!.disabled = pagina.pagina >= pagina.paginas;
+  }
+
+  /**
+   * Repaint without stealing focus: it only moves when it was inside a pager
+   * that just disabled the button it was on or disappeared (last page reached,
+   * or a fresh preview with a single page). It then goes to the other button,
+   * or to the table's heading when there is no pager left.
+   */
+  function conFocoDePaginador(pintar: () => void): void {
+    const activo = document.activeElement;
+    const paginador = [...document.querySelectorAll<HTMLElement>('[data-exclusiones-pager], [data-muestra-pager]')].find(
+      (nodo) => activo !== null && nodo.contains(activo),
+    );
+    pintar();
+    if (!paginador) return;
+    const ahora = document.activeElement;
+    const perdido =
+      ahora === null ||
+      ahora === document.body ||
+      (ahora instanceof HTMLButtonElement && ahora.disabled) ||
+      paginador.hidden;
+    if (!perdido) return;
+    const habilitado = paginador.hidden
+      ? null
+      : [...paginador.querySelectorAll<HTMLButtonElement>('button')].find((boton) => !boton.disabled);
+    const titulo = paginador.matches('[data-exclusiones-pager]')
+      ? $<HTMLElement>('[data-exclusiones-titulo]')
+      : $<HTMLElement>('[data-muestra-titulo]');
+    (habilitado ?? titulo).focus();
+  }
+
   function pintarExclusiones(previa: PrevisualizacionCampana): void {
     const host = $<HTMLElement>('[data-exclusiones]');
+    const paginador = $<HTMLElement>('[data-exclusiones-pager]');
+    const aviso = $<HTMLElement>('[data-exclusiones-truncadas]');
+    const filas = previa.exclusiones.exclusiones;
+    const total = previa.exclusiones.total;
+
+    // The heading always carries the real total; the list may hold only the
+    // first 100 of them.
+    $<HTMLElement>('[data-exclusiones-total]').textContent = t('mowaMes.campana.exclusiones.total', {
+      total: formatNumber(total),
+    });
+    aviso.hidden = total <= filas.length;
+    aviso.textContent = aviso.hidden
+      ? ''
+      : t('mowaMes.campana.exclusiones.truncadas', {
+          mostradas: formatNumber(filas.length),
+          total: formatNumber(total),
+        });
+
     host.replaceChildren();
-    if (previa.exclusiones.total === 0) {
+    if (total === 0) {
       host.append(vacio(t('mowaMes.campana.exclusiones.vacio')));
-      $<HTMLElement>('[data-exclusiones-nota]').textContent = '';
+      paginador.hidden = true;
       return;
     }
+    const pagina = paginar(filas, estado.paginaExclusiones);
+    estado.paginaExclusiones = pagina.pagina;
     const { envoltorio, cuerpo } = tabla('mm-exclusiones__tabla', [
       [t('mowaMes.seguimiento.exclusiones.col.pagare'), false],
       [t('mowaMes.seguimiento.exclusiones.col.motivo'), false],
     ]);
-    previa.exclusiones.exclusiones.forEach((exclusion) => {
+    pagina.filas.forEach((exclusion) => {
       const fila = document.createElement('tr');
       const motivo = document.createElement('td');
       const tag = document.createElement('span');
@@ -849,23 +936,20 @@ import '../../styles/mowa-mes.css';
       cuerpo.append(fila);
     });
     host.append(envoltorio);
-    const nota = $<HTMLElement>('[data-exclusiones-nota]');
-    nota.textContent =
-      previa.exclusiones.total > previa.exclusiones.exclusiones.length
-        ? t('mowaMes.campana.exclusiones.masExclusiones', {
-            mostradas: previa.exclusiones.exclusiones.length,
-            total: previa.exclusiones.total,
-          })
-        : '';
+    pintarPaginador(paginador, pagina);
   }
 
   function pintarMuestra(previa: PrevisualizacionCampana): void {
     const host = $<HTMLElement>('[data-muestra]');
+    const paginador = $<HTMLElement>('[data-muestra-pager]');
     host.replaceChildren();
     if (previa.muestra.length === 0) {
       host.append(vacio(t('mowaMes.campana.muestra.vacio')));
+      paginador.hidden = true;
       return;
     }
+    const pagina = paginar(previa.muestra, estado.paginaMuestra);
+    estado.paginaMuestra = pagina.pagina;
     const { envoltorio, cuerpo } = tabla('mm-muestra__tabla', [
       [t('mowaMes.campana.muestra.col.numero'), false],
       [t('mowaMes.campana.muestra.col.dni'), false],
@@ -874,7 +958,7 @@ import '../../styles/mowa-mes.css';
       [t('mowaMes.campana.muestra.col.mensaje'), false],
       [t('mowaMes.campana.muestra.col.advertencias'), false],
     ]);
-    previa.muestra.forEach((fila) => {
+    pagina.filas.forEach((fila) => {
       const tr = document.createElement('tr');
       const numero = celda('td', fila.numero, 'mono');
       if (fila.supervision) {
@@ -906,6 +990,7 @@ import '../../styles/mowa-mes.css';
       cuerpo.append(tr);
     });
     host.append(envoltorio);
+    pintarPaginador(paginador, pagina);
   }
 
   function pintarArchivosPrevistos(previa: PrevisualizacionCampana): void {
@@ -986,9 +1071,11 @@ import '../../styles/mowa-mes.css';
       const previa = await previsualizarCampana(entradaCampana(borrador), control.signal);
       if (control.signal.aborted) return;
       estado.previsualizacion = previa;
+      estado.paginaExclusiones = 1;
+      estado.paginaMuestra = 1;
       estado.error404 = null;
       estado.huellaInvalida = false;
-      pintarResultado();
+      conFocoDePaginador(pintarResultado);
     } catch (caido) {
       if (caido instanceof DOMException && caido.name === 'AbortError') return;
       estado.previsualizacion = null;
@@ -1002,6 +1089,22 @@ import '../../styles/mowa-mes.css';
     } finally {
       if (controlPrevisualizacion === control) $<HTMLElement>('[data-previsualizacion-calculando]').hidden = true;
     }
+  }
+
+  function moverPagina(campo: 'paginaExclusiones' | 'paginaMuestra', delta: -1 | 1): void {
+    const previa = estado.previsualizacion;
+    if (!previa) return;
+    estado[campo] += delta;
+    conFocoDePaginador(() => (campo === 'paginaExclusiones' ? pintarExclusiones(previa) : pintarMuestra(previa)));
+  }
+
+  for (const [selector, campo] of [
+    ['[data-exclusiones-pager]', 'paginaExclusiones'],
+    ['[data-muestra-pager]', 'paginaMuestra'],
+  ] as const) {
+    const paginador = $<HTMLElement>(selector);
+    paginador.querySelector('[data-anterior]')!.addEventListener('click', () => moverPagina(campo, -1));
+    paginador.querySelector('[data-siguiente]')!.addEventListener('click', () => moverPagina(campo, 1));
   }
 
   // ---- Creation -----------------------------------------------------------------

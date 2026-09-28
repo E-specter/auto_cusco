@@ -11,10 +11,12 @@ import {
   borradorDeSupervision,
   borradorDesdeVersion,
   entradaSupervision,
+  FILAS_POR_PAGINA,
   hayCambiosSpeech,
   modoGuardado,
   moverElemento,
   nivelLargo,
+  paginar,
   problemasConfiguracion,
   problemasSupervision,
   rangoSegmento,
@@ -319,5 +321,84 @@ describe('borrador de supervisores', () => {
     expect(problemasSupervision({ procedencias: [], supervisores: [] })).toEqual([
       { tipo: 'sin_procedencias' },
     ]);
+  });
+});
+
+describe('paginar (RF-MM-26)', () => {
+  const filas = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
+
+  it('lee de a 10 filas', () => {
+    expect(FILAS_POR_PAGINA).toBe(10);
+  });
+
+  it.each([
+    // total, páginas, hayPaginador
+    [0, 1, false],
+    [10, 1, false],
+    [11, 2, true],
+    [20, 2, true],
+    [100, 10, true],
+  ])('con %i filas hay %i página(s) y el paginador es %s', (total, paginas, hayPaginador) => {
+    const pagina = paginar(filas(total), 1);
+    expect(pagina.total).toBe(total);
+    expect(pagina.paginas).toBe(paginas);
+    expect(pagina.hayPaginador).toBe(hayPaginador);
+  });
+
+  it('sin filas no hay rango y la página es la primera', () => {
+    expect(paginar([], 1)).toEqual({
+      filas: [],
+      pagina: 1,
+      paginas: 1,
+      desde: 0,
+      hasta: 0,
+      total: 0,
+      hayPaginador: false,
+    });
+  });
+
+  it('la primera página trae las 10 primeras filas', () => {
+    const pagina = paginar(filas(20), 1);
+    expect(pagina.filas).toEqual(filas(10));
+    expect([pagina.desde, pagina.hasta]).toEqual([1, 10]);
+  });
+
+  it('la última página completa termina en el total', () => {
+    const pagina = paginar(filas(20), 2);
+    expect(pagina.filas).toEqual([11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+    expect([pagina.desde, pagina.hasta]).toEqual([11, 20]);
+  });
+
+  it('la última página incompleta trae solo lo que queda', () => {
+    const pagina = paginar(filas(11), 2);
+    expect(pagina.filas).toEqual([11]);
+    expect([pagina.desde, pagina.hasta]).toEqual([11, 11]);
+  });
+
+  it('con 100 filas la página 10 es la última', () => {
+    const pagina = paginar(filas(100), 10);
+    expect(pagina.filas).toEqual(filas(100).slice(90));
+    expect([pagina.desde, pagina.hasta, pagina.paginas]).toEqual([91, 100, 10]);
+  });
+
+  it('con exactamente 10 filas no hay una segunda página vacía', () => {
+    const pagina = paginar(filas(10), 2);
+    expect(pagina.pagina).toBe(1);
+    expect(pagina.filas).toEqual(filas(10));
+  });
+
+  it('una página fuera de rango se lleva a la más cercana', () => {
+    expect(paginar(filas(25), 0).pagina).toBe(1);
+    expect(paginar(filas(25), -3).pagina).toBe(1);
+    expect(paginar(filas(25), 99).pagina).toBe(3);
+    expect(paginar(filas(25), Number.NaN).pagina).toBe(1);
+  });
+
+  it('todas las páginas juntas reproducen las filas, sin repetir ni perder', () => {
+    for (const total of [0, 1, 9, 10, 11, 19, 20, 21, 100]) {
+      const todas = filas(total);
+      const unidas = Array.from({ length: paginar(todas, 1).paginas }, (_, i) => paginar(todas, i + 1).filas).flat();
+      expect(unidas).toEqual(todas);
+    }
   });
 });

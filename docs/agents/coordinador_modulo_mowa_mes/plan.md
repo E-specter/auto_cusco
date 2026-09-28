@@ -159,3 +159,33 @@ Consultas originales:
 | C-4 | Un producto sin documento, ¿se excluye o se carga con `dni` vacío? RF-MM-13 no lo lista | Excluir con el código `falta_documento` | B4 |
 | C-5 | Un reporte con más de un `id` de MES en el mismo archivo, ¿se rechaza o se asocia cada `id` por separado? | Asociar cada `id` a la campaña elegida | B5 |
 | C-6 | Los archivos generados, ¿se guardan en PostgreSQL o en `data/output/gestiones/`? | PostgreSQL: descarga reproducible y sin archivos sensibles sueltos en disco | B4 |
+
+## 5. Agregados del 2026-09-28 (RF-MM-23 a RF-MM-26; T-MM-B8, T-MM-F6, T-MM-C3)
+
+Delegados por `architec` el 2026-09-28, con los requerimientos commiteados en `93b7ca6`.
+
+### 5.1 Cortes y orden
+
+1. **F6-A, solo frontend (RF-MM-26):** paginación de la muestra (20 filas) y de las exclusiones (100) de la previsualización, 10 por página con `.pager`, más el total y el aviso cuando hay más de 100. Base: `93b7ca6`. No depende del backend.
+2. **B8, backend (RF-MM-23 a 25):** tarifa, costos, plantilla de nombre, migración, contrato y `docs/mowa-mes.md`. Se hace en paralelo con F6-A, se verifica en un worktree y se commitea después.
+3. **F6-B, frontend (RF-MM-23 a 25):** sobre el contrato de B8. Tarifa y plantilla en Configuración; plantilla y nombre resultante en Campaña; costos en la previsualización y en Seguimiento.
+4. **C3:** revisión contra RF-MM-23 a 26.
+
+### 5.2 Decisiones técnicas dentro del módulo (informadas a `architec`)
+
+- **Montos en el contrato:** como texto decimal, igual que los montos de `/cartera` (`consulta-cartera.md` §6). La tarifa se envía con sus decimales, hasta 4, y los costos con precisión completa. El frontend los muestra con `formatMonto`: costos con 2 decimales y la tarifa con los que tenga. En el backend todo es `Decimal`, nunca `float`.
+- **Redondeo:** se guarda el valor exacto (cargados × tarifa). El costo del mes suma los valores exactos y solo se redondea al mostrar, con redondeo a la mitad hacia arriba.
+- **Nombre con `{archivo}` agregado y el límite de 120:** el recorte se aplica a la parte de la plantilla, de modo que el sufijo `_{archivo}de{total}` nunca se corte y los archivos de una campaña no repitan nombre.
+- **Content-Disposition:** el nombre resuelto se guarda tal cual, en UTF-8. El encabezado lleva `filename` en ASCII, con el mismo criterio que `exportadores/comunes.py`, y además `filename*` en UTF-8 (RFC 5987), para que un navegador moderno descargue el nombre exacto.
+
+### 5.3 Respuestas de `architec` (2026-09-28)
+
+- **Decisiones técnicas de 5.2:** aprobadas. Se documentan en `mowa-mes.md` con el corte.
+- **D-1:** `{campana}` se muestra como un marcador visible, y el nombre se marca como estimado si usa `{total}` o `{archivo}`. La campaña creada muestra los nombres reales.
+- **D-2:** el costo del mes omite las campañas sin tarifa e indica cuántas quedaron fuera.
+- **D-3:** el costo real no se guarda. Sale de la conciliación vigente (E-1) por la tarifa congelada.
+- **Encargos listos para enviar:** `briefs-agregados.md`.
+
+### 5.4 Costo real en el listado (2026-09-28)
+
+`architec` aprobó la opción (iii), con apoyo de `designer`: la campaña guarda un conteo derivado, `enviados_conciliados` (E-1). Se escribe en la misma transacción que importa o reemplaza el reporte. Sin reportes es `NULL` (pendiente), nunca 0. No se hace backfill: las campañas anteriores no tienen tarifa. El costo real se calcula al leer como conteo × tarifa congelada, así que el listado lleva estimado y real por fila. Hay una prueba postgres de consistencia contra la conciliación, con su mutación. RF-MM-24 no cambia.

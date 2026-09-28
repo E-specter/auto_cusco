@@ -595,7 +595,6 @@
   "mowaMes.campana.cifras.evaluados": "Evaluated",
   "mowaMes.campana.exclusiones.title": "Exclusions",
   "mowaMes.campana.exclusiones.vacio": "No product was excluded.",
-  "mowaMes.campana.exclusiones.masExclusiones": "Showing the first {mostradas} of {total}.",
   "mowaMes.campana.muestra.title": "Load sample",
   "mowaMes.campana.muestra.vacio": "The preview carries no sample rows.",
   "mowaMes.campana.muestra.col.numero": "Number",
@@ -616,5 +615,9 @@
   "mowaMes.campana.creada.title": "Campaign {id} created",
   "mowaMes.campana.creada.meta": "Cut-off {corte} · send {envio} · {speech}",
   "mowaMes.campana.creada.otra": "Build another campaign",
-  "mowaMes.campana.creada.irASeguimiento": "View in Follow-up"
+  "mowaMes.campana.creada.irASeguimiento": "View in Follow-up",
+  "mowaMes.campana.exclusiones.total": "{total} in total",
+  "mowaMes.campana.exclusiones.truncadas": "Showing the first {mostradas} of {total}. The full list will be in the campaign's tracking after you create it.",
+  "mowaMes.campana.exclusiones.paginacion": "Exclusions pagination",
+  "mowaMes.campana.muestra.paginacion": "Sample pagination"
 }

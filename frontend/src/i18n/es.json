@@ -595,7 +595,6 @@
   "mowaMes.campana.cifras.evaluados": "Evaluados",
   "mowaMes.campana.exclusiones.title": "Exclusiones",
   "mowaMes.campana.exclusiones.vacio": "Ningún producto quedó excluido.",
-  "mowaMes.campana.exclusiones.masExclusiones": "Mostrando las primeras {mostradas} de {total}.",
   "mowaMes.campana.muestra.title": "Muestra de la carga",
   "mowaMes.campana.muestra.vacio": "La previsualización no trae filas de muestra.",
   "mowaMes.campana.muestra.col.numero": "Número",
@@ -616,5 +615,9 @@
   "mowaMes.campana.creada.title": "Campaña {id} creada",
   "mowaMes.campana.creada.meta": "Corte {corte} · envío {envio} · {speech}",
   "mowaMes.campana.creada.otra": "Armar otra campaña",
-  "mowaMes.campana.creada.irASeguimiento": "Ver en Seguimiento"
+  "mowaMes.campana.creada.irASeguimiento": "Ver en Seguimiento",
+  "mowaMes.campana.exclusiones.total": "{total} en total",
+  "mowaMes.campana.exclusiones.truncadas": "Se muestran las primeras {mostradas} de {total}. La lista completa estará en el seguimiento de la campaña después de crearla.",
+  "mowaMes.campana.exclusiones.paginacion": "Paginación de las exclusiones",
+  "mowaMes.campana.muestra.paginacion": "Paginación de la muestra"
 }

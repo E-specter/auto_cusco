@@ -16,7 +16,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 import type { Campos, SeleccionGuardada, Version } from '../src/lib/api';
-import type { CreacionCampanaEntrada, PeticionCampanaEntrada } from '../src/lib/api-mowa-mes';
+import type { CodigoMowaMes, CreacionCampanaEntrada, PeticionCampanaEntrada } from '../src/lib/api-mowa-mes';
 import { camposSinteticos, seleccionGuardada, version } from './api-falsa';
 import {
   apiMowaMes,
@@ -193,7 +193,11 @@ test.describe('P1: previsualización válida', () => {
     );
 
     await expect(page.getByRole('cell', { name: '000000000000000901' })).toBeVisible();
-    await expect(page.getByText('Mostrando las primeras 1 de 7.')).toBeVisible();
+    await expect(page.getByText('Se muestran las primeras 1 de 7.', { exact: false })).toBeVisible();
+    await expect(page.locator('[data-exclusiones-total]')).toHaveText('7 en total');
+    // One row per table: nothing to page.
+    await expect(page.locator('[data-muestra-pager]')).toBeHidden();
+    await expect(page.locator('[data-exclusiones-pager]')).toBeHidden();
     await expect(page.locator('.mm-exclusiones__tabla .tag')).toHaveText('Teléfono inválido');
 
     await expect(page.getByText('Estimación solo por filas', { exact: false })).toBeVisible();
@@ -488,5 +492,181 @@ test.describe('idioma y conexión', () => {
 
     await expect(page.getByRole('heading', { name: 'Sin conexión con la API' })).toBeVisible();
     await expect(page.locator('[data-contenido]')).toBeHidden();
+  });
+});
+
+/** Synthetic rows: phones in 900000xxx, numeric promissory notes and documents. */
+function filasDeMuestra(cantidad: number) {
+  return Array.from({ length: cantidad }, (_, i) => ({
+    numero: `900000${String(i + 1).padStart(3, '0')}`,
+    mensaje: `Mensaje sintetico ${i + 1}`,
+    dni: `00${String(100000 + i)}`,
+    supervision: false,
+    pagare: `${'0'.repeat(14)}${String(1000 + i)}`,
+    segmento: '9_a_30' as const,
+    largo: 60,
+    advertencias: [] as CodigoMowaMes[],
+  }));
+}
+
+function exclusionesSinteticas(total: number, enLista = Math.min(total, 100)) {
+  return {
+    total,
+    limite: 100,
+    desplazamiento: 0,
+    exclusiones: Array.from({ length: enLista }, (_, i) => ({
+      pagare: `${'0'.repeat(14)}${String(2000 + i)}`,
+      codigo: 'telefono_invalido' as const,
+    })),
+  };
+}
+
+function previaPaginada(muestra: number, exclusionesTotal: number) {
+  return previsualizacionCampanaSintetica(entradaMinima(), {
+    muestra: filasDeMuestra(muestra),
+    exclusiones: exclusionesSinteticas(exclusionesTotal),
+  });
+}
+
+const pedidosDePrevisualizacion = (api: ApiFalsaMowaMes) =>
+  api.pedidos.filter((p) => p.ruta === '/mowa-mes/campanas/previsualizacion' && p.metodo === 'POST');
+
+test.describe('F6-A: paginación de la previsualización (RF-MM-26)', () => {
+  test('la muestra de 20 se pagina de a 10 sin volver a pedir la previsualización', async ({ page }) => {
+    const api = apiMowaMes();
+    api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaPaginada(20, 0) }];
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+
+    const numeros = page.locator('.mm-muestra__tabla tbody tr td:first-child');
+    const paginador = page.getByRole('group', { name: 'Paginación de la muestra' });
+    const rango = paginador.locator('[data-rango]');
+
+    await expect(numeros).toHaveCount(10);
+    await expect(numeros.first()).toHaveText('900000001');
+    await expect(numeros.last()).toHaveText('900000010');
+    await expect(rango).toHaveText('1–10 de 20');
+    await expect(paginador.getByRole('button', { name: 'Anteriores' })).toBeDisabled();
+
+    await paginador.getByRole('button', { name: 'Siguientes' }).click();
+
+    await expect(numeros.first()).toHaveText('900000011');
+    await expect(numeros.last()).toHaveText('900000020');
+    await expect(rango).toHaveText('11–20 de 20');
+    await expect(paginador.getByRole('button', { name: 'Siguientes' })).toBeDisabled();
+    // The button that held the focus just went away: the focus follows to the other one.
+    await expect(paginador.getByRole('button', { name: 'Anteriores' })).toBeFocused();
+
+    await paginador.getByRole('button', { name: 'Anteriores' }).click();
+    await expect(numeros.first()).toHaveText('900000001');
+    expect(pedidosDePrevisualizacion(api)).toHaveLength(1);
+  });
+
+  test('las 100 exclusiones se pagan de a 10 y el aviso dice que hay más, con el total real', async ({ page }) => {
+    const api = apiMowaMes();
+    api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaPaginada(0, 250) }];
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+
+    await expect(page.locator('[data-exclusiones-total]')).toHaveText('250 en total');
+    await expect(page.locator('[data-exclusiones-truncadas]')).toHaveText(
+      'Se muestran las primeras 100 de 250. La lista completa estará en el seguimiento de la campaña después de crearla.',
+    );
+
+    const paginador = page.getByRole('group', { name: 'Paginación de las exclusiones' });
+    const siguiente = paginador.getByRole('button', { name: 'Siguientes' });
+    await expect(paginador.locator('[data-rango]')).toHaveText('1–10 de 100');
+    await siguiente.click();
+    // Still enabled: the focus stays where the analyst left it.
+    await expect(siguiente).toBeFocused();
+    for (let i = 0; i < 8; i++) await siguiente.click();
+
+    await expect(paginador.locator('[data-rango]')).toHaveText('91–100 de 100');
+    await expect(siguiente).toBeDisabled();
+    await expect(page.locator('.mm-exclusiones__tabla tbody tr')).toHaveCount(10);
+    await expect(page.getByRole('cell', { name: `${'0'.repeat(14)}2099` })).toBeVisible();
+  });
+
+  test('con 100 o menos exclusiones el encabezado da el total y no hay aviso', async ({ page }) => {
+    const api = apiMowaMes();
+    api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaPaginada(0, 100) }];
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+
+    await expect(page.locator('[data-exclusiones-total]')).toHaveText('100 en total');
+    await expect(page.locator('[data-exclusiones-truncadas]')).toBeHidden();
+    await expect(page.locator('[data-exclusiones-pager]')).toBeVisible();
+  });
+
+  test('sin exclusiones el encabezado dice 0 y no hay paginador', async ({ page }) => {
+    const api = apiMowaMes();
+    api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaPaginada(0, 0) }];
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+
+    await expect(page.locator('[data-exclusiones-total]')).toHaveText('0 en total');
+    await expect(page.getByText('Ningún producto quedó excluido.')).toBeVisible();
+    await expect(page.locator('[data-exclusiones-pager]')).toBeHidden();
+  });
+
+  test('el paginador solo aparece con más de 10 filas', async ({ page }) => {
+    const api = apiMowaMes();
+    api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaPaginada(10, 10) }];
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+
+    await expect(page.locator('.mm-muestra__tabla tbody tr')).toHaveCount(10);
+    await expect(page.locator('[data-muestra-pager]')).toBeHidden();
+    await expect(page.locator('[data-exclusiones-pager]')).toBeHidden();
+
+    api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaPaginada(11, 11) }];
+    await page.getByLabel('WhatsApp de la campaña').fill('900000555');
+
+    await expect(page.locator('[data-muestra-pager] [data-rango]')).toHaveText('1–10 de 11');
+    await expect(page.locator('[data-exclusiones-pager] [data-rango]')).toHaveText('1–10 de 11');
+  });
+
+  test('al recalcular, las dos tablas vuelven a la página 1 y el foco no se mueve del campo', async ({ page }) => {
+    const api = apiMowaMes();
+    api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaPaginada(20, 30) }];
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+
+    const muestra = page.getByRole('group', { name: 'Paginación de la muestra' });
+    const exclusiones = page.getByRole('group', { name: 'Paginación de las exclusiones' });
+    await muestra.getByRole('button', { name: 'Siguientes' }).click();
+    await exclusiones.getByRole('button', { name: 'Siguientes' }).click();
+    await expect(muestra.locator('[data-rango]')).toHaveText('11–20 de 20');
+    await expect(exclusiones.locator('[data-rango]')).toHaveText('11–20 de 30');
+
+    api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaPaginada(20, 30) }];
+    const whatsapp = page.getByLabel('WhatsApp de la campaña');
+    await whatsapp.fill('900000555');
+
+    await expect(muestra.locator('[data-rango]')).toHaveText('1–10 de 20');
+    await expect(exclusiones.locator('[data-rango]')).toHaveText('1–10 de 30');
+    await expect(page.locator('.mm-muestra__tabla tbody tr td:first-child').first()).toHaveText('900000001');
+    await expect(whatsapp).toBeFocused();
+    expect(pedidosDePrevisualizacion(api).length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('en inglés traduce el total, el aviso y el paginador', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    const api = apiMowaMes();
+    api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaPaginada(20, 250) }];
+    await montarApiMowaMes(page, api);
+    await montarSeleccion(page, seleccionFalsa());
+    await page.goto(RUTA);
+    await page.getByLabel('Saved selection').selectOption({ label: 'Preventiva top 1000' });
+
+    await expect(page.locator('[data-exclusiones-total]')).toHaveText('250 in total');
+    await expect(page.locator('[data-exclusiones-truncadas]')).toContainText('Showing the first 100 of 250.');
+    await expect(page.getByRole('group', { name: 'Exclusions pagination' })).toBeVisible();
+    await expect(page.locator('[data-muestra-pager] [data-rango]')).toHaveText('1–10 of 20');
+    await expect(
+      page.getByRole('group', { name: 'Sample pagination' }).getByRole('button', { name: 'Next' }),
+    ).toBeEnabled();
   });
 });

@@ -52,6 +52,37 @@ async function montarSeleccionCampana(page: Page): Promise<void> {
   });
 }
 
+/**
+ * A preview with the full sample (20 rows) and 250 exclusions of which the
+ * API lists the first 100: both tables paged, the "there are more" notice on.
+ */
+function previaConTablasPaginadas() {
+  return previsualizacionCampanaSintetica(
+    { fecha_corte: '2026-09-13', filtros: [], cantidad: 1000, tipo_carga: 'masiva', salida: 'numero_largo', herramientas: { keyword: false, respuesta_automatica: false, blacklist_indecopi: false, speech_optimizado: false }, programacion: 'hora_determinada', envios: ['2026-09-14T09:00:00-05:00'] },
+    {
+      muestra: Array.from({ length: 20 }, (_, i) => ({
+        numero: `900000${String(i + 1).padStart(3, '0')}`,
+        mensaje: `Mensaje sintetico ${i + 1}`,
+        dni: `00${String(100000 + i)}`,
+        supervision: false,
+        pagare: `${'0'.repeat(14)}${String(1000 + i)}`,
+        segmento: '9_a_30' as const,
+        largo: 60,
+        advertencias: [],
+      })),
+      exclusiones: {
+        total: 250,
+        limite: 100,
+        desplazamiento: 0,
+        exclusiones: Array.from({ length: 100 }, (_, i) => ({
+          pagare: `${'0'.repeat(14)}${String(2000 + i)}`,
+          codigo: 'telefono_invalido' as const,
+        })),
+      },
+    },
+  );
+}
+
 function apiConDatos() {
   const api = apiVacia();
   api.versiones = [version()];
@@ -138,6 +169,23 @@ for (const tema of ['light', 'dark'] as const) {
       await page.goto('/mowa-mes/campana');
       await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 1000' });
       await expect(page.locator('[data-limite-excedido]')).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('campaña de MOWA MES, con las tablas paginadas y el aviso de más exclusiones', async ({ page }) => {
+      const api = apiMowaMes();
+      api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaConTablasPaginadas() }];
+      await montarApiMowaMes(page, api);
+      await montarSeleccionCampana(page);
+      await page.goto('/mowa-mes/campana');
+      await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 1000' });
+      await expect(page.locator('[data-exclusiones-truncadas]')).toBeVisible();
+      await expect(page.getByRole('group', { name: 'Paginación de la muestra' })).toBeVisible();
+      await sinViolaciones(page);
+
+      // Second page: the previous button on, the next one disabled.
+      await page.getByRole('group', { name: 'Paginación de la muestra' }).getByRole('button', { name: 'Siguientes' }).click();
+      await expect(page.locator('[data-muestra-pager] [data-rango]')).toHaveText('11–20 de 20');
       await sinViolaciones(page);
     });
   });
