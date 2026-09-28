@@ -30,7 +30,10 @@ Los requerimientos de este documento se numeran `RF-MM-XX` dentro del módulo, p
 * **RF-MM-24 — Costo de la campaña:** Mostrar el costo en soles de cada campaña y del mes, calculado con la tarifa de RF-MM-23.
   * **Costo estimado** = SMS cargados × tarifa, incluida la supervisión (RF-MM-02). Se muestra al previsualizar, antes de crear, y queda con la campaña.
   * **Costo real** = SMS enviados × tarifa. Se muestra cuando se importa el reporte de enviados (RF-MM-20); antes, se indica que está pendiente del reporte.
+  * El costo real no se guarda: se calcula con la conciliación vigente (RF-MM-22) y la tarifa guardada de la campaña, así que si se reemplaza un reporte se recalcula solo.
   * El costo del mes suma el costo estimado de las campañas imputadas a ese mes, con la misma regla de imputación del límite mensual (RF-MM-01), y se muestra junto al consumo del límite.
+  * Si en el mes hay campañas sin tarifa guardada, entonces el costo del mes suma las demás e indica cuántas campañas quedaron fuera del total.
+  * Los montos se calculan con su valor exacto y se redondean solo al mostrarlos.
   * Los montos se muestran en soles con 2 decimales; la tarifa, con los decimales que tenga.
 
 ## 2. Inputs de la campaña
@@ -104,7 +107,7 @@ Formato confirmado con el ejemplo de carga (sección 7).
   * Si la campaña se divide en más de un archivo y la plantilla no usa `{archivo}`, entonces se agrega `_{archivo}de{total}` al final, para que ningún archivo repita el nombre de otro.
   * Los caracteres que no admiten los nombres de archivo en Windows (`\ / : * ? " < > |`) se reemplazan por `_`, y se recortan los espacios y puntos de los extremos. El nombre, sin la extensión, se limita a 120 caracteres.
   * Si el nombre resultante queda vacío, entonces se usa la plantilla por defecto.
-  * Antes de crear la campaña se muestra el nombre resultante del primer archivo.
+  * Antes de crear la campaña se muestra el nombre resultante del primer archivo. Como el número de campaña todavía no existe, `{campana}` aparece como un marcador visible. Si la plantilla usa `{archivo}` o `{total}`, el nombre se marca como estimado, porque la división real puede sumar archivos por el límite de 2 MB (RF-MM-11). Al crear la campaña se muestran los nombres reales de cada archivo.
   * El nombre de cada archivo queda guardado con la campaña: una descarga posterior entrega el mismo nombre aunque la plantilla de la configuración haya cambiado (como los bytes, RF-MM-11).
 * **RF-MM-26 — Paginación de la previsualización:** Mostrar paginadas la muestra de la carga y la lista de exclusiones de la previsualización de la campaña, para no tener que desplazarse hasta el final de la pantalla.
   * Se pagina lo que la previsualización ya devuelve: las 20 primeras filas de la muestra y las 100 primeras exclusiones. Paginar no vuelve a calcular la campaña.
