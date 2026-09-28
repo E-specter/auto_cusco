@@ -5,7 +5,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { formatMonto, formatParticipacion } from '../../src/lib/format';
+import { formatMonto, formatParticipacion, formatSoles, formatTarifa } from '../../src/lib/format';
 import { setLanguageForTests } from './idioma';
 
 afterEach(() => setLanguageForTests('es'));
@@ -49,6 +49,43 @@ describe('montos como texto', () => {
     setLanguageForTests('en');
 
     expect(formatMonto('1234.5')).toBe('1,234.50');
+  });
+});
+
+describe('soles (RF-MM-24)', () => {
+  it('un monto en soles lleva el símbolo y siempre dos decimales', () => {
+    expect(formatSoles('24691.3')).toBe('S/ 24,691.30');
+    expect(formatSoles('0')).toBe('S/ 0.00');
+  });
+
+  it('redondea el costo sin pasar por un float', () => {
+    expect(formatSoles('9007199254740993.005')).toBe('S/ 9,007,199,254,740,993.01');
+  });
+
+  it('un costo ausente es una raya, y un texto que no es monto no gana símbolo', () => {
+    expect(formatSoles(null)).toBe('—');
+    expect(formatSoles('pendiente')).toBe('pendiente');
+  });
+});
+
+describe('tarifa (RF-MM-23)', () => {
+  it('muestra los decimales que tiene, con un mínimo de dos', () => {
+    expect(formatTarifa('0.02')).toBe('S/ 0.02');
+    expect(formatTarifa('0.0215')).toBe('S/ 0.0215');
+    expect(formatTarifa('0.1')).toBe('S/ 0.10');
+  });
+
+  it('no cuenta los ceros que agrega la escala guardada', () => {
+    expect(formatTarifa('0.0200')).toBe('S/ 0.02');
+    expect(formatTarifa('0.0210')).toBe('S/ 0.021');
+  });
+
+  it('nunca muestra más de cuatro decimales', () => {
+    expect(formatTarifa('0.021549')).toBe('S/ 0.0215');
+  });
+
+  it('una tarifa ausente es una raya', () => {
+    expect(formatTarifa(null)).toBe('—');
   });
 });
 

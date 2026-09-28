@@ -121,6 +121,33 @@ export function formatMonto(valor: string | null | undefined, decimales = 2): st
   return `${negativo && !esCero ? '-' : ''}${agrupada}${parteDecimal ? `${decimal}${parteDecimal}` : ''}`;
 }
 
+/** Soles prefix; the no-break space keeps "S/" and the figure on one line. */
+const SOLES = 'S/ ';
+
+/**
+ * An amount in soles, always with 2 decimals: "S/ 1,234.50". Same guarantee
+ * as `formatMonto` — the figure is never turned into a float.
+ */
+export function formatSoles(valor: string | null | undefined): string {
+  if (valor === null || valor === undefined || valor.trim() === '') return '—';
+  if (aPlano(valor) === null) return valor;
+  return `${SOLES}${formatMonto(valor, 2)}`;
+}
+
+/**
+ * A per-unit rate in soles, with the decimals it actually has: at least 2 so
+ * it reads like money, at most 4, the precision the rate is stored with.
+ * Trailing zeros from the stored scale do not count: "0.0200" is S/ 0.02,
+ * "0.0215" is S/ 0.0215.
+ */
+export function formatTarifa(valor: string | null | undefined): string {
+  if (valor === null || valor === undefined || valor.trim() === '') return '—';
+  const plano = aPlano(valor);
+  if (plano === null) return valor;
+  const significativos = (plano.split('.')[1] ?? '').replace(/0+$/, '').length;
+  return `${SOLES}${formatMonto(valor, Math.min(4, Math.max(2, significativos)))}`;
+}
+
 /**
  * A share as a percentage with one decimal, for reading only. Two amounts
  * divided to get "38.2 %" lose nothing the analyst reads; the amounts
