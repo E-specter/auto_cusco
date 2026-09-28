@@ -58,6 +58,7 @@ from app.core.entities.mowa_mes_reporte import FilaReporte  # noqa: E402
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService  # noqa: E402
 from app.core.services.plataformas.mowa_mes.campana import CampanasMowaMesService  # noqa: E402
 from app.core.services.plataformas.mowa_mes.conciliacion import conciliar  # noqa: E402
+from app.core.services.plataformas.mowa_mes.reportes import enviados_de  # noqa: E402
 from app.core.services.seleccion_cartera.servicio import (  # noqa: E402
     CANTIDAD_MAXIMA,
     ConsultaCarteraService,
@@ -166,9 +167,12 @@ def main() -> None:
             )
             for i, f in enumerate(cargadas, start=2)
         ]
+        # Desde B8 guardar un reporte recalcula `enviados_conciliados` en la misma transaccion.
         _medir(
-            "guardar reporte de enviados",
-            lambda: campanas.guardar_reportes(creada.id, "reporte.xlsx", {990_100_000: reporte}),
+            "guardar reporte (+ recalculo)",
+            lambda: campanas.guardar_reportes(
+                creada.id, "reporte.xlsx", {990_100_000: reporte}, enviados_de
+            ),
         )
         conciliacion = _medir(
             "conciliar (leer y emparejar)",
@@ -177,6 +181,62 @@ def main() -> None:
             ),
         )
         print(f"conciliados: {conciliacion.total.enviados} de {conciliacion.total.cargados}")
+        _medir(
+            "reemplazar el reporte (1 campana)",
+            lambda: campanas.guardar_reportes(
+                creada.id, "reporte2.xlsx", {990_100_000: reporte}, enviados_de
+            ),
+        )
+        segunda = _medir(
+            "crear una segunda campana",
+            lambda: servicio.crear(replace_huella(peticion, armada.speech_huella)),
+        )
+        cargadas_segunda = campanas.filas_cargadas(segunda.id)
+        reporte_segunda = [
+            FilaReporte(
+                i, 990_100_000, f.numero, f.mensaje, "04/05/99", f.dni, "enviado", "Nro. LARGO", "u"
+            )
+            for i, f in enumerate(cargadas_segunda, start=2)
+        ]
+        _medir(
+            "mover el id a otra campana (2)",
+            lambda: campanas.guardar_reportes(
+                segunda.id, "reporte3.xlsx", {990_100_000: reporte_segunda}, enviados_de
+            ),
+        )
+        print(
+            "enviados guardados:",
+            campanas.obtener(creada.id).enviados_conciliados,
+            campanas.obtener(segunda.id).enviados_conciliados,
+            "(la primera se quedo sin reporte: None; la segunda tiene todos)",
+        )
+        # Peor caso: el id que se mueve deja a la primera campana con otro id, asi que se
+        # concilian las dos (la primera con la mitad de sus filas, la segunda con todas).
+        mitad = len(reporte) // 2
+        mes_a, mes_b = 990_100_001, 990_100_002
+        campanas.guardar_reportes(
+            creada.id,
+            "dos_ids.xlsx",
+            {
+                mes_a: [replace_mes(f, mes_a) for f in reporte[:mitad]],
+                mes_b: [replace_mes(f, mes_b) for f in reporte[mitad:]],
+            },
+            enviados_de,
+        )
+        _medir(
+            "mover un id dejando otro (2 concil.)",
+            lambda: campanas.guardar_reportes(
+                segunda.id,
+                "mover.xlsx",
+                {mes_a: [replace_mes(f, mes_a) for f in reporte_segunda[:mitad]]},
+                enviados_de,
+            ),
+        )
+        print(
+            "enviados guardados:",
+            campanas.obtener(creada.id).enviados_conciliados,
+            campanas.obtener(segunda.id).enviados_conciliados,
+        )
     finally:
         _limpiar(engine)
         with engine.begin() as cx:
@@ -191,6 +251,12 @@ def ConfiguracionMowaMes_con(configuracion, **cambios):  # noqa: N802
     from dataclasses import replace
 
     return replace(configuracion, **cambios)
+
+
+def replace_mes(fila: FilaReporte, mes_id: int) -> FilaReporte:
+    from dataclasses import replace
+
+    return replace(fila, mes_id=mes_id)
 
 
 def replace_huella(peticion: PeticionCampana, huella: str) -> PeticionCampana:

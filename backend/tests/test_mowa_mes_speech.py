@@ -5,11 +5,13 @@ Titulares y numeros sinteticos; WhatsApp del rango 900000xxx.
 
 from dataclasses import replace
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 import pytest
 
 from app.core.entities.mowa_mes import (
     RANGOS_SEGMENTO,
+    CampoConfiguracion,
     CodigoMowaMes,
     ConfiguracionInvalida,
     ConfiguracionMowaMes,
@@ -367,6 +369,130 @@ def test_guardar_configuracion_valida_el_whatsapp_con_rf02() -> None:
     with pytest.raises(ConfiguracionInvalida):
         servicio.guardar_configuracion(ConfiguracionMowaMes(0, None))
     assert repositorio.escrituras == 2
+
+
+def test_la_configuracion_nace_con_la_tarifa_y_la_plantilla_por_defecto() -> None:
+    _, repositorio = _servicio(None)
+
+    assert repositorio.configuracion.tarifa_sms == Decimal("0.02")
+    assert repositorio.configuracion.plantilla_nombre_archivo == (
+        "mowa_mes_campana_{campana}_{archivo}_de_{total}"
+    )
+
+
+def test_guardar_la_tarifa_la_valida_y_la_guarda_exacta() -> None:
+    servicio, repositorio = _servicio(None)
+
+    guardada = servicio.guardar_configuracion(
+        ConfiguracionMowaMes(3_000_000, None, tarifa_sms=Decimal("0.0125"))
+    )
+
+    assert guardada.tarifa_sms == Decimal("0.0125")
+    assert isinstance(repositorio.configuracion.tarifa_sms, Decimal)
+    for invalida in (Decimal("-0.01"), Decimal("0.00001"), Decimal("NaN"), 0.02, "0.02"):
+        with pytest.raises(ConfiguracionInvalida, match="hasta 4 decimales"):
+            servicio.guardar_configuracion(
+                ConfiguracionMowaMes(3_000_000, None, tarifa_sms=invalida)
+            )
+    assert repositorio.escrituras == 1
+
+
+def test_guardar_una_plantilla_valida_la_conserva_recortada() -> None:
+    servicio, _ = _servicio(None)
+
+    guardada = servicio.guardar_configuracion(
+        ConfiguracionMowaMes(
+            3_000_000,
+            None,
+            plantilla_nombre_archivo="  CajaCusco_{fecha_envio}_{archivo}de{total}  ",
+        )
+    )
+
+    assert guardada.plantilla_nombre_archivo == "CajaCusco_{fecha_envio}_{archivo}de{total}"
+
+
+def test_una_plantilla_vacia_vuelve_a_la_de_por_defecto() -> None:
+    servicio, _ = _servicio(None)
+
+    guardada = servicio.guardar_configuracion(
+        ConfiguracionMowaMes(3_000_000, None, plantilla_nombre_archivo="   ")
+    )
+
+    assert guardada.plantilla_nombre_archivo == "mowa_mes_campana_{campana}_{archivo}_de_{total}"
+
+
+@pytest.mark.parametrize(
+    ("plantilla", "dice"),
+    [("caja_{nombre}", "{nombre}"), ("caja_{campana", "sin cerrar"), ("caja}", "sin abrir")],
+)
+def test_una_plantilla_invalida_no_se_guarda(plantilla, dice) -> None:
+    servicio, repositorio = _servicio(None)
+
+    with pytest.raises(ConfiguracionInvalida, match=dice):
+        servicio.guardar_configuracion(
+            ConfiguracionMowaMes(3_000_000, None, plantilla_nombre_archivo=plantilla)
+        )
+
+    assert repositorio.escrituras == 0
+    assert repositorio.configuracion.plantilla_nombre_archivo.startswith("mowa_mes_campana_")
+
+
+@pytest.mark.parametrize(
+    ("configuracion", "campo"),
+    [
+        (ConfiguracionMowaMes(0, None), CampoConfiguracion.LIMITE_MENSUAL),
+        (ConfiguracionMowaMes(1, "51900000123"), CampoConfiguracion.WHATSAPP_CONTACTO),
+        (
+            ConfiguracionMowaMes(1, None, registros_por_archivo=0),
+            CampoConfiguracion.REGISTROS_POR_ARCHIVO,
+        ),
+        (
+            ConfiguracionMowaMes(1, None, bytes_por_archivo=1),
+            CampoConfiguracion.BYTES_POR_ARCHIVO,
+        ),
+        (
+            ConfiguracionMowaMes(1, None, tarifa_sms=Decimal("-1")),
+            CampoConfiguracion.TARIFA_SMS,
+        ),
+        (
+            ConfiguracionMowaMes(1, None, plantilla_nombre_archivo="{x}"),
+            CampoConfiguracion.PLANTILLA_NOMBRE_ARCHIVO,
+        ),
+    ],
+)
+def test_cada_error_de_la_configuracion_dice_a_que_campo_pertenece(configuracion, campo) -> None:
+    servicio, _ = _servicio(None)
+
+    with pytest.raises(ConfiguracionInvalida) as error:
+        servicio.guardar_configuracion(configuracion)
+
+    assert error.value.campo is campo
+
+
+def test_revisar_una_plantilla_invalida_dice_que_el_campo_es_la_plantilla() -> None:
+    servicio, _ = _servicio(None)
+
+    with pytest.raises(ConfiguracionInvalida) as error:
+        servicio.revisar_plantilla_nombre("{x}")
+
+    assert error.value.campo is CampoConfiguracion.PLANTILLA_NOMBRE_ARCHIVO
+
+
+def test_revisar_la_plantilla_da_dos_nombres_de_muestra_sin_guardar() -> None:
+    servicio, repositorio = _servicio(None)
+
+    plantilla, nombres = servicio.revisar_plantilla_nombre(
+        "CajaCusco_{fecha_envio}_{archivo}de{total}"
+    )
+
+    assert plantilla == "CajaCusco_{fecha_envio}_{archivo}de{total}"
+    assert nombres == ["CajaCusco_2026-10-01_1de2.xlsx", "CajaCusco_2026-10-01_2de2.xlsx"]
+    assert servicio.revisar_plantilla_nombre("")[0] == (
+        "mowa_mes_campana_{campana}_{archivo}_de_{total}"
+    )
+    assert repositorio.escrituras == 0
+    with pytest.raises(ConfiguracionInvalida, match="{x}"):
+        servicio.revisar_plantilla_nombre("{x}")
 
 
 def test_la_previsualizacion_usa_el_whatsapp_configurado_si_no_se_indica_otro() -> None:

@@ -78,6 +78,8 @@ export interface CampanaBorrador {
   whatsapp: string;
   /** `null` uses the configured default supervisors. */
   supervisores: SupervisorBorrador[] | null;
+  /** `''` uses the configured file-name template (RF-MM-25). */
+  plantillaNombreArchivo: string;
 }
 
 // ---- Lima's wall clock -------------------------------------------------------------
@@ -176,6 +178,7 @@ export function entradaCampana(borrador: CampanaBorrador): PeticionCampanaEntrad
     speech_id: borrador.speechId,
     whatsapp: borrador.whatsapp.trim() || null,
     supervisores,
+    plantilla_nombre_archivo: borrador.plantillaNombreArchivo.trim() || null,
   };
 }
 

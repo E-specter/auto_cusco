@@ -7,9 +7,13 @@ traduce por codigo.
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 
 LIMITE_MENSUAL_POR_DEFECTO = 2_500_000  # RF-MM-01
+TARIFA_SMS_POR_DEFECTO = Decimal("0.02")  # RF-MM-23, en soles
+DECIMALES_TARIFA = 4  # RF-MM-23
+PLANTILLA_NOMBRE_POR_DEFECTO = "mowa_mes_campana_{campana}_{archivo}_de_{total}"  # RF-MM-25
 LARGO_ADVERTENCIA = 150  # RF-MM-19: se carga, pero se advierte
 LARGO_MAXIMO = 160  # RF-MM-19: se excluye
 LARGO_TITULAR = 8  # RF-MM-14: [titular 8]
@@ -120,6 +124,8 @@ class ConfiguracionMowaMes:
     actualizado_en: datetime | None = None
     registros_por_archivo: int = REGISTROS_POR_ARCHIVO
     bytes_por_archivo: int = BYTES_POR_ARCHIVO
+    tarifa_sms: Decimal = TARIFA_SMS_POR_DEFECTO
+    plantilla_nombre_archivo: str = PLANTILLA_NOMBRE_POR_DEFECTO
 
 
 @dataclass(frozen=True)
@@ -179,8 +185,27 @@ class LargoSegmento:
     ejemplo: str | None  # None si usa [whatsapp] y no hay numero: nunca un enlace roto
 
 
+class CampoConfiguracion(StrEnum):
+    """El campo de la configuracion al que pertenece un error 400 (lo lee el frontend).
+
+    Un catalogo aparte del texto del `detail`: el frontend ubica el error bajo su campo
+    por este valor y no adivinando por las palabras del mensaje.
+    """
+
+    LIMITE_MENSUAL = "limite_mensual"
+    WHATSAPP_CONTACTO = "whatsapp_contacto"
+    REGISTROS_POR_ARCHIVO = "registros_por_archivo"
+    BYTES_POR_ARCHIVO = "bytes_por_archivo"
+    TARIFA_SMS = "tarifa_sms"
+    PLANTILLA_NOMBRE_ARCHIVO = "plantilla_nombre_archivo"
+
+
 class ConfiguracionInvalida(Exception):
     """La configuracion del conector no se puede guardar tal como viene."""
+
+    def __init__(self, mensaje: str, campo: CampoConfiguracion | None = None) -> None:
+        super().__init__(mensaje)
+        self.campo = campo
 
 
 class SpeechInvalido(Exception):

@@ -1746,7 +1746,7 @@
           "mowa-mes"
         ],
         "summary": "Actualizar la configuracion del conector (parcial)",
-        "description": "Actualizacion parcial sobre PUT, no un reemplazo completo.\n\n- `limite_mensual` es obligatorio (RF-MM-01).\n- Cualquier otro campo omitido conserva el valor guardado.\n- `whatsapp_contacto: null` borra el numero de contacto (RF-MM-16).\n- `registros_por_archivo` y `bytes_por_archivo` no admiten null (422) y solo pueden\n  bajar del maximo de la plataforma (RF-MM-11).\n\nEsta regla es propia de este endpoint: `PUT /supervisores` reemplaza la lista completa.",
+        "description": "Actualizacion parcial sobre PUT, no un reemplazo completo.\n\n- `limite_mensual` es obligatorio (RF-MM-01).\n- Cualquier otro campo omitido conserva el valor guardado.\n- `whatsapp_contacto: null` borra el numero de contacto (RF-MM-16).\n- `registros_por_archivo` y `bytes_por_archivo` no admiten null (422) y solo pueden\n  bajar del maximo de la plataforma (RF-MM-11).\n- `tarifa_sms` (RF-MM-23) y `plantilla_nombre_archivo` (RF-MM-25) tampoco admiten null\n  (422). Una tarifa que no es un decimal mayor o igual a 0 con hasta 4 decimales, o una\n  plantilla con una variable desconocida o una llave sin cerrar, responde 400.\n\nTodo 400 de este endpoint trae `detail` (el motivo) y `campo` (el campo de la\nconfiguracion al que pertenece), para que el frontend lo ubique sin leer el texto.\n\nEsta regla es propia de este endpoint: `PUT /supervisores` reemplaza la lista completa.",
         "operationId": "guardar_configuracion_mowa_mes_configuracion_put",
         "requestBody": {
           "content": {
@@ -1770,11 +1770,63 @@
             }
           },
           "400": {
-            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "description": "Un valor no es valido; `campo` dice cual y `detail` el motivo",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DetalleError"
+                  "$ref": "#/components/schemas/ErrorConfiguracionRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mowa-mes/plantilla-nombre-archivo/previsualizacion": {
+      "post": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Previsualizar una plantilla del nombre de los archivos, sin guardarla",
+        "description": "Resuelve la plantilla con datos de muestra usando la misma funcion que la creacion de\ncampanas (RF-MM-25). Una variable desconocida o una llave sin cerrar responde 400 con\n`detail` y `campo` (`plantilla_nombre_archivo`).",
+        "operationId": "previsualizar_plantilla_nombre_mowa_mes_plantilla_nombre_archivo_previsualizacion_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlantillaNombreEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantillaNombreRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Un valor no es valido; `campo` dice cual y `detail` el motivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorConfiguracionRespuesta"
                 }
               }
             }
@@ -2078,7 +2130,7 @@
           "mowa-mes"
         ],
         "summary": "Previsualizar Campana",
-        "description": "La campana calculada sin guardar nada. Los errores de campana no son 4xx: se listan.\n\n`speech.huella` es lo que la creacion tiene que enviar como `speech_huella`.",
+        "description": "La campana calculada sin guardar nada. Los errores de campana no son 4xx: se listan.\n\n`speech.huella` es lo que la creacion tiene que enviar como `speech_huella`. Un 400 trae\n`detail` y `campo` (`plantilla_nombre_archivo` si el error es de la plantilla).",
         "operationId": "previsualizar_campana_mowa_mes_campanas_previsualizacion_post",
         "requestBody": {
           "content": {
@@ -2102,11 +2154,11 @@
             }
           },
           "400": {
-            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "description": "La peticion no se puede atender; `detail` es el motivo y `campo`, si es de un campo que la pantalla pueda ubicar, cual",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DetalleError"
+                  "$ref": "#/components/schemas/ErrorPeticionCampanaRespuesta"
                 }
               }
             }
@@ -2164,11 +2216,11 @@
             }
           },
           "400": {
-            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "description": "La peticion no se puede atender; `detail` es el motivo y `campo`, si es de un campo que la pantalla pueda ubicar, cual",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DetalleError"
+                  "$ref": "#/components/schemas/ErrorPeticionCampanaRespuesta"
                 }
               }
             }
@@ -2409,7 +2461,7 @@
           "mowa-mes"
         ],
         "summary": "Descargar Archivo",
-        "description": "Los bytes guardados al crear la campana: la misma descarga siempre (C-6).",
+        "description": "Los bytes y el nombre guardados al crear la campana: la misma descarga siempre (C-6).\n\n`Content-Disposition` lleva `filename` en ASCII y `filename*` en UTF-8 (RFC 5987).",
         "operationId": "descargar_archivo_mowa_mes_campanas__campana_id__archivos__numero__get",
         "parameters": [
           {
@@ -2444,7 +2496,7 @@
             },
             "headers": {
               "Content-Disposition": {
-                "description": "attachment; filename=\"<nombre>.xlsx\"",
+                "description": "attachment; filename=\"<nombre en ASCII>.xlsx\"; filename*=UTF-8''<nombre exacto>.xlsx (RFC 5987)",
                 "schema": {
                   "type": "string"
                 }
@@ -2783,6 +2835,11 @@
           "bytes": {
             "type": "integer",
             "title": "Bytes"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre",
+            "description": "El nombre resuelto al crear la campana, con extension"
           }
         },
         "type": "object",
@@ -2790,7 +2847,8 @@
           "numero",
           "filas",
           "supervision",
-          "bytes"
+          "bytes",
+          "nombre"
         ],
         "title": "ArchivoRespuesta"
       },
@@ -3028,6 +3086,50 @@
             },
             "type": "array",
             "title": "Archivos"
+          },
+          "tarifa_sms": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarifa Sms",
+            "description": "Soles por SMS congelados al crearla; null en las anteriores a RF-MM-23"
+          },
+          "costo_estimado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Estimado",
+            "description": "Soles, guardado con la campana; null si el estado no es `calculado`"
+          },
+          "costo_estimado_estado": {
+            "$ref": "#/components/schemas/EstadoCostoEstimado",
+            "description": "`calculado`, o `no_disponible` si la campana no tiene tarifa (creada antes de RF-MM-23). El frontend decide por este estado, no por el null del monto"
+          },
+          "costo_real": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Real",
+            "description": "Soles: enviados de la conciliacion vigente (E-1, supervision incluida) por la tarifa congelada; se calcula al leer, no se guarda. null si `costo_real_estado` no es calculado"
+          },
+          "costo_real_estado": {
+            "$ref": "#/components/schemas/EstadoCosto",
+            "description": "`calculado`; `pendiente` si no hay reporte importado; `no_disponible` si la campana no tiene tarifa (con o sin reporte). Ni pendiente ni no disponible son cero"
           }
         },
         "type": "object",
@@ -3058,9 +3160,27 @@
           "excluidos",
           "advertencias",
           "confirmo_limite",
-          "archivos"
+          "archivos",
+          "tarifa_sms",
+          "costo_estimado",
+          "costo_estimado_estado",
+          "costo_real",
+          "costo_real_estado"
         ],
         "title": "CampanaRespuesta"
+      },
+      "CampoConfiguracion": {
+        "type": "string",
+        "enum": [
+          "limite_mensual",
+          "whatsapp_contacto",
+          "registros_por_archivo",
+          "bytes_por_archivo",
+          "tarifa_sms",
+          "plantilla_nombre_archivo"
+        ],
+        "title": "CampoConfiguracion",
+        "description": "El campo de la configuracion al que pertenece un error 400 (lo lee el frontend).\n\nUn catalogo aparte del texto del `detail`: el frontend ubica el error bajo su campo\npor este valor y no adivinando por las palabras del mensaje."
       },
       "CampoEntrada": {
         "properties": {
@@ -3324,6 +3444,34 @@
             },
             "type": "array",
             "title": "Advertencias"
+          },
+          "tarifa_sms": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarifa Sms",
+            "description": "La tarifa congelada de la campana; null si no tiene"
+          },
+          "costo_real": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Real",
+            "description": "Soles: enviados (E-1, supervision incluida) por la tarifa congelada. null si `costo_real_estado` no es `calculado`. No se guarda: sale de esta conciliacion"
+          },
+          "costo_real_estado": {
+            "$ref": "#/components/schemas/EstadoCosto",
+            "description": "`calculado`; `pendiente` si no hay reporte importado; `no_disponible` si la campana no tiene tarifa. Ni pendiente ni no disponible son cero"
           }
         },
         "type": "object",
@@ -3336,7 +3484,10 @@
           "sin_correspondencia",
           "sin_correspondencia_por_estado",
           "por_id",
-          "advertencias"
+          "advertencias",
+          "tarifa_sms",
+          "costo_real",
+          "costo_real_estado"
         ],
         "title": "ConciliacionRespuesta"
       },
@@ -3374,6 +3525,18 @@
             "minimum": 100000.0,
             "title": "Bytes Por Archivo",
             "description": "Bytes por archivo (RF-MM-11). Sin el campo se conserva el actual; null: 422"
+          },
+          "tarifa_sms": {
+            "type": "string",
+            "maxLength": 32,
+            "title": "Tarifa Sms",
+            "description": "Soles por SMS, texto decimal mayor o igual a 0 con hasta 4 decimales (RF-MM-23). Sin el campo se conserva la actual; null: 422"
+          },
+          "plantilla_nombre_archivo": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Plantilla Nombre Archivo",
+            "description": "Plantilla del nombre de los archivos de carga (RF-MM-25). Sin el campo se conserva la actual; vacia, vuelve la de por defecto; null: 422"
           }
         },
         "type": "object",
@@ -3418,6 +3581,23 @@
           "bytes_por_archivo": {
             "type": "integer",
             "title": "Bytes Por Archivo"
+          },
+          "tarifa_sms": {
+            "type": "string",
+            "title": "Tarifa Sms",
+            "description": "Soles por SMS, texto decimal con 4 decimales"
+          },
+          "plantilla_nombre_archivo": {
+            "type": "string",
+            "title": "Plantilla Nombre Archivo"
+          },
+          "variables_plantilla": {
+            "items": {
+              "$ref": "#/components/schemas/VariablePlantillaRespuesta"
+            },
+            "type": "array",
+            "title": "Variables Plantilla",
+            "description": "Las variables validas de la plantilla, en el orden del requerimiento"
           }
         },
         "type": "object",
@@ -3426,7 +3606,10 @@
           "whatsapp_contacto",
           "actualizado_en",
           "registros_por_archivo",
-          "bytes_por_archivo"
+          "bytes_por_archivo",
+          "tarifa_sms",
+          "plantilla_nombre_archivo",
+          "variables_plantilla"
         ],
         "title": "ConfiguracionRespuesta"
       },
@@ -3510,6 +3693,33 @@
           "excedido": {
             "type": "boolean",
             "title": "Excedido"
+          },
+          "costo_mes": {
+            "type": "string",
+            "title": "Costo Mes",
+            "description": "Soles: suma del costo estimado de las campanas ya creadas del mes (RF-MM-24), sin las que no tienen tarifa. Texto decimal"
+          },
+          "campanas_sin_tarifa": {
+            "type": "integer",
+            "title": "Campanas Sin Tarifa",
+            "description": "Campanas del mes que quedaron fuera de `costo_mes` por no tener tarifa"
+          },
+          "costo_esta_campana": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Esta Campana",
+            "description": "Soles: costo estimado de la campana que se previsualiza; null sin campana"
+          },
+          "costo_total": {
+            "type": "string",
+            "title": "Costo Total",
+            "description": "Soles: `costo_mes` mas `costo_esta_campana`"
           }
         },
         "type": "object",
@@ -3520,7 +3730,11 @@
           "esta_campana",
           "total",
           "disponible",
-          "excedido"
+          "excedido",
+          "costo_mes",
+          "campanas_sin_tarifa",
+          "costo_esta_campana",
+          "costo_total"
         ],
         "title": "ConsumoLimiteRespuesta"
       },
@@ -3654,6 +3868,19 @@
             "title": "Supervisores",
             "description": "Sin lista se usa la configurada por defecto"
           },
+          "plantilla_nombre_archivo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plantilla Nombre Archivo",
+            "description": "Plantilla del nombre de los archivos (RF-MM-25); sin ella o vacia, la de la configuracion. Una variable desconocida o una llave sin cerrar responde 400"
+          },
           "speech_huella": {
             "type": "string",
             "maxLength": 64,
@@ -3740,6 +3967,24 @@
         ],
         "title": "DiaNoLaborableRespuesta"
       },
+      "ErrorConfiguracionRespuesta": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "campo": {
+            "$ref": "#/components/schemas/CampoConfiguracion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "campo"
+        ],
+        "title": "ErrorConfiguracionRespuesta",
+        "description": "400 propio de la configuracion: dice a que campo pertenece el error.\n\nEl frontend ubica el mensaje bajo su campo por `campo`, sin adivinar por las palabras\ndel `detail`. Extiende `detail` como pide la regla de docs/contrato-api.md, seccion 3."
+      },
       "ErrorCreacionCampanaRespuesta": {
         "properties": {
           "detail": {
@@ -3781,6 +4026,31 @@
         ],
         "title": "ErrorGeneracionRespuesta"
       },
+      "ErrorPeticionCampanaRespuesta": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "campo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CampoConfiguracion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "campo"
+        ],
+        "title": "ErrorPeticionCampanaRespuesta",
+        "description": "400 de la previsualizacion y de la creacion de campanas.\n\n`campo` dice a que campo de la pantalla pertenece el error cuando el frontend lo puede\nubicar (hoy solo `plantilla_nombre_archivo`); es null si el error no es de un campo.\nExtiende `detail` como pide la regla de docs/contrato-api.md, seccion 3."
+      },
       "EstadoCarga": {
         "type": "string",
         "enum": [
@@ -3809,6 +4079,25 @@
           "cantidad"
         ],
         "title": "EstadoConteoRespuesta"
+      },
+      "EstadoCosto": {
+        "type": "string",
+        "enum": [
+          "calculado",
+          "pendiente",
+          "no_disponible"
+        ],
+        "title": "EstadoCosto",
+        "description": "Por que un costo trae o no un valor; distingue \"pendiente\" y \"sin tarifa\" de cero."
+      },
+      "EstadoCostoEstimado": {
+        "type": "string",
+        "enum": [
+          "calculado",
+          "no_disponible"
+        ],
+        "title": "EstadoCostoEstimado",
+        "description": "El costo estimado de una campana: con valor, o no disponible porque no tiene tarifa."
       },
       "ExcepcionEntrada": {
         "properties": {
@@ -4697,6 +4986,19 @@
             ],
             "title": "Supervisores",
             "description": "Sin lista se usa la configurada por defecto"
+          },
+          "plantilla_nombre_archivo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plantilla Nombre Archivo",
+            "description": "Plantilla del nombre de los archivos (RF-MM-25); sin ella o vacia, la de la configuracion. Una variable desconocida o una llave sin cerrar responde 400"
           }
         },
         "type": "object",
@@ -4763,6 +5065,44 @@
           "definicion"
         ],
         "title": "PeticionGeneracion"
+      },
+      "PlantillaNombreEntrada": {
+        "properties": {
+          "plantilla": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Plantilla",
+            "description": "Vacia: la plantilla de por defecto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plantilla"
+        ],
+        "title": "PlantillaNombreEntrada"
+      },
+      "PlantillaNombreRespuesta": {
+        "properties": {
+          "plantilla": {
+            "type": "string",
+            "title": "Plantilla",
+            "description": "La plantilla validada, la que se guardaria"
+          },
+          "nombres_ejemplo": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Nombres Ejemplo",
+            "description": "Los nombres que daria con datos de muestra: un archivo de una campana de dos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plantilla",
+          "nombres_ejemplo"
+        ],
+        "title": "PlantillaNombreRespuesta"
       },
       "PrevisualizacionCampanaRespuesta": {
         "properties": {
@@ -4892,6 +5232,38 @@
           "puede_crear": {
             "type": "boolean",
             "title": "Puede Crear"
+          },
+          "tarifa_sms": {
+            "type": "string",
+            "title": "Tarifa Sms",
+            "description": "Soles por SMS vigente ahora; la creacion la congela"
+          },
+          "costo_estimado": {
+            "type": "string",
+            "title": "Costo Estimado",
+            "description": "Soles: SMS cargados (supervision incluida) por la tarifa (RF-MM-24)"
+          },
+          "plantilla_nombre_archivo": {
+            "type": "string",
+            "title": "Plantilla Nombre Archivo",
+            "description": "La plantilla que se usaria: la de la peticion o la de la configuracion"
+          },
+          "nombre_primer_archivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre Primer Archivo",
+            "description": "Nombre del primer archivo con `[campana]` en el lugar del numero de campana, que todavia no existe (D-1); null si no hay archivos previstos"
+          },
+          "nombre_estimado": {
+            "type": "boolean",
+            "title": "Nombre Estimado",
+            "description": "El nombre depende de como se divida la carga (`{archivo}`, `{total}`, `{cantidad}` o el sufijo automatico); al crear pueden salir mas archivos por el tope de bytes"
           }
         },
         "type": "object",
@@ -4919,7 +5291,12 @@
           "limite",
           "advertencias",
           "errores",
-          "puede_crear"
+          "puede_crear",
+          "tarifa_sms",
+          "costo_estimado",
+          "plantilla_nombre_archivo",
+          "nombre_primer_archivo",
+          "nombre_estimado"
         ],
         "title": "PrevisualizacionCampanaRespuesta"
       },
@@ -5605,6 +5982,24 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VariablePlantillaRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "descripcion": {
+            "type": "string",
+            "title": "Descripcion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "descripcion"
+        ],
+        "title": "VariablePlantillaRespuesta"
       },
       "VersionRespuesta": {
         "properties": {

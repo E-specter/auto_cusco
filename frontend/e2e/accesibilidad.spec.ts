@@ -11,7 +11,14 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 
 import type { Campos, SeleccionGuardada, Version } from '../src/lib/api';
 import { apiVacia, camposSinteticos, montarApi, seleccionGuardada, version } from './api-falsa';
-import { apiMowaMes, montarApiMowaMes, previsualizacionCampanaSintetica } from './api-falsa-mowa-mes';
+import {
+  apiMowaMes,
+  campanaSintetica,
+  consumoSintetico,
+  montarApiMowaMes,
+  previsualizacionCampanaSintetica,
+  SIN_TARIFA_GUARDADA,
+} from './api-falsa-mowa-mes';
 
 const REGLAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
@@ -186,6 +193,61 @@ for (const tema of ['light', 'dark'] as const) {
       // Second page: the previous button on, the next one disabled.
       await page.getByRole('group', { name: 'Paginación de la muestra' }).getByRole('button', { name: 'Siguientes' }).click();
       await expect(page.locator('[data-muestra-pager] [data-rango]')).toHaveText('11–20 de 20');
+      await sinViolaciones(page);
+    });
+
+    test('configuración de MOWA MES, con el error de la plantilla y el de la tarifa', async ({ page }) => {
+      const api = apiMowaMes();
+      await montarApiMowaMes(page, api);
+      await page.goto('/mowa-mes/configuracion');
+      await expect(page.locator('[data-plantilla-ejemplo]')).toContainText('Nombre del primer archivo:');
+      await sinViolaciones(page);
+
+      await page.getByLabel('Nombre de los archivos').fill('carga_{banco}');
+      await expect(page.locator('[data-plantilla-error]')).toContainText('No es una variable de la plantilla: {banco}');
+      await sinViolaciones(page);
+
+      await page.getByLabel('Nombre de los archivos').fill('carga_{campana}');
+      await page.getByLabel('Tarifa por SMS (S/)').fill('abc');
+      await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+      await expect(page.locator('[data-tarifa-error]')).toContainText('La tarifa debe ser un decimal');
+      await sinViolaciones(page);
+    });
+
+    test('seguimiento de MOWA MES, con los estados del costo y el aviso de campañas sin tarifa', async ({ page }) => {
+      const api = apiMowaMes();
+      api.campanas = [
+        campanaSintetica({ id: 3, descripcion: 'Campaña sintética 3' }),
+        campanaSintetica({ id: 2, descripcion: 'Campaña sintética 2', costo_real: '0.0000', costo_real_estado: 'calculado' }),
+        campanaSintetica({ id: 1, descripcion: 'Campaña sintética 1', ...SIN_TARIFA_GUARDADA }),
+      ];
+      api.consumo = (mes) => consumoSintetico(mes, { campanas_sin_tarifa: 2 });
+      await montarApiMowaMes(page, api);
+      await page.goto('/mowa-mes/seguimiento');
+      await expect(page.locator('[data-costo-mes]')).toContainText('no incluye 2 campañas sin tarifa');
+      await expect(page.getByText('Pendiente del reporte').first()).toBeVisible();
+      await expect(page.getByText('No disponible').first()).toBeVisible();
+      await sinViolaciones(page);
+
+      // The campaign without a rate in the detail too: muted words with the reason.
+      await page.getByRole('button', { name: 'Ver la campaña 1' }).click();
+      await expect(page.getByRole('heading', { name: 'Campaña 1' })).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('campaña de MOWA MES, con el nombre estimado, el costo y el error de la plantilla', async ({ page }) => {
+      const api = apiMowaMes();
+      await montarApiMowaMes(page, api);
+      await montarSeleccionCampana(page);
+      await page.goto('/mowa-mes/campana');
+      await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 1000' });
+      await expect(page.locator('[data-nombre-primer-archivo]')).toContainText('[campana]');
+      await expect(page.locator('[data-nombre-estimado]')).toBeVisible();
+      await expect(page.locator('[data-cifras] .stat', { hasText: 'Costo estimado' })).toContainText('S/ 19.64');
+      await sinViolaciones(page);
+
+      await page.getByLabel('Nombre de los archivos').fill('carga_{banco}');
+      await expect(page.locator('[data-plantilla-error]')).toContainText('{banco}');
       await sinViolaciones(page);
     });
   });

@@ -5,6 +5,7 @@ repositorio en memoria: se prueba la traduccion HTTP, no la base.
 """
 
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -350,6 +351,256 @@ def test_limite_mensual_es_obligatorio(cliente) -> None:
         client.put("/mowa-mes/configuracion", json={**GUARDADA, "limite_mensual": None}).status_code
         == 422
     )
+
+
+# --- Tarifa por SMS y plantilla del nombre de los archivos (B8) ----------
+
+
+def test_la_configuracion_trae_tarifa_plantilla_y_las_variables_validas(cliente) -> None:
+    client, _ = cliente
+
+    cuerpo = client.get("/mowa-mes/configuracion").json()
+
+    assert cuerpo["tarifa_sms"] == "0.0200"
+    assert cuerpo["plantilla_nombre_archivo"] == "mowa_mes_campana_{campana}_{archivo}_de_{total}"
+    assert [v["nombre"] for v in cuerpo["variables_plantilla"]] == [
+        "campana",
+        "descripcion",
+        "fecha_envio",
+        "fecha_corte",
+        "archivo",
+        "total",
+        "cantidad",
+    ]
+    assert all(v["descripcion"] for v in cuerpo["variables_plantilla"])
+
+
+@pytest.mark.parametrize(
+    ("enviada", "guardada"),
+    [
+        ("0.0125", "0.0125"),
+        ("1", "1.0000"),
+        ("0", "0.0000"),
+        ("0.05", "0.0500"),
+        (" 0.03 ", "0.0300"),
+    ],
+)
+def test_la_tarifa_se_guarda_como_texto_decimal_exacto(cliente, enviada, guardada) -> None:
+    client, repositorio = cliente
+
+    respuesta = client.put("/mowa-mes/configuracion", json={**GUARDADA, "tarifa_sms": enviada})
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["tarifa_sms"] == guardada
+    assert isinstance(repositorio.configuracion.tarifa_sms, Decimal)
+    assert client.get("/mowa-mes/configuracion").json()["tarifa_sms"] == guardada
+
+
+def test_una_tarifa_omitida_conserva_la_guardada(cliente) -> None:
+    client, _ = cliente
+    client.put("/mowa-mes/configuracion", json={**GUARDADA, "tarifa_sms": "0.0375"})
+
+    respuesta = client.put("/mowa-mes/configuracion", json=GUARDADA)
+
+    assert respuesta.json()["tarifa_sms"] == "0.0375"
+
+
+@pytest.mark.parametrize(
+    "invalida", ["-0.01", "0.00001", "abc", "", "1e2", "0,02", "NaN", "123456789"]
+)
+def test_una_tarifa_invalida_responde_400_con_el_motivo_y_no_guarda(cliente, invalida) -> None:
+    client, repositorio = cliente
+
+    respuesta = client.put("/mowa-mes/configuracion", json={**GUARDADA, "tarifa_sms": invalida})
+
+    assert respuesta.status_code == 400
+    assert "hasta 4 decimales" in respuesta.json()["detail"]
+    assert repositorio.configuracion.tarifa_sms == Decimal("0.02")
+
+
+@pytest.mark.parametrize("campo", ["tarifa_sms", "plantilla_nombre_archivo"])
+def test_null_en_tarifa_o_plantilla_responde_422_y_no_se_trata_como_omitido(cliente, campo) -> None:
+    client, repositorio = cliente
+    antes = getattr(repositorio.configuracion, campo)
+
+    respuesta = client.put("/mowa-mes/configuracion", json={**GUARDADA, campo: None})
+
+    assert respuesta.status_code == 422
+    assert getattr(repositorio.configuracion, campo) == antes
+
+
+def test_la_tarifa_no_se_acepta_como_numero_de_json(cliente) -> None:
+    # Un monto no pasa por float: 0.02 como numero JSON no es un texto decimal.
+    client, repositorio = cliente
+
+    respuesta = client.put("/mowa-mes/configuracion", json={**GUARDADA, "tarifa_sms": 0.02})
+
+    assert respuesta.status_code == 422
+    assert repositorio.configuracion.tarifa_sms == Decimal("0.02")
+
+
+def test_la_plantilla_se_guarda_y_una_omitida_conserva_la_guardada(cliente) -> None:
+    client, _ = cliente
+    plantilla = "CajaCusco_{fecha_envio}_{archivo}de{total}"
+
+    guardada = client.put(
+        "/mowa-mes/configuracion", json={**GUARDADA, "plantilla_nombre_archivo": plantilla}
+    )
+    omitida = client.put("/mowa-mes/configuracion", json=GUARDADA)
+
+    assert guardada.json()["plantilla_nombre_archivo"] == plantilla
+    assert omitida.json()["plantilla_nombre_archivo"] == plantilla
+
+
+def test_una_plantilla_vacia_vuelve_a_la_de_por_defecto(cliente) -> None:
+    client, _ = cliente
+    client.put("/mowa-mes/configuracion", json={**GUARDADA, "plantilla_nombre_archivo": "otra"})
+
+    respuesta = client.put(
+        "/mowa-mes/configuracion", json={**GUARDADA, "plantilla_nombre_archivo": ""}
+    )
+
+    assert respuesta.json()["plantilla_nombre_archivo"] == (
+        "mowa_mes_campana_{campana}_{archivo}_de_{total}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("plantilla", "dice"),
+    [("caja_{nombre}", "{nombre}"), ("caja_{campana", "sin cerrar"), ("caja}", "sin abrir")],
+)
+def test_una_plantilla_invalida_responde_400_nombrando_la_variable_y_no_guarda(
+    cliente, plantilla, dice
+) -> None:
+    client, repositorio = cliente
+
+    respuesta = client.put(
+        "/mowa-mes/configuracion", json={**GUARDADA, "plantilla_nombre_archivo": plantilla}
+    )
+
+    assert respuesta.status_code == 400
+    assert dice in respuesta.json()["detail"]
+    assert repositorio.configuracion.plantilla_nombre_archivo.startswith("mowa_mes_campana_")
+
+
+@pytest.mark.parametrize(
+    ("cambio", "campo"),
+    [
+        ({"tarifa_sms": "-1"}, "tarifa_sms"),
+        ({"tarifa_sms": "abc"}, "tarifa_sms"),
+        ({"tarifa_sms": "0.00001"}, "tarifa_sms"),
+        ({"plantilla_nombre_archivo": "a_{x}"}, "plantilla_nombre_archivo"),
+        ({"plantilla_nombre_archivo": "a_{campana"}, "plantilla_nombre_archivo"),
+        ({"plantilla_nombre_archivo": "a}"}, "plantilla_nombre_archivo"),
+        ({"plantilla_nombre_archivo": "a" * 301}, "plantilla_nombre_archivo"),
+        ({"whatsapp_contacto": "800000123"}, "whatsapp_contacto"),
+    ],
+)
+def test_el_400_de_la_configuracion_trae_el_campo_al_que_pertenece(cliente, cambio, campo) -> None:
+    # El frontend ubica el error bajo su campo por `campo`, no leyendo el texto del `detail`.
+    client, repositorio = cliente
+
+    respuesta = client.put("/mowa-mes/configuracion", json={**GUARDADA, **cambio})
+
+    assert respuesta.status_code == 400
+    cuerpo = respuesta.json()
+    assert set(cuerpo) == {"detail", "campo"}
+    assert cuerpo["campo"] == campo
+    assert isinstance(cuerpo["detail"], str) and cuerpo["detail"]
+    assert repositorio.escrituras == 0
+
+
+def test_si_hay_dos_errores_el_400_habla_de_uno_solo_y_dice_de_cual(cliente) -> None:
+    client, _ = cliente
+
+    respuesta = client.put(
+        "/mowa-mes/configuracion",
+        json={**GUARDADA, "tarifa_sms": "abc", "plantilla_nombre_archivo": "a_{x}"},
+    )
+
+    assert respuesta.status_code == 400
+    assert respuesta.json()["campo"] == "tarifa_sms"  # la tarifa se lee antes que la plantilla
+
+
+def test_el_contrato_declara_el_400_de_la_configuracion_con_su_campo() -> None:
+    from app.api import contrato
+
+    esquema = contrato.generar()
+    campo = esquema["components"]["schemas"]["ErrorConfiguracionRespuesta"]["properties"]["campo"]
+    enum = esquema["components"]["schemas"]["CampoConfiguracion"]["enum"]
+
+    assert campo == {"$ref": "#/components/schemas/CampoConfiguracion"}
+    assert enum == [
+        "limite_mensual",
+        "whatsapp_contacto",
+        "registros_por_archivo",
+        "bytes_por_archivo",
+        "tarifa_sms",
+        "plantilla_nombre_archivo",
+    ]
+    for ruta in ("/mowa-mes/configuracion", "/mowa-mes/plantilla-nombre-archivo/previsualizacion"):
+        verbo = "put" if ruta == "/mowa-mes/configuracion" else "post"
+        assert esquema["paths"][ruta][verbo]["responses"]["400"]["content"]["application/json"][
+            "schema"
+        ] == {"$ref": "#/components/schemas/ErrorConfiguracionRespuesta"}
+
+
+def test_la_previsualizacion_de_la_plantilla_resuelve_con_datos_de_muestra(cliente) -> None:
+    client, repositorio = cliente
+
+    respuesta = client.post(
+        "/mowa-mes/plantilla-nombre-archivo/previsualizacion",
+        json={"plantilla": "CajaCusco_{fecha_envio}_{archivo}de{total}"},
+    )
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == {
+        "plantilla": "CajaCusco_{fecha_envio}_{archivo}de{total}",
+        "nombres_ejemplo": ["CajaCusco_2026-10-01_1de2.xlsx", "CajaCusco_2026-10-01_2de2.xlsx"],
+    }
+    assert repositorio.escrituras == 0  # no guarda nada
+
+
+def test_la_previsualizacion_sin_variables_agrega_el_sufijo_y_una_vacia_usa_la_de_por_defecto(
+    cliente,
+) -> None:
+    client, _ = cliente
+    ruta = "/mowa-mes/plantilla-nombre-archivo/previsualizacion"
+
+    sin_variables = client.post(ruta, json={"plantilla": "caja"}).json()
+    vacia = client.post(ruta, json={"plantilla": "  "}).json()
+
+    assert sin_variables["nombres_ejemplo"] == ["caja_1de2.xlsx", "caja_2de2.xlsx"]
+    assert vacia["nombres_ejemplo"] == [
+        "mowa_mes_campana_1234_1_de_2.xlsx",
+        "mowa_mes_campana_1234_2_de_2.xlsx",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("plantilla", "dice"),
+    [("a_{foo}_b", "{foo}"), ("a_{", "sin cerrar"), ("a_}", "sin abrir")],
+)
+def test_la_previsualizacion_de_una_plantilla_invalida_responde_400(
+    cliente, plantilla, dice
+) -> None:
+    client, _ = cliente
+
+    respuesta = client.post(
+        "/mowa-mes/plantilla-nombre-archivo/previsualizacion", json={"plantilla": plantilla}
+    )
+
+    assert respuesta.status_code == 400
+    assert dice in respuesta.json()["detail"]
+    assert respuesta.json()["campo"] == "plantilla_nombre_archivo"
+
+
+def test_la_previsualizacion_de_la_plantilla_exige_el_campo(cliente) -> None:
+    client, _ = cliente
+    ruta = "/mowa-mes/plantilla-nombre-archivo/previsualizacion"
+
+    assert client.post(ruta, json={}).status_code == 422
+    assert client.post(ruta, json={"plantilla": None}).status_code == 422
 
 
 @pytest.mark.parametrize("vacio", ["", "   "])

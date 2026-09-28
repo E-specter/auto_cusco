@@ -9,6 +9,9 @@ import type {
   ConfiguracionSupervision,
   ConfiguracionSupervisionEntrada,
   DiaNoLaborable,
+  EstadoCosto,
+  CampoError,
+  EstadoCostoEstimado,
   LargoSegmento,
   PartesEntrada,
   PartesSpeech,
@@ -292,4 +295,106 @@ export function paginar<T>(
     total,
     hayPaginador: total > porPagina,
   };
+}
+
+// ---- Tarifa y nombre de los archivos (RF-MM-23, RF-MM-25) -----------------------
+
+/**
+ * The rate as the API takes it, or `null` when it is not a decimal of at least
+ * 0 with up to 4 decimals. The comma is accepted as the separator, and the
+ * text is never turned into a number: an amount must not travel as a float.
+ */
+export function tarifaNormalizada(texto: string): string | null {
+  const limpio = texto.trim().replace(',', '.');
+  return /^\d+(\.\d{1,4})?$/.test(limpio) ? limpio : null;
+}
+
+/** Same reading of a `{name}` as the API's: any run of characters without braces. */
+const VARIABLE_DE_PLANTILLA = /\{([^{}]*)\}/g;
+
+/**
+ * The `{names}` in a template that the API did not list as valid, once each and
+ * in the order they appear. The list comes from the configuration response, so
+ * nothing is spelled out here; the API's 400 stays the final word (it also
+ * catches an unclosed brace, which this does not try to).
+ */
+export function variablesDesconocidas(plantilla: string, validas: readonly { nombre: string }[]): string[] {
+  const conocidas = new Set(validas.map((v) => v.nombre));
+  const desconocidas: string[] = [];
+  for (const coincidencia of plantilla.matchAll(VARIABLE_DE_PLANTILLA)) {
+    const nombre = coincidencia[1];
+    if (!conocidas.has(nombre) && !desconocidas.includes(nombre)) desconocidas.push(nombre);
+  }
+  return desconocidas;
+}
+
+/**
+ * Put `{nombre}` where the cursor is, replacing whatever is selected. Positions
+ * outside the text are clamped; the returned cursor sits right after the
+ * inserted variable.
+ */
+export function insertarVariable(
+  texto: string,
+  inicio: number,
+  fin: number,
+  nombre: string,
+): { texto: string; cursor: number } {
+  const desde = Math.min(Math.max(0, Math.min(inicio, fin)), texto.length);
+  const hasta = Math.min(Math.max(0, Math.max(inicio, fin)), texto.length);
+  const variable = `{${nombre}}`;
+  return { texto: texto.slice(0, desde) + variable + texto.slice(hasta), cursor: desde + variable.length };
+}
+
+// ---- Costs (RF-MM-24) -----------------------------------------------------------
+
+export type PresentacionCosto =
+  | { tipo: 'monto'; valor: string | null }
+  | { tipo: 'pendiente' }
+  | { tipo: 'no_disponible' };
+
+/**
+ * What a cost cell shows. The state decides, never the amount: a real cost of
+ * "0.0000" with state `calculado` is an amount (S/ 0.00), and a `null` amount
+ * with any other state is not a zero.
+ */
+export function presentarCosto(estado: EstadoCosto | EstadoCostoEstimado, monto: string | null): PresentacionCosto {
+  if (estado === 'calculado') return { tipo: 'monto', valor: monto };
+  return { tipo: estado === 'pendiente' ? 'pendiente' : 'no_disponible' };
+}
+
+/**
+ * The rate as it is edited: the API stores four decimals ("0.0200"), and the
+ * field shows the shortest text that reads the same, two decimals at least.
+ * String work only, never a number.
+ */
+export function tarifaEditable(valor: string): string {
+  const [enteros, decimales = ''] = valor.trim().split('.');
+  const recortados = decimales.replace(/0+$/, '');
+  return `${enteros}.${recortados.padEnd(2, '0')}`;
+}
+
+/**
+ * Every setting the contract can name in a 400. Typed as a record over the
+ * generated `CampoError`, so the compiler (`astro check`) fails on a renamed
+ * value, on one the API adds and on one it drops: the screens never go on
+ * comparing a `campo` the API stopped sending.
+ */
+export const CAMPOS_DE_ERROR: Readonly<Record<CampoError, true>> = {
+  limite_mensual: true,
+  whatsapp_contacto: true,
+  registros_por_archivo: true,
+  bytes_por_archivo: true,
+  tarifa_sms: true,
+  plantilla_nombre_archivo: true,
+};
+
+/**
+ * The field a 400 of the configuration or of the campaign's template is about,
+ * as the API names it in the error body (`campo`). `null` when the body carries
+ * none, or one this client does not know: the caller then shows the sentence in
+ * the panel's general notice — the field is never guessed from the words.
+ */
+export function campoDeError(cuerpo: Readonly<Record<string, unknown>> | null): CampoError | null {
+  const campo = cuerpo?.campo;
+  return typeof campo === 'string' && Object.hasOwn(CAMPOS_DE_ERROR, campo) ? (campo as CampoError) : null;
 }

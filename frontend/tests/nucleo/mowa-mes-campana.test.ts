@@ -32,6 +32,7 @@ function borrador(parcial: Partial<CampanaBorrador> = {}): CampanaBorrador {
     speechId: null,
     whatsapp: '',
     supervisores: null,
+    plantillaNombreArchivo: '',
     ...parcial,
   };
 }
@@ -162,6 +163,14 @@ describe('armado de la petición', () => {
     expect(entradaCampana(borrador({ whatsapp: ' 900000999 ' })).whatsapp).toBe('900000999');
   });
 
+  it('una plantilla vacía viaja como null (usa la de la configuración); con texto, recortada', () => {
+    expect(entradaCampana(borrador({ plantillaNombreArchivo: '' })).plantilla_nombre_archivo).toBeNull();
+    expect(entradaCampana(borrador({ plantillaNombreArchivo: '   ' })).plantilla_nombre_archivo).toBeNull();
+    expect(entradaCampana(borrador({ plantillaNombreArchivo: ' carga_{campana} ' })).plantilla_nombre_archivo).toBe(
+      'carga_{campana}',
+    );
+  });
+
   it('supervisores null usa los configurados; una lista propia se recorta', () => {
     expect(entradaCampana(borrador({ supervisores: null })).supervisores).toBeNull();
     expect(
@@ -238,6 +247,10 @@ describe('lectura de la previsualización', () => {
       total: 2_600_982,
       disponible: -100_982,
       excedido: true,
+      costo_mes: '52019.6400',
+      campanas_sin_tarifa: 0,
+      costo_esta_campana: '19.6400',
+      costo_total: '52039.2800',
     };
     const mensaje = mensajeLimiteExcedido(consumo);
     expect(mensaje).toContain('2,600,982');
@@ -272,10 +285,15 @@ describe('previsualización completa (contrato)', () => {
       muestra: [],
       exclusiones: { total: 20, limite: 100, desplazamiento: 0, exclusiones: [] },
       archivos_previstos_por_filas: [{ numero: 1, filas: 982, supervision: 2 }],
-      limite: { mes: '2026-09', limite: 2_500_000, cargados_mes: 982, esta_campana: 982, total: 982, disponible: 2_499_018, excedido: false },
+      limite: { mes: '2026-09', limite: 2_500_000, cargados_mes: 982, esta_campana: 982, total: 982, disponible: 2_499_018, excedido: false, costo_mes: '19.6400', campanas_sin_tarifa: 0, costo_esta_campana: '19.6400', costo_total: '19.6400' },
       advertencias: [],
       errores: [],
       puede_crear: true,
+      tarifa_sms: '0.0200',
+      costo_estimado: '19.6400',
+      plantilla_nombre_archivo: 'mowa_mes_campana_{campana}_{archivo}_de_{total}',
+      nombre_primer_archivo: 'mowa_mes_campana_[campana]_1_de_1.xlsx',
+      nombre_estimado: true,
     };
     expect(resumenProblemasCampana(previsualizacion)).not.toBe('');
   });

@@ -152,6 +152,9 @@ test.describe('speech (RF-MM-17)', () => {
       registros_por_archivo: 50000,
       bytes_por_archivo: 2000000,
       whatsapp_contacto: '900000555',
+      // The form always sends what it shows: the rate, and the template as it is saved.
+      tarifa_sms: '0.02',
+      plantilla_nombre_archivo: 'mowa_mes_campana_{campana}_{archivo}_de_{total}',
     });
   });
 });
@@ -159,7 +162,9 @@ test.describe('speech (RF-MM-17)', () => {
 test.describe('plataforma', () => {
   test('un WhatsApp que la API rechaza se señala en su campo con el motivo', async ({ page }) => {
     const api = apiMowaMes();
-    api.respuestas.guardarConfiguracion = [{ estado: 400, cuerpo: { detail: 'El numero no cumple RF-02' } }];
+    api.respuestas.guardarConfiguracion = [
+      { estado: 400, cuerpo: { detail: 'El numero no cumple RF-02', campo: 'whatsapp_contacto' } },
+    ];
     await abrir(page, api);
 
     const whatsapp = page.getByLabel('WhatsApp de contacto');
@@ -407,3 +412,310 @@ test.describe('idioma', () => {
 
 // Accessibility (axe) for this screen lives in e2e/accesibilidad.spec.ts,
 // alongside the other MOWA MES screens (T-MM-F5).
+
+test.describe('F6-B: tarifa y nombre de los archivos (RF-MM-23, RF-MM-25)', () => {
+  const plantilla = (page: Page) => page.getByLabel('Nombre de los archivos');
+  const tarifa = (page: Page) => page.getByLabel('Tarifa por SMS (S/)');
+  const ejemplo = (page: Page) => page.locator('[data-plantilla-ejemplo]');
+  const errorPlantilla = (page: Page) => page.locator('[data-plantilla-error]');
+  const variables = (page: Page) => page.getByRole('group', { name: 'Variables de la plantilla' });
+  const putsDeConfiguracion = (api: ApiFalsaMowaMes) => pedidosA(api, 'PUT', '/mowa-mes/configuracion');
+  const revisionesDePlantilla = (api: ApiFalsaMowaMes) =>
+    pedidosA(api, 'POST', '/mowa-mes/plantilla-nombre-archivo/previsualizacion');
+
+  test('muestra la tarifa sin ceros de más, la plantilla, las 7 variables de la API y el nombre que ella devuelve', async ({
+    page,
+  }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+
+    await expect(tarifa(page)).toHaveValue('0.02');
+    await expect(tarifa(page)).toHaveAttribute('inputmode', 'decimal');
+    await expect(tarifa(page)).not.toHaveAttribute('type', 'number');
+    await expect(plantilla(page)).toHaveValue('mowa_mes_campana_{campana}_{archivo}_de_{total}');
+    // The list is the API's, in its order: nothing is spelled out in the screen.
+    await expect(variables(page).getByRole('button')).toHaveText([
+      '{campana}',
+      '{descripcion}',
+      '{fecha_envio}',
+      '{fecha_corte}',
+      '{archivo}',
+      '{total}',
+      '{cantidad}',
+    ]);
+    // The buttons are a labelled group that follows the field in the DOM, right after it.
+    await expect(page.locator('#mm-plantilla + [data-plantilla-variables]')).toHaveCount(1);
+    await expect(variables(page)).toHaveAttribute('role', 'group');
+    await expect(variables(page).getByRole('button', { name: '{total}' })).toHaveAttribute(
+      'title',
+      'Cantidad de archivos de la campana',
+    );
+    // The name is worked out by the API with sample data; the screen only shows it.
+    await expect(ejemplo(page)).toContainText('Nombre del primer archivo: mowa_mes_campana_1234_1_de_2.xlsx');
+    await expect(ejemplo(page)).toContainText('Nombre del archivo 2: mowa_mes_campana_1234_2_de_2.xlsx');
+  });
+
+  test('un botón inserta la variable donde está el cursor, reemplaza la selección y deja el foco en el campo', async ({
+    page,
+  }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    const campo = plantilla(page);
+
+    await campo.fill('carga_.final');
+    await campo.evaluate((el: HTMLInputElement) => el.setSelectionRange(6, 6));
+    await variables(page).getByRole('button', { name: '{campana}' }).click();
+    await expect(campo).toHaveValue('carga_{campana}.final');
+    await expect(campo).toBeFocused();
+    expect(await campo.evaluate((el: HTMLInputElement) => el.selectionStart)).toBe(15);
+
+    // A selection is replaced.
+    await campo.evaluate((el: HTMLInputElement) => el.setSelectionRange(6, 15));
+    await variables(page).getByRole('button', { name: '{fecha_corte}' }).click();
+    await expect(campo).toHaveValue('carga_{fecha_corte}.final');
+    // Inserting is typing: the API is asked for the new name.
+    await expect(ejemplo(page)).toContainText('carga_2026-09-30.final_1de2.xlsx');
+  });
+
+  test('una variable desconocida se marca en vivo con la lista de la API y no se pide el nombre', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    const antes = revisionesDePlantilla(api).length;
+
+    await plantilla(page).fill('carga_{banco}_{campana}');
+
+    await expect(errorPlantilla(page)).toHaveText('No es una variable de la plantilla: {banco}. Usa las de los botones.');
+    await expect(plantilla(page)).toHaveAttribute('aria-invalid', 'true');
+    await expect(plantilla(page)).toHaveAccessibleDescription(/No es una variable de la plantilla: \{banco\}/);
+    await expect(ejemplo(page)).toBeEmpty();
+    // Waits past the typing delay: no request goes out for a template already known to be wrong.
+    await page.waitForTimeout(700);
+    expect(revisionesDePlantilla(api)).toHaveLength(antes);
+
+    // And it cannot be saved.
+    await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+    expect(putsDeConfiguracion(api)).toEqual([]);
+    await expect(plantilla(page)).toBeFocused();
+
+    // Fixing it clears the mark and brings the name back.
+    await plantilla(page).fill('carga_{campana}');
+    await expect(errorPlantilla(page)).toHaveText('');
+    await expect(plantilla(page)).toHaveAttribute('aria-invalid', 'false');
+    await expect(ejemplo(page)).toContainText('carga_1234_1de2.xlsx');
+  });
+
+  test('una llave sin cerrar la dice el 400 de la API, junto al campo', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+
+    await plantilla(page).fill('carga_{campana');
+
+    await expect(errorPlantilla(page)).toHaveText('La plantilla tiene una llave { sin cerrar');
+    await expect(plantilla(page)).toHaveAttribute('aria-invalid', 'true');
+    await expect(ejemplo(page)).toBeEmpty();
+  });
+
+  test('guardar manda la tarifa y la plantilla, acepta la coma y muestra lo que la API guardó', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+
+    await tarifa(page).fill('0,025');
+    await plantilla(page).fill('carga_{fecha_envio}_{archivo}');
+    await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+
+    await expect(page.getByText('Guardado.')).toBeVisible();
+    expect(putsDeConfiguracion(api)[0].cuerpo).toMatchObject({
+      tarifa_sms: '0.025',
+      plantilla_nombre_archivo: 'carga_{fecha_envio}_{archivo}',
+    });
+    // The API keeps four decimals; the field reads them without the extra zero.
+    await expect(tarifa(page)).toHaveValue('0.025');
+    expect(api.configuracion.tarifa_sms).toBe('0.0250');
+  });
+
+  test.describe('una tarifa inválida no viaja', () => {
+    for (const escrita of ['abc', '', '-0.02', '0.02345', '0.0.2', 'S/ 0.02']) {
+      test(`la tarifa ${JSON.stringify(escrita)} se señala junto al campo, anclada con aria-describedby`, async ({
+        page,
+      }) => {
+        const api = apiMowaMes();
+        await abrir(page, api);
+
+        await tarifa(page).fill(escrita);
+        await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+
+        const mensaje = page.locator('[data-tarifa-error]');
+        await expect(mensaje).toHaveText(
+          'La tarifa debe ser un decimal de 0 en adelante, con hasta 4 decimales (por ejemplo 0.02).',
+        );
+        await expect(tarifa(page)).toHaveAttribute('aria-invalid', 'true');
+        await expect(tarifa(page)).toHaveAttribute('aria-describedby', 'mm-tarifa-hint mm-tarifa-error');
+        await expect(tarifa(page)).toHaveAccessibleDescription(/con hasta 4 decimales \(por ejemplo 0\.02\)/);
+        await expect(tarifa(page)).toBeFocused();
+        expect(putsDeConfiguracion(api)).toEqual([]);
+
+        // Typing clears the mark.
+        await tarifa(page).fill('0.03');
+        await expect(mensaje).toHaveText('');
+        await expect(tarifa(page)).not.toHaveAttribute('aria-invalid', 'true');
+      });
+    }
+  });
+
+  test('un 400 de la API sobre la tarifa se muestra bajo la tarifa, no bajo el WhatsApp', async ({ page }) => {
+    const api = apiMowaMes();
+    api.respuestas.guardarConfiguracion = [
+      {
+        estado: 400,
+        cuerpo: {
+          detail: 'La tarifa debe ser un numero decimal mayor o igual a 0, con hasta 4 decimales (por ejemplo 0.02)',
+          campo: 'tarifa_sms',
+        },
+      },
+    ];
+    await abrir(page, api);
+
+    await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+
+    await expect(page.locator('[data-tarifa-error]')).toHaveText(
+      'La tarifa debe ser un numero decimal mayor o igual a 0, con hasta 4 decimales (por ejemplo 0.02)',
+    );
+    await expect(tarifa(page)).toBeFocused();
+    await expect(page.getByLabel('WhatsApp de contacto')).not.toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('[data-plataforma-error]')).toHaveText('');
+  });
+
+  test('un 400 de la API sobre la plantilla nombra la variable, bajo el campo de la plantilla', async ({ page }) => {
+    const api = apiMowaMes();
+    api.respuestas.guardarConfiguracion = [
+      {
+        estado: 400,
+        cuerpo: {
+          detail: '{banco} no es una variable de la plantilla. Variables validas: {campana}',
+          campo: 'plantilla_nombre_archivo',
+        },
+      },
+    ];
+    await abrir(page, api);
+
+    await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+
+    await expect(errorPlantilla(page)).toHaveText(/^\{banco\} no es una variable de la plantilla/);
+    await expect(plantilla(page)).toBeFocused();
+    await expect(plantilla(page)).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  test.describe('el campo del 400 decide dónde va el error, no las palabras del texto', () => {
+    const general = (page: Page) => page.locator('[data-plataforma-error]');
+    const sinMarcas = async (page: Page) => {
+      for (const campo of [tarifa(page), plantilla(page), page.getByLabel('WhatsApp de contacto')]) {
+        await expect(campo).not.toHaveAttribute('aria-invalid', 'true');
+      }
+      await expect(page.locator('[data-tarifa-error]')).toHaveText('');
+      await expect(errorPlantilla(page)).toHaveText('');
+    };
+
+    test('sin campo el texto va al aviso general y no se marca ni se enfoca ningún campo', async ({ page }) => {
+      const api = apiMowaMes();
+      // The sentence talks about the rate, but names no field: it must not be placed by its words.
+      api.respuestas.guardarConfiguracion = [{ estado: 400, cuerpo: { detail: 'La tarifa no es válida por una razón nueva' } }];
+      await abrir(page, api);
+
+      await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+
+      await expect(general(page)).toHaveText('La tarifa no es válida por una razón nueva');
+      await sinMarcas(page);
+      await expect(tarifa(page)).not.toBeFocused();
+    });
+
+    test('un campo que el cliente no conoce se trata como si no hubiera campo', async ({ page }) => {
+      const api = apiMowaMes();
+      api.respuestas.guardarConfiguracion = [
+        { estado: 400, cuerpo: { detail: 'Algo de un ajuste nuevo', campo: 'ajuste_nuevo' } },
+      ];
+      await abrir(page, api);
+
+      await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+
+      await expect(general(page)).toHaveText('Algo de un ajuste nuevo');
+      await sinMarcas(page);
+    });
+
+    test('el campo manda aunque el texto hable de otra cosa', async ({ page }) => {
+      const api = apiMowaMes();
+      api.respuestas.guardarConfiguracion = [
+        { estado: 400, cuerpo: { detail: 'La tarifa y la plantilla no tienen nada que ver', campo: 'whatsapp_contacto' } },
+      ];
+      await abrir(page, api);
+
+      await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+
+      await expect(general(page)).toHaveText('La tarifa y la plantilla no tienen nada que ver');
+      await expect(page.getByLabel('WhatsApp de contacto')).toHaveAttribute('aria-invalid', 'true');
+      await expect(page.getByLabel('WhatsApp de contacto')).toBeFocused();
+      await expect(tarifa(page)).not.toHaveAttribute('aria-invalid', 'true');
+      await expect(plantilla(page)).not.toHaveAttribute('aria-invalid', 'true');
+    });
+
+    for (const [campo, etiqueta] of [
+      ['registros_por_archivo', 'Filas por archivo'],
+      ['bytes_por_archivo', 'Tamaño máximo por archivo (bytes)'],
+      ['limite_mensual', 'Límite mensual de SMS'],
+    ] as const) {
+      test(`${campo}: el texto va al aviso general y se marca y enfoca ese campo`, async ({ page }) => {
+        const api = apiMowaMes();
+        api.respuestas.guardarConfiguracion = [{ estado: 400, cuerpo: { detail: `Motivo de ${campo}`, campo } }];
+        await abrir(page, api);
+
+        await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+
+        await expect(general(page)).toHaveText(`Motivo de ${campo}`);
+        await expect(page.getByLabel(etiqueta)).toHaveAttribute('aria-invalid', 'true');
+        await expect(page.getByLabel(etiqueta)).toBeFocused();
+      });
+    }
+
+    test('el 400 real de una tarifa o una plantilla que no aceptó la API trae su campo', async ({ page }) => {
+      const api = apiMowaMes();
+      await abrir(page, api);
+      // Past the local checks (a template that is well formed here) but over the API's own limit of 300 characters.
+      await plantilla(page).fill(`{campana}${'x'.repeat(300)}`);
+      await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+
+      await expect(errorPlantilla(page)).toHaveText('La plantilla no puede pasar de 300 caracteres');
+      await expect(plantilla(page)).toBeFocused();
+      await expect(plantilla(page)).toHaveAttribute('aria-invalid', 'true');
+    });
+  });
+
+  test('una plantilla vacía queda como la de por defecto, la que devuelve la API', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+
+    await plantilla(page).fill('');
+    await expect(ejemplo(page)).toContainText('mowa_mes_campana_1234_1_de_2.xlsx');
+    await page.getByRole('button', { name: 'Guardar plataforma' }).click();
+
+    await expect(page.getByText('Guardado.')).toBeVisible();
+    await expect(plantilla(page)).toHaveValue('mowa_mes_campana_{campana}_{archivo}_de_{total}');
+  });
+
+  test('en inglés traduce los rótulos y la nota de variables', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    const api = apiMowaMes();
+    await montarApiMowaMes(page, api);
+    await page.goto(RUTA);
+
+    await expect(page.getByLabel('Rate per SMS (S/)')).toHaveValue('0.02');
+    await expect(page.getByLabel('File names')).toHaveValue('mowa_mes_campana_{campana}_{archivo}_de_{total}');
+    await expect(page.locator('[data-plantilla-ejemplo]')).toContainText('Name of the first file:');
+    await expect(page.getByRole('group', { name: 'Template variables' })).toBeVisible();
+
+    await page.getByLabel('File names').fill('{banco}');
+    await expect(page.locator('[data-plantilla-error]')).toHaveText(
+      'Not a template variable: {banco}. Use the ones on the buttons.',
+    );
+  });
+});

@@ -16,12 +16,14 @@ Filtros y orden en la misma sintaxis que `/cartera`.
 """
 
 from datetime import date, datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.adapters.input.lector_reporte_mowa_mes import LectorReporteMowaMes
+from app.adapters.output.exportadores.comunes import disposicion_de_descarga
 from app.adapters.output.plataformas.mowa_mes.archivo_carga import escribir_archivo_carga
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_campanas_mowa_mes_postgres import (
@@ -39,6 +41,7 @@ from app.core.entities.gestiones_digitales import Supervisor
 from app.core.entities.mowa_mes import (
     RANGOS_SEGMENTO,
     TIPO_CODIGO,
+    CampoConfiguracion,
     CodigoMowaMes,
     Programacion,
     Segmento,
@@ -62,8 +65,9 @@ from app.core.entities.mowa_mes_campana import (
     SpeechCambiado,
     TipoCarga,
 )
+from app.core.entities.mowa_mes_costo import EstadoCosto, EstadoCostoEstimado
 from app.core.entities.mowa_mes_reporte import CifrasGrupo, ReporteInvalido, ReporteYaImportado
-from app.core.services.plataformas.mowa_mes import division
+from app.core.services.plataformas.mowa_mes import costos, division
 from app.core.services.plataformas.mowa_mes.campana import CampanasMowaMesService
 from app.core.services.plataformas.mowa_mes.reportes import (
     EstadoConciliacion,
@@ -154,6 +158,14 @@ class PeticionCampanaEntrada(BaseModel):
     supervisores: list[SupervisorCampanaEntrada] | None = Field(
         default=None, max_length=100, description="Sin lista se usa la configurada por defecto"
     )
+    plantilla_nombre_archivo: str | None = Field(
+        default=None,
+        max_length=1000,
+        description=(
+            "Plantilla del nombre de los archivos (RF-MM-25); sin ella o vacia, la de la "
+            "configuracion. Una variable desconocida o una llave sin cerrar responde 400"
+        ),
+    )
 
     def peticion(self, speech_huella: str | None = None, confirmar_limite: bool = False):
         return PeticionCampana(
@@ -177,6 +189,7 @@ class PeticionCampanaEntrada(BaseModel):
                 else tuple(Supervisor(s.numero, s.procedencia) for s in self.supervisores)
             ),
             confirmar_limite=confirmar_limite,
+            plantilla_nombre_archivo=self.plantilla_nombre_archivo,
         )
 
 
@@ -268,6 +281,7 @@ class ArchivoRespuesta(ModeloRespuesta):
     filas: int
     supervision: int
     bytes: int
+    nombre: str = Field(description="El nombre resuelto al crear la campana, con extension")
 
 
 class ConsumoLimiteRespuesta(ModeloRespuesta):
@@ -278,6 +292,19 @@ class ConsumoLimiteRespuesta(ModeloRespuesta):
     total: int
     disponible: int
     excedido: bool
+    costo_mes: str = Field(
+        description=(
+            "Soles: suma del costo estimado de las campanas ya creadas del mes (RF-MM-24), "
+            "sin las que no tienen tarifa. Texto decimal"
+        )
+    )
+    campanas_sin_tarifa: int = Field(
+        description="Campanas del mes que quedaron fuera de `costo_mes` por no tener tarifa"
+    )
+    costo_esta_campana: str | None = Field(
+        description="Soles: costo estimado de la campana que se previsualiza; null sin campana"
+    )
+    costo_total: str = Field(description="Soles: `costo_mes` mas `costo_esta_campana`")
 
 
 class SpeechCampanaRespuesta(ModeloRespuesta):
@@ -315,6 +342,25 @@ class PrevisualizacionCampanaRespuesta(ModeloRespuesta):
     advertencias: list[AvisoCampanaRespuesta]
     errores: list[AvisoCampanaRespuesta]
     puede_crear: bool
+    tarifa_sms: str = Field(description="Soles por SMS vigente ahora; la creacion la congela")
+    costo_estimado: str = Field(
+        description="Soles: SMS cargados (supervision incluida) por la tarifa (RF-MM-24)"
+    )
+    plantilla_nombre_archivo: str = Field(
+        description="La plantilla que se usaria: la de la peticion o la de la configuracion"
+    )
+    nombre_primer_archivo: str | None = Field(
+        description=(
+            "Nombre del primer archivo con `[campana]` en el lugar del numero de campana, que "
+            "todavia no existe (D-1); null si no hay archivos previstos"
+        )
+    )
+    nombre_estimado: bool = Field(
+        description=(
+            "El nombre depende de como se divida la carga (`{archivo}`, `{total}`, `{cantidad}` "
+            "o el sufijo automatico); al crear pueden salir mas archivos por el tope de bytes"
+        )
+    )
 
 
 class SpeechRegistradoRespuesta(ModeloRespuesta):
@@ -350,6 +396,31 @@ class CampanaRespuesta(ModeloRespuesta):
     advertencias: int
     confirmo_limite: bool
     archivos: list[ArchivoRespuesta]
+    tarifa_sms: str | None = Field(
+        description="Soles por SMS congelados al crearla; null en las anteriores a RF-MM-23"
+    )
+    costo_estimado: str | None = Field(
+        description="Soles, guardado con la campana; null si el estado no es `calculado`"
+    )
+    costo_estimado_estado: EstadoCostoEstimado = Field(
+        description=(
+            "`calculado`, o `no_disponible` si la campana no tiene tarifa (creada antes de "
+            "RF-MM-23). El frontend decide por este estado, no por el null del monto"
+        )
+    )
+    costo_real: str | None = Field(
+        description=(
+            "Soles: enviados de la conciliacion vigente (E-1, supervision incluida) por la "
+            "tarifa congelada; se calcula al leer, no se guarda. null si `costo_real_estado` "
+            "no es calculado"
+        )
+    )
+    costo_real_estado: EstadoCosto = Field(
+        description=(
+            "`calculado`; `pendiente` si no hay reporte importado; `no_disponible` si la "
+            "campana no tiene tarifa (con o sin reporte). Ni pendiente ni no disponible son cero"
+        )
+    )
 
 
 class ListaCampanasRespuesta(ModeloRespuesta):
@@ -401,6 +472,21 @@ class ConciliacionRespuesta(ModeloRespuesta):
     sin_correspondencia_por_estado: list[EstadoConteoRespuesta]
     por_id: list[CifrasIdRespuesta]
     advertencias: list[AdvertenciaReporteRespuesta]
+    tarifa_sms: str | None = Field(
+        description="La tarifa congelada de la campana; null si no tiene"
+    )
+    costo_real: str | None = Field(
+        description=(
+            "Soles: enviados (E-1, supervision incluida) por la tarifa congelada. null si "
+            "`costo_real_estado` no es `calculado`. No se guarda: sale de esta conciliacion"
+        )
+    )
+    costo_real_estado: EstadoCosto = Field(
+        description=(
+            "`calculado`; `pendiente` si no hay reporte importado; `no_disponible` si la "
+            "campana no tiene tarifa. Ni pendiente ni no disponible son cero"
+        )
+    )
 
 
 # --- Traduccion ----------------------------------------------------------
@@ -418,6 +504,11 @@ def _conteos(conteo: dict[CodigoMowaMes, int]) -> list[CodigoConteoRespuesta]:
     ]
 
 
+def _monto(valor: Decimal | None) -> str | None:
+    """Un monto como viaja en el contrato: texto decimal, nunca un numero de JSON."""
+    return None if valor is None else costos.texto_decimal(valor)
+
+
 def _consumo(consumo: ConsumoLimite) -> ConsumoLimiteRespuesta:
     return ConsumoLimiteRespuesta(
         mes=_mes(consumo.mes),
@@ -427,6 +518,10 @@ def _consumo(consumo: ConsumoLimite) -> ConsumoLimiteRespuesta:
         total=consumo.total,
         disponible=consumo.disponible,
         excedido=consumo.excedido,
+        costo_mes=costos.texto_decimal(consumo.costo_mes),
+        campanas_sin_tarifa=consumo.campanas_sin_tarifa,
+        costo_esta_campana=_monto(consumo.costo_esta_campana),
+        costo_total=costos.texto_decimal(consumo.costo_total),
     )
 
 
@@ -509,10 +604,22 @@ def _previsualizacion(armada: CampanaArmada) -> PrevisualizacionCampanaRespuesta
             for e in armada.errores
         ],
         puede_crear=not armada.errores,
+        tarifa_sms=costos.texto_decimal(armada.tarifa_sms),
+        costo_estimado=costos.texto_decimal(armada.costo_estimado),
+        plantilla_nombre_archivo=armada.plantilla_nombre_archivo,
+        nombre_primer_archivo=armada.nombre_primer_archivo,
+        nombre_estimado=armada.nombre_estimado,
     )
 
 
 def _campana(campana: CampanaRegistrada) -> CampanaRespuesta:
+    # El costo real sale de `enviados_conciliados`, que mantiene la transaccion del reporte.
+    # Una campana sin tarifa no tiene costo real aunque tenga reportes (no hay backfill).
+    real = costos.costo_real(
+        campana.tarifa_sms,
+        hay_reporte=campana.enviados_conciliados is not None,
+        enviados=campana.enviados_conciliados or 0,
+    )
     return CampanaRespuesta(
         id=campana.id,
         creado_en=campana.creado_en,
@@ -542,10 +649,23 @@ def _campana(campana: CampanaRegistrada) -> CampanaRespuesta:
         confirmo_limite=campana.confirmo_limite,
         archivos=[
             ArchivoRespuesta(
-                numero=a.numero, filas=a.filas, supervision=a.supervision, bytes=a.bytes
+                numero=a.numero,
+                filas=a.filas,
+                supervision=a.supervision,
+                bytes=a.bytes,
+                nombre=a.nombre,
             )
             for a in campana.archivos
         ],
+        tarifa_sms=_monto(campana.tarifa_sms),
+        costo_estimado=_monto(campana.costo_estimado),
+        costo_estimado_estado=(
+            EstadoCostoEstimado.NO_DISPONIBLE
+            if campana.tarifa_sms is None
+            else EstadoCostoEstimado.CALCULADO
+        ),
+        costo_real=_monto(real.valor),
+        costo_real_estado=real.estado,
     )
 
 
@@ -592,6 +712,9 @@ def _conciliacion(campana_id: int, estado: EstadoConciliacion) -> ConciliacionRe
             )
             for a in c.advertencias
         ],
+        tarifa_sms=_monto(estado.tarifa_sms),
+        costo_real=_monto(estado.costo_real.valor),
+        costo_real_estado=estado.costo_real.estado,
     )
 
 
@@ -605,7 +728,33 @@ def _traducir(exc: Exception) -> HTTPException:
     return HTTPException(status_code=400, detail=str(exc))
 
 
-_ERRORES_ARMADO = (PeticionCampanaInvalida, SinVersionVigente, SpeechNoEncontrado)
+class ErrorPeticionCampanaRespuesta(ModeloRespuesta):
+    """400 de la previsualizacion y de la creacion de campanas.
+
+    `campo` dice a que campo de la pantalla pertenece el error cuando el frontend lo puede
+    ubicar (hoy solo `plantilla_nombre_archivo`); es null si el error no es de un campo.
+    Extiende `detail` como pide la regla de docs/contrato-api.md, seccion 3.
+    """
+
+    detail: str
+    campo: CampoConfiguracion | None
+
+
+def _peticion_invalida(exc: Exception) -> JSONResponse:
+    cuerpo = ErrorPeticionCampanaRespuesta(detail=str(exc), campo=getattr(exc, "campo", None))
+    return JSONResponse(status_code=400, content=cuerpo.model_dump(mode="json"))
+
+
+_ERROR_400_PETICION = {
+    400: {
+        "model": ErrorPeticionCampanaRespuesta,
+        "description": (
+            "La peticion no se puede atender; `detail` es el motivo y `campo`, si es de un "
+            "campo que la pantalla pueda ubicar, cual"
+        ),
+    }
+}
+_ERRORES_ARMADO = (SinVersionVigente, SpeechNoEncontrado)
 
 
 # --- Endpoints -----------------------------------------------------------
@@ -614,18 +763,21 @@ _ERRORES_ARMADO = (PeticionCampanaInvalida, SinVersionVigente, SpeechNoEncontrad
 @router.post(
     "/campanas/previsualizacion",
     response_model=PrevisualizacionCampanaRespuesta,
-    responses=respuestas_de_error(400, 404),
+    responses={**_ERROR_400_PETICION, **respuestas_de_error(404)},
 )
 def previsualizar_campana(
     entrada: PeticionCampanaEntrada,
     servicio: CampanasMowaMesService = Depends(obtener_servicio_campanas),
-) -> PrevisualizacionCampanaRespuesta:
+) -> PrevisualizacionCampanaRespuesta | JSONResponse:
     """La campana calculada sin guardar nada. Los errores de campana no son 4xx: se listan.
 
-    `speech.huella` es lo que la creacion tiene que enviar como `speech_huella`.
+    `speech.huella` es lo que la creacion tiene que enviar como `speech_huella`. Un 400 trae
+    `detail` y `campo` (`plantilla_nombre_archivo` si el error es de la plantilla).
     """
     try:
         return _previsualizacion(servicio.previsualizar(entrada.peticion()))
+    except PeticionCampanaInvalida as exc:
+        return _peticion_invalida(exc)
     except _ERRORES_ARMADO as exc:
         raise _traducir(exc) from exc
 
@@ -635,7 +787,8 @@ def previsualizar_campana(
     status_code=201,
     response_model=CampanaRespuesta,
     responses={
-        **respuestas_de_error(400, 404),
+        **_ERROR_400_PETICION,
+        **respuestas_de_error(404),
         409: {
             "model": ErrorCreacionCampanaRespuesta,
             "description": (
@@ -667,7 +820,9 @@ def crear_campana(
             status_code=409,
             content={"detail": str(exc), "codigo": CodigoErrorCampana.LIMITE_EXCEDIDO.value},
         )
-    except (*_ERRORES_ARMADO, CampanaInvalida, ArchivoDemasiadoGrande) as exc:
+    except (PeticionCampanaInvalida, CampanaInvalida, ArchivoDemasiadoGrande) as exc:
+        return _peticion_invalida(exc)
+    except _ERRORES_ARMADO as exc:
         raise _traducir(exc) from exc
 
 
@@ -730,7 +885,10 @@ def _respuesta_de_descarga() -> dict:
             "content": {TIPO_MIME_XLSX: {"schema": {"type": "string", "format": "binary"}}},
             "headers": {
                 "Content-Disposition": {
-                    "description": 'attachment; filename="<nombre>.xlsx"',
+                    "description": (
+                        'attachment; filename="<nombre en ASCII>.xlsx"; '
+                        "filename*=UTF-8''<nombre exacto>.xlsx (RFC 5987)"
+                    ),
                     "schema": {"type": "string"},
                 },
                 **{
@@ -743,10 +901,6 @@ def _respuesta_de_descarga() -> dict:
     }
 
 
-def nombre_archivo(campana_id: int, numero: int, total: int) -> str:
-    return f"mowa_mes_campana_{campana_id}_{numero}_de_{total}.xlsx"
-
-
 @router.get(
     "/campanas/{campana_id}/archivos/{numero}",
     response_class=Response,
@@ -757,19 +911,21 @@ def descargar_archivo(
     numero: int,
     servicio: CampanasMowaMesService = Depends(obtener_servicio_campanas),
 ) -> Response:
-    """Los bytes guardados al crear la campana: la misma descarga siempre (C-6)."""
+    """Los bytes y el nombre guardados al crear la campana: la misma descarga siempre (C-6).
+
+    `Content-Disposition` lleva `filename` en ASCII y `filename*` en UTF-8 (RFC 5987).
+    """
     try:
         campana, archivo = servicio.archivo(campana_id, numero)
     except (CampanaNoEncontrada, ArchivoNoEncontrado) as exc:
         raise _traducir(exc) from exc
     total = len(campana.archivos)
+    nombre = next(a.nombre for a in campana.archivos if a.numero == archivo.numero)
     return Response(
         content=archivo.contenido,
         media_type=TIPO_MIME_XLSX,
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="{nombre_archivo(campana_id, numero, total)}"'
-            ),
+            "Content-Disposition": disposicion_de_descarga(nombre),
             "X-Mowa-Mes-Campana": str(campana_id),
             "X-Mowa-Mes-Archivo": str(archivo.numero),
             "X-Mowa-Mes-Archivos-Total": str(total),

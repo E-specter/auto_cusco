@@ -127,6 +127,24 @@ import '../../styles/mowa-mes.css';
             </div>
 
             <div class="field">
+              <label class="field__label" for="mm-plantilla" data-i18n="mowaMes.campana.plantilla">Nombre de los archivos</label>
+              <input
+                class="input mono"
+                id="mm-plantilla"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                data-plantilla
+                aria-describedby="mm-plantilla-hint mm-plantilla-error"
+              />
+              <div class="mm-variables" role="group" data-i18n-attr="aria-label:mowaMes.plantilla.variables" aria-label="Variables de la plantilla" data-plantilla-variables></div>
+              <p class="field__hint" id="mm-plantilla-hint" data-i18n="mowaMes.campana.plantilla.hint">
+                Plantilla precargada desde Configuración. Puedes cambiarla solo para esta campaña.
+              </p>
+              <p class="field__error" id="mm-plantilla-error" data-plantilla-error role="alert"></p>
+            </div>
+
+            <div class="field">
               <label class="field__label" for="mm-speech" data-i18n="mowaMes.campana.speech">Versión de speech</label>
               <select class="input" id="mm-speech" data-speech></select>
             </div>
@@ -262,6 +280,14 @@ import '../../styles/mowa-mes.css';
 
             <dl class="mm-cifras" data-cifras></dl>
 
+            <p class="mm-nombre-archivo" data-nombre-archivo hidden>
+              <span data-i18n="mowaMes.campana.nombrePrimerArchivo">Nombre del primer archivo:</span>
+              <span class="mono" data-nombre-primer-archivo></span>
+            </p>
+            <p class="field__hint" data-nombre-estimado hidden data-i18n="mowaMes.campana.nombreEstimado">
+              Estimado: el número de archivos depende de cómo se divida la carga, y [campana] se conoce al crearla.
+            </p>
+
             <h3 class="mm-subtitulo" data-i18n="mowaMes.campana.limite.title">Consumo del mes</h3>
             <dl class="mm-cifras" data-limite-cifras></dl>
             <p class="field__hint" data-limite-esta-campana></p>
@@ -388,11 +414,13 @@ import '../../styles/mowa-mes.css';
     crearCampana,
     descargarArchivoCampana,
     listarSpeech,
+    obtenerConfiguracion,
     obtenerSupervision,
     previsualizarCampana,
     siguienteDiaGestionable,
     type ArchivoCampana,
     type Campana,
+    type ConfiguracionMowaMes,
     type ConfiguracionSupervision,
     type PrevisualizacionCampana,
     type ProgramacionCampana,
@@ -409,11 +437,12 @@ import '../../styles/mowa-mes.css';
     type ProgramacionBorrador,
     type SupervisorBorrador,
   } from '../../lib/mowa-mes-campana';
-  import { moverElemento, paginar, traducirCodigo, type PaginaLocal } from '../../lib/mowa-mes';
+  import { campoDeError, moverElemento, paginar, traducirCodigo, type PaginaLocal } from '../../lib/mowa-mes';
+  import { notaVariablesDesconocidas, pintarBotonesDeVariables } from '../../lib/mowa-mes-plantilla';
   import { leerResumenDescarga, nombreArchivo } from '../../lib/mowa-mes-seguimiento';
   import { guardarArchivo } from '../../lib/descargas';
   import { openWhenFree } from '../../lib/dialogs';
-  import { formatBytes, formatDate, formatNumber } from '../../lib/format';
+  import { formatBytes, formatDate, formatNumber, formatSoles, formatTarifa } from '../../lib/format';
   import { applyTranslations, t } from '../../lib/i18n';
   import { EVENTO_SELECCION, montarSelector, type EstadoSeleccion } from '../../scripts/selector-seleccion';
 
@@ -425,6 +454,8 @@ import '../../styles/mowa-mes.css';
   const estado = {
     seleccion: null as EstadoSeleccion | null,
     supervisionConfigurada: null as ConfiguracionSupervision | null,
+    configuracion: null as ConfiguracionMowaMes | null,
+    plantillaEditada: false,
     versionesSpeech: [] as VersionSpeech[],
     siguienteDia: null as string | null,
     fechasMultiples: [''] as string[],
@@ -486,10 +517,12 @@ import '../../styles/mowa-mes.css';
     return nodo;
   }
 
-  function celda(etiqueta: 'td' | 'th', texto: string, clase = ''): HTMLTableCellElement {
+  function celda(etiqueta: 'td' | 'th', texto: string, clase = '', columna = ''): HTMLTableCellElement {
     const nodo = document.createElement(etiqueta);
     nodo.textContent = texto;
     if (clase) nodo.className = clase;
+    // Names the cell when the table stacks below 48rem (`.table--apilable`).
+    if (columna) nodo.dataset.etiqueta = columna;
     if (etiqueta === 'th') nodo.scope = 'row';
     return nodo;
   }
@@ -519,7 +552,7 @@ import '../../styles/mowa-mes.css';
     const envoltorio = document.createElement('div');
     envoltorio.className = 'table-scroll';
     const nodo = document.createElement('table');
-    nodo.className = `table ${clase}`;
+    nodo.className = `table table--apilable ${clase}`;
     const cabeza = document.createElement('thead');
     const fila = document.createElement('tr');
     columnas.forEach(([texto, numerica]) => {
@@ -536,7 +569,7 @@ import '../../styles/mowa-mes.css';
     return { envoltorio, cuerpo };
   }
 
-  function cifra(etiqueta: string, valor: string): HTMLElement {
+  function cifra(etiqueta: string, valor: string, pista?: string): HTMLElement {
     const bloque = document.createElement('div');
     bloque.className = 'stat';
     const nombre = document.createElement('dt');
@@ -546,6 +579,12 @@ import '../../styles/mowa-mes.css';
     numero.className = 'stat__value';
     numero.textContent = valor;
     bloque.append(nombre, numero);
+    if (pista) {
+      const detalle = document.createElement('dd');
+      detalle.className = 'field__hint';
+      detalle.textContent = pista;
+      bloque.append(detalle);
+    }
     return bloque;
   }
 
@@ -570,6 +609,20 @@ import '../../styles/mowa-mes.css';
     return { modo, fechas };
   }
 
+  /** `''` when the field still holds the configured template: that is "use the configured one". */
+  function plantillaElegida(): string {
+    const escrita = $<HTMLInputElement>('#mm-plantilla').value;
+    return escrita.trim() === (estado.configuracion?.plantilla_nombre_archivo ?? '').trim() ? '' : escrita;
+  }
+
+  /** The unknown-variable note for what is typed; the API's 400 stays the final word. */
+  function pintarPlantilla(): boolean {
+    const nota = notaVariablesDesconocidas($<HTMLInputElement>('#mm-plantilla').value, estado.configuracion?.variables_plantilla ?? []);
+    $<HTMLElement>('[data-plantilla-error]').textContent = nota;
+    $<HTMLInputElement>('#mm-plantilla').setAttribute('aria-invalid', String(nota !== ''));
+    return nota === '';
+  }
+
   function leerBorrador(): CampanaBorrador | null {
     const sel = estado.seleccion;
     const usable = seleccionUsable();
@@ -587,6 +640,7 @@ import '../../styles/mowa-mes.css';
         seleccionId: sel.guardada?.id ?? null,
       },
       descripcion: $<HTMLTextAreaElement>('#mm-descripcion').value,
+      plantillaNombreArchivo: plantillaElegida(),
       herramientas: {
         keyword: $<HTMLInputElement>('[data-herramienta-keyword]').checked,
         blacklistIndecopi: $<HTMLInputElement>('[data-herramienta-blacklist]').checked,
@@ -835,7 +889,18 @@ import '../../styles/mowa-mes.css';
       cifra(t('mowaMes.seguimiento.detalle.supervision'), formatNumber(previa.supervision_cargados)),
       cifra(t('mowaMes.seguimiento.detalle.total'), formatNumber(previa.total_cargados)),
       cifra(t('mowaMes.seguimiento.detalle.excluidos'), formatNumber(previa.excluidos)),
+      // The API sends the amount already worked out, as text: only formatted here.
+      cifra(
+        t('mowaMes.campana.costo.estimado'),
+        formatSoles(previa.costo_estimado),
+        t('mowaMes.campana.costo.hint', { n: formatNumber(previa.total_cargados), tarifa: formatTarifa(previa.tarifa_sms) }),
+      ),
     );
+
+    // The first file's name is the API's, never worked out here; `[campana]` marks the id it does not have yet.
+    $<HTMLElement>('[data-nombre-archivo]').hidden = previa.nombre_primer_archivo === null;
+    $<HTMLElement>('[data-nombre-primer-archivo]').textContent = previa.nombre_primer_archivo ?? '';
+    $<HTMLElement>('[data-nombre-estimado]').hidden = previa.nombre_primer_archivo === null || !previa.nombre_estimado;
 
     const limiteHost = $<HTMLElement>('[data-limite-cifras]');
     limiteHost.replaceChildren(
@@ -932,7 +997,8 @@ import '../../styles/mowa-mes.css';
       // is a pill and carries data, not a sentence.
       tag.textContent = t(`mowaMes.seguimiento.exclusiones.motivo.${exclusion.codigo}`);
       motivo.append(tag);
-      fila.append(celda('td', exclusion.pagare, 'mono'), motivo);
+      motivo.dataset.etiqueta = t('mowaMes.seguimiento.exclusiones.col.motivo');
+      fila.append(celda('td', exclusion.pagare, 'mono', t('mowaMes.seguimiento.exclusiones.col.pagare')), motivo);
       cuerpo.append(fila);
     });
     host.append(envoltorio);
@@ -960,7 +1026,7 @@ import '../../styles/mowa-mes.css';
     ]);
     pagina.filas.forEach((fila) => {
       const tr = document.createElement('tr');
-      const numero = celda('td', fila.numero, 'mono');
+      const numero = celda('td', fila.numero, 'mono', t('mowaMes.campana.muestra.col.numero'));
       if (fila.supervision) {
         const tag = document.createElement('span');
         tag.className = 'tag tag--neutral';
@@ -972,6 +1038,7 @@ import '../../styles/mowa-mes.css';
       // pill (there is no short-label catalogue for warning codes).
       const advertencias = document.createElement('td');
       advertencias.className = 'mono';
+      advertencias.dataset.etiqueta = t('mowaMes.campana.muestra.col.advertencias');
       fila.advertencias.forEach((codigo, indice) => {
         const nodo = document.createElement('span');
         nodo.title = traducirCodigo(codigo, codigo);
@@ -981,10 +1048,10 @@ import '../../styles/mowa-mes.css';
       });
       tr.append(
         numero,
-        celda('td', fila.dni, 'mono'),
-        celda('td', fila.segmento ?? '—'),
-        celda('td', formatNumber(fila.largo), 'num'),
-        celda('td', fila.mensaje),
+        celda('td', fila.dni, 'mono', t('mowaMes.campana.muestra.col.dni')),
+        celda('td', fila.segmento ?? '—', '', t('mowaMes.campana.muestra.col.segmento')),
+        celda('td', formatNumber(fila.largo), 'num', t('mowaMes.campana.muestra.col.largo')),
+        celda('td', fila.mensaje, '', t('mowaMes.campana.muestra.col.mensaje')),
         advertencias,
       );
       cuerpo.append(tr);
@@ -1054,7 +1121,7 @@ import '../../styles/mowa-mes.css';
 
     const problemas = problemasCampana(borrador);
     pintarProblemasCliente(problemas);
-    if (problemas.length > 0) {
+    if (!pintarPlantilla() || problemas.length > 0) {
       estado.previsualizacion = null;
       estado.error404 = null;
       pintarResultado();
@@ -1081,6 +1148,12 @@ import '../../styles/mowa-mes.css';
       estado.previsualizacion = null;
       if (caido instanceof ApiError && caido.status === 404) {
         estado.error404 = caido.detail || t('common.errorBody');
+      } else if (caido instanceof ApiError && caido.status === 400 && campoDeError(caido.cuerpo) === 'plantilla_nombre_archivo') {
+        // The 400 names the template (an unclosed brace, or a variable the local list missed).
+        // Any other 400 has no field and goes to the general notice below.
+        estado.error404 = null;
+        $<HTMLElement>('[data-plantilla-error]').textContent = caido.detail || t('common.errorBody');
+        $<HTMLInputElement>('#mm-plantilla').setAttribute('aria-invalid', 'true');
       } else {
         estado.error404 = null;
         mostrarError(mensajeDeError(caido));
@@ -1137,7 +1210,13 @@ import '../../styles/mowa-mes.css';
           error.textContent = t('mowaMes.campana.crear.bloqueadaHuella');
         }
       } else if (caido instanceof ApiError && caido.status === 400) {
-        error.textContent = caido.detail || t('common.errorBody');
+        if (campoDeError(caido.cuerpo) === 'plantilla_nombre_archivo') {
+          $<HTMLElement>('[data-plantilla-error]').textContent = caido.detail || t('common.errorBody');
+          $<HTMLInputElement>('#mm-plantilla').setAttribute('aria-invalid', 'true');
+          $<HTMLInputElement>('#mm-plantilla').focus();
+        } else {
+          error.textContent = caido.detail || t('common.errorBody');
+        }
       } else {
         mostrarError(mensajeDeError(caido));
       }
@@ -1252,6 +1331,10 @@ import '../../styles/mowa-mes.css';
   $<HTMLTextAreaElement>('#mm-descripcion').addEventListener('input', () => {
     estado.descripcionEditada = true;
   });
+  $<HTMLInputElement>('#mm-plantilla').addEventListener('input', () => {
+    estado.plantillaEditada = true;
+    programarPrevisualizacion();
+  });
 
   // ---- Boot ------------------------------------------------------------------------
 
@@ -1273,12 +1356,17 @@ import '../../styles/mowa-mes.css';
 
   async function arrancar(): Promise<void> {
     try {
-      const [supervision, versiones, siguiente] = await Promise.all([
+      const [supervision, versiones, siguiente, configuracion] = await Promise.all([
         obtenerSupervision(),
         listarSpeech(),
         siguienteDiaGestionable(),
+        obtenerConfiguracion(),
       ]);
       estado.supervisionConfigurada = supervision;
+      estado.configuracion = configuracion;
+      pintarBotonesDeVariables($<HTMLElement>('[data-plantilla-variables]'), $<HTMLInputElement>('#mm-plantilla'), configuracion.variables_plantilla);
+      // Preloaded with the configured template, until the analyst edits it for this campaign.
+      if (!estado.plantillaEditada) $<HTMLInputElement>('#mm-plantilla').value = configuracion.plantilla_nombre_archivo;
       estado.versionesSpeech = versiones;
       estado.siguienteDia = siguiente.fecha;
       pintarSpeech();
@@ -1314,6 +1402,7 @@ import '../../styles/mowa-mes.css';
 
   document.addEventListener('languagechange', () => {
     applyTranslations();
+    pintarPlantilla();
     pintarSpeech();
     pintarSupervisoresPropios();
     pintarFechasMultiples();

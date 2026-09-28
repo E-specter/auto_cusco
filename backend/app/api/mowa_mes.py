@@ -2,8 +2,9 @@
 
 Primer corte (B6a), configuracion:
 
-    GET  /mowa-mes/configuracion              limite mensual y WhatsApp por defecto
-    PUT  /mowa-mes/configuracion
+    GET  /mowa-mes/configuracion              limite mensual, WhatsApp, tarifa por SMS y plantilla
+    PUT  /mowa-mes/configuracion              del nombre de los archivos (B8)
+    POST /mowa-mes/plantilla-nombre-archivo/previsualizacion   nombres de muestra, sin guardar
     GET  /mowa-mes/speech                     versiones, la original primero
     GET  /mowa-mes/speech/{id}
     POST /mowa-mes/speech                     version nueva
@@ -12,8 +13,10 @@ Primer corte (B6a), configuracion:
 """
 
 from datetime import datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.adapters.persistence.db import get_engine
@@ -28,6 +31,7 @@ from app.core.entities.mowa_mes import (
     LARGO_MAXIMO_NOMBRE_SPEECH,
     RANGOS_SEGMENTO,
     REGISTROS_POR_ARCHIVO,
+    CampoConfiguracion,
     CodigoMowaMes,
     ConfiguracionInvalida,
     ConfiguracionMowaMes,
@@ -40,6 +44,8 @@ from app.core.entities.mowa_mes import (
     SpeechNoEncontrado,
     VersionSpeech,
 )
+from app.core.entities.mowa_mes_costo import VARIABLES_PLANTILLA, TarifaInvalida
+from app.core.services.plataformas.mowa_mes import costos
 from app.core.services.plataformas.mowa_mes.configuracion import ConfiguracionMowaMesService
 from app.core.services.plataformas.mowa_mes.speech import usa_whatsapp
 
@@ -79,10 +85,39 @@ class ConfiguracionEntrada(BaseModel):
         le=BYTES_POR_ARCHIVO,
         description="Bytes por archivo (RF-MM-11). Sin el campo se conserva el actual; null: 422",
     )
+    # Texto y no numero: un monto no pasa por float (RF-MM-23). Lo valida el nucleo, que
+    # responde 400 con el motivo; null no es texto y responde 422.
+    tarifa_sms: str = Field(
+        default=None,
+        max_length=32,
+        description=(
+            "Soles por SMS, texto decimal mayor o igual a 0 con hasta 4 decimales (RF-MM-23). "
+            "Sin el campo se conserva la actual; null: 422"
+        ),
+    )
+    plantilla_nombre_archivo: str = Field(
+        default=None,
+        max_length=1000,
+        description=(
+            "Plantilla del nombre de los archivos de carga (RF-MM-25). Sin el campo se conserva "
+            "la actual; vacia, vuelve la de por defecto; null: 422"
+        ),
+    )
 
     def valor(self, campo: str, actual: ConfiguracionMowaMes):
         """El valor enviado o, si el campo no vino, el guardado (actualizacion parcial)."""
         return getattr(self if campo in self.model_fields_set else actual, campo)
+
+    def tarifa(self, actual: ConfiguracionMowaMes) -> Decimal:
+        """La tarifa enviada, leida como texto decimal, o la guardada si el campo no vino."""
+        if "tarifa_sms" not in self.model_fields_set:
+            return actual.tarifa_sms
+        return costos.tarifa_desde_texto(self.tarifa_sms)
+
+
+class VariablePlantillaRespuesta(ModeloRespuesta):
+    nombre: str
+    descripcion: str
 
 
 class ConfiguracionRespuesta(ModeloRespuesta):
@@ -91,6 +126,11 @@ class ConfiguracionRespuesta(ModeloRespuesta):
     actualizado_en: datetime | None
     registros_por_archivo: int
     bytes_por_archivo: int
+    tarifa_sms: str = Field(description="Soles por SMS, texto decimal con 4 decimales")
+    plantilla_nombre_archivo: str
+    variables_plantilla: list[VariablePlantillaRespuesta] = Field(
+        description="Las variables validas de la plantilla, en el orden del requerimiento"
+    )
 
 
 def _configuracion(configuracion: ConfiguracionMowaMes) -> ConfiguracionRespuesta:
@@ -100,6 +140,12 @@ def _configuracion(configuracion: ConfiguracionMowaMes) -> ConfiguracionRespuest
         actualizado_en=configuracion.actualizado_en,
         registros_por_archivo=configuracion.registros_por_archivo,
         bytes_por_archivo=configuracion.bytes_por_archivo,
+        tarifa_sms=costos.texto_decimal(configuracion.tarifa_sms),
+        plantilla_nombre_archivo=configuracion.plantilla_nombre_archivo,
+        variables_plantilla=[
+            VariablePlantillaRespuesta(nombre=v.nombre, descripcion=v.descripcion)
+            for v in VARIABLES_PLANTILLA
+        ],
     )
 
 
@@ -110,16 +156,41 @@ def obtener_configuracion(
     return _configuracion(servicio.obtener_configuracion())
 
 
+class ErrorConfiguracionRespuesta(ModeloRespuesta):
+    """400 propio de la configuracion: dice a que campo pertenece el error.
+
+    El frontend ubica el mensaje bajo su campo por `campo`, sin adivinar por las palabras
+    del `detail`. Extiende `detail` como pide la regla de docs/contrato-api.md, seccion 3.
+    """
+
+    detail: str
+    campo: CampoConfiguracion
+
+
+def _error_de_configuracion(detail: str, campo: CampoConfiguracion | None) -> JSONResponse:
+    # Pasa por el modelo: un 400 sin campo seria un error del backend, no una respuesta valida.
+    cuerpo = ErrorConfiguracionRespuesta(detail=detail, campo=campo)
+    return JSONResponse(status_code=400, content=cuerpo.model_dump(mode="json"))
+
+
+_ERROR_400_CONFIGURACION = {
+    400: {
+        "model": ErrorConfiguracionRespuesta,
+        "description": "Un valor no es valido; `campo` dice cual y `detail` el motivo",
+    }
+}
+
+
 @router.put(
     "/configuracion",
     summary="Actualizar la configuracion del conector (parcial)",
     response_model=ConfiguracionRespuesta,
-    responses=respuestas_de_error(400),
+    responses=_ERROR_400_CONFIGURACION,
 )
 def guardar_configuracion(
     entrada: ConfiguracionEntrada,
     servicio: ConfiguracionMowaMesService = Depends(obtener_servicio_mowa_mes),
-) -> ConfiguracionRespuesta:
+) -> ConfiguracionRespuesta | JSONResponse:
     """Actualizacion parcial sobre PUT, no un reemplazo completo.
 
     - `limite_mensual` es obligatorio (RF-MM-01).
@@ -127,6 +198,12 @@ def guardar_configuracion(
     - `whatsapp_contacto: null` borra el numero de contacto (RF-MM-16).
     - `registros_por_archivo` y `bytes_por_archivo` no admiten null (422) y solo pueden
       bajar del maximo de la plataforma (RF-MM-11).
+    - `tarifa_sms` (RF-MM-23) y `plantilla_nombre_archivo` (RF-MM-25) tampoco admiten null
+      (422). Una tarifa que no es un decimal mayor o igual a 0 con hasta 4 decimales, o una
+      plantilla con una variable desconocida o una llave sin cerrar, responde 400.
+
+    Todo 400 de este endpoint trae `detail` (el motivo) y `campo` (el campo de la
+    configuracion al que pertenece), para que el frontend lo ubique sin leer el texto.
 
     Esta regla es propia de este endpoint: `PUT /supervisores` reemplaza la lista completa.
     """
@@ -139,11 +216,46 @@ def guardar_configuracion(
                     whatsapp_contacto=entrada.valor("whatsapp_contacto", actual),
                     registros_por_archivo=entrada.valor("registros_por_archivo", actual),
                     bytes_por_archivo=entrada.valor("bytes_por_archivo", actual),
+                    tarifa_sms=entrada.tarifa(actual),
+                    plantilla_nombre_archivo=entrada.valor("plantilla_nombre_archivo", actual),
                 )
             )
         )
+    except TarifaInvalida as exc:
+        return _error_de_configuracion(str(exc), CampoConfiguracion.TARIFA_SMS)
     except ConfiguracionInvalida as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _error_de_configuracion(str(exc), exc.campo)
+
+
+class PlantillaNombreEntrada(BaseModel):
+    plantilla: str = Field(max_length=1000, description="Vacia: la plantilla de por defecto")
+
+
+class PlantillaNombreRespuesta(ModeloRespuesta):
+    plantilla: str = Field(description="La plantilla validada, la que se guardaria")
+    nombres_ejemplo: list[str] = Field(
+        description="Los nombres que daria con datos de muestra: un archivo de una campana de dos"
+    )
+
+
+@router.post(
+    "/plantilla-nombre-archivo/previsualizacion",
+    summary="Previsualizar una plantilla del nombre de los archivos, sin guardarla",
+    response_model=PlantillaNombreRespuesta,
+    responses=_ERROR_400_CONFIGURACION,
+)
+def previsualizar_plantilla_nombre(
+    entrada: PlantillaNombreEntrada,
+    servicio: ConfiguracionMowaMesService = Depends(obtener_servicio_mowa_mes),
+) -> PlantillaNombreRespuesta | JSONResponse:
+    """Resuelve la plantilla con datos de muestra usando la misma funcion que la creacion de
+    campanas (RF-MM-25). Una variable desconocida o una llave sin cerrar responde 400 con
+    `detail` y `campo` (`plantilla_nombre_archivo`)."""
+    try:
+        plantilla, nombres = servicio.revisar_plantilla_nombre(entrada.plantilla)
+    except ConfiguracionInvalida as exc:
+        return _error_de_configuracion(str(exc), exc.campo)
+    return PlantillaNombreRespuesta(plantilla=plantilla, nombres_ejemplo=nombres)
 
 
 # --- Speech --------------------------------------------------------------

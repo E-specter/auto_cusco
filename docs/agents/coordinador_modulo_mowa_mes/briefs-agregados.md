@@ -112,3 +112,14 @@ Encargos listos para enviar apenas estén abiertas las sesiones `dev_frontend_mo
   - `no_disponible`: «No disponible», en `muted`, con `title` y `aria-description` «Campaña creada antes de guardar la tarifa».
   - Costo del mes: si `campanas_sin_tarifa` es mayor que 0, junto a la cifra va «no incluye {n} campañas sin tarifa».
   - Todos estos textos van en i18n es y en, dentro del bloque `mowaMes.*`.
+
+## Cierre de B8 y F6-B (2026-09-28)
+
+- **Condiciones de `architec` para B8:**
+  - importar el reporte en menos de unos 3 s con 46 000 filas, y crear la campaña sin empeorar respecto de §13;
+  - `pg_advisory_xact_lock` global justificado en §16, con una constante con nombre y una prueba o nota de que una segunda importación espera;
+  - pruebas de `/archivos-carga` en verde y `disposicion_de_descarga` probada con un nombre ASCII y otro con tildes.
+- **Pedido del coordinador:** los 400 de `PUT /mowa-mes/configuracion` y de la plantilla en la previsualización traen un `campo` estructurado. El frontend deja de ubicar el error por el texto del `detail`.
+- **Preguntas a `designer`:** si el costo del mes va en una línea aparte o dentro de las cifras del límite, y si las 7 paradas de Tab de los botones de variables quedan así o se agrupan con navegación por flechas.
+- **Fuera de alcance, para C3:** la tabla de campañas de Seguimiento pasa a 12 columnas con desplazamiento lateral; no se apila.
+- **Commit:** B8 y F6-B van juntos en uno solo.

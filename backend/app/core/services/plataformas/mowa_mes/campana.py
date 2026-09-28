@@ -19,6 +19,7 @@ from typing import Any
 from app.core.entities.cartera import ConsultaInvalida, Filtro, Operador
 from app.core.entities.gestiones_digitales import ConfiguracionSupervision, SupervisionInvalida
 from app.core.entities.mowa_mes import (
+    CampoConfiguracion,
     CodigoMowaMes,
     PartesSegmento,
     Programacion,
@@ -46,12 +47,19 @@ from app.core.entities.mowa_mes_campana import (
     SupervisorAsignado,
     TipoCarga,
 )
+from app.core.entities.mowa_mes_costo import PlantillaInvalida
 from app.core.ports.repositorio_campanas_mowa_mes_port import RepositorioCampanasMowaMesPort
 from app.core.ports.repositorio_mowa_mes_port import RepositorioMowaMesPort
 from app.core.ports.repositorio_supervision_port import RepositorioSupervisionPort
 from app.core.services.calendario.servicio import ZONA, ahora_en_lima
 from app.core.services.gestiones_digitales import supervision
-from app.core.services.plataformas.mowa_mes import division, segmentos, speech
+from app.core.services.plataformas.mowa_mes import (
+    costos,
+    division,
+    nombre_archivo,
+    segmentos,
+    speech,
+)
 from app.core.services.plataformas.mowa_mes.division import EscritorArchivo
 from app.core.services.plataformas.mowa_mes.segmentos import ProgramacionInvalida
 from app.core.services.seleccion_cartera import expresiones
@@ -219,6 +227,7 @@ class CampanasMowaMesService:
         fecha_envio = self._fecha_envio(peticion, fecha_generacion)
         version = self._speech(peticion.speech_id)
         configuracion = self._mowa_mes.obtener_configuracion()
+        plantilla = self._plantilla(peticion, configuracion.plantilla_nombre_archivo)
         whatsapp = self._whatsapp(peticion, configuracion.whatsapp_contacto)
         supervisores, procedencias = self._supervisores_de(peticion)
         documentos = supervision.documentos_por_posicion(supervisores, procedencias)
@@ -245,16 +254,33 @@ class CampanasMowaMesService:
         filas_supervision = _filas_supervision(productos, supervisores, procedencias)
         filas = (*filas_supervision, *productos)
         mes = fecha_envio.replace(day=1)
+        tarifa = configuracion.tarifa_sms
+        costo_estimado = costos.costo(len(filas), tarifa)
+        costo_del_mes = self._campanas.costo_del_mes(mes)
         consumo = ConsumoLimite(
             mes=mes,
             limite=configuracion.limite_mensual,
             cargados_mes=self._campanas.cargados_en_mes(mes),
             esta_campana=len(filas),
+            costo_mes=costo_del_mes.costo,
+            campanas_sin_tarifa=costo_del_mes.campanas_sin_tarifa,
+            costo_esta_campana=costo_estimado,
         )
         sugerida = descripcion_sugerida(filtros)
+        descripcion = (peticion.descripcion or "").strip() or sugerida
+        previsto = nombre_archivo.nombre_previsto(
+            plantilla,
+            nombre_archivo.ContextoNombre(
+                nombre_archivo.MARCADOR_CAMPANA, descripcion, fecha_envio, peticion.fecha_corte
+            ),
+            [
+                a.filas
+                for a in division.previstos_por_filas(filas, configuracion.registros_por_archivo)
+            ],
+        )
         return CampanaArmada(
             peticion=peticion,
-            descripcion=(peticion.descripcion or "").strip() or sugerida,
+            descripcion=descripcion,
             descripcion_sugerida=sugerida,
             fecha_generacion=fecha_generacion,
             fecha_envio=fecha_envio,
@@ -273,6 +299,11 @@ class CampanasMowaMesService:
             exclusiones=tuple(exclusiones),
             errores=errores,
             consumo=consumo,
+            tarifa_sms=tarifa,
+            costo_estimado=costo_estimado,
+            plantilla_nombre_archivo=plantilla,
+            nombre_primer_archivo=None if previsto is None else previsto[0],
+            nombre_estimado=False if previsto is None else previsto[1],
         )
 
     def crear(self, peticion: PeticionCampana) -> CampanaRegistrada:
@@ -291,7 +322,16 @@ class CampanasMowaMesService:
         archivos = division.dividir(
             armada.filas, armada.registros_por_archivo, armada.bytes_por_archivo, self._escritor
         )
-        return self._campanas.crear(armada, archivos)
+
+        def nombrar(campana_id: int) -> list[str]:
+            contexto = nombre_archivo.ContextoNombre(
+                str(campana_id), armada.descripcion, armada.fecha_envio, peticion.fecha_corte
+            )
+            return nombre_archivo.resolver_nombres(
+                armada.plantilla_nombre_archivo, contexto, [a.filas for a in archivos]
+            )
+
+        return self._campanas.crear(armada, archivos, nombrar)
 
     def listar(self, limite: int, desplazamiento: int) -> tuple[int, list[CampanaRegistrada]]:
         return self._campanas.listar(limite, desplazamiento)
@@ -318,10 +358,13 @@ class CampanasMowaMesService:
     def limite_mensual(self, mes: date | None = None) -> ConsumoLimite:
         """Consumo del mes (por defecto el actual en Lima), sin campana nueva."""
         primero = (mes or fecha_en_lima(self._reloj())).replace(day=1)
+        costo_del_mes = self._campanas.costo_del_mes(primero)
         return ConsumoLimite(
             mes=primero,
             limite=self._mowa_mes.obtener_configuracion().limite_mensual,
             cargados_mes=self._campanas.cargados_en_mes(primero),
+            costo_mes=costo_del_mes.costo,
+            campanas_sin_tarifa=costo_del_mes.campanas_sin_tarifa,
         )
 
     # --- Detalles ------------------------------------------------------
@@ -349,6 +392,15 @@ class CampanasMowaMesService:
         if original is None:
             raise RuntimeError("Falta el Speech original: aplica las migraciones")
         return original
+
+    @staticmethod
+    def _plantilla(peticion: PeticionCampana, por_defecto: str) -> str:
+        try:
+            return nombre_archivo.plantilla_valida(peticion.plantilla_nombre_archivo, por_defecto)
+        except PlantillaInvalida as exc:
+            raise PeticionCampanaInvalida(
+                str(exc), CampoConfiguracion.PLANTILLA_NOMBRE_ARCHIVO
+            ) from exc
 
     @staticmethod
     def _whatsapp(peticion: PeticionCampana, por_defecto: str | None) -> str | None:

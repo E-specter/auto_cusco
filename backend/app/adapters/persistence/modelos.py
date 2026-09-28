@@ -330,10 +330,17 @@ class MowaMesConfiguracion(Base):
     # RF-MM-11: el maximo de la plataforma; la configuracion solo puede bajarlo.
     registros_por_archivo: Mapped[int] = mapped_column(Integer, server_default="50000")
     bytes_por_archivo: Mapped[int] = mapped_column(Integer, server_default="2000000")
+    # RF-MM-23: soles por SMS, hasta 4 decimales. RF-MM-25: plantilla del nombre de los archivos.
+    tarifa_sms: Mapped[Decimal] = mapped_column(Numeric(12, 4), server_default="0.02")
+    plantilla_nombre_archivo: Mapped[str] = mapped_column(
+        Text, server_default="mowa_mes_campana_{campana}_{archivo}_de_{total}"
+    )
 
     __table_args__ = (
         CheckConstraint("id = 1", name="fila_unica"),
         CheckConstraint("limite_mensual > 0", name="limite_positivo"),
+        CheckConstraint("tarifa_sms >= 0", name="tarifa_no_negativa"),
+        CheckConstraint("length(btrim(plantilla_nombre_archivo)) > 0", name="plantilla_no_vacia"),
         CheckConstraint(
             "registros_por_archivo BETWEEN 1 AND 50000", name="registros_por_archivo_valido"
         ),
@@ -414,9 +421,25 @@ class MowaMesCampana(Base):
     excluidos: Mapped[int] = mapped_column(Integer)
     advertencias: Mapped[int] = mapped_column(Integer)
     confirmo_limite: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    # RF-MM-23 y RF-MM-24: la tarifa vigente al crearla y el costo estimado con ella. NULL en
+    # las campanas anteriores: su costo no esta disponible, no se les asigna la tarifa actual.
+    tarifa_sms: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
+    costo_estimado: Mapped[Decimal | None] = mapped_column(Numeric(18, 4))
+    # DERIVADO, no un dato de la campana: los enviados de la conciliacion vigente (E-1),
+    # supervision incluida. Lo actualiza la misma transaccion que importa o reemplaza un
+    # reporte (y recalcula tambien la campana a la que ese reporte se le quita, si la hay).
+    # NULL: sin reporte importado (costo real pendiente). 0: se importo y no se envio nada.
+    # El costo real se calcula al leer como enviados_conciliados x tarifa_sms (D-3).
+    enviados_conciliados: Mapped[int | None] = mapped_column(Integer)
 
     __table_args__ = (
         CheckConstraint(f"tipo_carga IN ({_en(TipoCarga)})", name="tipo_carga_valido"),
+        CheckConstraint(
+            "enviados_conciliados IS NULL OR enviados_conciliados BETWEEN 0 AND total_cargados",
+            name="enviados_conciliados_validos",
+        ),
+        CheckConstraint("tarifa_sms IS NULL OR tarifa_sms >= 0", name="tarifa_no_negativa"),
+        CheckConstraint("(tarifa_sms IS NULL) = (costo_estimado IS NULL)", name="costo_con_tarifa"),
         CheckConstraint(f"salida IN ({_en(Salida)})", name="salida_valida"),
         CheckConstraint(f"programacion IN ({_en(Programacion)})", name="programacion_valida"),
         CheckConstraint("cantidad >= 1", name="cantidad_positiva"),
@@ -441,8 +464,15 @@ class MowaMesArchivo(Base):
     supervision: Mapped[int] = mapped_column(Integer)
     bytes: Mapped[int] = mapped_column(Integer)
     contenido: Mapped[bytes] = mapped_column(LargeBinary)
+    # RF-MM-25: el nombre resuelto al crear la campana, con extension. La descarga entrega
+    # este mismo nombre aunque la plantilla de la configuracion cambie despues.
+    nombre: Mapped[str] = mapped_column(Text)
 
-    __table_args__ = (CheckConstraint("numero >= 1", name="numero_positivo"),)
+    __table_args__ = (
+        CheckConstraint("numero >= 1", name="numero_positivo"),
+        CheckConstraint("length(btrim(nombre)) > 0", name="nombre_no_vacio"),
+        UniqueConstraint("campana_id", "nombre"),
+    )
 
 
 class MowaMesFilaCargada(Base):

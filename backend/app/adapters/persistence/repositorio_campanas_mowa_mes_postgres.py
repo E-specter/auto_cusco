@@ -8,6 +8,7 @@ no puede colarse entre la comprobacion y la marca de uso.
 
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, datetime
+from decimal import Decimal
 from itertools import islice
 from typing import Any
 
@@ -43,8 +44,13 @@ from app.core.entities.mowa_mes_campana import (
     SupervisorAsignado,
     TipoCarga,
 )
+from app.core.entities.mowa_mes_costo import CostoMes
 from app.core.entities.mowa_mes_reporte import FilaReporte, ReporteImportado
-from app.core.ports.repositorio_campanas_mowa_mes_port import RepositorioCampanasMowaMesPort
+from app.core.ports.repositorio_campanas_mowa_mes_port import (
+    ContadorDeEnviados,
+    NombradorDeArchivos,
+    RepositorioCampanasMowaMesPort,
+)
 from app.core.services.plataformas.mowa_mes.campana import huella_speech
 
 _CAMPANA = MowaMesCampana.__table__
@@ -55,6 +61,10 @@ _REPORTE = MowaMesReporte.__table__
 _REPORTE_FILA = MowaMesReporteFila.__table__
 _SPEECH = MowaMesSpeechVersion.__table__
 _LOTE = 5_000
+# Clave de pg_advisory_xact_lock que serializa las importaciones de reportes. Es GLOBAL y
+# no por campana a proposito: un id de MES es unico entre campanas, asi que dos importaciones
+# de campanas distintas pueden reclamar el mismo id a la vez. Ver docs/mowa-mes.md §16.1 (4).
+CLAVE_BLOQUEO_IMPORTACION_REPORTES = 8_402_310_001
 
 
 def _lotes(valores: Iterable[dict[str, Any]]) -> Iterable[list[dict[str, Any]]]:
@@ -105,6 +115,8 @@ def _valores_campana(armada: CampanaArmada) -> dict[str, Any]:
         "excluidos": len(armada.exclusiones),
         "advertencias": sum(armada.advertencias_por_codigo().values()),
         "confirmo_limite": armada.peticion.confirmar_limite,
+        "tarifa_sms": armada.tarifa_sms,
+        "costo_estimado": armada.costo_estimado,
     }
 
 
@@ -157,6 +169,9 @@ def _campana(fila: Row, archivos: Sequence[ArchivoResumen]) -> CampanaRegistrada
         advertencias=fila.advertencias,
         confirmo_limite=fila.confirmo_limite,
         archivos=tuple(archivos),
+        tarifa_sms=fila.tarifa_sms,
+        costo_estimado=fila.costo_estimado,
+        enviados_conciliados=fila.enviados_conciliados,
     )
 
 
@@ -171,7 +186,21 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
         with self._engine.connect() as cx:
             return int(cx.execute(consulta).scalar_one())
 
-    def crear(self, armada: CampanaArmada, archivos: Sequence[ArchivoCarga]) -> CampanaRegistrada:
+    def costo_del_mes(self, mes: date) -> CostoMes:
+        consulta = select(
+            func.coalesce(func.sum(_CAMPANA.c.costo_estimado), Decimal(0)),
+            func.count().filter(_CAMPANA.c.tarifa_sms.is_(None)),
+        ).where(_CAMPANA.c.mes_imputacion == mes)
+        with self._engine.connect() as cx:
+            costo, sin_tarifa = cx.execute(consulta).one()
+        return CostoMes(Decimal(costo), int(sin_tarifa))
+
+    def crear(
+        self,
+        armada: CampanaArmada,
+        archivos: Sequence[ArchivoCarga],
+        nombrar: NombradorDeArchivos,
+    ) -> CampanaRegistrada:
         with self._engine.begin() as cx:
             version = cx.execute(
                 select(_SPEECH.c.partes).where(_SPEECH.c.id == armada.speech.id).with_for_update()
@@ -192,6 +221,7 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
             campana_id = cx.execute(
                 insert(_CAMPANA).values(**_valores_campana(armada)).returning(_CAMPANA.c.id)
             ).scalar_one()
+            nombres = list(nombrar(campana_id))
             _insertar(
                 cx,
                 _ARCHIVO,
@@ -203,8 +233,9 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
                         "supervision": a.supervision,
                         "bytes": a.bytes,
                         "contenido": a.contenido,
+                        "nombre": nombre,
                     }
-                    for a in archivos
+                    for a, nombre in zip(archivos, nombres, strict=True)
                 ),
             )
             _insertar(cx, _FILA, _filas_cargadas(campana_id, armada.filas, archivos))
@@ -236,13 +267,14 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
                 _ARCHIVO.c.filas,
                 _ARCHIVO.c.supervision,
                 _ARCHIVO.c.bytes,
+                _ARCHIVO.c.nombre,
             )
             .where(_ARCHIVO.c.campana_id.in_(ids))
             .order_by(_ARCHIVO.c.campana_id, _ARCHIVO.c.numero)
         )
         for fila in filas:
             por_campana[fila.campana_id].append(
-                ArchivoResumen(fila.numero, fila.filas, fila.supervision, fila.bytes)
+                ArchivoResumen(fila.numero, fila.filas, fila.supervision, fila.bytes, fila.nombre)
             )
         return por_campana
 
@@ -300,21 +332,25 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
 
     def filas_cargadas(self, campana_id: int) -> list[FilaCarga]:
         with self._engine.connect() as cx:
-            filas = cx.execute(
-                select(_FILA).where(_FILA.c.campana_id == campana_id).order_by(_FILA.c.posicion)
+            return self._leer_filas_cargadas(cx, campana_id)
+
+    @staticmethod
+    def _leer_filas_cargadas(cx: Connection, campana_id: int) -> list[FilaCarga]:
+        filas = cx.execute(
+            select(_FILA).where(_FILA.c.campana_id == campana_id).order_by(_FILA.c.posicion)
+        )
+        return [
+            FilaCarga(
+                numero=fila.numero,
+                mensaje=fila.mensaje,
+                dni=fila.dni,
+                supervision=fila.supervision,
+                pagare=fila.pagare,
+                segmento=Segmento(fila.segmento) if fila.segmento else None,
+                advertencias=tuple(CodigoMowaMes(codigo) for codigo in fila.advertencias),
             )
-            return [
-                FilaCarga(
-                    numero=fila.numero,
-                    mensaje=fila.mensaje,
-                    dni=fila.dni,
-                    supervision=fila.supervision,
-                    pagare=fila.pagare,
-                    segmento=Segmento(fila.segmento) if fila.segmento else None,
-                    advertencias=tuple(CodigoMowaMes(codigo) for codigo in fila.advertencias),
-                )
-                for fila in filas
-            ]
+            for fila in filas
+        ]
 
     # --- Reporte de enviados ------------------------------------------
 
@@ -334,8 +370,17 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
         campana_id: int,
         nombre_archivo: str,
         filas_por_id: Mapping[int, Sequence[FilaReporte]],
+        contar_enviados: ContadorDeEnviados,
     ) -> None:
         with self._engine.begin() as cx:
+            # Una importacion a la vez: el conteo de enviados se recalcula sobre lo que esta
+            # transaccion deja guardado, y dos a la vez podrian pisarse el resultado.
+            cx.execute(select(func.pg_advisory_xact_lock(CLAVE_BLOQUEO_IMPORTACION_REPORTES)))
+            # Las campanas a las que este reemplazo les quita un id de MES tambien cambian.
+            duenas = cx.execute(
+                select(_REPORTE.c.campana_id).where(_REPORTE.c.mes_id.in_(list(filas_por_id)))
+            ).scalars()
+            afectadas = sorted({campana_id, *duenas})
             cx.execute(delete(_REPORTE).where(_REPORTE.c.mes_id.in_(list(filas_por_id))))
             for mes_id, filas in sorted(filas_por_id.items()):
                 reporte_id = cx.execute(
@@ -366,6 +411,19 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
                         for f in filas
                     ),
                 )
+            for id_afectada in afectadas:
+                # NULL sin reporte (pendiente); nunca 0, que es "se importo y no se envio nada".
+                filas_reporte = self._leer_filas_reporte(cx, id_afectada)
+                enviados = (
+                    contar_enviados(self._leer_filas_cargadas(cx, id_afectada), filas_reporte)
+                    if filas_reporte
+                    else None
+                )
+                cx.execute(
+                    update(_CAMPANA)
+                    .where(_CAMPANA.c.id == id_afectada)
+                    .values(enviados_conciliados=enviados)
+                )
 
     def reportes(self, campana_id: int) -> list[ReporteImportado]:
         with self._engine.connect() as cx:
@@ -380,24 +438,28 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
         ]
 
     def filas_reporte(self, campana_id: int) -> list[FilaReporte]:
+        with self._engine.connect() as cx:
+            return self._leer_filas_reporte(cx, campana_id)
+
+    @staticmethod
+    def _leer_filas_reporte(cx: Connection, campana_id: int) -> list[FilaReporte]:
         consulta = (
             select(_REPORTE.c.mes_id, *_REPORTE_FILA.c)
             .join(_REPORTE, _REPORTE.c.id == _REPORTE_FILA.c.reporte_id)
             .where(_REPORTE.c.campana_id == campana_id)
             .order_by(_REPORTE.c.mes_id, _REPORTE_FILA.c.fila)
         )
-        with self._engine.connect() as cx:
-            return [
-                FilaReporte(
-                    fila=f.fila,
-                    mes_id=f.mes_id,
-                    celular=f.celular,
-                    mensaje=f.mensaje,
-                    fecha_envio=f.fecha_envio,
-                    dni=f.dni,
-                    estado=f.estado,
-                    salida=f.salida,
-                    usuario=f.usuario,
-                )
-                for f in cx.execute(consulta)
-            ]
+        return [
+            FilaReporte(
+                fila=f.fila,
+                mes_id=f.mes_id,
+                celular=f.celular,
+                mensaje=f.mensaje,
+                fecha_envio=f.fecha_envio,
+                dni=f.dni,
+                estado=f.estado,
+                salida=f.salida,
+                usuario=f.usuario,
+            )
+            for f in cx.execute(consulta)
+        ]

@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
+from urllib.parse import quote
 
 from app.core.entities.exportacion import EXTENSIONES, FormatoArchivo
 
@@ -30,6 +31,24 @@ def nombre_de_archivo(nombre: str, formato: FormatoArchivo) -> str:
     limpio = _ESPACIOS.sub(" ", _PERMITIDOS.sub(" ", sin_tildes)).strip(" .")
     base = (limpio[:LARGO_MAXIMO_NOMBRE].strip(" .") or NOMBRE_POR_DEFECTO).replace(" ", "_")
     return f"{base}.{EXTENSIONES[formato]}"
+
+
+def disposicion_de_descarga(nombre: str) -> str:
+    """Cabecera `Content-Disposition` de un archivo cuyo nombre puede tener tildes o `ñ`.
+
+    `filename` va en ASCII, con el mismo criterio de `nombre_de_archivo` (sin tildes y
+    con `_` en lo que no es seguro), para los clientes que no leen `filename*`; este
+    lleva el nombre exacto en UTF-8 (RFC 5987). El nombre ya viene saneado para el
+    disco: aqui solo se prepara para viajar en una cabecera HTTP.
+    """
+    base, punto, extension = nombre.rpartition(".")
+    if not punto:
+        base, extension = nombre, ""
+    sin_tildes = unicodedata.normalize("NFKD", base).encode("ascii", "ignore").decode("ascii")
+    ascii_base = _PERMITIDOS.sub("_", sin_tildes).strip(" .") or "archivo"
+    ascii_extension = _PERMITIDOS.sub("_", extension) if extension else ""
+    nombre_ascii = f"{ascii_base}.{ascii_extension}" if ascii_extension else ascii_base
+    return f"attachment; filename=\"{nombre_ascii}\"; filename*=UTF-8''{quote(nombre, safe='')}"
 
 
 def columnas(fila: Mapping[str, Any], cabeceras: tuple[str, ...]) -> list[Any]:

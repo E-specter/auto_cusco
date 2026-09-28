@@ -57,6 +57,8 @@ def _configuracion(fila: Row) -> ConfiguracionMowaMes:
         actualizado_en=fila.actualizado_en,
         registros_por_archivo=fila.registros_por_archivo,
         bytes_por_archivo=fila.bytes_por_archivo,
+        tarifa_sms=fila.tarifa_sms,
+        plantilla_nombre_archivo=fila.plantilla_nombre_archivo,
     )
 
 
@@ -87,6 +89,8 @@ class RepositorioMowaMesPostgres(RepositorioMowaMesPort):
                 whatsapp_contacto=configuracion.whatsapp_contacto,
                 registros_por_archivo=configuracion.registros_por_archivo,
                 bytes_por_archivo=configuracion.bytes_por_archivo,
+                tarifa_sms=configuracion.tarifa_sms,
+                plantilla_nombre_archivo=configuracion.plantilla_nombre_archivo,
                 actualizado_en=func.clock_timestamp(),
             )
             .returning(*_CONFIGURACION.c)

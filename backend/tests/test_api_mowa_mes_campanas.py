@@ -6,6 +6,8 @@ lee con el lector de verdad. Datos sinteticos.
 """
 
 import io
+from dataclasses import replace
+from decimal import Decimal
 
 import openpyxl
 import pytest
@@ -178,7 +180,13 @@ def test_crear_y_consultar_una_campana() -> None:
         "2026-09",
     )
     assert cuerpo["archivos"] == [
-        {"numero": 1, "filas": 6, "supervision": 5, "bytes": cuerpo["archivos"][0]["bytes"]}
+        {
+            "numero": 1,
+            "filas": 6,
+            "supervision": 5,
+            "bytes": cuerpo["archivos"][0]["bytes"],
+            "nombre": "mowa_mes_campana_1_1_de_1.xlsx",
+        }
     ]
     assert cuerpo["speech"] == {"id": 1, "nombre": "Speech original"}
     # En el orden de la lista (entrelazada a proposito), cada uno con su DNI por procedencia.
@@ -258,6 +266,10 @@ def test_limite_mensual_de_un_mes() -> None:
         "total": 100,
         "disponible": 2_499_900,
         "excedido": False,
+        "costo_mes": "0.0000",
+        "campanas_sin_tarifa": 0,
+        "costo_esta_campana": None,
+        "costo_total": "0.0000",
     }
     assert client.get("/mowa-mes/limite-mensual").json()["mes"] == "2026-09"
     assert client.get("/mowa-mes/limite-mensual", params={"mes": "2026-13"}).status_code == 422
@@ -273,7 +285,10 @@ def test_la_descarga_entrega_el_xlsx_y_las_cabeceras_declaradas() -> None:
     respuesta = client.get(f"/mowa-mes/campanas/{campana_id}/archivos/1")
 
     assert respuesta.status_code == 200
-    assert 'filename="mowa_mes_campana_1_1_de_1.xlsx"' in respuesta.headers["content-disposition"]
+    assert respuesta.headers["content-disposition"] == (
+        'attachment; filename="mowa_mes_campana_1_1_de_1.xlsx"; '
+        "filename*=UTF-8''mowa_mes_campana_1_1_de_1.xlsx"
+    )
     enviadas = {n for n in respuesta.headers if n.startswith("x-mowa-mes-")}
     assert enviadas == {nombre.lower() for nombre in CABECERAS_ARCHIVO}
     assert (respuesta.headers["x-mowa-mes-filas"], respuesta.headers["x-mowa-mes-supervision"]) == (
@@ -445,3 +460,260 @@ def test_la_conciliacion_sin_reporte_da_todo_cargado_y_nada_enviado() -> None:
         }
     assert (cuerpo["sin_correspondencia"], cuerpo["sin_correspondencia_por_estado"]) == (0, [])
     assert (cuerpo["por_id"], cuerpo["advertencias"]) == ([], [])
+
+
+# --- Tarifa, costos y nombre de los archivos (B8: RF-MM-23 a RF-MM-25) ---
+
+
+def _con_tarifa(entorno: Entorno, tarifa: str) -> None:
+    entorno.mowa_mes.configuracion = replace(
+        entorno.mowa_mes.configuracion, tarifa_sms=Decimal(tarifa)
+    )
+
+
+def test_la_previsualizacion_trae_tarifa_costo_y_nombre_del_primer_archivo() -> None:
+    client = _cliente(Entorno())
+
+    cuerpo = client.post("/mowa-mes/campanas/previsualizacion", json=CUERPO).json()
+
+    assert cuerpo["tarifa_sms"] == "0.0200"
+    assert cuerpo["costo_estimado"] == "0.1200"  # 6 SMS, supervision incluida, a 0.02
+    assert cuerpo["plantilla_nombre_archivo"] == "mowa_mes_campana_{campana}_{archivo}_de_{total}"
+    assert cuerpo["nombre_primer_archivo"] == "mowa_mes_campana_[campana]_1_de_1.xlsx"
+    assert cuerpo["nombre_estimado"] is True
+    assert cuerpo["limite"]["costo_esta_campana"] == "0.1200"
+    assert cuerpo["limite"]["costo_total"] == "0.1200"
+
+
+def test_los_montos_viajan_como_texto_nunca_como_numero() -> None:
+    entorno = Entorno()
+    client = _cliente(entorno)
+    campana = _crear(client).json()
+
+    previa = client.post("/mowa-mes/campanas/previsualizacion", json=CUERPO).json()
+    limite = client.get("/mowa-mes/limite-mensual", params={"mes": "2026-09"}).json()
+
+    for monto in (
+        previa["tarifa_sms"],
+        previa["costo_estimado"],
+        previa["limite"]["costo_mes"],
+        previa["limite"]["costo_esta_campana"],
+        previa["limite"]["costo_total"],
+        limite["costo_mes"],
+        limite["costo_total"],
+        campana["tarifa_sms"],
+        campana["costo_estimado"],
+    ):
+        assert isinstance(monto, str) and monto.replace(".", "").isdigit(), monto
+
+
+def test_la_creacion_congela_la_tarifa_y_el_costo_y_el_costo_real_queda_pendiente() -> None:
+    entorno = Entorno()
+    _con_tarifa(entorno, "0.05")
+    client = _cliente(entorno)
+
+    campana = _crear(client).json()
+    _con_tarifa(entorno, "0.10")
+    leida = client.get(f"/mowa-mes/campanas/{campana['id']}").json()
+
+    for cuerpo in (campana, leida):
+        assert cuerpo["tarifa_sms"] == "0.0500"
+        assert cuerpo["costo_estimado"] == "0.3000"
+        assert cuerpo["costo_estimado_estado"] == "calculado"
+        assert cuerpo["costo_real"] is None
+        assert cuerpo["costo_real_estado"] == "pendiente"
+    assert "enviados_conciliados" not in leida  # derivado interno: no se expone
+
+
+def test_el_costo_del_mes_suma_los_estimados_y_lo_dice_junto_al_limite() -> None:
+    entorno = Entorno()
+    client = _cliente(entorno)
+    _crear(client)
+    _con_tarifa(entorno, "0.10")
+    _crear(client)  # 6 SMS a 0.10
+
+    limite = client.get("/mowa-mes/limite-mensual", params={"mes": "2026-09"}).json()
+    previa = client.post("/mowa-mes/campanas/previsualizacion", json=CUERPO).json()["limite"]
+
+    assert limite["costo_mes"] == "0.7200"  # 0.12 + 0.60
+    assert limite["costo_esta_campana"] is None
+    assert previa["costo_mes"] == "0.7200"
+    assert previa["costo_esta_campana"] == "0.6000"
+    assert previa["costo_total"] == "1.3200"
+
+
+def test_una_campana_sin_tarifa_dice_no_disponible_y_no_suma_pero_se_cuenta() -> None:
+    entorno = Entorno()
+    client = _cliente(entorno)
+    campana_id = _crear(client).json()["id"]
+    entorno.campanas.campanas[campana_id] = replace(
+        entorno.campanas.campanas[campana_id], tarifa_sms=None, costo_estimado=None
+    )
+
+    leida = client.get(f"/mowa-mes/campanas/{campana_id}").json()
+    lista = client.get("/mowa-mes/campanas").json()["campanas"][0]
+    limite = client.get("/mowa-mes/limite-mensual", params={"mes": "2026-09"}).json()
+
+    for cuerpo in (leida, lista):
+        assert cuerpo["tarifa_sms"] is None
+        assert cuerpo["costo_estimado"] is None
+        assert cuerpo["costo_estimado_estado"] == "no_disponible"
+        assert cuerpo["costo_real"] is None
+        assert cuerpo["costo_real_estado"] == "no_disponible"
+    assert (limite["costo_mes"], limite["campanas_sin_tarifa"]) == ("0.0000", 1)
+
+
+def test_el_costo_real_sale_de_los_enviados_y_lo_muestran_la_conciliacion_y_el_listado() -> None:
+    entorno = Entorno()
+    _con_tarifa(entorno, "0.05")
+    client = _cliente(entorno)
+    campana_id = _crear(client).json()["id"]
+    contenido = _reporte(entorno.campanas.filas_cargadas(campana_id), 990001)
+
+    importado = client.post(
+        f"/mowa-mes/campanas/{campana_id}/reportes", files={"archivo": ("reporte.xlsx", contenido)}
+    ).json()
+    conciliacion = client.get(f"/mowa-mes/campanas/{campana_id}/conciliacion").json()
+    leida = client.get(f"/mowa-mes/campanas/{campana_id}").json()
+    lista = client.get("/mowa-mes/campanas").json()["campanas"][0]
+
+    for cuerpo in (importado, conciliacion):
+        assert cuerpo["tarifa_sms"] == "0.0500"
+        assert cuerpo["costo_real"] == "0.3000"  # 6 enviados
+        assert cuerpo["costo_real_estado"] == "calculado"
+    for cuerpo in (leida, lista):
+        assert (cuerpo["costo_real"], cuerpo["costo_real_estado"]) == ("0.3000", "calculado")
+    assert leida["costo_real"] == conciliacion["costo_real"]
+
+
+def test_la_conciliacion_sin_reporte_da_costo_real_pendiente() -> None:
+    client = _cliente(Entorno())
+    campana_id = _crear(client).json()["id"]
+
+    cuerpo = client.get(f"/mowa-mes/campanas/{campana_id}/conciliacion").json()
+
+    assert (cuerpo["costo_real"], cuerpo["costo_real_estado"]) == (None, "pendiente")
+    assert cuerpo["tarifa_sms"] == "0.0200"
+
+
+def test_solo_los_enviados_cuentan_en_el_costo_real() -> None:
+    entorno = Entorno()
+    client = _cliente(entorno)
+    campana_id = _crear(client).json()["id"]
+    libro = openpyxl.Workbook()
+    hoja = libro.active
+    hoja.title = "Hoja1"
+    hoja.append(list(COLUMNAS_REPORTE))
+    for fila in entorno.campanas.filas_cargadas(campana_id):
+        estado = "enviado" if fila.supervision else "fallido"
+        hoja.append([990003, fila.numero, fila.mensaje, "14/09/26", fila.dni, estado, "L", "u"])
+    buffer = io.BytesIO()
+    libro.save(buffer)
+
+    cuerpo = client.post(
+        f"/mowa-mes/campanas/{campana_id}/reportes",
+        files={"archivo": ("reporte.xlsx", buffer.getvalue())},
+    ).json()
+
+    assert cuerpo["costo_real"] == "0.1000"  # 5 enviados a 0.02, no los 6 cargados
+
+
+def test_la_plantilla_de_la_campana_da_los_nombres_de_los_archivos() -> None:
+    client = _cliente(Entorno())
+
+    previa = client.post(
+        "/mowa-mes/campanas/previsualizacion",
+        json={**CUERPO, "plantilla_nombre_archivo": "CajaCusco_{fecha_envio}_{campana}"},
+    ).json()
+    creada = _crear(client, plantilla_nombre_archivo="CajaCusco_{fecha_envio}_{campana}").json()
+
+    assert previa["plantilla_nombre_archivo"] == "CajaCusco_{fecha_envio}_{campana}"
+    assert previa["nombre_primer_archivo"] == "CajaCusco_2026-09-14_[campana].xlsx"
+    assert previa["nombre_estimado"] is False
+    assert [a["nombre"] for a in creada["archivos"]] == ["CajaCusco_2026-09-14_1.xlsx"]
+
+
+@pytest.mark.parametrize(
+    ("plantilla", "dice"),
+    [("caja_{nombre}", "{nombre}"), ("caja_{campana", "sin cerrar"), ("caja}", "sin abrir")],
+)
+def test_una_plantilla_de_campana_invalida_responde_400_con_el_motivo(plantilla, dice) -> None:
+    client = _cliente(Entorno())
+
+    previa = client.post(
+        "/mowa-mes/campanas/previsualizacion",
+        json={**CUERPO, "plantilla_nombre_archivo": plantilla},
+    )
+    creada = _crear(client, plantilla_nombre_archivo=plantilla)
+
+    for respuesta in (previa, creada):
+        assert respuesta.status_code == 400
+        assert dice in respuesta.json()["detail"]
+        assert respuesta.json()["campo"] == "plantilla_nombre_archivo"
+        assert set(respuesta.json()) == {"detail", "campo"}
+
+
+def test_un_400_que_no_es_de_un_campo_trae_campo_null_y_un_404_no_lo_trae() -> None:
+    client = _cliente(Entorno(supervisores=()))
+    otros = [
+        client.post(
+            "/mowa-mes/campanas/previsualizacion", json={**CUERPO, "tipo_carga": "personalizada"}
+        ),
+        client.post(
+            "/mowa-mes/campanas/previsualizacion",
+            json={**CUERPO, "filtros": ["campo_inventado:igual:x"]},
+        ),
+        _crear(client),  # sin supervisores: CampanaInvalida
+    ]
+    sin_version = _cliente(Entorno(vigente=False)).post(
+        "/mowa-mes/campanas/previsualizacion", json=CUERPO
+    )
+
+    for respuesta in otros:
+        assert respuesta.status_code == 400
+        assert respuesta.json()["campo"] is None
+        assert isinstance(respuesta.json()["detail"], str)
+    assert sin_version.status_code == 404
+    assert set(sin_version.json()) == {"detail"}
+
+
+def test_el_contrato_declara_el_400_de_las_campanas_con_su_campo_opcional() -> None:
+    esquema = contrato.generar()
+    modelo = esquema["components"]["schemas"]["ErrorPeticionCampanaRespuesta"]
+
+    assert set(modelo["required"]) == {"detail", "campo"}
+    assert {"$ref": "#/components/schemas/CampoConfiguracion"} in modelo["properties"]["campo"][
+        "anyOf"
+    ]
+    for ruta in ("/mowa-mes/campanas/previsualizacion", "/mowa-mes/campanas"):
+        respuesta = esquema["paths"][ruta]["post"]["responses"]["400"]
+        assert respuesta["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/ErrorPeticionCampanaRespuesta"
+        }
+
+
+def test_la_descarga_usa_el_nombre_guardado_con_filename_ascii_y_filename_utf8() -> None:
+    entorno = Entorno()
+    client = _cliente(entorno)
+    campana_id = _crear(client, plantilla_nombre_archivo="Cobranza_mañana_{campana}").json()["id"]
+    # El cambio posterior de la plantilla de la configuracion no toca lo ya guardado.
+    entorno.mowa_mes.configuracion = replace(
+        entorno.mowa_mes.configuracion, plantilla_nombre_archivo="otra_{campana}"
+    )
+
+    respuesta = client.get(f"/mowa-mes/campanas/{campana_id}/archivos/1")
+
+    assert respuesta.headers["content-disposition"] == (
+        'attachment; filename="Cobranza_manana_1.xlsx"; '
+        "filename*=UTF-8''Cobranza_ma%C3%B1ana_1.xlsx"
+    )
+
+
+def test_el_contrato_declara_la_descarga_con_los_dos_nombres() -> None:
+    esquema = contrato.generar()
+    cabecera = esquema["paths"]["/mowa-mes/campanas/{campana_id}/archivos/{numero}"]["get"][
+        "responses"
+    ]["200"]["headers"]["Content-Disposition"]
+
+    assert "filename*=UTF-8" in cabecera["description"]
+    assert "ASCII" in cabecera["description"]

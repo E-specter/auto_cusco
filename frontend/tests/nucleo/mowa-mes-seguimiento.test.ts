@@ -121,6 +121,9 @@ describe('conciliación', () => {
     sin_correspondencia_por_estado: [],
     por_id: [],
     advertencias: [],
+    tarifa_sms: '0.0200',
+    costo_real: '19.0400',
+    costo_real_estado: 'calculado',
   };
 
   it('productos, supervisión y total van siempre separados y en ese orden (RF-41)', () => {

@@ -186,6 +186,45 @@ def test_nombre_de_archivo_es_seguro(nombre, esperado) -> None:
     assert comunes.nombre_de_archivo(nombre, FormatoArchivo.CSV) == esperado
 
 
+@pytest.mark.parametrize(
+    ("nombre", "cabecera"),
+    [
+        (
+            "mowa_mes_campana_7_1_de_2.xlsx",
+            'attachment; filename="mowa_mes_campana_7_1_de_2.xlsx"; '
+            "filename*=UTF-8''mowa_mes_campana_7_1_de_2.xlsx",
+        ),
+        (
+            "Cobranza mañana José.xlsx",
+            'attachment; filename="Cobranza manana Jose.xlsx"; '
+            "filename*=UTF-8''Cobranza%20ma%C3%B1ana%20Jos%C3%A9.xlsx",
+        ),
+        (
+            "a€b😀c.xlsx",  # lo que no tiene equivalente ASCII se reemplaza en `filename`
+            "attachment; filename=\"abc.xlsx\"; filename*=UTF-8''a%E2%82%ACb%F0%9F%98%80c.xlsx",
+        ),
+        (
+            "日本語.xlsx",  # sin nada ASCII, el `filename` cae a un nombre neutro
+            'attachment; filename="archivo.xlsx"; '
+            "filename*=UTF-8''%E6%97%A5%E6%9C%AC%E8%AA%9E.xlsx",
+        ),
+        (
+            "100%;a,b.xlsx",  # separadores de la cabecera: _ en ASCII, codificados en UTF-8
+            "attachment; filename=\"100_a_b.xlsx\"; filename*=UTF-8''100%25%3Ba%2Cb.xlsx",
+        ),
+    ],
+)
+def test_disposicion_de_descarga_lleva_filename_ascii_y_filename_utf8(nombre, cabecera) -> None:
+    assert comunes.disposicion_de_descarga(nombre) == cabecera
+
+
+def test_disposicion_de_descarga_no_deja_pasar_comillas_ni_saltos_de_linea() -> None:
+    cabecera = comunes.disposicion_de_descarga('a"b\r\nc.xlsx')
+
+    assert "\r" not in cabecera and "\n" not in cabecera
+    assert cabecera.count('"') == 2  # solo las que encierran `filename`
+
+
 def test_una_tabla_sin_filas_produce_un_archivo_con_solo_cabeceras() -> None:
     vacia = Tabla(nombre="vacia", cabeceras=("pagare",), filas=())
 

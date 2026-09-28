@@ -7,6 +7,7 @@ Titulares, documentos y telefonos sinteticos; supervisores del rango 900000xxx.
 
 from dataclasses import replace
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 import pytest
 
@@ -32,6 +33,7 @@ from app.core.entities.mowa_mes_campana import (
     SpeechCambiado,
     TipoCarga,
 )
+from app.core.entities.mowa_mes_costo import CostoMes, EstadoCosto
 from app.core.entities.mowa_mes_reporte import FilaReporte, ReporteImportado, ReporteYaImportado
 from app.core.services.plataformas.mowa_mes import speech
 from app.core.services.plataformas.mowa_mes.campana import (
@@ -80,8 +82,15 @@ class RepositorioCarteraFalso:
 
 
 class RepositorioCampanasMemoria:
-    def __init__(self, cargados_mes: int = 0) -> None:
+    def __init__(
+        self,
+        cargados_mes: int = 0,
+        costo_previo_mes: Decimal = Decimal(0),
+        sin_tarifa_previas: int = 0,
+    ) -> None:
         self.cargados_mes = cargados_mes
+        self.costo_previo_mes = costo_previo_mes  # campanas del mes que no se crean aqui
+        self.sin_tarifa_previas = sin_tarifa_previas
         self.meses_consultados: list[date] = []
         self.campanas: dict[int, CampanaRegistrada] = {}
         self.guardadas: dict[int, tuple] = {}
@@ -92,7 +101,16 @@ class RepositorioCampanasMemoria:
         propias = sum(c.total_cargados for c in self.campanas.values() if c.mes_imputacion == mes)
         return self.cargados_mes + propias
 
-    def crear(self, armada, archivos):
+    def costo_del_mes(self, mes):
+        del_mes = [c for c in self.campanas.values() if c.mes_imputacion == mes]
+        con_tarifa = [c.costo_estimado for c in del_mes if c.tarifa_sms is not None]
+        return CostoMes(
+            self.costo_previo_mes + sum(con_tarifa, Decimal(0)),
+            self.sin_tarifa_previas + len(del_mes) - len(con_tarifa),
+        )
+
+    def crear(self, armada, archivos, nombrar):
+        nombres = list(nombrar(len(self.campanas) + 1))
         p = armada.peticion
         campana_id = len(self.campanas) + 1
         campana = CampanaRegistrada(
@@ -122,8 +140,11 @@ class RepositorioCampanasMemoria:
             advertencias=sum(armada.advertencias_por_codigo().values()),
             confirmo_limite=p.confirmar_limite,
             archivos=tuple(
-                ArchivoResumen(a.numero, a.filas, a.supervision, a.bytes) for a in archivos
+                ArchivoResumen(a.numero, a.filas, a.supervision, a.bytes, nombre)
+                for a, nombre in zip(archivos, nombres, strict=True)
             ),
+            tarifa_sms=armada.tarifa_sms,
+            costo_estimado=armada.costo_estimado,
         )
         self.campanas[campana_id] = campana
         self.guardadas[campana_id] = (armada, list(archivos))
@@ -153,9 +174,20 @@ class RepositorioCampanasMemoria:
     def reportes_ya_importados(self, mes_ids):
         return tuple(sorted(i for i in mes_ids if i in self.informes))
 
-    def guardar_reportes(self, campana_id, nombre_archivo, filas_por_id):
+    def guardar_reportes(self, campana_id, nombre_archivo, filas_por_id, contar_enviados):
+        afectadas = {campana_id} | {self.informes[m][0] for m in filas_por_id if m in self.informes}
         for mes_id, filas in filas_por_id.items():
             self.informes[mes_id] = (campana_id, nombre_archivo, list(filas))
+        for id_afectada in afectadas:
+            filas_reporte = self.filas_reporte(id_afectada)
+            enviados = (
+                contar_enviados(self.filas_cargadas(id_afectada), filas_reporte)
+                if filas_reporte
+                else None
+            )
+            self.campanas[id_afectada] = replace(
+                self.campanas[id_afectada], enviados_conciliados=enviados
+            )
 
     def reportes(self, campana_id):
         return [
@@ -595,3 +627,351 @@ def test_un_producto_puede_llevar_las_dos_advertencias() -> None:
         CodigoMowaMes.MENSAJE_EXCEDE_150,
         CodigoMowaMes.DOCUMENTO_NO_ESTANDAR,
     )
+
+
+# --- Tarifa y costo (RF-MM-23, RF-MM-24) --------------------------------
+
+
+def _con_tarifa(mowa_mes, tarifa: str) -> None:
+    mowa_mes.configuracion = replace(mowa_mes.configuracion, tarifa_sms=Decimal(tarifa))
+
+
+def test_la_previsualizacion_calcula_el_costo_estimado_con_la_supervision() -> None:
+    servicio, _, _ = armar_servicio([producto(1), producto(2)])
+
+    armada = servicio.previsualizar(peticion())
+
+    assert armada.total_cargados == 7  # 2 productos y 5 registros de supervision
+    assert armada.tarifa_sms == Decimal("0.02")
+    assert armada.costo_estimado == Decimal("0.14")
+    assert isinstance(armada.costo_estimado, Decimal)
+    assert armada.consumo.costo_esta_campana == Decimal("0.14")
+
+
+def test_el_costo_estimado_usa_la_tarifa_de_la_configuracion() -> None:
+    servicio, _, mowa_mes = armar_servicio([producto(1), producto(2)])
+    _con_tarifa(mowa_mes, "0.0125")
+
+    armada = servicio.previsualizar(peticion())
+
+    assert armada.tarifa_sms == Decimal("0.0125")
+    assert armada.costo_estimado == Decimal("0.0875")  # 7 x 0.0125, sin redondeo
+
+
+def test_crear_congela_la_tarifa_y_el_costo_y_un_cambio_posterior_no_los_toca() -> None:
+    servicio, _, mowa_mes = armar_servicio([producto(1), producto(2)])
+    _con_tarifa(mowa_mes, "0.05")
+    creada = servicio.crear(peticion())
+
+    _con_tarifa(mowa_mes, "0.10")
+
+    guardada = servicio.obtener(creada.id)
+    assert (guardada.tarifa_sms, guardada.costo_estimado) == (Decimal("0.05"), Decimal("0.35"))
+    nueva = servicio.previsualizar(peticion())
+    assert (nueva.tarifa_sms, nueva.costo_estimado) == (Decimal("0.10"), Decimal("0.70"))
+
+
+def test_el_costo_del_mes_suma_los_estimados_guardados_y_no_recalcula_con_la_tarifa_actual() -> (
+    None
+):
+    servicio, _, mowa_mes = armar_servicio([producto(1), producto(2)])
+    servicio.crear(peticion())  # 7 SMS a 0.02 = 0.14
+    _con_tarifa(mowa_mes, "0.05")
+    servicio.crear(peticion())  # 7 SMS a 0.05 = 0.35
+    _con_tarifa(mowa_mes, "0.10")
+
+    limite = servicio.limite_mensual(date(2026, 9, 1))
+    previa = servicio.previsualizar(peticion()).consumo
+
+    assert limite.costo_mes == Decimal("0.49")  # con la tarifa actual serian 14 x 0.10 = 1.40
+    assert limite.campanas_sin_tarifa == 0
+    assert limite.costo_esta_campana is None
+    assert limite.costo_total == Decimal("0.49")
+    assert previa.costo_mes == Decimal("0.49")
+    assert previa.costo_esta_campana == Decimal("0.70")
+    assert previa.costo_total == Decimal("1.19")
+
+
+def test_las_campanas_sin_tarifa_se_omiten_del_costo_del_mes_y_se_cuentan() -> None:
+    campanas = RepositorioCampanasMemoria(costo_previo_mes=Decimal("10"), sin_tarifa_previas=2)
+    servicio, _, _ = armar_servicio([producto(1)])
+    servicio._campanas = campanas
+
+    limite = servicio.limite_mensual(date(2026, 9, 1))
+    previa = servicio.previsualizar(peticion()).consumo
+
+    assert (limite.costo_mes, limite.campanas_sin_tarifa) == (Decimal("10"), 2)
+    assert (previa.costo_mes, previa.campanas_sin_tarifa) == (Decimal("10"), 2)
+    assert previa.costo_total == Decimal("10.12")  # 10 + 6 SMS x 0.02
+
+
+def test_una_campana_anterior_sin_tarifa_no_suma_costo_y_cuenta_como_fuera() -> None:
+    servicio, campanas, _ = armar_servicio([producto(1)])
+    creada = servicio.crear(peticion())
+    campanas.campanas[creada.id] = replace(creada, tarifa_sms=None, costo_estimado=None)
+
+    limite = servicio.limite_mensual(date(2026, 9, 1))
+
+    assert (limite.costo_mes, limite.campanas_sin_tarifa) == (Decimal("0"), 1)
+
+
+def test_el_costo_estimado_de_una_seleccion_vacia_es_cero() -> None:
+    servicio, _, _ = armar_servicio([producto(1, telefono=None)])
+
+    armada = servicio.previsualizar(peticion())
+
+    assert armada.total_cargados == 0
+    assert armada.costo_estimado == Decimal("0")
+    assert armada.errores  # sin productos cargables: no se puede crear
+
+
+# --- Nombre de los archivos (RF-MM-25) ----------------------------------
+
+
+def _servicio_con_archivos_de(filas: int, productos: int = 3):
+    servicio, campanas, mowa_mes = armar_servicio([producto(i) for i in range(1, productos + 1)])
+    mowa_mes.configuracion = replace(mowa_mes.configuracion, registros_por_archivo=filas)
+    return servicio, campanas, mowa_mes
+
+
+def test_crear_guarda_el_nombre_resuelto_de_cada_archivo_con_la_plantilla_por_defecto() -> None:
+    servicio, _, _ = _servicio_con_archivos_de(3)  # 8 filas en 3 archivos: 3, 3 y 2
+
+    creada = servicio.crear(peticion())
+
+    assert [(a.numero, a.filas, a.nombre) for a in creada.archivos] == [
+        (1, 3, f"mowa_mes_campana_{creada.id}_1_de_3.xlsx"),
+        (2, 3, f"mowa_mes_campana_{creada.id}_2_de_3.xlsx"),
+        (3, 2, f"mowa_mes_campana_{creada.id}_3_de_3.xlsx"),
+    ]
+
+
+def test_la_plantilla_de_la_campana_reemplaza_a_la_de_la_configuracion() -> None:
+    servicio, _, _ = _servicio_con_archivos_de(3)
+
+    creada = servicio.crear(
+        peticion(plantilla_nombre_archivo="CajaCusco_{fecha_envio}_{archivo}de{total}")
+    )
+
+    assert [a.nombre for a in creada.archivos] == [
+        "CajaCusco_2026-09-14_1de3.xlsx",
+        "CajaCusco_2026-09-14_2de3.xlsx",
+        "CajaCusco_2026-09-14_3de3.xlsx",
+    ]
+
+
+def test_sin_plantilla_o_con_plantilla_vacia_en_la_campana_se_usa_la_de_la_configuracion() -> None:
+    servicio, _, mowa_mes = _servicio_con_archivos_de(50_000, productos=1)
+    mowa_mes.configuracion = replace(
+        mowa_mes.configuracion, plantilla_nombre_archivo="cfg_{campana}"
+    )
+
+    sin = servicio.crear(peticion())
+    vacia = servicio.crear(peticion(plantilla_nombre_archivo="  "))
+
+    assert sin.archivos[0].nombre == f"cfg_{sin.id}.xlsx"
+    assert vacia.archivos[0].nombre == f"cfg_{vacia.id}.xlsx"
+
+
+def test_una_plantilla_de_campana_con_variable_desconocida_se_rechaza_y_la_nombra() -> None:
+    servicio, campanas, _ = armar_servicio([producto(1)])
+
+    for operacion in (servicio.previsualizar, servicio.crear):
+        with pytest.raises(PeticionCampanaInvalida, match="{foo}"):
+            operacion(peticion(plantilla_nombre_archivo="caja_{foo}"))
+    with pytest.raises(PeticionCampanaInvalida, match="sin cerrar"):
+        servicio.previsualizar(peticion(plantilla_nombre_archivo="caja_{campana"))
+    assert campanas.campanas == {}
+
+
+def test_el_nombre_guardado_no_cambia_si_despues_cambia_la_plantilla_de_la_configuracion() -> None:
+    servicio, _, mowa_mes = _servicio_con_archivos_de(50_000, productos=1)
+    creada = servicio.crear(peticion())
+    mowa_mes.configuracion = replace(
+        mowa_mes.configuracion, plantilla_nombre_archivo="otra_{campana}"
+    )
+
+    assert (
+        servicio.obtener(creada.id).archivos[0].nombre
+        == f"mowa_mes_campana_{creada.id}_1_de_1.xlsx"
+    )
+
+
+def test_la_previsualizacion_trae_el_nombre_del_primer_archivo_con_marcador_de_campana() -> None:
+    servicio, _, _ = _servicio_con_archivos_de(3)  # 3 archivos previstos
+
+    armada = servicio.previsualizar(peticion())
+
+    assert armada.plantilla_nombre_archivo == "mowa_mes_campana_{campana}_{archivo}_de_{total}"
+    assert armada.nombre_primer_archivo == "mowa_mes_campana_[campana]_1_de_3.xlsx"
+    assert armada.nombre_estimado is True  # usa {archivo} y {total}
+
+
+def test_el_nombre_previsto_no_es_estimado_si_no_depende_de_la_division() -> None:
+    servicio, _, _ = _servicio_con_archivos_de(50_000, productos=1)
+
+    armada = servicio.previsualizar(peticion(plantilla_nombre_archivo="CajaCusco_{campana}"))
+
+    assert armada.nombre_primer_archivo == "CajaCusco_[campana].xlsx"
+    assert armada.nombre_estimado is False
+
+
+def test_el_nombre_previsto_usa_la_descripcion_de_la_campana() -> None:
+    servicio, _, _ = _servicio_con_archivos_de(50_000, productos=1)
+
+    armada = servicio.previsualizar(
+        peticion(plantilla_nombre_archivo="{descripcion}", descripcion="Mi campaña: mañana")
+    )
+
+    assert armada.nombre_primer_archivo == "Mi campaña_ mañana.xlsx"
+
+
+def test_sin_archivos_previstos_no_hay_nombre_de_archivo() -> None:
+    servicio, _, _ = armar_servicio([producto(1, telefono=None)])
+
+    armada = servicio.previsualizar(peticion())
+
+    assert armada.nombre_primer_archivo is None
+    assert armada.nombre_estimado is False
+
+
+# --- Costo real: enviados_conciliados (RF-MM-24, D-3) --------------------
+
+
+def _reporte_con_estados(
+    filas: list[FilaCarga], mes_id: int, estados: list[str]
+) -> list[FilaReporte]:
+    return [
+        FilaReporte(i, mes_id, f.numero, f.mensaje, "14/09/26", f.dni, estado, "Nro. LARGO", "u")
+        for i, (f, estado) in enumerate(zip(filas, estados, strict=True), start=2)
+    ]
+
+
+def _campana_con_reportes(tarifa: str | None = None, productos: int = 2):
+    servicio, campanas, mowa_mes = armar_servicio([producto(i) for i in range(1, productos + 1)])
+    if tarifa is not None:
+        _con_tarifa(mowa_mes, tarifa)
+    creada = servicio.crear(peticion())
+    return servicio, campanas, creada
+
+
+def _importar(campanas, campana_id, reporte, reemplazar=False):
+    return ReportesMowaMesService(campanas, LectorFalso(reporte)).importar(
+        campana_id, "reporte.xlsx", b"", reemplazar
+    )
+
+
+def test_sin_reporte_el_costo_real_esta_pendiente_y_los_enviados_son_null_no_cero() -> None:
+    _, campanas, creada = _campana_con_reportes()
+
+    estado = ReportesMowaMesService(campanas, LectorFalso([])).conciliacion(creada.id)
+
+    assert estado.costo_real.estado is EstadoCosto.PENDIENTE
+    assert estado.costo_real.valor is None
+    assert campanas.obtener(creada.id).enviados_conciliados is None
+
+
+def test_el_costo_real_cuenta_solo_los_enviados_segun_e1_y_lo_guarda_como_derivado() -> None:
+    _, campanas, creada = _campana_con_reportes(tarifa="0.05")
+    filas = campanas.filas_cargadas(creada.id)  # 7: 5 de supervision y 2 productos
+    estados = ["enviado", "enviado", "enviado", "Enviado ", "fallido", "rechazado", "pendiente"]
+
+    estado = _importar(campanas, creada.id, _reporte_con_estados(filas, 70001, estados))
+
+    assert estado.conciliacion.total.enviados == 4  # E-1: sin distinguir mayusculas ni espacios
+    assert estado.costo_real.estado is EstadoCosto.CALCULADO
+    assert estado.costo_real.valor == Decimal("0.20")  # 4 x 0.05, no 7 x 0.05
+    assert estado.tarifa_sms == Decimal("0.05")
+    assert campanas.obtener(creada.id).enviados_conciliados == 4
+
+
+def test_un_reporte_sin_ningun_enviado_da_cero_calculado_y_no_pendiente() -> None:
+    _, campanas, creada = _campana_con_reportes()
+    filas = campanas.filas_cargadas(creada.id)
+
+    estado = _importar(campanas, creada.id, _reporte_con_estados(filas, 70001, ["fallido"] * 7))
+
+    assert estado.costo_real.estado is EstadoCosto.CALCULADO
+    assert estado.costo_real.valor == Decimal("0")
+    guardada = campanas.obtener(creada.id)
+    assert guardada.enviados_conciliados == 0
+    assert guardada.enviados_conciliados is not None
+
+
+def test_el_costo_real_usa_la_tarifa_congelada_de_la_campana_no_la_actual() -> None:
+    servicio, campanas, creada = _campana_con_reportes(tarifa="0.05")
+    _con_tarifa(servicio._mowa_mes, "0.10")
+    filas = campanas.filas_cargadas(creada.id)
+
+    estado = _importar(campanas, creada.id, _reporte_con_estados(filas, 70001, ["enviado"] * 7))
+
+    assert estado.tarifa_sms == Decimal("0.05")
+    assert estado.costo_real.valor == Decimal("0.35")  # con la actual serian 0.70
+
+
+def test_reemplazar_el_reporte_recalcula_los_enviados_guardados() -> None:
+    _, campanas, creada = _campana_con_reportes()
+    filas = campanas.filas_cargadas(creada.id)
+    _importar(campanas, creada.id, _reporte_con_estados(filas, 70001, ["enviado"] * 7))
+    assert campanas.obtener(creada.id).enviados_conciliados == 7
+
+    estado = _importar(
+        campanas,
+        creada.id,
+        _reporte_con_estados(filas, 70001, ["enviado"] * 3 + ["fallido"] * 4),
+        reemplazar=True,
+    )
+
+    assert estado.conciliacion.total.enviados == 3
+    assert campanas.obtener(creada.id).enviados_conciliados == 3
+
+
+def test_importar_un_segundo_id_de_mes_actualiza_el_conteo_con_todos_los_reportes() -> None:
+    _, campanas, creada = _campana_con_reportes()
+    filas = campanas.filas_cargadas(creada.id)
+    _importar(campanas, creada.id, _reporte_con_estados(filas[:4], 70001, ["enviado"] * 4))
+    assert campanas.obtener(creada.id).enviados_conciliados == 4
+
+    estado = _importar(campanas, creada.id, _reporte_con_estados(filas[4:], 70002, ["enviado"] * 3))
+
+    assert estado.conciliacion.total.enviados == 7
+    assert campanas.obtener(creada.id).enviados_conciliados == 7
+
+
+def test_mover_un_id_a_otra_campana_recalcula_las_dos() -> None:
+    servicio, campanas, _ = armar_servicio([producto(1), producto(2)])
+    primera = servicio.crear(peticion())
+    segunda = servicio.crear(peticion())
+    filas_primera = campanas.filas_cargadas(primera.id)
+    _importar(campanas, primera.id, _reporte_con_estados(filas_primera, 70001, ["enviado"] * 7))
+    assert campanas.obtener(primera.id).enviados_conciliados == 7
+
+    filas_segunda = campanas.filas_cargadas(segunda.id)
+    _importar(
+        campanas,
+        segunda.id,
+        _reporte_con_estados(filas_segunda, 70001, ["enviado"] * 2 + ["fallido"] * 5),
+        reemplazar=True,
+    )
+
+    assert campanas.obtener(segunda.id).enviados_conciliados == 2
+    # La primera se quedo sin reportes: vuelve a pendiente (null), no a 0.
+    assert campanas.obtener(primera.id).enviados_conciliados is None
+
+
+def test_sin_tarifa_el_costo_real_no_esta_disponible_aunque_haya_reporte() -> None:
+    _, campanas, creada = _campana_con_reportes()
+    campanas.campanas[creada.id] = replace(
+        campanas.campanas[creada.id], tarifa_sms=None, costo_estimado=None
+    )
+    filas = campanas.filas_cargadas(creada.id)
+
+    con_reporte = _importar(
+        campanas, creada.id, _reporte_con_estados(filas, 70001, ["enviado"] * 7)
+    )
+
+    assert con_reporte.costo_real.estado is EstadoCosto.NO_DISPONIBLE
+    assert con_reporte.costo_real.valor is None
+    assert con_reporte.tarifa_sms is None
+    # Los enviados de la conciliacion siguen saliendo, con o sin tarifa.
+    assert con_reporte.conciliacion.total.enviados == 7

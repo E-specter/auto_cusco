@@ -60,6 +60,12 @@ export type ProgramacionCampana = Esquemas['Programacion'];
 export type TipoCarga = Esquemas['TipoCarga'];
 export type Salida = Esquemas['Salida'];
 export type SupervisorCampanaEntrada = Esquemas['SupervisorCampanaEntrada'];
+export type PlantillaNombre = Esquemas['PlantillaNombreRespuesta'];
+export type VariablePlantilla = Esquemas['VariablePlantillaRespuesta'];
+/** The setting a 400 of the configuration (or of the campaign's template) is about. */
+export type CampoError = Esquemas['CampoConfiguracion'];
+export type EstadoCosto = Esquemas['EstadoCosto'];
+export type EstadoCostoEstimado = Esquemas['EstadoCostoEstimado'];
 
 function conJson(method: string, cuerpo: unknown, signal?: AbortSignal): RequestInit {
   return {
@@ -80,6 +86,18 @@ export function guardarConfiguracion(
   entrada: ConfiguracionMowaMesEntrada,
 ): Promise<ConfiguracionMowaMes> {
   return request<ConfiguracionMowaMes>('/mowa-mes/configuracion', conJson('PUT', entrada));
+}
+
+/**
+ * The file name a template would give, with the API's sample data: the same
+ * resolution creation uses, so the screen never works a name out itself. A
+ * template with an unknown variable or an unclosed brace answers 400 and says which.
+ */
+export function previsualizarPlantillaNombre(plantilla: string, signal?: AbortSignal): Promise<PlantillaNombre> {
+  return request<PlantillaNombre>(
+    '/mowa-mes/plantilla-nombre-archivo/previsualizacion',
+    conJson('POST', { plantilla }, signal),
+  );
 }
 
 // ---- Default supervisors (transversal) ----------------------------------------

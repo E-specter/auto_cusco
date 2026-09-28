@@ -11,6 +11,7 @@ from app.core.entities.mowa_mes import (
     BYTES_POR_ARCHIVO,
     BYTES_POR_ARCHIVO_MINIMO,
     REGISTROS_POR_ARCHIVO,
+    CampoConfiguracion,
     ConfiguracionInvalida,
     ConfiguracionMowaMes,
     DatosSpeech,
@@ -22,8 +23,9 @@ from app.core.entities.mowa_mes import (
     SpeechNoEncontrado,
     VersionSpeech,
 )
+from app.core.entities.mowa_mes_costo import PlantillaInvalida, TarifaInvalida
 from app.core.ports.repositorio_mowa_mes_port import RepositorioMowaMesPort
-from app.core.services.plataformas.mowa_mes import speech
+from app.core.services.plataformas.mowa_mes import costos, nombre_archivo, speech
 
 _NOMBRE_AUTOMATICO = re.compile(r"Speech (\d+)", re.IGNORECASE)
 
@@ -49,28 +51,62 @@ class ConfiguracionMowaMesService:
 
     def guardar_configuracion(self, configuracion: ConfiguracionMowaMes) -> ConfiguracionMowaMes:
         if configuracion.limite_mensual < 1:
-            raise ConfiguracionInvalida("El limite mensual debe ser mayor que cero")
+            raise ConfiguracionInvalida(
+                "El limite mensual debe ser mayor que cero", CampoConfiguracion.LIMITE_MENSUAL
+            )
         whatsapp = (configuracion.whatsapp_contacto or "").strip() or None
         if whatsapp is not None and not speech.whatsapp_valido(whatsapp):
             raise ConfiguracionInvalida(
-                "El WhatsApp de contacto debe tener 9 digitos y empezar con 9"
+                "El WhatsApp de contacto debe tener 9 digitos y empezar con 9",
+                CampoConfiguracion.WHATSAPP_CONTACTO,
             )
         if not 1 <= configuracion.registros_por_archivo <= REGISTROS_POR_ARCHIVO:
             raise ConfiguracionInvalida(
-                f"Las filas por archivo deben estar entre 1 y {REGISTROS_POR_ARCHIVO}"
+                f"Las filas por archivo deben estar entre 1 y {REGISTROS_POR_ARCHIVO}",
+                CampoConfiguracion.REGISTROS_POR_ARCHIVO,
             )
         if not BYTES_POR_ARCHIVO_MINIMO <= configuracion.bytes_por_archivo <= BYTES_POR_ARCHIVO:
             raise ConfiguracionInvalida(
                 f"Los bytes por archivo deben estar entre {BYTES_POR_ARCHIVO_MINIMO} y "
-                f"{BYTES_POR_ARCHIVO}"
+                f"{BYTES_POR_ARCHIVO}",
+                CampoConfiguracion.BYTES_POR_ARCHIVO,
             )
+        try:
+            tarifa = costos.validar_tarifa(configuracion.tarifa_sms)
+        except TarifaInvalida as exc:
+            raise ConfiguracionInvalida(str(exc), CampoConfiguracion.TARIFA_SMS) from exc
+        try:
+            plantilla = nombre_archivo.plantilla_valida(configuracion.plantilla_nombre_archivo)
+        except PlantillaInvalida as exc:
+            raise ConfiguracionInvalida(
+                str(exc), CampoConfiguracion.PLANTILLA_NOMBRE_ARCHIVO
+            ) from exc
         return self._repositorio.guardar_configuracion(
             ConfiguracionMowaMes(
                 limite_mensual=configuracion.limite_mensual,
                 whatsapp_contacto=whatsapp,
                 registros_por_archivo=configuracion.registros_por_archivo,
                 bytes_por_archivo=configuracion.bytes_por_archivo,
+                tarifa_sms=tarifa,
+                plantilla_nombre_archivo=plantilla,
             )
+        )
+
+    @staticmethod
+    def revisar_plantilla_nombre(plantilla: str | None) -> tuple[str, list[str]]:
+        """La plantilla validada y los nombres que daria con datos de muestra (RF-MM-25).
+
+        Es la misma resolucion de la creacion de campanas, con dos archivos de muestra.
+        No guarda nada.
+        """
+        try:
+            valida = nombre_archivo.plantilla_valida(plantilla)
+        except PlantillaInvalida as exc:
+            raise ConfiguracionInvalida(
+                str(exc), CampoConfiguracion.PLANTILLA_NOMBRE_ARCHIVO
+            ) from exc
+        return valida, nombre_archivo.resolver_nombres(
+            valida, nombre_archivo.CONTEXTO_EJEMPLO, nombre_archivo.CANTIDADES_EJEMPLO
         )
 
     # --- Speech ------------------------------------------------------

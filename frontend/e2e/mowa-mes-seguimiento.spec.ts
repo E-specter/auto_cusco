@@ -16,6 +16,7 @@ import {
   consumoSintetico,
   exclusionesSinteticas,
   montarApiMowaMes,
+  SIN_TARIFA_GUARDADA,
   type ApiFalsaMowaMes,
 } from './api-falsa-mowa-mes';
 
@@ -324,5 +325,169 @@ test.describe('idioma y conexión', () => {
 
     await expect(page.getByRole('heading', { name: 'Sin conexión con la API' })).toBeVisible();
     await expect(page.locator('[data-contenido]')).toBeHidden();
+  });
+});
+
+test.describe('F6-B: costos (RF-MM-24)', () => {
+  const fila = (page: Page, id: number) =>
+    page.locator('.mm-campanas__tabla tbody tr').filter({ hasText: `Campaña sintética ${id}` });
+  // After `total`: estimated, then real.
+  const COSTO_ESTIMADO = 7;
+  const COSTO_REAL = 8;
+  const AYUDA = 'Campaña creada antes de guardar la tarifa';
+
+  function tresCampanas(api: ApiFalsaMowaMes): void {
+    api.campanas = [
+      // Calculated estimate, no report yet: real cost pending.
+      campanaSintetica({ id: 3, descripcion: 'Campaña sintética 3' }),
+      // A report with zero sent: a real cost of 0.0000 that IS an amount.
+      campanaSintetica({ id: 2, descripcion: 'Campaña sintética 2', costo_real: '0.0000', costo_real_estado: 'calculado' }),
+      // Created before the rate was stored: neither cost is known.
+      campanaSintetica({ id: 1, descripcion: 'Campaña sintética 1', ...SIN_TARIFA_GUARDADA }),
+    ];
+  }
+
+  test('la tabla trae el costo estimado y el real en columnas propias, y el estado decide qué se lee', async ({
+    page,
+  }) => {
+    const api = apiMowaMes();
+    tresCampanas(api);
+    await abrir(page, api);
+
+    const cabeceras = page.locator('.mm-campanas__tabla thead th');
+    await expect(cabeceras.nth(COSTO_ESTIMADO)).toHaveText('Costo estimado');
+    await expect(cabeceras.nth(COSTO_REAL)).toHaveText('Costo real');
+
+    // An amount sits in the numeric column, formatted, never as a float.
+    const conMonto = fila(page, 3).locator('td').nth(COSTO_ESTIMADO);
+    await expect(conMonto).toHaveText('S/ 19.64');
+    await expect(conMonto).toHaveClass(/num/);
+
+    // No report yet: words, muted, not a number and not a zero.
+    const pendiente = fila(page, 3).locator('td').nth(COSTO_REAL);
+    await expect(pendiente).toHaveText('Pendiente del reporte');
+    await expect(pendiente).toHaveClass(/muted/);
+    await expect(pendiente).not.toHaveClass(/num/);
+    await expect(pendiente).not.toHaveAttribute('title', /.+/);
+
+    // Zero sent with a report: an amount, S/ 0.00, not "pending" and not "not available".
+    const cero = fila(page, 2).locator('td').nth(COSTO_REAL);
+    await expect(cero).toHaveText('S/ 0.00');
+    await expect(cero).toHaveClass(/num/);
+
+    // No stored rate: not available, with the reason for whoever asks for it.
+    for (const columna of [COSTO_ESTIMADO, COSTO_REAL]) {
+      const sinTarifa = fila(page, 1).locator('td').nth(columna);
+      await expect(sinTarifa).toHaveText('No disponible');
+      await expect(sinTarifa).toHaveClass(/muted/);
+      await expect(sinTarifa).toHaveAttribute('title', AYUDA);
+      await expect(sinTarifa).toHaveAttribute('aria-description', AYUDA);
+    }
+  });
+
+  test('el detalle da el costo estimado con su tarifa y el real según el estado', async ({ page }) => {
+    const api = apiMowaMes();
+    tresCampanas(api);
+    await abrir(page, api);
+
+    await expect(cifra(page, '[data-detalle-cifras]', 'Costo estimado')).toHaveText('S/ 19.64');
+    await expect(page.locator('[data-detalle-cifras] .stat', { hasText: 'Costo estimado' })).toContainText('Tarifa S/ 0.02');
+    await expect(cifra(page, '[data-detalle-cifras]', 'Costo real')).toHaveText('Pendiente del reporte');
+
+    await page.getByRole('button', { name: 'Ver la campaña 1' }).click();
+    await expect(page.getByRole('heading', { name: 'Campaña 1' })).toBeVisible();
+    await expect(cifra(page, '[data-detalle-cifras]', 'Costo estimado')).toHaveText('No disponible');
+    await expect(cifra(page, '[data-detalle-cifras]', 'Costo real')).toHaveText('No disponible');
+    await expect(page.locator('[data-detalle-cifras] .stat', { hasText: 'Costo real' })).toContainText(AYUDA);
+  });
+
+  test('importar el reporte trae el costo real al detalle, a la conciliación y a la fila de la lista', async ({
+    page,
+  }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    await expect(cifra(page, '[data-detalle-cifras]', 'Costo real')).toHaveText('Pendiente del reporte');
+
+    await importarReporte(page);
+
+    await expect(page.getByText('Reporte importado.')).toBeVisible();
+    // The reconciliation's own figures: 952 sent × S/ 0.02.
+    await expect(page.locator('.mm-conciliacion__costo')).toHaveText('Costo real: S/ 19.04 (952 enviados × S/ 0.02)');
+    await expect(cifra(page, '[data-detalle-cifras]', 'Costo real')).toHaveText('S/ 19.04');
+  });
+
+  test('sin tarifa guardada, la conciliación dice que el costo real no está disponible', async ({ page }) => {
+    const api = apiMowaMes();
+    api.campanas = [campanaSintetica({ ...SIN_TARIFA_GUARDADA })];
+    api.conciliaciones.set(1, conciliacionSintetica(1, { tarifa_sms: null, costo_real: null, costo_real_estado: 'no_disponible' }));
+    await abrir(page, api);
+
+    await expect(page.locator('.mm-conciliacion__costo')).toHaveText('Costo real: No disponible');
+  });
+
+  test('el costo del mes va junto al límite, y dice cuántas campañas deja fuera por no tener tarifa', async ({ page }) => {
+    const api = apiMowaMes();
+    api.consumo = (mes) => consumoSintetico(mes, { costo_mes: '1234.5000', costo_total: '1234.5000', campanas_sin_tarifa: 2 });
+    await abrir(page, api);
+
+    await expect(page.locator('[data-costo-mes]')).toHaveText('Costo del mes: S/ 1,234.50 · no incluye 2 campañas sin tarifa');
+    // Its own line right under the limit's figures, with nothing in between.
+    await expect(page.locator('[data-limite-cifras] + [data-costo-mes]')).toHaveCount(1);
+    // The amount in the numeral scale of the limit's figures; the note muted.
+    const fuente = (selector: string) =>
+      page.locator(selector).first().evaluate((el) => {
+        const estilo = getComputedStyle(el);
+        return { familia: estilo.fontFamily, tamano: estilo.fontSize, peso: estilo.fontWeight };
+      });
+    expect(await fuente('[data-costo-mes-valor]')).toEqual(await fuente('[data-limite-cifras] .stat__value'));
+    await expect(page.locator('[data-costo-mes-nota]')).toHaveClass(/muted/);
+  });
+
+  test('con una sola campaña sin tarifa lo dice en singular, y con ninguna no agrega nada', async ({ page }) => {
+    const api = apiMowaMes();
+    const anterior = mesRelativo(-1);
+    api.consumo = (mes) =>
+      mes === anterior ? consumoSintetico(mes, { campanas_sin_tarifa: 1 }) : consumoSintetico(mes);
+    await abrir(page, api);
+
+    await expect(page.locator('[data-costo-mes]')).toHaveText('Costo del mes: S/ 19.64');
+    // No campaign without a rate: no note at all, not even an empty muted element.
+    await expect(page.locator('[data-costo-mes-nota]')).toBeHidden();
+
+    await page.getByRole('button', { name: 'Mes anterior' }).click();
+    await expect(page.locator('[data-costo-mes]')).toHaveText('Costo del mes: S/ 19.64 · no incluye 1 campaña sin tarifa');
+  });
+
+  test('la tabla de archivos da el nombre real de cada archivo, con su .xlsx', async ({ page }) => {
+    const api = apiMowaMes();
+    api.campanas = [
+      campanaSintetica({
+        archivos: [
+          { numero: 1, filas: 500, supervision: 2, bytes: 30_000, nombre: 'carga_mayo_1de2.xlsx' },
+          { numero: 2, filas: 482, supervision: 0, bytes: 29_000, nombre: 'carga_mayo_2de2.xlsx' },
+        ],
+      }),
+    ];
+    await abrir(page, api);
+
+    await expect(page.locator('.mm-archivos__tabla thead th').nth(1)).toHaveText('Nombre');
+    await expect(page.locator('.mm-archivos__tabla tbody tr').nth(0).getByRole('cell', { name: 'carga_mayo_1de2.xlsx' })).toBeVisible();
+    await expect(page.locator('.mm-archivos__tabla tbody tr').nth(1).getByRole('cell', { name: 'carga_mayo_2de2.xlsx' })).toBeVisible();
+  });
+
+  test('en inglés traduce los estados y el costo del mes', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    const api = apiMowaMes();
+    api.campanas = [campanaSintetica({ ...SIN_TARIFA_GUARDADA })];
+    api.consumo = (mes) => consumoSintetico(mes, { campanas_sin_tarifa: 3 });
+    await montarApiMowaMes(page, api);
+    await page.goto(RUTA);
+
+    await expect(page.locator('[data-costo-mes]')).toHaveText('Cost of the month: S/ 19.64 · leaves out 3 campaigns without a rate');
+    const sin = page.locator('.mm-campanas__tabla tbody tr').first().locator('td').nth(COSTO_ESTIMADO);
+    await expect(sin).toHaveText('Not available');
+    await expect(sin).toHaveAttribute('title', 'Campaign created before the rate was stored');
   });
 });

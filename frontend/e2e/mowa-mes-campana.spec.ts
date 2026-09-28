@@ -13,6 +13,7 @@
  * Every value is synthetic: phones in 900000xxx, promissory notes numeric,
  * MES ids in 99xxxxxxx.
  */
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 import type { Campos, SeleccionGuardada, Version } from '../src/lib/api';
@@ -434,7 +435,7 @@ test.describe('P7: creación y descarga', () => {
       archivos_previstos_por_filas: [{ numero: 1, filas: 982, supervision: 2 }],
     });
     api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previa }];
-    const creada = campanaDesdeEntrada(bodyFrom(previa), 9, { archivos: [{ numero: 1, filas: 982, supervision: 2, bytes: 41_500 }] });
+    const creada = campanaDesdeEntrada(bodyFrom(previa), 9, { archivos: [{ numero: 1, filas: 982, supervision: 2, bytes: 41_500, nombre: 'mowa_mes_campana_9_1_de_1.xlsx' }] });
     // A scripted response for POST /mowa-mes/campanas answers the create call
     // directly and skips the fake's own bookkeeping, so the download route
     // (which looks the campaign up by id) needs it added here too.
@@ -668,5 +669,383 @@ test.describe('F6-A: paginación de la previsualización (RF-MM-26)', () => {
     await expect(
       page.getByRole('group', { name: 'Sample pagination' }).getByRole('button', { name: 'Next' }),
     ).toBeEnabled();
+  });
+});
+
+test.describe('F6-B: nombre de los archivos y costo estimado (RF-MM-24, RF-MM-25)', () => {
+  const plantilla = (page: Page) => page.getByLabel('Nombre de los archivos');
+  const nombre = (page: Page) => page.locator('[data-nombre-primer-archivo]');
+  const errorPlantilla = (page: Page) => page.locator('[data-plantilla-error]');
+
+  test('la plantilla llega precargada desde la configuración, con las variables que manda la API', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    // The form only shows once a saved selection is loaded.
+    await elegirSeleccionGuardada(page);
+
+    await expect(plantilla(page)).toHaveValue('mowa_mes_campana_{campana}_{archivo}_de_{total}');
+    // A labelled group that follows the field in the DOM, right after it.
+    await expect(page.locator('#mm-plantilla + [data-plantilla-variables]')).toHaveCount(1);
+    await expect(
+      page.getByRole('group', { name: 'Variables de la plantilla' }).getByRole('button'),
+    ).toHaveText(['{campana}', '{descripcion}', '{fecha_envio}', '{fecha_corte}', '{archivo}', '{total}', '{cantidad}']);
+  });
+
+  test('sin tocarla no viaja (usa la de la configuración); editada, viaja tal cual', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+    await expect(page.locator('[data-resultado]')).toBeVisible();
+    const previas = () => pedidosDePrevisualizacion(api);
+    expect((previas().at(-1)?.cuerpo as Record<string, unknown>).plantilla_nombre_archivo).toBeNull();
+
+    await plantilla(page).fill('carga_{fecha_corte}');
+    await expect(nombre(page)).toHaveText('carga_2026-09-13.xlsx');
+    expect((previas().at(-1)?.cuerpo as Record<string, unknown>).plantilla_nombre_archivo).toBe('carga_{fecha_corte}');
+
+    // Back to exactly the configured one: it stops travelling.
+    await plantilla(page).fill('mowa_mes_campana_{campana}_{archivo}_de_{total}');
+    await expect(nombre(page)).toHaveText('mowa_mes_campana_[campana]_1_de_1.xlsx');
+    expect((previas().at(-1)?.cuerpo as Record<string, unknown>).plantilla_nombre_archivo).toBeNull();
+  });
+
+  test('el nombre del primer archivo es el de la API, con [campana] como marcador, y avisa cuando es estimado', async ({
+    page,
+  }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+
+    await expect(nombre(page)).toHaveText('mowa_mes_campana_[campana]_1_de_1.xlsx');
+    await expect(page.getByText('Nombre del primer archivo:')).toBeVisible();
+    // The default uses {archivo} and {total}: it depends on how the load is split.
+    await expect(page.locator('[data-nombre-estimado]')).toBeVisible();
+    await expect(page.locator('[data-nombre-estimado]')).toContainText('Estimado');
+
+    // A template that does not depend on the split is not an estimate.
+    await plantilla(page).fill('carga_{descripcion}');
+    await expect(nombre(page)).toHaveText('carga_CajaCusco 9 _= dias atraso _= 30.xlsx');
+    await expect(page.locator('[data-nombre-estimado]')).toBeHidden();
+  });
+
+  test('sin archivos previstos no hay nombre que mostrar', async ({ page }) => {
+    const api = apiMowaMes();
+    api.respuestas.previsualizarCampana = [
+      {
+        estado: 200,
+        cuerpo: previsualizacionCampanaSintetica(entradaMinima(), {
+          archivos_previstos_por_filas: [],
+          nombre_primer_archivo: null,
+          nombre_estimado: false,
+          puede_crear: false,
+        }),
+      },
+    ];
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+
+    await expect(page.locator('[data-resultado]')).toBeVisible();
+    await expect(page.locator('[data-nombre-archivo]')).toBeHidden();
+    await expect(page.locator('[data-nombre-estimado]')).toBeHidden();
+  });
+
+  test('el costo estimado va en las cifras, ya calculado, con su hint de SMS por tarifa', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+
+    const costo = page.locator('[data-cifras] .stat', { hasText: 'Costo estimado' });
+    await expect(costo.locator('.stat__value')).toHaveText('S/ 19.64');
+    await expect(costo).toContainText('982 SMS × S/ 0.02');
+  });
+
+  test('el monto llega como texto y se formatea sin pasar por un número', async ({ page }) => {
+    const api = apiMowaMes();
+    api.respuestas.previsualizarCampana = [
+      {
+        estado: 200,
+        cuerpo: previsualizacionCampanaSintetica(entradaMinima(), {
+          // More digits than a float keeps: it must come out exactly.
+          costo_estimado: '12345678901234567.8900',
+          tarifa_sms: '0.0215',
+        }),
+      },
+    ];
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+
+    const costo = page.locator('[data-cifras] .stat', { hasText: 'Costo estimado' });
+    await expect(costo.locator('.stat__value')).toHaveText('S/ 12,345,678,901,234,567.89');
+    await expect(costo).toContainText('S/ 0.0215');
+  });
+
+  test('una variable desconocida se marca con la lista de la API y no pide otra previsualización', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+    await expect(page.locator('[data-resultado]')).toBeVisible();
+    const antes = pedidosDePrevisualizacion(api).length;
+
+    await plantilla(page).fill('carga_{banco}');
+
+    await expect(errorPlantilla(page)).toHaveText('No es una variable de la plantilla: {banco}. Usa las de los botones.');
+    await expect(plantilla(page)).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('[data-resultado]')).toBeHidden();
+    await page.waitForTimeout(700);
+    expect(pedidosDePrevisualizacion(api)).toHaveLength(antes);
+    await expect(page.getByRole('button', { name: 'Crear campaña' })).toBeDisabled();
+
+    await plantilla(page).fill('carga_{campana}');
+    await expect(errorPlantilla(page)).toHaveText('');
+    await expect(page.locator('[data-resultado]')).toBeVisible();
+  });
+
+  test('un 400 de la API sobre la plantilla se muestra junto al campo, no en un diálogo', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+    await expect(page.locator('[data-resultado]')).toBeVisible();
+    api.respuestas.previsualizarCampana = [
+      { estado: 400, cuerpo: { detail: 'La plantilla tiene una llave { sin cerrar', campo: 'plantilla_nombre_archivo' } },
+    ];
+
+    await plantilla(page).fill('carga_{campana');
+
+    await expect(errorPlantilla(page)).toHaveText('La plantilla tiene una llave { sin cerrar');
+    await expect(plantilla(page)).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByRole('dialog')).toBeHidden();
+  });
+
+  test('un 400 de la previsualización sin campo (null) va al aviso general, aunque el texto hable de la plantilla', async ({
+    page,
+  }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+    await expect(page.locator('[data-resultado]')).toBeVisible();
+    api.respuestas.previsualizarCampana = [
+      { estado: 400, cuerpo: { detail: 'Un motivo nuevo que nombra la plantilla sin serlo', campo: null } },
+    ];
+
+    await page.getByLabel('WhatsApp de la campaña').fill('900000555');
+
+    // The general notice (the error dialog), not the field: the words do not place the error.
+    const dialogo = page.getByRole('dialog');
+    await expect(dialogo).toBeVisible();
+    await expect(dialogo).toContainText('Un motivo nuevo que nombra la plantilla sin serlo');
+    await expect(errorPlantilla(page)).toHaveText('');
+    await expect(plantilla(page)).not.toHaveAttribute('aria-invalid', 'true');
+  });
+
+  test('un 400 de la previsualización sin el campo en el cuerpo tampoco se ubica en la plantilla', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+    await expect(page.locator('[data-resultado]')).toBeVisible();
+    api.respuestas.previsualizarCampana = [{ estado: 400, cuerpo: { detail: 'La plantilla tiene una llave { sin cerrar' } }];
+
+    await page.getByLabel('WhatsApp de la campaña').fill('900000555');
+
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(errorPlantilla(page)).toHaveText('');
+  });
+
+  test('la previsualización rechaza una plantilla de más de 300 caracteres y lo dice junto al campo', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+    await expect(page.locator('[data-resultado]')).toBeVisible();
+
+    await plantilla(page).fill(`{campana}${'x'.repeat(300)}`);
+
+    await expect(errorPlantilla(page)).toHaveText('La plantilla no puede pasar de 300 caracteres');
+    await expect(page.getByRole('dialog')).toBeHidden();
+  });
+
+  test('un 400 al crear con el campo de la plantilla se muestra en el campo y lo enfoca', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+    await expect(page.getByRole('button', { name: 'Crear campaña' })).toBeEnabled();
+    api.respuestas.crearCampana = [
+      { estado: 400, cuerpo: { detail: 'La plantilla no puede pasar de 300 caracteres', campo: 'plantilla_nombre_archivo' } },
+    ];
+
+    await page.getByRole('button', { name: 'Crear campaña' }).click();
+
+    await expect(errorPlantilla(page)).toHaveText('La plantilla no puede pasar de 300 caracteres');
+    await expect(plantilla(page)).toBeFocused();
+    await expect(page.locator('[data-crear-error]')).toHaveText('');
+  });
+
+  test('un 400 al crear sin campo se muestra junto al botón, no en la plantilla', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+    await expect(page.getByRole('button', { name: 'Crear campaña' })).toBeEnabled();
+    api.respuestas.crearCampana = [{ estado: 400, cuerpo: { detail: 'La campaña no tiene supervisores', campo: null } }];
+
+    await page.getByRole('button', { name: 'Crear campaña' }).click();
+
+    await expect(page.locator('[data-crear-error]')).toHaveText('La campaña no tiene supervisores');
+    await expect(errorPlantilla(page)).toHaveText('');
+  });
+
+  test('un botón inserta la variable en el cursor y la previsualización se vuelve a pedir', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+    await expect(page.locator('[data-resultado]')).toBeVisible();
+
+    await plantilla(page).fill('carga_.final');
+    await plantilla(page).evaluate((el: HTMLInputElement) => el.setSelectionRange(6, 6));
+    await page.getByRole('group', { name: 'Variables de la plantilla' }).getByRole('button', { name: '{fecha_envio}' }).click();
+
+    await expect(plantilla(page)).toHaveValue('carga_{fecha_envio}.final');
+    await expect(plantilla(page)).toBeFocused();
+    await expect(nombre(page)).toHaveText('carga_2026-09-17.final.xlsx');
+  });
+
+  test('crear manda la plantilla editada y la campaña creada trae los nombres reales', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+    await plantilla(page).fill('carga_{campana}');
+    await expect(nombre(page)).toHaveText('carga_[campana].xlsx');
+
+    await page.getByRole('button', { name: 'Crear campaña' }).click();
+
+    await expect(page.getByRole('heading', { name: /creada$/ })).toBeVisible();
+    const [envio] = api.pedidos.filter((p) => p.ruta === '/mowa-mes/campanas' && p.metodo === 'POST');
+    expect((envio.cuerpo as Record<string, unknown>).plantilla_nombre_archivo).toBe('carga_{campana}');
+    // The fake stores the real names the API would: {campana} became the id.
+    expect(api.campanas[0].archivos[0].nombre).toBe('carga_2.xlsx');
+  });
+
+  test('en inglés traduce el rótulo, el hint y el aviso de estimado', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    const api = apiMowaMes();
+    await montarApiMowaMes(page, api);
+    await montarSeleccion(page, seleccionFalsa());
+    await page.goto(RUTA);
+    await page.getByLabel('Saved selection').selectOption({ label: 'Preventiva top 1000' });
+
+    await expect(page.getByLabel('File names')).toHaveValue('mowa_mes_campana_{campana}_{archivo}_de_{total}');
+    await expect(page.getByText('Name of the first file:')).toBeVisible();
+    await expect(page.locator('[data-nombre-estimado]')).toContainText('Estimated');
+    const costo = page.locator('[data-cifras] .stat', { hasText: 'Estimated cost' });
+    await expect(costo).toContainText('982 SMS × S/ 0.02');
+  });
+});
+
+test.describe('F6-B: las tablas de la previsualización se apilan en pantallas angostas (hallazgo de C3)', () => {
+  /** A sample of 20 with long messages, the case that used to split letter by letter. */
+  function previaConMensajesLargos() {
+    return previsualizacionCampanaSintetica(entradaMinima(), {
+      muestra: Array.from({ length: 20 }, (_, i) => ({
+        numero: `900000${String(i + 1).padStart(3, '0')}`,
+        mensaje: 'Mensaje sintetico de prueba con un largo parecido al real para ver como se parte en pantallas angostas',
+        dni: `00${String(100000 + i)}`,
+        supervision: i === 0,
+        pagare: `${'0'.repeat(14)}${String(1000 + i)}`,
+        segmento: '9_a_30' as const,
+        largo: 118,
+        advertencias: i % 3 === 0 ? (['documento_no_estandar'] as CodigoMowaMes[]) : ([] as CodigoMowaMes[]),
+      })),
+      exclusiones: exclusionesSinteticas30(),
+    });
+  }
+
+  function exclusionesSinteticas30() {
+    return {
+      total: 30,
+      limite: 100,
+      desplazamiento: 0,
+      exclusiones: Array.from({ length: 30 }, (_, i) => ({
+        pagare: `${'0'.repeat(14)}${String(2000 + i)}`,
+        codigo: 'telefono_invalido' as const,
+      })),
+    };
+  }
+
+  /** Rows of a sensible height: 194–219 px once stacked at 360 px, ~350 px when they were not. */
+  const ALTO_MAXIMO_DE_FILA = 240;
+
+  async function abrirAngosto(page: Page, ancho: number): Promise<ApiFalsaMowaMes> {
+    await page.setViewportSize({ width: ancho, height: 900 });
+    const api = apiMowaMes();
+    api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaConMensajesLargos() }];
+    await abrir(page, api);
+    await elegirSeleccionGuardada(page);
+    await expect(page.locator('.mm-muestra__tabla tbody tr').first()).toBeVisible();
+    return api;
+  }
+
+  for (const ancho of [360, 640]) {
+    test(`a ${ancho} px la muestra y las exclusiones no desbordan y sus filas no se estiran`, async ({ page }) => {
+      await abrirAngosto(page, ancho);
+
+      for (const tabla of ['.mm-muestra__tabla', '.mm-exclusiones__tabla']) {
+        const medida = await page.locator(tabla).evaluate((el) => {
+          const contenedor = el.closest('.table-scroll') as HTMLElement;
+          return { scroll: contenedor.scrollWidth, cliente: contenedor.clientWidth };
+        });
+        // No sideways scroll inside the table's own container...
+        expect(medida.scroll, `${tabla} desborda a ${ancho}px`).toBeLessThanOrEqual(medida.cliente + 1);
+      }
+      // ...nor of the page.
+      const pagina = await page.evaluate(() => ({
+        scroll: document.documentElement.scrollWidth,
+        cliente: document.documentElement.clientWidth,
+      }));
+      expect(pagina.scroll).toBeLessThanOrEqual(pagina.cliente);
+
+      // Rows read as blocks: each cell names itself, and the message is not split letter by letter.
+      const primera = page.locator('.mm-muestra__tabla tbody tr').nth(1);
+      await expect(primera.locator('td').nth(4)).toHaveCSS('display', 'block');
+      const alto = (await primera.boundingBox())!.height;
+      expect(alto, `fila de la muestra a ${ancho}px: ${Math.round(alto)}px`).toBeLessThan(ALTO_MAXIMO_DE_FILA);
+      // The message takes the block's width; the wide layout's 32ch cap must not follow it here.
+      const mensaje = await primera.locator('td').nth(4).boundingBox();
+      expect(mensaje!.width).toBeGreaterThan(ancho === 360 ? 150 : 350);
+      const exclusion = (await page.locator('.mm-exclusiones__tabla tbody tr').first().boundingBox())!;
+      expect(exclusion.height).toBeLessThan(ALTO_MAXIMO_DE_FILA);
+    });
+  }
+
+  test('a 360 px cada celda se nombra sola y las que no tienen contenido no ocupan un bloque', async ({ page }) => {
+    await abrirAngosto(page, 360);
+
+    const fila = page.locator('.mm-muestra__tabla tbody tr').nth(1);
+    const etiquetas = await fila.locator('td').evaluateAll((celdas) =>
+      celdas.map((c) => (c as HTMLElement).dataset.etiqueta ?? ''),
+    );
+    expect(etiquetas).toEqual(['Número', 'DNI', 'Segmento', 'Largo', 'Mensaje', 'Advertencias']);
+    // The second row has no warnings: its warnings cell takes no room.
+    await expect(fila.locator('td').nth(5)).toHaveCSS('display', 'none');
+    // The first row does have one.
+    await expect(page.locator('.mm-muestra__tabla tbody tr').first().locator('td').nth(5)).not.toHaveCSS('display', 'none');
+  });
+
+  test('a 360 px axe no encuentra violaciones en la previsualización', async ({ page }) => {
+    await abrirAngosto(page, 360);
+
+    const resultado = await new AxeBuilder({ page })
+      .include('[data-resultado]')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect(resultado.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
+  });
+
+  test('en pantalla ancha la tabla sigue siendo una tabla, con la columna del mensaje acotada', async ({ page }) => {
+    await abrirAngosto(page, 1280);
+
+    const fila = page.locator('.mm-muestra__tabla tbody tr').nth(1);
+    await expect(fila).toHaveCSS('display', 'table-row');
+    const celdaMensaje = fila.locator('td').nth(4);
+    expect((await celdaMensaje.boundingBox())!.width).toBeLessThan(400);
+    expect((await fila.boundingBox())!.height).toBeLessThan(90);
   });
 });

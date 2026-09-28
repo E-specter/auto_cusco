@@ -9,10 +9,17 @@ guardada, el speech y los supervisores por defecto pueden cambiar despues.
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from decimal import Decimal
 from enum import StrEnum
 
 from app.core.entities.gestiones_digitales import Supervisor
-from app.core.entities.mowa_mes import CodigoMowaMes, Programacion, Segmento, VersionSpeech
+from app.core.entities.mowa_mes import (
+    CampoConfiguracion,
+    CodigoMowaMes,
+    Programacion,
+    Segmento,
+    VersionSpeech,
+)
 
 CABECERAS_CARGA = ("numero", "mensaje", "dni")  # RF-MM-10
 HOJA_CARGA = "Hoja1"
@@ -74,6 +81,7 @@ class PeticionCampana:
     whatsapp: str | None = None  # None: el de la configuracion
     supervisores: tuple[Supervisor, ...] | None = None  # None: la lista por defecto
     confirmar_limite: bool = False
+    plantilla_nombre_archivo: str | None = None  # None: la de la configuracion (RF-MM-25)
 
 
 @dataclass(frozen=True)
@@ -109,12 +117,23 @@ class ErrorCampana:
 
 @dataclass(frozen=True)
 class ConsumoLimite:
-    """Consumo del limite mensual (RF-MM-01), imputado al mes de la fecha de envio (S-MM-7)."""
+    """Consumo del limite mensual (RF-MM-01), imputado al mes de la fecha de envio (S-MM-7).
+
+    Lleva al lado el costo estimado del mes (RF-MM-24), que suma las campanas del
+    mismo mes con su tarifa guardada; las que no tienen tarifa se cuentan aparte.
+    """
 
     mes: date  # primer dia del mes
     limite: int
     cargados_mes: int
     esta_campana: int = 0
+    costo_mes: Decimal = Decimal(0)
+    campanas_sin_tarifa: int = 0
+    costo_esta_campana: Decimal | None = None  # None: no hay campana en curso
+
+    @property
+    def costo_total(self) -> Decimal:
+        return self.costo_mes + (self.costo_esta_campana or Decimal(0))
 
     @property
     def total(self) -> int:
@@ -154,6 +173,7 @@ class ArchivoResumen:
     filas: int
     supervision: int
     bytes: int
+    nombre: str  # el nombre resuelto al crear la campana, con extension (RF-MM-25)
 
 
 @dataclass(frozen=True)
@@ -184,6 +204,11 @@ class CampanaArmada:
     exclusiones: tuple[Exclusion, ...]
     errores: tuple[ErrorCampana, ...]
     consumo: ConsumoLimite
+    tarifa_sms: Decimal  # la de la configuracion en este momento; la creacion la congela
+    costo_estimado: Decimal  # cargados (supervision incluida) por la tarifa (RF-MM-24)
+    plantilla_nombre_archivo: str  # la de la peticion o, sin ella, la de la configuracion
+    nombre_primer_archivo: str | None  # con `[campana]` como marcador; None sin archivos
+    nombre_estimado: bool  # depende de como se divida la carga (D-1)
 
     @property
     def productos_cargados(self) -> int:
@@ -237,6 +262,12 @@ class CampanaRegistrada:
     advertencias: int
     confirmo_limite: bool
     archivos: tuple[ArchivoResumen, ...]
+    tarifa_sms: Decimal | None  # congelada al crearla; None en las anteriores a RF-MM-23
+    costo_estimado: Decimal | None  # None sin tarifa: no disponible, no cero
+    # Derivado: enviados (E-1) de la conciliacion vigente, que mantiene la transaccion del
+    # reporte. None = sin reporte importado; 0 = se importo y no se envio nada. Solo sirve
+    # para el costo real del listado; las cifras de la conciliacion salen de conciliar().
+    enviados_conciliados: int | None = None
 
     @property
     def total_cargados(self) -> int:
@@ -248,7 +279,15 @@ class CampanaRegistrada:
 
 
 class PeticionCampanaInvalida(Exception):
-    """Un input de la campana no se puede usar tal como viene."""
+    """Un input de la campana no se puede usar tal como viene.
+
+    `campo` dice a cual pertenece cuando el frontend lo puede ubicar en su pantalla
+    (hoy solo la plantilla del nombre de los archivos); None si no es de un campo.
+    """
+
+    def __init__(self, mensaje: str, campo: CampoConfiguracion | None = None) -> None:
+        super().__init__(mensaje)
+        self.campo = campo
 
 
 class CampanaInvalida(Exception):

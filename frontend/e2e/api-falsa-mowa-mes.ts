@@ -199,6 +199,106 @@ export function diasSinteticos(anio: number): DiaNoLaborable[] {
   ];
 }
 
+// ---- Costs and file names (T-MM-F6, B8's contract) ----------------------------------
+
+/** What the API stores by default (RF-MM-23, RF-MM-25). Amounts travel as text, 4 decimals. */
+export const TARIFA_POR_DEFECTO = '0.0200';
+export const PLANTILLA_POR_DEFECTO = 'mowa_mes_campana_{campana}_{archivo}_de_{total}';
+
+/** The valid variables, in the order the requirement lists them. */
+export const VARIABLES_PLANTILLA: Array<{ nombre: string; descripcion: string }> = [
+  { nombre: 'campana', descripcion: 'Numero de la campana en el sistema' },
+  { nombre: 'descripcion', descripcion: 'Descripcion de la campana' },
+  { nombre: 'fecha_envio', descripcion: 'Fecha de envio, en formato AAAA-MM-DD' },
+  { nombre: 'fecha_corte', descripcion: 'Fecha de corte de la sabana, en formato AAAA-MM-DD' },
+  { nombre: 'archivo', descripcion: 'Numero del archivo dentro de la campana (1, 2, ...)' },
+  { nombre: 'total', descripcion: 'Cantidad de archivos de la campana' },
+  { nombre: 'cantidad', descripcion: 'Filas de ese archivo, incluida la supervision si va en el' },
+];
+
+/** `unidades` × `tarifa`, both as the API sends them, without floats: 4 decimals. */
+export function montoSintetico(unidades: number, tarifa: string = TARIFA_POR_DEFECTO): string {
+  const [enteros, decimales = ''] = tarifa.split('.');
+  const diezmilesimas = Number(enteros + decimales.padEnd(4, '0').slice(0, 4));
+  const total = unidades * diezmilesimas;
+  return `${Math.floor(total / 10_000)}.${String(total % 10_000).padStart(4, '0')}`;
+}
+
+/**
+ * A test double of the API's template check: the same message for an unknown
+ * variable (named) or an unclosed brace, so a scenario can show a 400. It does
+ * not reproduce the name sanitising rules, which are the backend's own.
+ */
+export function errorDePlantilla(plantilla: string): string | null {
+  if (plantilla.length > 300) return 'La plantilla no puede pasar de 300 caracteres';
+  const resto = plantilla.replace(/\{([^{}]*)\}/g, '');
+  if (resto.includes('{')) return 'La plantilla tiene una llave { sin cerrar';
+  if (resto.includes('}')) return 'La plantilla tiene una llave } sin abrir';
+  for (const coincidencia of plantilla.matchAll(/\{([^{}]*)\}/g)) {
+    if (!VARIABLES_PLANTILLA.some((v) => v.nombre === coincidencia[1])) {
+      const validas = VARIABLES_PLANTILLA.map((v) => `{${v.nombre}}`).join(', ');
+      return `{${coincidencia[1]}} no es una variable de la plantilla. Variables validas: ${validas}`;
+    }
+  }
+  return null;
+}
+
+interface ContextoNombreFalso {
+  campana: string;
+  descripcion: string;
+  fechaEnvio: string;
+  fechaCorte: string;
+}
+
+/** One name per file; the automatic suffix enters when several files and no `{archivo}`. */
+function nombresSinteticos(plantilla: string, contexto: ContextoNombreFalso, cantidades: number[]): string[] {
+  const efectiva = plantilla.trim() === '' ? PLANTILLA_POR_DEFECTO : plantilla;
+  const usaArchivo = efectiva.includes('{archivo}');
+  return cantidades.map((cantidad, i) => {
+    const valores: Record<string, string> = {
+      campana: contexto.campana,
+      descripcion: contexto.descripcion,
+      fecha_envio: contexto.fechaEnvio,
+      fecha_corte: contexto.fechaCorte,
+      archivo: String(i + 1),
+      total: String(cantidades.length),
+      cantidad: String(cantidad),
+    };
+    // The API replaces what Windows does not accept in a file name by an underscore.
+    const cuerpo = efectiva
+      .replace(/\{([^{}]*)\}/g, (_, nombre: string) => valores[nombre] ?? '')
+      .replace(/[\\/:*?"<>|]/g, '_');
+    const sufijo = cantidades.length > 1 && !usaArchivo ? `_${i + 1}de${cantidades.length}` : '';
+    return `${cuerpo}${sufijo}.xlsx`;
+  });
+}
+
+/** The API's own sample for the configuration screen: two files, RF-MM-25's example. */
+export function nombresDeEjemplo(plantilla: string): string[] {
+  return nombresSinteticos(
+    plantilla,
+    { campana: '1234', descripcion: 'CajaCusco', fechaEnvio: '2026-10-01', fechaCorte: '2026-09-30' },
+    [50_000, 1_200],
+  );
+}
+
+/** What the campaign preview and creation are built with: the configured rate and template. */
+export interface ContextoCostos {
+  tarifa: string;
+  plantilla: string;
+}
+
+const CONTEXTO_POR_DEFECTO: ContextoCostos = { tarifa: TARIFA_POR_DEFECTO, plantilla: PLANTILLA_POR_DEFECTO };
+
+/** The amounts fields of a campaign created without a stored rate (before RF-MM-23). */
+export const SIN_TARIFA_GUARDADA = {
+  tarifa_sms: null,
+  costo_estimado: null,
+  costo_estimado_estado: 'no_disponible',
+  costo_real: null,
+  costo_real_estado: 'no_disponible',
+} as const;
+
 // ---- Follow-up (T-MM-F3) ----------------------------------------------------------
 
 /** A generated campaign with synthetic figures: 980 products and 2 supervisors. */
@@ -235,7 +335,12 @@ export function campanaSintetica(parcial: Partial<Campana> = {}): Campana {
     excluidos: 20,
     advertencias: 35,
     confirmo_limite: false,
-    archivos: [{ numero: 1, filas: 982, supervision: 2, bytes: 41_500 }],
+    archivos: [{ numero: 1, filas: 982, supervision: 2, bytes: 41_500, nombre: 'mowa_mes_campana_1_1_de_1.xlsx' }],
+    tarifa_sms: TARIFA_POR_DEFECTO,
+    costo_estimado: montoSintetico(982),
+    costo_estimado_estado: 'calculado',
+    costo_real: null,
+    costo_real_estado: 'pendiente',
     ...parcial,
   };
 }
@@ -265,6 +370,9 @@ export function conciliacionSintetica(campanaId = 1, parcial: Partial<Conciliaci
     sin_correspondencia_por_estado: [{ estado: 'enviado', cantidad: 8 }],
     por_id: [{ mes_id: 990000001, filas: 985, con_correspondencia: 977 }],
     advertencias: [],
+    tarifa_sms: TARIFA_POR_DEFECTO,
+    costo_real: montoSintetico(952),
+    costo_real_estado: 'calculado',
     ...parcial,
   };
 }
@@ -278,9 +386,18 @@ export function consumoSintetico(mes: string, parcial: Partial<ConsumoLimite> = 
     total: 982,
     disponible: 2_499_018,
     excedido: false,
+    costo_mes: montoSintetico(982),
+    campanas_sin_tarifa: 0,
+    // Only the preview knows this campaign's cost; the month's own reads leave it out.
+    costo_esta_campana: null,
+    costo_total: montoSintetico(982),
     ...parcial,
   };
 }
+
+/** What a scenario may hand back for a month: the original fields, the cost ones optional. */
+export type ConsumoParcial = Omit<ConsumoLimite, 'costo_mes' | 'campanas_sin_tarifa' | 'costo_esta_campana' | 'costo_total'> &
+  Partial<ConsumoLimite>;
 
 const EXCLUSIONES_EN_ORDEN: CodigoMowaMes[] = [
   'telefono_invalido',
@@ -327,7 +444,8 @@ const SIN_ERRORES_NI_ADVERTENCIAS: { errores: AvisoCampana[]; advertencias: Avis
  */
 export function previsualizacionCampanaSintetica(
   entrada: PeticionCampanaEntrada,
-  parcial: Partial<PrevisualizacionCampana> = {},
+  parcial: Omit<Partial<PrevisualizacionCampana>, 'limite'> & { limite?: ConsumoParcial } = {},
+  contexto: ContextoCostos = CONTEXTO_POR_DEFECTO,
 ): PrevisualizacionCampana {
   const cantidad = entrada.cantidad;
   const excluidos = Math.min(20, Math.max(0, Math.floor(cantidad * 0.02)));
@@ -337,6 +455,10 @@ export function previsualizacionCampanaSintetica(
   const totalCargados = productos + supervision;
   const speechId = entrada.speech_id ?? 1;
   const descripcionSugerida = 'CajaCusco 9 <= dias atraso <= 30';
+  const plantilla = entrada.plantilla_nombre_archivo?.trim() || contexto.plantilla;
+  const usadas = new Set([...plantilla.matchAll(/\{([^{}]*)\}/g)].map((m) => m[1]));
+  const { limite: limiteParcial, ...resto } = parcial;
+  const nombres = (parcial.archivos_previstos_por_filas ?? [{ numero: 1 }]).length;
 
   return {
     descripcion: entrada.descripcion?.trim() || descripcionSugerida,
@@ -369,10 +491,31 @@ export function previsualizacionCampanaSintetica(
       exclusiones: exclusionesSinteticas(Math.min(excluidos, 5)),
     },
     archivos_previstos_por_filas: [{ numero: 1, filas: totalCargados, supervision }],
-    limite: consumoSintetico('2026-09', { esta_campana: totalCargados, total: 982 + totalCargados }),
+    limite: consumoSintetico('2026-09', {
+      esta_campana: totalCargados,
+      total: 982 + totalCargados,
+      costo_esta_campana: montoSintetico(totalCargados, contexto.tarifa),
+      costo_total: montoSintetico(982 + totalCargados, contexto.tarifa),
+      ...limiteParcial,
+    }),
     ...SIN_ERRORES_NI_ADVERTENCIAS,
     puede_crear: true,
-    ...parcial,
+    tarifa_sms: contexto.tarifa,
+    costo_estimado: montoSintetico(totalCargados, contexto.tarifa),
+    plantilla_nombre_archivo: plantilla,
+    // `[campana]` stands for the id the campaign does not have yet.
+    nombre_primer_archivo: nombresSinteticos(
+      plantilla,
+      { campana: '[campana]', descripcion: descripcionSugerida, fechaEnvio: '2026-09-17', fechaCorte: entrada.fecha_corte },
+      [totalCargados],
+    )[0],
+    nombre_estimado:
+      usadas.has('archivo') ||
+      usadas.has('total') ||
+      usadas.has('cantidad') ||
+      // The automatic suffix depends on how the load is split.
+      (nombres > 1 && !usadas.has('archivo')),
+    ...resto,
   };
 }
 
@@ -385,8 +528,9 @@ export function campanaDesdeEntrada(
   entrada: CreacionCampanaEntrada,
   id: number,
   parcial: Partial<Campana> = {},
+  contexto: ContextoCostos = CONTEXTO_POR_DEFECTO,
 ): Campana {
-  const previa = previsualizacionCampanaSintetica(entrada);
+  const previa = previsualizacionCampanaSintetica(entrada, {}, contexto);
   return {
     id,
     creado_en: '2026-09-16T15:00:00+00:00',
@@ -419,7 +563,16 @@ export function campanaDesdeEntrada(
     excluidos: previa.excluidos,
     advertencias: previa.advertencias_por_codigo.reduce((total, c) => total + c.cantidad, 0),
     confirmo_limite: entrada.confirmar_limite ?? false,
-    archivos: previa.archivos_previstos_por_filas.map((archivo) => ({ ...archivo, bytes: archivo.filas * 60 })),
+    archivos: nombresSinteticos(
+      previa.plantilla_nombre_archivo,
+      { campana: String(id), descripcion: previa.descripcion, fechaEnvio: previa.fecha_envio, fechaCorte: entrada.fecha_corte },
+      previa.archivos_previstos_por_filas.map((archivo) => archivo.filas),
+    ).map((nombre, i) => ({ ...previa.archivos_previstos_por_filas[i], bytes: previa.archivos_previstos_por_filas[i].filas * 60, nombre })),
+    tarifa_sms: contexto.tarifa,
+    costo_estimado: previa.costo_estimado,
+    costo_estimado_estado: 'calculado',
+    costo_real: null,
+    costo_real_estado: 'pendiente',
     ...parcial,
   };
 }
@@ -438,7 +591,7 @@ export interface ApiFalsaMowaMes {
   /** Reconciliation per campaign id; a campaign missing here has no report yet. */
   conciliaciones: Map<number, Conciliacion>;
   /** Answers `GET /mowa-mes/limite-mensual` for a month. */
-  consumo: (mes: string) => ConsumoLimite;
+  consumo: (mes: string) => ConsumoParcial;
   /** Scripted answers, in order; the last one repeats. Empty means "behave". */
   respuestas: {
     guardarConfiguracion: Respuesta[];
@@ -449,6 +602,7 @@ export interface ApiFalsaMowaMes {
     importarReporte: Respuesta[];
     previsualizarCampana: Respuesta[];
     crearCampana: Respuesta[];
+    previsualizarPlantilla: Respuesta[];
   };
   /** When true, every call fails at the network level. */
   sinRed: boolean;
@@ -464,6 +618,9 @@ export function apiMowaMes(): ApiFalsaMowaMes {
       bytes_por_archivo: 2_000_000,
       whatsapp_contacto: '900000999',
       actualizado_en: '2026-09-13T10:00:00-05:00',
+      tarifa_sms: TARIFA_POR_DEFECTO,
+      plantilla_nombre_archivo: PLANTILLA_POR_DEFECTO,
+      variables_plantilla: VARIABLES_PLANTILLA,
     },
     supervision: {
       procedencias: ['Procedencia A', 'Procedencia B'],
@@ -488,6 +645,7 @@ export function apiMowaMes(): ApiFalsaMowaMes {
       importarReporte: [],
       previsualizarCampana: [],
       crearCampana: [],
+      previsualizarPlantilla: [],
     },
     sinRed: false,
     pedidos: [],
@@ -506,6 +664,11 @@ const esTelefono = (valor: string) => /^9\d{8}$/.test(valor);
 
 const enRango = (valor: unknown, minimo: number, maximo: number) =>
   typeof valor === 'number' && Number.isInteger(valor) && valor >= minimo && valor <= maximo;
+
+/** The rate and template the campaign endpoints read from the saved configuration. */
+function contextoDe(estado: ApiFalsaMowaMes): ContextoCostos {
+  return { tarifa: estado.configuracion.tarifa_sms, plantilla: estado.configuracion.plantilla_nombre_archivo };
+}
 
 function siguiente(cola: Respuesta[]): Respuesta | undefined {
   return cola.length > 1 ? cola.shift() : cola[0];
@@ -577,11 +740,39 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       if ('whatsapp_contacto' in entrada) {
         const recibido = entrada.whatsapp_contacto === null ? '' : String(entrada.whatsapp_contacto).trim();
         if (recibido !== '' && !esTelefono(recibido)) {
-          return json(route, 400, { detail: 'El numero de WhatsApp no cumple RF-02' });
+          return json(route, 400, { detail: 'El numero de WhatsApp no cumple RF-02', campo: 'whatsapp_contacto' });
         }
         whatsapp = recibido === '' ? null : recibido;
       }
+      // RF-MM-23 and RF-MM-25: omitted keeps, null is a 422, an invalid value a 400 that says why.
+      let tarifa = estado.configuracion.tarifa_sms;
+      if ('tarifa_sms' in entrada) {
+        // A JSON number is not a string: Pydantic answers 422, like for a null.
+        if (typeof entrada.tarifa_sms !== 'string') return invalido(route, 'tarifa_sms', 'Input should be a valid string');
+        const recibida = entrada.tarifa_sms.trim();
+        if (!/^\d+(\.\d{1,4})?$/.test(recibida)) {
+          return json(route, 400, {
+            detail: 'La tarifa debe ser un numero decimal mayor o igual a 0, con hasta 4 decimales (por ejemplo 0.02)',
+            campo: 'tarifa_sms',
+          });
+        }
+        const [enteros, decimales = ''] = recibida.split('.');
+        tarifa = `${enteros}.${decimales.padEnd(4, '0')}`;
+      }
+      let plantilla = estado.configuracion.plantilla_nombre_archivo;
+      if ('plantilla_nombre_archivo' in entrada) {
+        if (typeof entrada.plantilla_nombre_archivo !== 'string') {
+          return invalido(route, 'plantilla_nombre_archivo', 'Input should be a valid string');
+        }
+        const recibida = entrada.plantilla_nombre_archivo;
+        const motivo = errorDePlantilla(recibida);
+        if (motivo) return json(route, 400, { detail: motivo, campo: 'plantilla_nombre_archivo' });
+        plantilla = recibida.trim() === '' ? PLANTILLA_POR_DEFECTO : recibida;
+      }
       estado.configuracion = {
+        ...estado.configuracion,
+        tarifa_sms: tarifa,
+        plantilla_nombre_archivo: plantilla,
         limite_mensual: entrada.limite_mensual as number,
         registros_por_archivo:
           'registros_por_archivo' in entrada
@@ -593,6 +784,17 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
         actualizado_en: '2026-09-13T11:00:00-05:00',
       };
       return json(route, 200, estado.configuracion);
+    }
+
+    if (ruta === '/mowa-mes/plantilla-nombre-archivo/previsualizacion' && metodo === 'POST') {
+      const guion = siguiente(estado.respuestas.previsualizarPlantilla);
+      if (guion) return json(route, guion.estado, guion.cuerpo ?? {});
+      const recibida = (cuerpo as { plantilla?: unknown } | null)?.plantilla;
+      if (typeof recibida !== 'string') return invalido(route, 'plantilla', 'Field required');
+      const motivo = errorDePlantilla(recibida);
+      if (motivo) return json(route, 400, { detail: motivo, campo: 'plantilla_nombre_archivo' });
+      const plantilla = recibida.trim() === '' ? PLANTILLA_POR_DEFECTO : recibida;
+      return json(route, 200, { plantilla, nombres_ejemplo: nombresDeEjemplo(plantilla) });
     }
 
     if (ruta === '/supervisores' && metodo === 'GET') return json(route, 200, estado.supervision);
@@ -760,14 +962,16 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       const entrada = cuerpo as PeticionCampanaEntrada;
       // Same order and text as the backend's `_validar_opciones` (docs/mowa-mes.md §9).
       if (entrada.tipo_carga && entrada.tipo_carga !== 'masiva') {
-        return json(route, 400, { detail: 'El tipo de carga Personalizada todavia no esta habilitado' });
+        return json(route, 400, { detail: 'El tipo de carga Personalizada todavia no esta habilitado', campo: null });
       }
       if (entrada.salida && entrada.salida !== 'numero_largo') {
-        return json(route, 400, { detail: 'Solo la salida Numero largo esta habilitada' });
+        return json(route, 400, { detail: 'Solo la salida Numero largo esta habilitada', campo: null });
       }
       if (entrada.herramientas?.respuesta_automatica) {
-        return json(route, 400, { detail: 'La respuesta automatica todavia no esta habilitada' });
+        return json(route, 400, { detail: 'La respuesta automatica todavia no esta habilitada', campo: null });
       }
+      const errorPlantilla = entrada.plantilla_nombre_archivo ? errorDePlantilla(entrada.plantilla_nombre_archivo) : null;
+      if (errorPlantilla) return json(route, 400, { detail: errorPlantilla, campo: 'plantilla_nombre_archivo' });
       // `cantidad` is bounded by FastAPI's own field validation (ge=1, le=120000)
       // before the request ever reaches the service, so out-of-range values are
       // a 422 there, not the core's 400 — and PeticionCampanaEntrada['cantidad']
@@ -777,7 +981,7 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       if (entrada.speech_id != null && !estado.versiones.some((v) => v.id === entrada.speech_id)) {
         return json(route, 404, { detail: `No existe la version ${entrada.speech_id}` });
       }
-      return json(route, 200, previsualizacionCampanaSintetica(entrada));
+      return json(route, 200, previsualizacionCampanaSintetica(entrada, {}, contextoDe(estado)));
     }
 
     if (ruta === '/mowa-mes/campanas' && metodo === 'POST') {
@@ -787,11 +991,13 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       if (!entrada.speech_huella) {
         return json(route, 422, { detail: [{ loc: ['body', 'speech_huella'], msg: 'Field required', type: 'missing' }] });
       }
+      const errorPlantilla = entrada.plantilla_nombre_archivo ? errorDePlantilla(entrada.plantilla_nombre_archivo) : null;
+      if (errorPlantilla) return json(route, 400, { detail: errorPlantilla, campo: 'plantilla_nombre_archivo' });
       // A stale huella or an exceeded limit are scripted through
       // `respuestas.crearCampana`, not modeled here: this default is the
       // happy path, like `previsualizacionCampanaSintetica`.
       const id = Math.max(0, ...estado.campanas.map((c) => c.id)) + 1;
-      const nueva = campanaDesdeEntrada(entrada, id);
+      const nueva = campanaDesdeEntrada(entrada, id, {}, contextoDe(estado));
       estado.campanas = [nueva, ...estado.campanas];
       return json(route, 201, nueva);
     }
@@ -803,7 +1009,7 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       }
       const hoy = new Date();
       const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
-      return json(route, 200, estado.consumo(mes ?? mesActual));
+      return json(route, 200, consumoSintetico(mes ?? mesActual, estado.consumo(mes ?? mesActual)));
     }
 
     const unaCampana = ruta.match(/^\/mowa-mes\/campanas\/(\d+)(\/.*)?$/);
@@ -851,8 +1057,17 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       if (resto === '/reportes' && metodo === 'POST') {
         const guion = siguiente(estado.respuestas.importarReporte);
         if (guion) return json(route, guion.estado, guion.cuerpo ?? {});
-        const conciliacion = conciliacionSintetica(id);
+        const conciliacion = conciliacionSintetica(
+          id,
+          campana.tarifa_sms === null
+            ? { tarifa_sms: null, costo_real: null, costo_real_estado: 'no_disponible' }
+            : { tarifa_sms: campana.tarifa_sms },
+        );
         estado.conciliaciones.set(id, conciliacion);
+        // The real cost is not stored: the list recomputes it from the reconciliation in force.
+        estado.campanas = estado.campanas.map((c) =>
+          c.id === id ? { ...c, costo_real: conciliacion.costo_real, costo_real_estado: conciliacion.costo_real_estado } : c,
+        );
         return json(route, 201, conciliacion);
       }
 
@@ -869,6 +1084,10 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
               sin_correspondencia: 0,
               sin_correspondencia_por_estado: [],
               por_id: [],
+              // Without a report the real cost is pending, or unknown if no rate was ever stored.
+              tarifa_sms: campana.tarifa_sms,
+              costo_real: null,
+              costo_real_estado: campana.tarifa_sms === null ? 'no_disponible' : 'pendiente',
             }),
         );
       }

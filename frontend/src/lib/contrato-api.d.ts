@@ -455,11 +455,39 @@ export interface paths {
          *     - `whatsapp_contacto: null` borra el numero de contacto (RF-MM-16).
          *     - `registros_por_archivo` y `bytes_por_archivo` no admiten null (422) y solo pueden
          *       bajar del maximo de la plataforma (RF-MM-11).
+         *     - `tarifa_sms` (RF-MM-23) y `plantilla_nombre_archivo` (RF-MM-25) tampoco admiten null
+         *       (422). Una tarifa que no es un decimal mayor o igual a 0 con hasta 4 decimales, o una
+         *       plantilla con una variable desconocida o una llave sin cerrar, responde 400.
+         *
+         *     Todo 400 de este endpoint trae `detail` (el motivo) y `campo` (el campo de la
+         *     configuracion al que pertenece), para que el frontend lo ubique sin leer el texto.
          *
          *     Esta regla es propia de este endpoint: `PUT /supervisores` reemplaza la lista completa.
          */
         put: operations["guardar_configuracion_mowa_mes_configuracion_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/plantilla-nombre-archivo/previsualizacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Previsualizar una plantilla del nombre de los archivos, sin guardarla
+         * @description Resuelve la plantilla con datos de muestra usando la misma funcion que la creacion de
+         *     campanas (RF-MM-25). Una variable desconocida o una llave sin cerrar responde 400 con
+         *     `detail` y `campo` (`plantilla_nombre_archivo`).
+         */
+        post: operations["previsualizar_plantilla_nombre_mowa_mes_plantilla_nombre_archivo_previsualizacion_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -544,7 +572,8 @@ export interface paths {
          * Previsualizar Campana
          * @description La campana calculada sin guardar nada. Los errores de campana no son 4xx: se listan.
          *
-         *     `speech.huella` es lo que la creacion tiene que enviar como `speech_huella`.
+         *     `speech.huella` es lo que la creacion tiene que enviar como `speech_huella`. Un 400 trae
+         *     `detail` y `campo` (`plantilla_nombre_archivo` si el error es de la plantilla).
          */
         post: operations["previsualizar_campana_mowa_mes_campanas_previsualizacion_post"];
         delete?: never;
@@ -620,7 +649,9 @@ export interface paths {
         };
         /**
          * Descargar Archivo
-         * @description Los bytes guardados al crear la campana: la misma descarga siempre (C-6).
+         * @description Los bytes y el nombre guardados al crear la campana: la misma descarga siempre (C-6).
+         *
+         *     `Content-Disposition` lleva `filename` en ASCII y `filename*` en UTF-8 (RFC 5987).
          */
         get: operations["descargar_archivo_mowa_mes_campanas__campana_id__archivos__numero__get"];
         put?: never;
@@ -720,6 +751,11 @@ export interface components {
             supervision: number;
             /** Bytes */
             bytes: number;
+            /**
+             * Nombre
+             * @description El nombre resuelto al crear la campana, con extension
+             */
+            nombre: string;
         };
         /** AvisoCampanaRespuesta */
         AvisoCampanaRespuesta: {
@@ -829,7 +865,35 @@ export interface components {
             confirmo_limite: boolean;
             /** Archivos */
             archivos: components["schemas"]["ArchivoRespuesta"][];
+            /**
+             * Tarifa Sms
+             * @description Soles por SMS congelados al crearla; null en las anteriores a RF-MM-23
+             */
+            tarifa_sms: string | null;
+            /**
+             * Costo Estimado
+             * @description Soles, guardado con la campana; null si el estado no es `calculado`
+             */
+            costo_estimado: string | null;
+            /** @description `calculado`, o `no_disponible` si la campana no tiene tarifa (creada antes de RF-MM-23). El frontend decide por este estado, no por el null del monto */
+            costo_estimado_estado: components["schemas"]["EstadoCostoEstimado"];
+            /**
+             * Costo Real
+             * @description Soles: enviados de la conciliacion vigente (E-1, supervision incluida) por la tarifa congelada; se calcula al leer, no se guarda. null si `costo_real_estado` no es calculado
+             */
+            costo_real: string | null;
+            /** @description `calculado`; `pendiente` si no hay reporte importado; `no_disponible` si la campana no tiene tarifa (con o sin reporte). Ni pendiente ni no disponible son cero */
+            costo_real_estado: components["schemas"]["EstadoCosto"];
         };
+        /**
+         * CampoConfiguracion
+         * @description El campo de la configuracion al que pertenece un error 400 (lo lee el frontend).
+         *
+         *     Un catalogo aparte del texto del `detail`: el frontend ubica el error bajo su campo
+         *     por este valor y no adivinando por las palabras del mensaje.
+         * @enum {string}
+         */
+        CampoConfiguracion: "limite_mensual" | "whatsapp_contacto" | "registros_por_archivo" | "bytes_por_archivo" | "tarifa_sms" | "plantilla_nombre_archivo";
         /** CampoEntrada */
         CampoEntrada: {
             /** Nombre */
@@ -932,6 +996,18 @@ export interface components {
             por_id: components["schemas"]["CifrasIdRespuesta"][];
             /** Advertencias */
             advertencias: components["schemas"]["AdvertenciaReporteRespuesta"][];
+            /**
+             * Tarifa Sms
+             * @description La tarifa congelada de la campana; null si no tiene
+             */
+            tarifa_sms: string | null;
+            /**
+             * Costo Real
+             * @description Soles: enviados (E-1, supervision incluida) por la tarifa congelada. null si `costo_real_estado` no es `calculado`. No se guarda: sale de esta conciliacion
+             */
+            costo_real: string | null;
+            /** @description `calculado`; `pendiente` si no hay reporte importado; `no_disponible` si la campana no tiene tarifa. Ni pendiente ni no disponible son cero */
+            costo_real_estado: components["schemas"]["EstadoCosto"];
         };
         /** ConfiguracionEntrada */
         ConfiguracionEntrada: {
@@ -952,6 +1028,16 @@ export interface components {
              * @description Bytes por archivo (RF-MM-11). Sin el campo se conserva el actual; null: 422
              */
             bytes_por_archivo?: number;
+            /**
+             * Tarifa Sms
+             * @description Soles por SMS, texto decimal mayor o igual a 0 con hasta 4 decimales (RF-MM-23). Sin el campo se conserva la actual; null: 422
+             */
+            tarifa_sms?: string;
+            /**
+             * Plantilla Nombre Archivo
+             * @description Plantilla del nombre de los archivos de carga (RF-MM-25). Sin el campo se conserva la actual; vacia, vuelve la de por defecto; null: 422
+             */
+            plantilla_nombre_archivo?: string;
         };
         /** ConfiguracionRespuesta */
         ConfiguracionRespuesta: {
@@ -965,6 +1051,18 @@ export interface components {
             registros_por_archivo: number;
             /** Bytes Por Archivo */
             bytes_por_archivo: number;
+            /**
+             * Tarifa Sms
+             * @description Soles por SMS, texto decimal con 4 decimales
+             */
+            tarifa_sms: string;
+            /** Plantilla Nombre Archivo */
+            plantilla_nombre_archivo: string;
+            /**
+             * Variables Plantilla
+             * @description Las variables validas de la plantilla, en el orden del requerimiento
+             */
+            variables_plantilla: components["schemas"]["VariablePlantillaRespuesta"][];
         };
         /** ConfiguracionSupervisionEntrada */
         ConfiguracionSupervisionEntrada: {
@@ -999,6 +1097,26 @@ export interface components {
             disponible: number;
             /** Excedido */
             excedido: boolean;
+            /**
+             * Costo Mes
+             * @description Soles: suma del costo estimado de las campanas ya creadas del mes (RF-MM-24), sin las que no tienen tarifa. Texto decimal
+             */
+            costo_mes: string;
+            /**
+             * Campanas Sin Tarifa
+             * @description Campanas del mes que quedaron fuera de `costo_mes` por no tener tarifa
+             */
+            campanas_sin_tarifa: number;
+            /**
+             * Costo Esta Campana
+             * @description Soles: costo estimado de la campana que se previsualiza; null sin campana
+             */
+            costo_esta_campana: string | null;
+            /**
+             * Costo Total
+             * @description Soles: `costo_mes` mas `costo_esta_campana`
+             */
+            costo_total: string;
         };
         /** CreacionCampanaEntrada */
         CreacionCampanaEntrada: {
@@ -1063,6 +1181,11 @@ export interface components {
              */
             supervisores?: components["schemas"]["SupervisorCampanaEntrada"][] | null;
             /**
+             * Plantilla Nombre Archivo
+             * @description Plantilla del nombre de los archivos (RF-MM-25); sin ella o vacia, la de la configuracion. Una variable desconocida o una llave sin cerrar responde 400
+             */
+            plantilla_nombre_archivo?: string | null;
+            /**
              * Speech Huella
              * @description La huella del speech que devolvio la previsualizacion; si cambio, 409
              */
@@ -1103,6 +1226,18 @@ export interface components {
             retirado: boolean;
         };
         /**
+         * ErrorConfiguracionRespuesta
+         * @description 400 propio de la configuracion: dice a que campo pertenece el error.
+         *
+         *     El frontend ubica el mensaje bajo su campo por `campo`, sin adivinar por las palabras
+         *     del `detail`. Extiende `detail` como pide la regla de docs/contrato-api.md, seccion 3.
+         */
+        ErrorConfiguracionRespuesta: {
+            /** Detail */
+            detail: string;
+            campo: components["schemas"]["CampoConfiguracion"];
+        };
+        /**
          * ErrorCreacionCampanaRespuesta
          * @description 409 propio de este endpoint: distingue por `codigo` sin que el cliente
          *     tenga que adivinar la causa por el orden en que el servicio los revisa
@@ -1123,6 +1258,19 @@ export interface components {
             detalle: string;
         };
         /**
+         * ErrorPeticionCampanaRespuesta
+         * @description 400 de la previsualizacion y de la creacion de campanas.
+         *
+         *     `campo` dice a que campo de la pantalla pertenece el error cuando el frontend lo puede
+         *     ubicar (hoy solo `plantilla_nombre_archivo`); es null si el error no es de un campo.
+         *     Extiende `detail` como pide la regla de docs/contrato-api.md, seccion 3.
+         */
+        ErrorPeticionCampanaRespuesta: {
+            /** Detail */
+            detail: string;
+            campo: components["schemas"]["CampoConfiguracion"] | null;
+        };
+        /**
          * EstadoCarga
          * @description Estado de procesamiento de una version (la ingesta corre en segundo plano).
          * @enum {string}
@@ -1135,6 +1283,18 @@ export interface components {
             /** Cantidad */
             cantidad: number;
         };
+        /**
+         * EstadoCosto
+         * @description Por que un costo trae o no un valor; distingue "pendiente" y "sin tarifa" de cero.
+         * @enum {string}
+         */
+        EstadoCosto: "calculado" | "pendiente" | "no_disponible";
+        /**
+         * EstadoCostoEstimado
+         * @description El costo estimado de una campana: con valor, o no disponible porque no tiene tarifa.
+         * @enum {string}
+         */
+        EstadoCostoEstimado: "calculado" | "no_disponible";
         /** ExcepcionEntrada */
         ExcepcionEntrada: {
             /**
@@ -1493,6 +1653,11 @@ export interface components {
              * @description Sin lista se usa la configurada por defecto
              */
             supervisores?: components["schemas"]["SupervisorCampanaEntrada"][] | null;
+            /**
+             * Plantilla Nombre Archivo
+             * @description Plantilla del nombre de los archivos (RF-MM-25); sin ella o vacia, la de la configuracion. Una variable desconocida o una llave sin cerrar responde 400
+             */
+            plantilla_nombre_archivo?: string | null;
         };
         /** PeticionGeneracion */
         PeticionGeneracion: {
@@ -1517,6 +1682,27 @@ export interface components {
              */
             cantidad: number;
             opciones?: components["schemas"]["OpcionesEntrada"] | null;
+        };
+        /** PlantillaNombreEntrada */
+        PlantillaNombreEntrada: {
+            /**
+             * Plantilla
+             * @description Vacia: la plantilla de por defecto
+             */
+            plantilla: string;
+        };
+        /** PlantillaNombreRespuesta */
+        PlantillaNombreRespuesta: {
+            /**
+             * Plantilla
+             * @description La plantilla validada, la que se guardaria
+             */
+            plantilla: string;
+            /**
+             * Nombres Ejemplo
+             * @description Los nombres que daria con datos de muestra: un archivo de una campana de dos
+             */
+            nombres_ejemplo: string[];
         };
         /** PrevisualizacionCampanaRespuesta */
         PrevisualizacionCampanaRespuesta: {
@@ -1574,6 +1760,31 @@ export interface components {
             errores: components["schemas"]["AvisoCampanaRespuesta"][];
             /** Puede Crear */
             puede_crear: boolean;
+            /**
+             * Tarifa Sms
+             * @description Soles por SMS vigente ahora; la creacion la congela
+             */
+            tarifa_sms: string;
+            /**
+             * Costo Estimado
+             * @description Soles: SMS cargados (supervision incluida) por la tarifa (RF-MM-24)
+             */
+            costo_estimado: string;
+            /**
+             * Plantilla Nombre Archivo
+             * @description La plantilla que se usaria: la de la peticion o la de la configuracion
+             */
+            plantilla_nombre_archivo: string;
+            /**
+             * Nombre Primer Archivo
+             * @description Nombre del primer archivo con `[campana]` en el lugar del numero de campana, que todavia no existe (D-1); null si no hay archivos previstos
+             */
+            nombre_primer_archivo: string | null;
+            /**
+             * Nombre Estimado
+             * @description El nombre depende de como se divida la carga (`{archivo}`, `{total}`, `{cantidad}` o el sufijo automatico); al crear pueden salir mas archivos por el tope de bytes
+             */
+            nombre_estimado: boolean;
         };
         /** PrevisualizacionEntrada */
         PrevisualizacionEntrada: {
@@ -1831,6 +2042,13 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VariablePlantillaRespuesta */
+        VariablePlantillaRespuesta: {
+            /** Nombre */
+            nombre: string;
+            /** Descripcion */
+            descripcion: string;
         };
         /** VersionRespuesta */
         VersionRespuesta: {
@@ -3127,13 +3345,55 @@ export interface operations {
                     "application/json": components["schemas"]["ConfiguracionRespuesta"];
                 };
             };
-            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            /** @description Un valor no es valido; `campo` dice cual y `detail` el motivo */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleError"];
+                    "application/json": components["schemas"]["ErrorConfiguracionRespuesta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    previsualizar_plantilla_nombre_mowa_mes_plantilla_nombre_archivo_previsualizacion_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlantillaNombreEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlantillaNombreRespuesta"];
+                };
+            };
+            /** @description Un valor no es valido; `campo` dice cual y `detail` el motivo */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorConfiguracionRespuesta"];
                 };
             };
             /** @description Validation Error */
@@ -3393,13 +3653,13 @@ export interface operations {
                     "application/json": components["schemas"]["PrevisualizacionCampanaRespuesta"];
                 };
             };
-            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            /** @description La peticion no se puede atender; `detail` es el motivo y `campo`, si es de un campo que la pantalla pueda ubicar, cual */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleError"];
+                    "application/json": components["schemas"]["ErrorPeticionCampanaRespuesta"];
                 };
             };
             /** @description No existe lo pedido */
@@ -3476,13 +3736,13 @@ export interface operations {
                     "application/json": components["schemas"]["CampanaRespuesta"];
                 };
             };
-            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            /** @description La peticion no se puede atender; `detail` es el motivo y `campo`, si es de un campo que la pantalla pueda ubicar, cual */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleError"];
+                    "application/json": components["schemas"]["ErrorPeticionCampanaRespuesta"];
                 };
             };
             /** @description No existe lo pedido */
@@ -3613,7 +3873,7 @@ export interface operations {
             /** @description Archivo de carga de MOWA MES */
             200: {
                 headers: {
-                    /** @description attachment; filename="<nombre>.xlsx" */
+                    /** @description attachment; filename="<nombre en ASCII>.xlsx"; filename*=UTF-8''<nombre exacto>.xlsx (RFC 5987) */
                     "Content-Disposition"?: string;
                     /** @description Id de la campana */
                     "X-Mowa-Mes-Campana"?: string;

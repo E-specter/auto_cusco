@@ -114,6 +114,43 @@ import '../../styles/mowa-mes.css';
               </p>
             </div>
 
+            <div class="field">
+              <label class="field__label" for="mm-tarifa" data-i18n="mowaMes.plataforma.tarifa">Tarifa por SMS (S/)</label>
+              <input
+                class="input mono"
+                id="mm-tarifa"
+                name="tarifa_sms"
+                type="text"
+                inputmode="decimal"
+                autocomplete="off"
+                maxlength="12"
+                aria-describedby="mm-tarifa-hint mm-tarifa-error"
+              />
+              <p class="field__hint" id="mm-tarifa-hint" data-i18n="mowaMes.plataforma.tarifa.hint">
+                Decimal de 0 en adelante, con hasta 4 decimales (por ejemplo 0.02). Cada campaña guarda la tarifa vigente al crearse.
+              </p>
+              <p class="field__error" id="mm-tarifa-error" data-tarifa-error role="alert"></p>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="mm-plantilla" data-i18n="mowaMes.plataforma.plantilla">Nombre de los archivos</label>
+              <input
+                class="input mono"
+                id="mm-plantilla"
+                name="plantilla_nombre_archivo"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                aria-describedby="mm-plantilla-hint mm-plantilla-ejemplo mm-plantilla-error"
+              />
+              <div class="mm-variables" role="group" data-i18n-attr="aria-label:mowaMes.plantilla.variables" aria-label="Variables de la plantilla" data-plantilla-variables></div>
+              <p class="field__hint" id="mm-plantilla-hint" data-i18n="mowaMes.plataforma.plantilla.hint">
+                Es la plantilla de cada campaña nueva; en la campaña se puede cambiar solo para ella.
+              </p>
+              <div class="mm-nombre-archivo" id="mm-plantilla-ejemplo" data-plantilla-ejemplo></div>
+              <p class="field__error" id="mm-plantilla-error" data-plantilla-error role="alert"></p>
+            </div>
+
             <p class="notice notice--warning" data-sin-whatsapp hidden>
               <Icon name="triangle-alert" size={20} />
               <span data-i18n="mowaMes.plataforma.sinWhatsapp">
@@ -386,6 +423,7 @@ import '../../styles/mowa-mes.css';
     listarSpeech,
     obtenerConfiguracion,
     obtenerSupervision,
+    previsualizarPlantillaNombre,
     previsualizarSpeech,
     siguienteDiaGestionable,
     type ConfiguracionMowaMes,
@@ -398,12 +436,14 @@ import '../../styles/mowa-mes.css';
     type VersionSpeech,
   } from '../../lib/api-mowa-mes';
   import { openWhenFree } from '../../lib/dialogs';
+  import { notaVariablesDesconocidas, pintarBotonesDeVariables } from '../../lib/mowa-mes-plantilla';
   import { formatBytes, formatDate, formatDateTime, formatNumber, parseApiDate } from '../../lib/format';
   import { applyTranslations, locale, t } from '../../lib/i18n';
   import {
     accionDia,
     borradorDeSupervision,
     borradorDesdeVersion,
+    campoDeError,
     entradaSupervision,
     hayCambiosSpeech,
     modoGuardado,
@@ -416,6 +456,8 @@ import '../../styles/mowa-mes.css';
     RANGOS_CONFIGURACION,
     problemasConfiguracion,
     supervisionCambio,
+    tarifaEditable,
+    tarifaNormalizada,
     type CampoConfiguracion,
     traducirCodigo,
     type BorradorSupervision,
@@ -513,6 +555,8 @@ import '../../styles/mowa-mes.css';
   const inputRegistros = $<HTMLInputElement>('#mm-registros');
   const inputBytes = $<HTMLInputElement>('#mm-bytes');
   const inputWhatsapp = $<HTMLInputElement>('#mm-whatsapp');
+  const inputTarifa = $<HTMLInputElement>('#mm-tarifa');
+  const inputPlantilla = $<HTMLInputElement>('#mm-plantilla');
   const controlesPlataforma: Record<CampoConfiguracion, HTMLInputElement> = {
     limite_mensual: inputLimite,
     registros_por_archivo: inputRegistros,
@@ -531,7 +575,71 @@ import '../../styles/mowa-mes.css';
     inputRegistros.value = String(config.registros_por_archivo);
     inputBytes.value = String(config.bytes_por_archivo);
     inputWhatsapp.value = config.whatsapp_contacto ?? '';
+    inputTarifa.value = tarifaEditable(config.tarifa_sms);
+    inputPlantilla.value = config.plantilla_nombre_archivo;
+    pintarBotonesDeVariables($<HTMLElement>('[data-plantilla-variables]'), inputPlantilla, config.variables_plantilla);
     pintarMetaPlataforma();
+    void revisarPlantilla(0);
+  }
+
+  // ---- File-name template: live example, from the API ---------------------------------------
+
+  let temporizadorPlantilla = 0;
+  let controlPlantilla: AbortController | null = null;
+
+  function pintarEjemplo(nombres: readonly string[]): void {
+    const host = $<HTMLElement>('[data-plantilla-ejemplo]');
+    host.replaceChildren(
+      ...nombres.map((nombre, indice) => {
+        const linea = document.createElement('p');
+        const etiqueta = document.createElement('span');
+        etiqueta.textContent = t(indice === 0 ? 'mowaMes.plantilla.primerArchivo' : 'mowaMes.plantilla.otroArchivo', {
+          n: indice + 1,
+        });
+        const valor = document.createElement('span');
+        valor.className = 'mono';
+        valor.textContent = nombre;
+        linea.append(etiqueta, ' ', valor);
+        return linea;
+      }),
+    );
+  }
+
+  function errorDePlantilla(texto: string): void {
+    $<HTMLElement>('[data-plantilla-error]').textContent = texto;
+    inputPlantilla.setAttribute('aria-invalid', String(texto !== ''));
+  }
+
+  /**
+   * The unknown-variable note is local, from the list the API sent; the name
+   * itself, and any other reason (an unclosed brace), come from the API.
+   */
+  async function revisarPlantilla(espera = ESPERA_PREVISUALIZACION): Promise<void> {
+    window.clearTimeout(temporizadorPlantilla);
+    controlPlantilla?.abort();
+    const variables = estado.configuracion?.variables_plantilla ?? [];
+    const nota = notaVariablesDesconocidas(inputPlantilla.value, variables);
+    errorDePlantilla(nota);
+    if (nota !== '') {
+      pintarEjemplo([]);
+      return;
+    }
+    const control = new AbortController();
+    controlPlantilla = control;
+    await new Promise<void>((resolver) => {
+      temporizadorPlantilla = window.setTimeout(resolver, espera);
+    });
+    if (control.signal.aborted) return;
+    try {
+      const respuesta = await previsualizarPlantillaNombre(inputPlantilla.value, control.signal);
+      if (control.signal.aborted) return;
+      errorDePlantilla('');
+      pintarEjemplo(respuesta.nombres_ejemplo);
+    } catch (caido) {
+      if (caido instanceof DOMException && caido.name === 'AbortError') return;
+      pintarEjemplo([]);
+      errorDePlantilla(caido instanceof ApiError ? caido.detail || t('common.errorBody') : mensajeDeError(caido));
+    }
   }
 
   function pintarMetaPlataforma(): void {
@@ -557,7 +665,8 @@ import '../../styles/mowa-mes.css';
 
   function limpiarErrorPlataforma(): void {
     $<HTMLElement>('[data-plataforma-error]').textContent = '';
-    [inputLimite, inputRegistros, inputBytes, inputWhatsapp].forEach((control) => {
+    $<HTMLElement>('[data-tarifa-error]').textContent = '';
+    [inputLimite, inputRegistros, inputBytes, inputWhatsapp, inputTarifa].forEach((control) => {
       control.removeAttribute('aria-invalid');
     });
   }
@@ -569,6 +678,8 @@ import '../../styles/mowa-mes.css';
     });
   });
   inputWhatsapp.addEventListener('input', limpiarErrorPlataforma);
+  inputTarifa.addEventListener('input', limpiarErrorPlataforma);
+  inputPlantilla.addEventListener('input', () => void revisarPlantilla());
 
   formPlataforma.addEventListener('submit', async (evento) => {
     evento.preventDefault();
@@ -587,6 +698,18 @@ import '../../styles/mowa-mes.css';
       return;
     }
 
+    const tarifa = tarifaNormalizada(inputTarifa.value);
+    if (tarifa === null) {
+      $<HTMLElement>('[data-tarifa-error]').textContent = t('mowaMes.plataforma.tarifa.invalida');
+      inputTarifa.setAttribute('aria-invalid', 'true');
+      inputTarifa.focus();
+      return;
+    }
+    if (notaVariablesDesconocidas(inputPlantilla.value, estado.configuracion?.variables_plantilla ?? []) !== '') {
+      inputPlantilla.focus();
+      return;
+    }
+
     const whatsapp = inputWhatsapp.value.trim();
     const guardar = $<HTMLButtonElement>('[data-plataforma-guardar]');
     ocupado(guardar, true);
@@ -596,6 +719,8 @@ import '../../styles/mowa-mes.css';
         registros_por_archivo: Number(inputRegistros.value.trim()),
         bytes_por_archivo: Number(inputBytes.value.trim()),
         whatsapp_contacto: whatsapp === '' ? null : whatsapp,
+        tarifa_sms: tarifa,
+        plantilla_nombre_archivo: inputPlantilla.value,
       });
       pintarPlataforma();
       avisar($<HTMLElement>('[data-plataforma-estado]'), 'mowaMes.guardado');
@@ -603,9 +728,28 @@ import '../../styles/mowa-mes.css';
       programarPrevisualizacion(0);
     } catch (caido) {
       if (caido instanceof ApiError && caido.status === 400) {
-        error.textContent = caido.detail || t('mowaMes.plataforma.whatsapp.invalido');
-        inputWhatsapp.setAttribute('aria-invalid', 'true');
-        inputWhatsapp.focus();
+        // The 400 names the setting it is about (`campo`). Without one, the sentence
+        // goes to the panel's general notice: the field is never guessed from its words.
+        const detalle = caido.detail || t('common.errorBody');
+        const campo = campoDeError(caido.cuerpo);
+        if (campo === 'tarifa_sms') {
+          $<HTMLElement>('[data-tarifa-error]').textContent = detalle;
+          inputTarifa.setAttribute('aria-invalid', 'true');
+          inputTarifa.focus();
+        } else if (campo === 'plantilla_nombre_archivo') {
+          errorDePlantilla(detalle);
+          inputPlantilla.focus();
+        } else {
+          error.textContent = detalle;
+          const control =
+            campo === 'whatsapp_contacto'
+              ? inputWhatsapp
+              : campo === null
+                ? null
+                : controlesPlataforma[campo];
+          control?.setAttribute('aria-invalid', 'true');
+          control?.focus();
+        }
       } else {
         error.textContent = mensajeDeError(caido);
       }
@@ -1576,6 +1720,7 @@ import '../../styles/mowa-mes.css';
   document.addEventListener('languagechange', () => {
     applyTranslations();
     pintarMetaPlataforma();
+    void revisarPlantilla(0);
     pintarSupervision();
     pintarVersiones();
     pintarSpeech();

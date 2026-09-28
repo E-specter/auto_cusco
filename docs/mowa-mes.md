@@ -2,7 +2,7 @@
 
 Conector SMS de MOWA MES. Requerimientos en [requerimientos-mowa-mes.md](requerimientos-mowa-mes.md) (RF-MM-01 a RF-MM-22) y RF-37 a RF-41 de [atomics-requirements.md](atomics-requirements.md). Plan del coordinador en `docs/agents/coordinador_modulo_mowa_mes/plan.md`.
 
-Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6a, commit `7849ef0`) y segundo corte (B4, B5 y B6b: campaña, archivos, reporte de enviados y conciliación, secciones 9 a 14).**
+Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6a, commit `7849ef0`), segundo corte (B4, B5 y B6b: campaña, archivos, reporte de enviados y conciliación, secciones 9 a 14), el `409` con código (sección 15) y B8: tarifa, costos y nombre de los archivos (sección 16).**
 
 ## 1. Piezas
 
@@ -164,6 +164,19 @@ El frontend traduce cada uno con la clave plana `mowaMes.codigo.<codigo>` en `fr
 - **Filas del Speech original que entran en 2 000 000 bytes:** unas **60 000** (33 bytes por fila, porque el `.xlsx` comparte los textos repetidos del speech). Es más que el tope de 50 000 filas, así que con el Speech original la división por bytes es un caso teórico y manda el límite de filas. Puede aparecer con un speech de textos muy variados o mensajes largos, y está cubierta por pruebas.
 - Las 12 677 advertencias `mensaje_excede_150` salen de la distribución de días de la sábana sintética (segmento `9 a 30`, que mide 156), no de un dato real.
 
+**Medición de B8 (2026-09-28, contra `auto_cusco_test`, misma sábana de 46 000 filas).** Desde B8 guardar un reporte recalcula `enviados_conciliados` dentro de la misma transacción (relee las filas cargadas y las del reporte de cada campaña afectada y las concilia), con un `pg_advisory_xact_lock` que serializa las importaciones.
+
+| Paso | Tiempo |
+|---|---|
+| Previsualización | 5,3 s |
+| Crear | 4,8 s |
+| Guardar un reporte de 45 851 filas, con el recálculo | 2,4 s (antes 0,9 s) |
+| Conciliar | 1,6 s |
+| Reemplazar el reporte (1 campaña) | 2,5 s |
+| Mover el id a otra campaña que se queda sin reportes (concilia solo la de destino) | 2,3 s |
+
+El costo de la importación pasó de unos 0,9 s a unos 2,4 s, que sigue siendo del orden de unos pocos segundos, así que no se optimizó. El peor caso, mover un id que deja a la campaña de origen con otro id (con lo que se concilian las dos, una con la mitad de sus filas y otra con todas), tarda 3,6 s. Con esto se cumplen las condiciones de architec para aceptarlo sin optimizar: importar menos de unos 3 s (2,4 s) y crear sin empeorar respecto de lo medido antes (4,6 s contra 5,2 s). El escenario completo está en `scripts/medir_campana_mowa_mes.py` (necesita `DB_NAME` terminado en `_test`).
+
 ## 14. Pruebas del segundo corte
 
 | Archivo | Nivel |
@@ -191,3 +204,60 @@ El `409` de creación tenía un solo motivo de texto en `detail`; el frontend no
 - **El orden de los chequeos no cambia:** `CampanasMowaMesService.crear()` revisa la huella antes que el límite (`app/core/services/plataformas/mowa_mes/campana.py`), igual que antes de este corte. Con `confirmar_limite=True`, un `409` solo puede ser `huella_cambiada` (el chequeo del límite queda salteado); con `confirmar_limite=False`, puede ser cualquiera de los dos según cuál se dispare primero.
 - **En el frontend**, un `409` sin `codigo` reconocido se trata como `huella_cambiada` (decisión de architec, implementación de `dev_frontend_modulo_mowa_mes`).
 - **Prueba de contrato:** `tests/test_contrato_openapi.py::test_los_errores_declarados_traen_detail_obligatorio` recorre cada respuesta `4xx` salvo `422`, resuelve `$ref` y aplana `allOf`, y exige `detail` string obligatorio. No hay excepciones por nombre de endpoint: este `409` pasa porque conserva `detail`, no porque esté en una lista. La regla completa está en `docs/contrato-api.md`, sección 3 (decisión de architec).
+
+## 16. Tarifa, costos y nombre de los archivos (B8, RF-MM-23 a RF-MM-25)
+
+| Pieza | Ruta |
+|---|---|
+| Entidades y catálogo de variables | `app/core/entities/mowa_mes_costo.py` |
+| Tarifa y costos | `app/core/services/plataformas/mowa_mes/costos.py` |
+| Plantilla del nombre | `app/core/services/plataformas/mowa_mes/nombre_archivo.py` |
+| `Content-Disposition` | `disposicion_de_descarga` en `app/adapters/output/exportadores/comunes.py` |
+| Migración | `c3d9f5a17e28` (una sola; ida y vuelta y `alembic check` limpios) |
+
+### 16.1 Decisiones técnicas (aprobadas por architec el 2026-09-28)
+
+1. **Montos en el contrato: texto decimal con 4 decimales fijos**, plano y sin exponente (`"0.0200"`, `"917.0200"`, `"0.0000"`). Todo es `Decimal` en el backend, nunca `float` (`costos.costo` es `Decimal(cantidad) * tarifa`, exacto). La entrada de `tarifa_sms` también es texto: un número de JSON responde `422`; un texto que no es decimal ≥ 0 con hasta 4 decimales (y hasta 8 enteros) responde `400` con el motivo; `null` responde `422`. Columnas: `NUMERIC(12,4)` la tarifa y `NUMERIC(18,4)` el costo (el peor caso, 120 100 filas a la tarifa máxima, cabe en 14 enteros).
+2. **Redondeo solo al mostrar.** Se guarda el valor exacto (cargados × tarifa) y el costo del mes suma valores exactos; el redondeo a 2 decimales, a la mitad hacia arriba, lo hace quien muestra el monto.
+3. **Tarifa congelada.** La campaña guarda `tarifa_sms` y `costo_estimado` al crearse; un cambio posterior en la configuración no los toca. Las campañas anteriores quedan con `NULL` y su costo es `no_disponible` (`costo_estimado_estado`, `costo_real_estado`); no se les asigna la tarifa actual. El costo del mes (`ConsumoLimite.costo_mes`) suma los `costo_estimado` guardados con la regla de imputación del límite, omite las campañas sin tarifa y dice cuántas fueron (`campanas_sin_tarifa`, D-2). `costo_esta_campana` y `costo_total` los calcula el backend: el frontend no suma ni multiplica.
+4. **Costo real (D-3).** No se guarda el costo: sale de `enviados_conciliados × tarifa` de la campaña. `enviados_conciliados` es un valor **derivado** de la conciliación vigente (E-1, supervisión incluida) que actualiza `guardar_reportes` en la misma transacción que importa o reemplaza un reporte, con la misma función del núcleo que arma la conciliación (`reportes.enviados_de`): una sola definición de "enviado". Recalcula la campaña elegida y también cualquier campaña a la que el reemplazo le quita un id de MES (C-5 permite moverlo). Un `pg_advisory_xact_lock` (clave `CLAVE_BLOQUEO_IMPORTACION_REPORTES`, en el repositorio) serializa las importaciones. **Es global y no por campaña a propósito:** un id de MES es único entre campañas (`mowa_mes_reporte.mes_id`), así que dos importaciones de campañas distintas pueden reclamar el mismo id a la vez; con un lock por campaña se pisarían el reemplazo y el conteo de la campaña de la que se lo quitan. El costo es que dos importaciones se turnan (cada una tarda unos 2,4 s con 46 000 filas) y, como son manuales y poco frecuentes, no se nota. Una prueba postgres (`test_una_segunda_importacion_espera_al_lock_global_y_no_falla`) retiene el lock desde otra conexión y comprueba que la importación espera y, al soltarlo, termina con 201. `NULL` = sin reporte (`pendiente`); `0` = se importó y no se envió nada. Sin backfill (las campañas anteriores no tienen tarifa, así que su costo real es `no_disponible` con o sin reportes) y el campo **no se expone** en ninguna respuesta: las cifras de enviados que se muestran salen siempre de la conciliación en vivo. Un `CHECK` lo mantiene entre 0 y `total_cargados`. La conciliación (`GET .../conciliacion`, `POST .../reportes`) calcula además su propio `costo_real` en vivo; una prueba postgres comprueba que coincide con el del listado.
+5. **Nombre y límite de 120.** El recorte se aplica a la parte de la plantilla y nunca al sufijo `_{archivo}de{total}`. El nombre resuelto se guarda con cada archivo (`mowa_mes_archivo.nombre`, con extensión, único por campaña): una descarga posterior entrega el mismo nombre aunque la plantilla de la configuración cambie. La migración completó las campañas existentes con `mowa_mes_campana_<id>_<n>_de_<total>.xlsx`, así que sus descargas no cambian.
+6. **`Content-Disposition`** lleva `filename` en ASCII (sin tildes, `_` en lo que no es seguro, como `nombre_de_archivo`) y `filename*=UTF-8''…` (RFC 5987) con el nombre exacto.
+
+### 16.2 Precisiones del nombre de archivo (revisadas por el coordinador)
+
+- **Orden de resolución:** sustituir variables → reemplazar por `_` los caracteres de Windows (`\ / : * ? " < > |`) → recortar espacios y puntos de los extremos → reservar el sufijo → limitar a 120 → `.xlsx`. Es la misma función para la creación, la previsualización y el ejemplo de la configuración.
+- **(1) `nombre_estimado`** es `true` no solo si la plantilla usa `{archivo}` o `{total}` (D-1), también si usa `{cantidad}` o si el sufijo automático entró por haber más de un archivo: los dos dependen de cómo se divida la carga.
+- **(2) Vacío antes del sufijo:** si tras sustituir y sanear no queda nada, se usa la plantilla por defecto **antes** de agregar el sufijo; con el orden literal, un `_1de3` solo habría contado como nombre. `{descripcion}` con solo espacios y puntos cae en este caso; una plantilla de solo caracteres prohibidos no queda vacía (quedan guiones bajos).
+- **(3) Unicidad:** si dos nombres de una campaña coinciden (por ejemplo `{archivo}{cantidad}` da `123` para el archivo 1 con 23 filas y para el 12 con 3), se reserva el sufijo en todos; con el sufijo el nombre es único y nunca se recorta. La comparación no distingue mayúsculas, como el sistema de archivos de Windows.
+- **(4) Caracteres de control** (0x00–0x1F) también se reemplazan por `_`, además de los 9 prohibidos.
+- **Plantilla vacía** (en la configuración o en la campaña) = la de por defecto; en la campaña, la de la configuración. Máximo 300 caracteres. Variable desconocida (`{x}`), llave `{` sin cerrar o `}` sin abrir responden `400` con el motivo, en la configuración, en la previsualización y en la creación de campañas. Las variables distinguen mayúsculas.
+- **Previsualización de la campaña:** `nombre_primer_archivo` con `[campana]` en el lugar del número de campaña (todavía no existe) y `null` si no hay archivos previstos.
+- **Ejemplo de la configuración:** `POST /mowa-mes/plantilla-nombre-archivo/previsualizacion` resuelve la plantilla con datos de muestra fijos (campaña 1234, descripción `CajaCusco`, envío 2026-10-01, corte 2026-09-30) para dos archivos de 50 000 y 1 200 filas, sin guardar nada. La respuesta de configuración trae `variables_plantilla` para que el frontend no copie la lista.
+
+### 16.2.1 El `400` trae el campo (pedido de architec)
+
+Antes el frontend ubicaba el error bajo su campo adivinando por el texto del `detail`, y eso se rompe en cuanto cambia una frase. Ahora el `400` de estos endpoints trae, además de `detail`, el campo al que pertenece, en un modelo de error propio que extiende `detail` (regla de `docs/contrato-api.md`, sección 3; mismo patrón que el `409` de la sección 15):
+
+| Endpoint | Modelo | `campo` |
+|---|---|---|
+| `PUT /mowa-mes/configuracion` | `ErrorConfiguracionRespuesta` | `CampoConfiguracion`, siempre presente: `limite_mensual`, `whatsapp_contacto`, `registros_por_archivo`, `bytes_por_archivo`, `tarifa_sms`, `plantilla_nombre_archivo` |
+| `POST /mowa-mes/plantilla-nombre-archivo/previsualizacion` | `ErrorConfiguracionRespuesta` | siempre `plantilla_nombre_archivo` |
+| `POST /mowa-mes/campanas/previsualizacion` y `POST /mowa-mes/campanas` | `ErrorPeticionCampanaRespuesta` | `plantilla_nombre_archivo` si el error es de la plantilla; `null` en cualquier otro `400` (filtro mal escrito, opción deshabilitada, sin supervisores…) |
+
+- El enum `CampoConfiguracion` vive en `app/core/entities/mowa_mes.py`. `ConfiguracionInvalida` y `PeticionCampanaInvalida` llevan `campo`; los sitios que las lanzan lo fijan. Si un `400` de la configuración no trajera campo, la respuesta falla al construirse (500) en vez de salir sin él.
+- Si un `PUT` de configuración trae dos errores, el `400` habla de uno solo: la tarifa se lee antes que la plantilla, y el núcleo revisa límite, WhatsApp, filas, bytes, tarifa y plantilla en ese orden.
+- El `404` de la previsualización y de la creación (sin versión vigente, speech inexistente) sigue siendo `DetalleError`, sin `campo`.
+- `null` en `tarifa_sms` o en `plantilla_nombre_archivo` sigue siendo `422` (lo ataja Pydantic antes del servicio), y por eso no trae `campo`.
+
+### 16.3 Pruebas
+
+| Archivo | Qué cubre |
+|---|---|
+| `tests/test_mowa_mes_costos.py` | Tarifa (bordes, texto inválido, float rechazado), costo exacto, costo real con sus tres estados, texto decimal |
+| `tests/test_mowa_mes_nombre_archivo.py` | Variables, saneamiento, bordes (vacío, solo prohibidos, solo espacios y puntos, 120 exacto), sufijo, unicidad y **propiedades a mano** con semilla fija sobre miles de plantillas: sin caracteres prohibidos, nunca más de 120, sufijo que sobrevive al recorte y nombres distintos por campaña |
+| `tests/test_mowa_mes_campana.py` | Costo estimado con supervisión, tarifa congelada, costo del mes, campañas sin tarifa, nombres guardados, plantilla por campaña, costo real y `enviados_conciliados` (importar, reemplazar, segundo id, mover un id) |
+| `tests/test_api_mowa_mes_campanas.py`, `test_api_mowa_mes_configuracion.py`, `test_exportadores.py` | Formas del contrato, montos como texto, 400/422, `Content-Disposition` con `ñ` |
+| `tests/test_mowa_mes_campanas_postgres.py` | Defectos de la base, tarifa exacta, congelado y costo del mes contra la base real, campañas sin tarifa, consistencia de `enviados_conciliados` con la conciliación tras cada paso, atomicidad de la importación, restricciones (`CHECK` y `UNIQUE`) y nombres guardados |
+
+**Mutaciones (en un worktree pinneado, 24 en total, todas detectadas; las 7 últimas son del `campo` del `400` —campo equivocado en la tarifa, el WhatsApp, la plantilla de la configuración y del `PUT`, plantilla de campaña sin campo, `campo` descartado en el `400` de campañas— y el lock global retirado):** tarifa actual en lugar de la congelada (costo real del núcleo, del listado y costo del mes en SQL), `float` en lugar de `Decimal` (costo y lectura de la tarifa), costo real con cualquier estado (núcleo y postgres), sufijo recortado por el límite de 120, variable desconocida aceptada, reemplazo que no recalcula el conteo, campaña de origen de un id movido sin recalcular, `0` en lugar de `NULL` sin reporte, conteo fuera de la transacción, descarga sin `filename*`, campañas sin tarifa sin contarse, costo estimado sin la supervisión y descarga con el nombre de la plantilla actual en lugar del guardado.

@@ -68,6 +68,11 @@ import '../../styles/mowa-mes.css';
         </div>
         <div class="panel__body mm-form">
           <dl class="mm-cifras" data-limite-cifras></dl>
+          <p class="mm-costo-mes" data-costo-mes>
+            <span data-i18n="mowaMes.seguimiento.costoMes">Costo del mes:</span>{' '}
+            <strong class="mm-costo-mes__valor" data-costo-mes-valor></strong>{' '}
+            <span class="muted" data-costo-mes-nota hidden></span>
+          </p>
           <p class="notice notice--danger" data-limite-excedido hidden>
             <Icon name="triangle-alert" size={20} />
             <span data-limite-excedido-texto></span>
@@ -246,14 +251,16 @@ import '../../styles/mowa-mes.css';
     type Conciliacion,
     type ConsumoLimite,
     type EstadoConteo,
+    type EstadoCosto,
+    type EstadoCostoEstimado,
     type ListaCampanas,
     type PaginaExclusiones,
   } from '../../lib/api-mowa-mes';
   import { guardarArchivo } from '../../lib/descargas';
   import { openWhenFree } from '../../lib/dialogs';
-  import { formatBytes, formatDate, formatDateTime, formatNumber } from '../../lib/format';
+  import { formatBytes, formatDate, formatDateTime, formatNumber, formatSoles, formatTarifa } from '../../lib/format';
   import { applyTranslations, locale, t } from '../../lib/i18n';
-  import { traducirCodigo } from '../../lib/mowa-mes';
+  import { presentarCosto, traducirCodigo, type PresentacionCosto } from '../../lib/mowa-mes';
   import {
     CODIGOS_EXCLUSION,
     filasConciliacion,
@@ -354,17 +361,70 @@ import '../../styles/mowa-mes.css';
     return { envoltorio, cuerpo };
   }
 
-  function cifra(etiqueta: string, valor: string): HTMLElement {
+  function cifra(etiqueta: string, valor: string, pista?: string, apagada = false): HTMLElement {
     const bloque = document.createElement('div');
     bloque.className = 'stat';
     const nombre = document.createElement('dt');
     nombre.className = 'stat__label';
     nombre.textContent = etiqueta;
     const numero = document.createElement('dd');
-    numero.className = 'stat__value';
+    numero.className = apagada ? 'stat__value muted' : 'stat__value';
     numero.textContent = valor;
     bloque.append(nombre, numero);
+    if (pista) {
+      const detalle = document.createElement('dd');
+      detalle.className = 'field__hint';
+      detalle.textContent = pista;
+      bloque.append(detalle);
+    }
     return bloque;
+  }
+
+  // ---- Costs (RF-MM-24): the API sends the amounts worked out, as text --------------------------
+
+  const AYUDA_SIN_TARIFA = 'mowaMes.costo.noDisponible.ayuda';
+
+  /** The words for a cost that is not an amount. The state decides, never a null amount. */
+  function textoDeCosto(presentacion: Exclude<PresentacionCosto, { tipo: 'monto' }>): string {
+    return t(presentacion.tipo === 'pendiente' ? 'mowaMes.costo.pendiente' : 'mowaMes.costo.noDisponible');
+  }
+
+  /** An amount sits in the numeric column; the two other states are muted text, not a number. */
+  function celdaCosto(estadoCosto: EstadoCosto | EstadoCostoEstimado, monto: string | null): HTMLTableCellElement {
+    const presentacion = presentarCosto(estadoCosto, monto);
+    if (presentacion.tipo === 'monto') return celda('td', formatSoles(presentacion.valor), 'num');
+    const nodo = celda('td', textoDeCosto(presentacion), 'muted');
+    if (presentacion.tipo === 'no_disponible') {
+      const ayuda = t(AYUDA_SIN_TARIFA);
+      nodo.title = ayuda;
+      nodo.setAttribute('aria-description', ayuda);
+    }
+    return nodo;
+  }
+
+  function cifraDeCosto(
+    etiqueta: string,
+    estadoCosto: EstadoCosto | EstadoCostoEstimado,
+    monto: string | null,
+    tarifa: string | null,
+  ): HTMLElement {
+    const presentacion = presentarCosto(estadoCosto, monto);
+    const pista = tarifa === null ? undefined : t('mowaMes.costo.tarifa', { tarifa: formatTarifa(tarifa) });
+    if (presentacion.tipo === 'monto') return cifra(etiqueta, formatSoles(presentacion.valor), pista);
+    return cifra(
+      etiqueta,
+      textoDeCosto(presentacion),
+      presentacion.tipo === 'no_disponible' ? t(AYUDA_SIN_TARIFA) : pista,
+      true,
+    );
+  }
+
+  /** What the real cost is now: the loaded reconciliation is fresher than the list row. */
+  function costoRealVigente(campana: Campana): { estado: EstadoCosto; monto: string | null } {
+    const conciliacion = estado.conciliacion;
+    return conciliacion && conciliacion.campana_id === campana.id
+      ? { estado: conciliacion.costo_real_estado, monto: conciliacion.costo_real }
+      : { estado: campana.costo_real_estado, monto: campana.costo_real };
   }
 
   function textoEstados(estados: readonly EstadoConteo[]): string {
@@ -415,6 +475,20 @@ import '../../styles/mowa-mes.css';
       cifra(t('mowaMes.seguimiento.limite.disponible'), formatNumber(consumo.disponible)),
       cifra(t('mowaMes.seguimiento.limite.uso'), uso),
     );
+
+    // The month's cost, and how many campaigns it leaves out for having no stored rate.
+    // The figure in the scale of the limit's; the note only when some campaign has no rate.
+    $<HTMLElement>('[data-costo-mes-valor]').textContent = formatSoles(consumo.costo_mes);
+    const nota = $<HTMLElement>('[data-costo-mes-nota]');
+    nota.hidden = consumo.campanas_sin_tarifa === 0;
+    nota.textContent =
+      consumo.campanas_sin_tarifa === 0
+        ? ''
+        : `· ${
+            consumo.campanas_sin_tarifa === 1
+              ? t('mowaMes.seguimiento.costoMes.sinTarifaUna')
+              : t('mowaMes.seguimiento.costoMes.sinTarifa', { n: formatNumber(consumo.campanas_sin_tarifa) })
+          }`;
 
     $<HTMLElement>('[data-limite-excedido]').hidden = !consumo.excedido;
     $<HTMLElement>('[data-limite-excedido-texto]').textContent = t('mowaMes.seguimiento.limite.excedido', {
@@ -473,6 +547,8 @@ import '../../styles/mowa-mes.css';
       ['mowaMes.seguimiento.campanas.col.productos', true],
       ['mowaMes.seguimiento.campanas.col.supervision', true],
       ['mowaMes.seguimiento.campanas.col.total', true],
+      ['mowaMes.seguimiento.campanas.col.costoEstimado', true],
+      ['mowaMes.seguimiento.campanas.col.costoReal', true],
       ['mowaMes.seguimiento.campanas.col.excluidos', true],
       ['mowaMes.seguimiento.campanas.col.archivos', true],
       ['mowaMes.seguimiento.campanas.col.accion', false],
@@ -500,6 +576,8 @@ import '../../styles/mowa-mes.css';
         celda('td', formatNumber(campana.productos_cargados), 'num'),
         celda('td', formatNumber(campana.supervision_cargados), 'num'),
         celda('td', formatNumber(campana.total_cargados), 'num'),
+        celdaCosto(campana.costo_estimado_estado, campana.costo_estimado),
+        celdaCosto(campana.costo_real_estado, campana.costo_real),
         celda('td', formatNumber(campana.excluidos), 'num'),
         celda('td', formatNumber(campana.archivos.length), 'num'),
         accion,
@@ -564,6 +642,18 @@ import '../../styles/mowa-mes.css';
       cifra(t('mowaMes.seguimiento.detalle.total'), formatNumber(campana.total_cargados)),
       cifra(t('mowaMes.seguimiento.detalle.excluidos'), formatNumber(campana.excluidos)),
       cifra(t('mowaMes.seguimiento.detalle.advertencias'), formatNumber(campana.advertencias)),
+      cifraDeCosto(
+        t('mowaMes.seguimiento.detalle.costoEstimado'),
+        campana.costo_estimado_estado,
+        campana.costo_estimado,
+        campana.tarifa_sms,
+      ),
+      cifraDeCosto(
+        t('mowaMes.seguimiento.detalle.costoReal'),
+        costoRealVigente(campana).estado,
+        costoRealVigente(campana).monto,
+        campana.tarifa_sms,
+      ),
     );
 
     pintarArchivos(campana);
@@ -574,6 +664,7 @@ import '../../styles/mowa-mes.css';
     host.replaceChildren();
     const { envoltorio, cuerpo } = tabla('mm-archivos__tabla', [
       ['mowaMes.seguimiento.archivos.col.numero', true],
+      ['mowaMes.seguimiento.archivos.col.nombre', false],
       ['mowaMes.seguimiento.archivos.col.filas', true],
       ['mowaMes.seguimiento.archivos.col.supervision', true],
       ['mowaMes.seguimiento.archivos.col.bytes', true],
@@ -599,6 +690,7 @@ import '../../styles/mowa-mes.css';
 
       fila.append(
         celda('td', String(archivo.numero), 'num'),
+        celda('td', archivo.nombre, 'mono mm-nombre'),
         celda('td', formatNumber(archivo.filas), 'num'),
         celda('td', formatNumber(archivo.supervision), 'num'),
         celda('td', formatBytes(archivo.bytes), 'num'),
@@ -650,6 +742,7 @@ import '../../styles/mowa-mes.css';
       if (estado.campanaId !== id) return;
       estado.conciliacion = conciliacion;
       pintarConciliacion();
+      pintarDetalle();
     } catch (caido) {
       mostrarError(caido);
     }
@@ -708,6 +801,9 @@ import '../../styles/mowa-mes.css';
       if (estado.campanaId !== id) return;
       estado.conciliacion = conciliacion;
       pintarConciliacion();
+      pintarDetalle();
+      // The list row carries the real cost too, and it just changed.
+      void cargarCampanas().catch(mostrarError);
       avisar($<HTMLElement>('[data-reporte-estado]'), t('mowaMes.seguimiento.reporte.importado'));
     } catch (caido) {
       if (caido instanceof ApiError && caido.status === 409 && !reemplazar) {
@@ -801,6 +897,19 @@ import '../../styles/mowa-mes.css';
       sin.append(estados);
     }
     host.append(sin);
+
+    const costo = document.createElement('p');
+    costo.className = 'mm-conciliacion__costo';
+    const real = presentarCosto(conciliacion.costo_real_estado, conciliacion.costo_real);
+    costo.textContent =
+      real.tipo === 'monto'
+        ? t('mowaMes.seguimiento.conciliacion.costoReal', {
+            monto: formatSoles(real.valor),
+            enviados: formatNumber(conciliacion.total.enviados),
+            tarifa: formatTarifa(conciliacion.tarifa_sms),
+          })
+        : t('mowaMes.seguimiento.conciliacion.costoRealSin', { motivo: textoDeCosto(real) });
+    host.append(costo);
 
     const ids = tabla('mm-ids__tabla', [
       ['mowaMes.seguimiento.conciliacion.col.mesId', false],

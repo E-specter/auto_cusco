@@ -10,16 +10,23 @@ import {
   accionDia,
   borradorDeSupervision,
   borradorDesdeVersion,
+  CAMPOS_DE_ERROR,
+  campoDeError,
   entradaSupervision,
   FILAS_POR_PAGINA,
   hayCambiosSpeech,
+  insertarVariable,
   modoGuardado,
   moverElemento,
   nivelLargo,
   paginar,
+  presentarCosto,
   problemasConfiguracion,
   problemasSupervision,
   rangoSegmento,
+  tarifaEditable,
+  tarifaNormalizada,
+  variablesDesconocidas,
   renombrarProcedencia,
   resumenNiveles,
   supervisionCambio,
@@ -400,5 +407,177 @@ describe('paginar (RF-MM-26)', () => {
       const unidas = Array.from({ length: paginar(todas, 1).paginas }, (_, i) => paginar(todas, i + 1).filas).flat();
       expect(unidas).toEqual(todas);
     }
+  });
+});
+
+describe('tarifaNormalizada (RF-MM-23)', () => {
+  it.each([
+    ['0.02', '0.02'],
+    ['0', '0'],
+    ['1', '1'],
+    ['0.0215', '0.0215'],
+    ['0,02', '0.02'],
+    ['  0.03  ', '0.03'],
+    ['12.5', '12.5'],
+  ])('acepta %j y lo entrega como %j', (entrada, esperado) => {
+    expect(tarifaNormalizada(entrada)).toBe(esperado);
+  });
+
+  it.each(['', '   ', '-0.02', '0.02345', '.5', '5.', '1e3', 'abc', '0.0.2', '1,2,3', 'S/ 0.02', '0.02 soles'])(
+    'rechaza %j',
+    (entrada) => {
+      expect(tarifaNormalizada(entrada)).toBeNull();
+    },
+  );
+
+  it('no pasa por un número: conserva los ceros y la precisión que se escribieron', () => {
+    expect(tarifaNormalizada('0.0200')).toBe('0.0200');
+    expect(tarifaNormalizada('0.1000')).toBe('0.1000');
+  });
+});
+
+describe('variablesDesconocidas (RF-MM-25)', () => {
+  const validas = ['campana', 'descripcion', 'fecha_envio', 'fecha_corte', 'archivo', 'total', 'cantidad'].map(
+    (nombre) => ({ nombre, descripcion: `d ${nombre}` }),
+  );
+
+  it('sin llaves no hay nada que marcar', () => {
+    expect(variablesDesconocidas('mowa_mes_carga', validas)).toEqual([]);
+    expect(variablesDesconocidas('', validas)).toEqual([]);
+  });
+
+  it('las variables de la lista no se marcan', () => {
+    expect(variablesDesconocidas('mowa_mes_campana_{campana}_{archivo}_de_{total}', validas)).toEqual([]);
+  });
+
+  it('marca cada desconocida una vez y en el orden en que aparece', () => {
+    expect(variablesDesconocidas('{banco}_{campana}_{otra}_{banco}', validas)).toEqual(['banco', 'otra']);
+  });
+
+  it('distingue mayúsculas: la lista manda', () => {
+    expect(variablesDesconocidas('{Campana}', validas)).toEqual(['Campana']);
+  });
+
+  it('unas llaves vacías cuentan como desconocidas', () => {
+    expect(variablesDesconocidas('a{}b', validas)).toEqual(['']);
+  });
+
+  it('no inventa variables: con una lista vacía, todas son desconocidas', () => {
+    expect(variablesDesconocidas('{campana}', [])).toEqual(['campana']);
+  });
+
+  it('una llave sin cerrar no es una variable: eso lo dice el 400 del backend', () => {
+    expect(variablesDesconocidas('{campana', validas)).toEqual([]);
+    expect(variablesDesconocidas('campana}', validas)).toEqual([]);
+  });
+});
+
+describe('insertarVariable', () => {
+  it('inserta en la posición del cursor y deja el cursor después de la variable', () => {
+    expect(insertarVariable('ab', 1, 1, 'total')).toEqual({ texto: 'a{total}b', cursor: 8 });
+  });
+
+  it('reemplaza lo seleccionado', () => {
+    expect(insertarVariable('abcdef', 2, 4, 'archivo')).toEqual({ texto: 'ab{archivo}ef', cursor: 11 });
+  });
+
+  it('al principio y al final', () => {
+    expect(insertarVariable('x', 0, 0, 'campana').texto).toBe('{campana}x');
+    expect(insertarVariable('x', 1, 1, 'campana').texto).toBe('x{campana}');
+  });
+
+  it('sobre un campo vacío', () => {
+    expect(insertarVariable('', 0, 0, 'total')).toEqual({ texto: '{total}', cursor: 7 });
+  });
+
+  it('una selección al revés o fuera del texto se acota', () => {
+    expect(insertarVariable('abc', 3, 1, 'x').texto).toBe('a{x}');
+    expect(insertarVariable('abc', -5, 99, 'x').texto).toBe('{x}');
+    expect(insertarVariable('abc', 50, 60, 'x').texto).toBe('abc{x}');
+  });
+});
+
+describe('presentarCosto (RF-MM-24)', () => {
+  it('calculado muestra el monto', () => {
+    expect(presentarCosto('calculado', '1234.5000')).toEqual({ tipo: 'monto', valor: '1234.5000' });
+  });
+
+  it('un costo real de cero con estado calculado es un monto, no «pendiente» ni «no disponible»', () => {
+    expect(presentarCosto('calculado', '0.0000')).toEqual({ tipo: 'monto', valor: '0.0000' });
+  });
+
+  it('decide el estado, no el null: calculado con monto nulo no se lee como no disponible', () => {
+    expect(presentarCosto('calculado', null)).toEqual({ tipo: 'monto', valor: null });
+  });
+
+  it('pendiente y no disponible no muestran monto, aunque llegue uno', () => {
+    expect(presentarCosto('pendiente', null)).toEqual({ tipo: 'pendiente' });
+    expect(presentarCosto('pendiente', '5.0000')).toEqual({ tipo: 'pendiente' });
+    expect(presentarCosto('no_disponible', null)).toEqual({ tipo: 'no_disponible' });
+    expect(presentarCosto('no_disponible', '5.0000')).toEqual({ tipo: 'no_disponible' });
+  });
+});
+
+describe('tarifaEditable', () => {
+  it.each([
+    ['0.0200', '0.02'],
+    ['0.0215', '0.0215'],
+    ['0.1000', '0.10'],
+    ['1.0000', '1.00'],
+    ['12', '12.00'],
+    ['0.0250', '0.025'],
+    [' 0.0300 ', '0.03'],
+  ])('%j se edita como %j', (guardada, editable) => {
+    expect(tarifaEditable(guardada)).toBe(editable);
+  });
+
+  it('lo que se muestra al editar se acepta de vuelta y dice lo mismo', () => {
+    for (const guardada of ['0.0200', '0.0215', '5.0000']) {
+      expect(tarifaNormalizada(tarifaEditable(guardada))).not.toBeNull();
+    }
+  });
+});
+
+describe('campoDeError', () => {
+  it('cubre exactamente los campos que el contrato puede nombrar', () => {
+    // `CAMPOS_DE_ERROR` is a record over the generated enum: `astro check` fails if the
+    // contract renames, adds or drops one. This pins the list the screens act on.
+    expect(Object.keys(CAMPOS_DE_ERROR).sort()).toEqual([
+      'bytes_por_archivo',
+      'limite_mensual',
+      'plantilla_nombre_archivo',
+      'registros_por_archivo',
+      'tarifa_sms',
+      'whatsapp_contacto',
+    ]);
+  });
+
+  it.each([
+    'limite_mensual',
+    'whatsapp_contacto',
+    'registros_por_archivo',
+    'bytes_por_archivo',
+    'tarifa_sms',
+    'plantilla_nombre_archivo',
+  ])('lee el campo %s que nombra la API', (campo) => {
+    expect(campoDeError({ detail: 'lo que sea', campo })).toBe(campo);
+  });
+
+  it('no adivina por el texto: sin campo, o con uno nulo, no hay campo', () => {
+    expect(campoDeError({ detail: 'La tarifa debe ser un numero decimal' })).toBeNull();
+    expect(campoDeError({ detail: 'La plantilla tiene una llave { sin cerrar', campo: null })).toBeNull();
+    expect(campoDeError({ detail: 'El numero de WhatsApp no cumple RF-02' })).toBeNull();
+  });
+
+  it('un campo que este cliente no conoce, o que no es texto, no es un campo', () => {
+    expect(campoDeError({ campo: 'campo_nuevo' })).toBeNull();
+    expect(campoDeError({ campo: 7 })).toBeNull();
+    expect(campoDeError({ campo: ['tarifa_sms'] })).toBeNull();
+    expect(campoDeError({ campo: '' })).toBeNull();
+  });
+
+  it('un cuerpo que no llegó (no era un objeto JSON) tampoco', () => {
+    expect(campoDeError(null)).toBeNull();
+    expect(campoDeError({})).toBeNull();
   });
 });

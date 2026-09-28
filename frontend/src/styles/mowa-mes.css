@@ -429,13 +429,98 @@
   font-size: var(--text-sm);
 }
 
-/* The synthetic message column reads like data, and is the one column allowed
-   to grow: the analyst compares it against the 160-character SMS limit. */
-.mm-muestra__tabla td:nth-last-child(2) {
-  max-inline-size: 32ch;
-  overflow-wrap: anywhere;
+/* The message column reads like data, and is the one column allowed to grow:
+   the analyst compares it against the 160-character SMS limit. Only in the wide
+   layout: once the table stacks, the message takes the whole block, and a
+   max width with `anywhere` would let an auto-width column shrink to a
+   character and split the text letter by letter. */
+@media (min-width: 48rem) {
+  .mm-muestra__tabla td:nth-last-child(2) {
+    max-inline-size: 32ch;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Stacked (see `.table--apilable`): number, document, segment and length in two
+   columns, the message and the warnings across, and no block for a cell with
+   nothing in it — ten rows a page must not be ten screens. */
+@media (max-width: 47.99rem) {
+  .table.mm-muestra__tabla.table--apilable tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: var(--space-3);
+  }
+
+  .table.mm-muestra__tabla.table--apilable td:nth-last-child(-n + 2) {
+    grid-column: 1 / -1;
+  }
+
+  .table.mm-muestra__tabla.table--apilable td:empty {
+    display: none;
+  }
+
+  .mm-muestra__tabla td {
+    overflow-wrap: anywhere;
+  }
 }
 
 .mm-muestra__tabla .tag {
   margin-inline-end: var(--space-1);
+}
+
+/* File-name template (RF-MM-25): the variables as a row of quiet buttons under
+   the field, and the name the API gives, in mono, wrapping instead of scrolling. */
+.mm-variables {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
+
+.mm-nombre-archivo {
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.mm-nombre-archivo p + p {
+  margin-block-start: var(--space-1);
+}
+
+/* Costs (RF-MM-24). A figure that is not an amount — "Pendiente del reporte",
+   "No disponible" — is text, so it is read at text size and muted rather than
+   set in the numeral style of a `.stat__value`. */
+.stat__value.muted {
+  font-family: var(--font-primary);
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: normal;
+  line-height: 1.3;
+  color: var(--color-text-muted);
+}
+
+.mm-conciliacion__costo {
+  font-size: var(--text-sm);
+}
+
+/* The month's cost: its own line right under the limit's figures, the amount in
+   the same numeral scale as theirs (`.stat__value`), the note muted. */
+/* Inline, not flex: the spaces between the label, the amount and the note are
+   real text, so a screen reader and a copy read "Costo del mes: S/ 19.64 · …". */
+.mm-costo-mes {
+  font-size: var(--text-sm);
+}
+
+.mm-costo-mes__valor {
+  font-family: var(--font-secondary);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The real file name: a mono identifier that may be long, wrapped, never scrolled. */
+.mm-archivos__tabla td.mm-nombre {
+  overflow-wrap: anywhere;
+  min-inline-size: 16ch;
 }
