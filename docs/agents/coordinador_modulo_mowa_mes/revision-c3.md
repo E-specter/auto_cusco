@@ -1,6 +1,6 @@
 # Revisión de los agregados de `mowa_mes` (T-MM-C3)
 
-> **Cerrada el 2026-09-28.** Los cuatro requerimientos están implementados y commiteados, salvo el cambio chico de la sección 6, que va en el corte de cierre. Queda un pendiente de `designer`, fuera del módulo.
+> **Cerrada el 2026-09-28.** Los cuatro requerimientos están implementados y commiteados, salvo el cambio chico de la sección 6, que va en el corte de cierre. El único pendiente, de `designer` y fuera del módulo, se resolvió en `5de5358`.
 
 Coordinador: `coordinador_modulo_mowa_mes`. Reporta a `architec`. Requerimientos: RF-MM-23 a RF-MM-26 (`93b7ca6`, precisiones D-1 a D-3 en `fa19cfe`).
 
@@ -82,7 +82,7 @@ Hecha por dev_frontend sobre `aed0af5`, con un script aparte y axe en cada ancho
    - el título y el motivo del 404 (venía de F2-B).
 
    Tiene tres aserciones con tres mutaciones, todas detectadas. En el worktree desde `aed0af5`: Vitest 353/353 y Playwright 174/174.
-2. `.btn--primary:hover` da un contraste de 3,02:1 en el tema claro, bajo el 4,5:1 que pide AA. Es un patrón de `designer` y afecta a todos los botones primarios. **Pasado a `designer`.**
+2. `.btn--primary:hover` da un contraste de 3,02:1 en el tema claro, bajo el 4,5:1 que pide AA. Es un patrón de `designer` y afecta a todos los botones primarios. **Resuelto por `designer` en `5de5358`:** con el mouse encima da 5,95:1 y presionado 7,75:1, en los dos temas (el oscuro también fallaba). La prueba axe de esos dos estados quedó en `accesibilidad.spec.ts`.
 
 **Anotado sin cambios:**
 
