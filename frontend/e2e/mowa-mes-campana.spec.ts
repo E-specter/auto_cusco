@@ -465,6 +465,10 @@ test.describe('P8: sin versión vigente', () => {
 
     await expect(page.getByText('No se pudo previsualizar')).toBeVisible();
     await expect(page.getByText('La fecha 2026-09-13 no tiene una version vigente de sabana')).toBeVisible();
+    // The title and the API's reason are separate elements, read as two words, not glued.
+    await expect(page.locator('[data-error-404]')).toHaveText(
+      'No se pudo previsualizar La fecha 2026-09-13 no tiene una version vigente de sabana',
+    );
     await expect(page.getByRole('button', { name: 'Crear campaña' })).toBeDisabled();
   });
 });
@@ -595,6 +599,8 @@ test.describe('F6-A: paginación de la previsualización (RF-MM-26)', () => {
     await elegirSeleccionGuardada(page);
 
     await expect(page.locator('[data-exclusiones-total]')).toHaveText('100 en total');
+    // The heading's own name reads "Exclusiones 100 en total": the two spans are not glued.
+    await expect(page.getByRole('heading', { name: 'Exclusiones 100 en total' })).toBeVisible();
     await expect(page.locator('[data-exclusiones-truncadas]')).toBeHidden();
     await expect(page.locator('[data-exclusiones-pager]')).toBeVisible();
   });
@@ -718,6 +724,14 @@ test.describe('F6-B: nombre de los archivos y costo estimado (RF-MM-24, RF-MM-25
 
     await expect(nombre(page)).toHaveText('mowa_mes_campana_[campana]_1_de_1.xlsx');
     await expect(page.getByText('Nombre del primer archivo:')).toBeVisible();
+    // The label and the name are separate elements: the space between them must be real text,
+    // on screen and for a screen reader, not "…archivo:mowa_mes…".
+    await expect(page.locator('[data-nombre-archivo]')).toHaveText(
+      'Nombre del primer archivo: mowa_mes_campana_[campana]_1_de_1.xlsx',
+    );
+    expect(await page.locator('[data-nombre-archivo]').evaluate((el) => (el as HTMLElement).innerText)).toContain(
+      'archivo: mowa_mes',
+    );
     // The default uses {archivo} and {total}: it depends on how the load is split.
     await expect(page.locator('[data-nombre-estimado]')).toBeVisible();
     await expect(page.locator('[data-nombre-estimado]')).toContainText('Estimado');
