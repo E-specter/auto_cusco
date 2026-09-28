@@ -23,6 +23,15 @@ Los requerimientos de este documento se numeran `RF-MM-XX` dentro del módulo, p
 * **RF-MM-02 — SMS cargados y SMS enviados:** Distinguir en cada campaña los **SMS cargados** (los que el sistema generó y exportó) de los **SMS enviados** (los que MES reporta como despachados), porque pueden diferir por causas propias de la plataforma.
   * Los cargados se conocen al generar la carga; los enviados, al importar el reporte de enviados (sección 5).
   * Un SMS cargado cuenta como **enviado** solo si su fila del reporte trae `estado` = `enviado`. Si la fila del reporte trae otro estado, el SMS cuenta como cargado no enviado y aparece en el conteo por `estado` (RF-MM-22).
+* **RF-MM-23 — Tarifa por SMS:** Mantener en la configuración la tarifa en soles que cobra la plataforma por cada SMS, con valor por defecto **S/ 0.02**.
+  * La tarifa es un número decimal mayor o igual a 0, con hasta 4 decimales.
+  * Cada campaña guarda la tarifa vigente al crearla. Si después cambia la tarifa en la configuración, el costo de las campañas ya creadas no cambia.
+  * Si una campaña no tiene tarifa guardada (creada antes de esta regla), entonces su costo se muestra como no disponible; no se le asigna la tarifa actual.
+* **RF-MM-24 — Costo de la campaña:** Mostrar el costo en soles de cada campaña y del mes, calculado con la tarifa de RF-MM-23.
+  * **Costo estimado** = SMS cargados × tarifa, incluida la supervisión (RF-MM-02). Se muestra al previsualizar, antes de crear, y queda con la campaña.
+  * **Costo real** = SMS enviados × tarifa. Se muestra cuando se importa el reporte de enviados (RF-MM-20); antes, se indica que está pendiente del reporte.
+  * El costo del mes suma el costo estimado de las campañas imputadas a ese mes, con la misma regla de imputación del límite mensual (RF-MM-01), y se muestra junto al consumo del límite.
+  * Los montos se muestran en soles con 2 decimales; la tarifa, con los decimales que tenga.
 
 ## 2. Inputs de la campaña
 
@@ -76,6 +85,32 @@ Formato confirmado con el ejemplo de carga (sección 7).
   * Su mensaje supera los 160 caracteres (RF-MM-19).
   * Un mismo teléfono puede recibir más de un mensaje si tiene varios productos en la selección: no es motivo de exclusión (así ocurre en el ejemplo).
   * Un documento que no es DNI ni RUC tampoco es motivo de exclusión: se carga y se advierte (RF-MM-10).
+* **RF-MM-25 — Nombre de los archivos de carga:** Nombrar cada archivo de carga con una plantilla de texto fijo y variables entre llaves, definida por defecto en la configuración y editable al crear cada campaña.
+  * Variables disponibles:
+
+    | Variable | Valor |
+    |---|---|
+    | `{campana}` | Número de la campaña en el sistema |
+    | `{descripcion}` | Descripción de la campaña (RF-MM-04) |
+    | `{fecha_envio}` | Fecha de envío usada en RF-MM-15, en formato `AAAA-MM-DD` |
+    | `{fecha_corte}` | Fecha de corte de la sábana, en formato `AAAA-MM-DD` |
+    | `{archivo}` | Número del archivo dentro de la campaña (1, 2, …) |
+    | `{total}` | Cantidad de archivos de la campaña (RF-MM-11) |
+    | `{cantidad}` | Filas de ese archivo, incluida la supervisión si va en él |
+
+  * Plantilla por defecto: `mowa_mes_campana_{campana}_{archivo}_de_{total}`, que es el nombre que el sistema ya usaba. La extensión `.xlsx` se agrega sola.
+  * Ejemplo: `CajaCusco_{fecha_envio}_{archivo}de{total}` → `CajaCusco_2026-10-01_1de2.xlsx`.
+  * Si la plantilla usa una variable que no está en la tabla, entonces se rechaza al guardarla, indicando cuál.
+  * Si la campaña se divide en más de un archivo y la plantilla no usa `{archivo}`, entonces se agrega `_{archivo}de{total}` al final, para que ningún archivo repita el nombre de otro.
+  * Los caracteres que no admiten los nombres de archivo en Windows (`\ / : * ? " < > |`) se reemplazan por `_`, y se recortan los espacios y puntos de los extremos. El nombre, sin la extensión, se limita a 120 caracteres.
+  * Si el nombre resultante queda vacío, entonces se usa la plantilla por defecto.
+  * Antes de crear la campaña se muestra el nombre resultante del primer archivo.
+  * El nombre de cada archivo queda guardado con la campaña: una descarga posterior entrega el mismo nombre aunque la plantilla de la configuración haya cambiado (como los bytes, RF-MM-11).
+* **RF-MM-26 — Paginación de la previsualización:** Mostrar paginadas la muestra de la carga y la lista de exclusiones de la previsualización de la campaña, para no tener que desplazarse hasta el final de la pantalla.
+  * Se pagina lo que la previsualización ya devuelve: las 20 primeras filas de la muestra y las 100 primeras exclusiones. Paginar no vuelve a calcular la campaña.
+  * 10 filas por página, con el paginador compartido de la interfaz.
+  * La tabla de exclusiones muestra siempre el total de productos excluidos. Si son más de 100, entonces indica que solo se ven las 100 primeras y que la lista completa se consulta en el seguimiento de la campaña después de crearla.
+  * Si la previsualización se vuelve a calcular, entonces las dos tablas vuelven a la primera página.
 
 ## 4. Construcción del campo `mensaje` (speech)
 
@@ -176,6 +211,9 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Superar el límite mensual (antes S-MM-2) | Se advierte y se pide confirmación; no se bloquea (RF-MM-01) | Usuario (2026-09-21) |
 | Cuota que vence el mismo día del envío (antes S-MM-6) | `dias_ajustados = 0` es `Preventiva`, no `1 a 8` (RF-MM-15) | Usuario (2026-09-21) |
 | `Enviar en diferentes horas` (antes S-MM-5) | El segmento se calcula con la fecha más temprana, igual para todos los productos (RF-MM-15) | Usuario (2026-09-21) |
+| Sobre qué se calcula el costo | Estimado sobre cargados al previsualizar y crear; real sobre enviados al importar el reporte; tarifa congelada en cada campaña (RF-MM-23, RF-MM-24) | Usuario (2026-09-28) |
+| Dónde se define el nombre de los archivos | Plantilla por defecto en la configuración, editable al crear cada campaña (RF-MM-25) | Usuario (2026-09-28) |
+| Qué se pagina en la previsualización | Las 20 filas de muestra y las 100 exclusiones que ya devuelve, sin recalcular; la lista completa sigue en el seguimiento (RF-MM-26) | Usuario (2026-09-28) |
 
 ## 7. Evidencia de los ejemplos
 
@@ -206,3 +244,10 @@ Los ejemplos están en `archivos_anexo_chat/`, con prefijo `MOWA_MES_Ejemplo_`: 
 | S-MM-4 | Feriados nacionales de Perú vigentes al 2026, calculados por regla para cualquier año; decretos y cambios de ley por configuración | RF-MM-08 |
 
 Quedan abiertos S-MM-1, S-MM-3 y S-MM-4: los tres dependen de información externa (qué ofrece MES y qué dice la ley), no de una preferencia del usuario. S-MM-2, S-MM-5 y S-MM-6 se confirmaron el 2026-09-21, y S-MM-7 y S-MM-8 el 2026-09-14; los cinco pasaron a la sección 6.
+
+## 9. Registro de cambios
+
+**2026-09-28**
+- **RF nuevos incorporados:** RF-MM-23 (tarifa por SMS) y RF-MM-24 (costo de la campaña) en la sección 1; RF-MM-25 (nombre de los archivos de carga) y RF-MM-26 (paginación de la previsualización) en la sección 3.
+- **RF existentes ampliados o modificados:** ninguno.
+- **Nota de numeración:** como el resto del módulo, los RF nuevos continúan la secuencia sin renumerar los existentes (decisión del usuario del 2026-09-13), así que dentro de cada sección los números pueden no ser consecutivos.
