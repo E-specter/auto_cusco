@@ -57,12 +57,20 @@ export interface ConsultaCartera {
  * `null` is allowed because that is how a nullable field arrives in the
  * generated contract types, so an endpoint's own error class can narrow this
  * to its enum without fighting the base. Read it as "no code".
+ *
+ * `cuerpo` is the whole error body as the server sent it, for fields an
+ * endpoint adds beyond `detail` and `codigo` (MOWA MES names the offending
+ * setting in `campo`). The base does not know those fields, so it keeps them
+ * unread and the module narrows what it needs: one generic slot instead of a
+ * new property here every time an endpoint extends its error. `null` when
+ * the body was not a JSON object.
  */
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly detail: string,
     readonly codigo?: string | null,
+    readonly cuerpo: Readonly<Record<string, unknown>> | null = null,
   ) {
     super(detail || `HTTP ${status}`);
     this.name = 'ApiError';
@@ -97,16 +105,20 @@ export async function requestRespuesta(path: string, init?: RequestInit): Promis
   if (!response.ok) {
     let detail = '';
     let codigo: string | undefined;
+    let cuerpo: Record<string, unknown> | null = null;
     try {
       const body = await response.json();
       detail = typeof body?.detail === 'string' ? body.detail : '';
       // Only a string is passed on: anything else is not a code the screen
       // could branch on, and it would reach the interface as noise.
       codigo = typeof body?.codigo === 'string' ? body.codigo : undefined;
+      if (body && typeof body === 'object' && !Array.isArray(body)) {
+        cuerpo = Object.freeze({ ...body });
+      }
     } catch {
       /* A non-JSON error body leaves `detail` empty; the status still speaks. */
     }
-    throw new ApiError(response.status, detail, codigo);
+    throw new ApiError(response.status, detail, codigo, cuerpo);
   }
 
   return response;

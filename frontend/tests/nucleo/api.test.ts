@@ -183,3 +183,38 @@ describe('código del error', () => {
     expect((fallo as ApiError).codigo).toBeUndefined();
   });
 });
+
+describe('cuerpo del error', () => {
+  it('conserva los campos propios del endpoint para que el módulo los lea', async () => {
+    responderCon(400, { detail: 'La tarifa no puede ser negativa', campo: 'tarifa_sms' });
+
+    const fallo = (await listarVersiones().catch((error: unknown) => error)) as ApiError;
+
+    expect(fallo.cuerpo).toEqual({ detail: 'La tarifa no puede ser negativa', campo: 'tarifa_sms' });
+    expect(fallo.cuerpo?.campo).toBe('tarifa_sms');
+  });
+
+  it('no se puede modificar después de leído', async () => {
+    responderCon(400, { detail: 'x', campo: 'tarifa_sms' });
+
+    const fallo = (await listarVersiones().catch((error: unknown) => error)) as ApiError;
+
+    expect(Object.isFrozen(fallo.cuerpo)).toBe(true);
+  });
+
+  it('queda en null si el cuerpo no es un objeto JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>502</html>', { status: 502 })));
+
+    const fallo = (await listarVersiones().catch((error: unknown) => error)) as ApiError;
+
+    expect(fallo.cuerpo).toBeNull();
+  });
+
+  it('una lista como cuerpo tampoco cuenta como objeto', async () => {
+    responderCon(422, [{ loc: ['body'], msg: 'x' }]);
+
+    const fallo = (await listarVersiones().catch((error: unknown) => error)) as ApiError;
+
+    expect(fallo.cuerpo).toBeNull();
+  });
+});
