@@ -356,3 +356,27 @@ for (const ruta of ['/cargas', '/cartera'] as const) {
     await sinViolaciones(page);
   });
 }
+
+// Hover and press are states axe never sees on a still page: the primary
+// button must keep AA contrast while the pointer is on it and while pressed.
+for (const tema of ['light', 'dark'] as const) {
+  test(`botón primario con el mouse encima y presionado, tema ${tema === 'light' ? 'claro' : 'oscuro'}`, async ({ page }) => {
+    await page.addInitScript((elegido) => {
+      localStorage.setItem('app:appearance', JSON.stringify({ theme: elegido, language: 'es' }));
+    }, tema);
+    await montarApi(page, apiConDatos());
+    await page.goto('/cargas');
+    const boton = page.locator('.btn--primary').first();
+    await expect(boton).toBeVisible();
+
+    await boton.hover();
+    // Colour transitions run regardless of reduced motion; let them settle.
+    await page.waitForTimeout(250);
+    await sinViolaciones(page);
+
+    await page.mouse.down();
+    await page.waitForTimeout(250);
+    await sinViolaciones(page);
+    await page.mouse.up();
+  });
+}

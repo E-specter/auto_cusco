@@ -106,15 +106,18 @@
   color: var(--ink-950);
 }
 
+/* Hover darkens the fill one step and keeps the ink label: paper on the 600
+   step is only 3.0:1, ink on it is 5.9:1. The label never flips on hover. */
 .btn--primary:hover:not(:disabled) {
   background-color: var(--color-accent-hover);
   border-color: var(--color-accent-hover);
-  color: var(--paper-50);
 }
 
+/* Pressed goes two steps darker, where paper reads at 7.7:1; the 700 step
+   gave only 4.7:1, too close to the AA floor to trust. */
 .btn--primary:active:not(:disabled) {
-  background-color: var(--primary-700);
-  border-color: var(--primary-700);
+  background-color: var(--primary-800);
+  border-color: var(--primary-800);
   color: var(--paper-50);
 }
 
