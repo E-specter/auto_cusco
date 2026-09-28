@@ -148,6 +148,10 @@ const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/';
     <script>
       import { applyTranslations, isLanguage, setLanguage, t } from '../lib/i18n';
       import { health } from '../lib/api';
+      import { observarDesplazables } from '../lib/desplazables';
+
+      // Every table that scrolls, on every screen, stays reachable by keyboard.
+      observarDesplazables();
 
       type Theme = 'light' | 'dark' | 'system';
       interface Appearance {

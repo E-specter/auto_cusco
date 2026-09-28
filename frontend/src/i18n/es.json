@@ -149,6 +149,7 @@
   "common.error": "Algo salió mal",
   "common.errorBody": "No se pudo completar la operación. Vuelve a intentarlo.",
   "common.bytes": "{n} MB",
+  "common.tablaDesplazable": "Tabla desplazable",
   "incidencia.cabecera_desconocida": "Cabecera no reconocida; la columna no se catalogó",
   "incidencia.cabecera_duplicada": "La cabecera aparece más de una vez",
   "incidencia.columna_faltante": "Columna esperada ausente del archivo",

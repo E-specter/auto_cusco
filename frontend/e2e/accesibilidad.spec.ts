@@ -277,3 +277,20 @@ test('cartera: selección que no aplica, con partes marcadas', async ({ page }) 
   await expect(page.getByRole('heading', { name: 'La selección tiene partes que no aplican.' })).toBeVisible();
   await sinViolaciones(page);
 });
+
+// A table wider than a phone scrolls sideways; its hidden columns must be
+// reachable by keyboard (axe: scrollable-region-focusable, WCAG 2.1.1).
+for (const ruta of ['/cargas', '/cartera'] as const) {
+  test(`${ruta} a 360 px: las tablas que desbordan se alcanzan con teclado`, async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await montarApi(page, apiConDatos());
+    await page.goto(ruta);
+    if (ruta === '/cartera') {
+      await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva mayor saldo' });
+      await expect(page.locator('.productos__tabla')).toBeVisible();
+    } else {
+      await expect(page.getByRole('cell', { name: 'pagare_repetido' })).toBeVisible();
+    }
+    await sinViolaciones(page);
+  });
+}

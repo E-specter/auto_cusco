@@ -149,6 +149,7 @@
   "common.error": "Something went wrong",
   "common.errorBody": "The operation could not be completed. Try again.",
   "common.bytes": "{n} MB",
+  "common.tablaDesplazable": "Scrollable table",
   "incidencia.cabecera_desconocida": "Unrecognised header; the column was not catalogued",
   "incidencia.cabecera_duplicada": "The header appears more than once",
   "incidencia.columna_faltante": "Expected column missing from the file",
