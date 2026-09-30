@@ -83,6 +83,20 @@ Agregar un formato es agregar su adaptador en `backend/app/adapters/output/expor
 
 El nombre del archivo sale del nombre de la definición, pasado a ASCII y sin separadores de ruta: lo escribe el usuario y termina en una cabecera HTTP y en el disco.
 
+### Protección contra fórmulas (RF-53)
+
+Un texto que una hoja de cálculo podría tomar por fórmula no debe ejecutarse al abrir el archivo. La protección es distinta por formato y el contenido del XLSX no cambia nunca:
+
+| Formato | Qué hace |
+|---|---|
+| `xlsx` | Un texto que empieza con `=` se escribe con el tipo de texto explícito (`inlineStr`, igual que los demás textos), no como fórmula. Sin apóstrofo y sin `quotePrefix`: la celda dice exactamente lo que dice el texto. Los que empiezan con `+`, `-` o `@` ya salían como texto. No es una opción |
+| `csv` | Un valor que es **texto** en la tabla y empieza con `=`, `+`, `-`, `@`, tabulación o retorno de carro lleva un apóstrofo delante. **Excepción:** un texto que es solo un número con signo (`-1,234.56`, `+51987654321`, `-5`) no se toca, porque no es una fórmula y el apóstrofo rompería la carga. `-2+3` sí se protege. Solo cuenta lo que es `str`: un importe, un entero, una fecha o un booleano no se tocan, aunque su texto empiece con `-`. **Las cabeceras se protegen igual**: un nombre de columna de una definición compartida (RF-51) es un valor exportado como cualquier otro |
+| `json` | Sin cambios |
+
+- **La opción `proteger_formulas`** (`OpcionesArchivo`, activa por defecto) solo afecta al CSV; con `false` el CSV (cabeceras incluidas) sale exactamente como antes. Todavía **no se expone en `/archivos-carga`**: la guardará la definición y llegará con las definiciones guardadas (B4b). El contrato de la API no cambia.
+- **Qué es "solo un número".** Un signo opcional, un dígito y luego solo dígitos, puntos y comas, todo ASCII. Es más estricto que la expresión regular del diseño en dos casos, y siempre del lado de proteger: los dígitos de otros alfabetos no cuentan como número y un salto de línea al final tampoco. Se comprueba carácter a carácter, sin expresiones regulares por celda.
+- **Las dos excepciones a RF-54:** un texto que antes salía como fórmula viva en un XLSX (por ejemplo `=1+1`, también en los archivos de MOWA MES) ahora sale como texto, y en el CSV un texto peligroso ahora lleva apóstrofo (con `proteger_formulas` en `false`, no). En el XLSX el resto del archivo es idéntico: las pruebas comparan todas las partes del zip contra lo que producía HEAD (ver `docs/motor-texto-enriquecido.md`, sección 18).
+
 ## 4. Volumen
 
 La selección se lee por páginas y las filas de salida se arman sobre la marcha, así una carga grande no obliga a tener la cartera entera en memoria.

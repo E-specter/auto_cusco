@@ -7,6 +7,7 @@ consulta a la cartera.
 
 import io
 import json
+import zipfile
 from datetime import date
 from decimal import Decimal
 
@@ -163,6 +164,42 @@ def test_generar_xlsx_entrega_un_libro_que_se_puede_abrir(cliente) -> None:
     assert hoja.title == "Campaña"
     assert [c.value for c in hoja[1]] == ["anexo", "numero", "deuda", "vence"]
     assert hoja["A2"].value == 1010
+
+
+def _definicion_con_formula() -> dict:
+    # Un texto fijo que una hoja de calculo tomaria por formula (RF-53).
+    return {
+        **DEFINICION,
+        "campos": [*DEFINICION["campos"], {"nombre": "nota", "plantilla": "=1+1"}],
+    }
+
+
+def test_el_csv_lleva_apostrofo_delante_de_un_texto_que_parece_formula(cliente) -> None:
+    client, _ = cliente
+
+    respuesta = client.post(
+        "/archivos-carga",
+        json=_peticion(formato="csv", definicion=_definicion_con_formula()),
+    )
+
+    filas = respuesta.content.decode("utf-8").splitlines()
+    assert respuesta.status_code == 200
+    assert filas[0] == "anexo,numero,deuda,vence,nota"
+    assert [fila.rsplit(",", 1)[1] for fila in filas[1:]] == ["'=1+1", "'=1+1"]
+    assert filas[2].startswith("1010,51900000001,")  # lo demas no cambia
+
+
+def test_el_xlsx_escribe_como_texto_un_igual_que_antes_era_formula(cliente) -> None:
+    client, _ = cliente
+
+    respuesta = client.post("/archivos-carga", json=_peticion(definicion=_definicion_con_formula()))
+
+    libro = openpyxl.load_workbook(io.BytesIO(respuesta.content))
+    celda = libro.active["E2"]
+    assert (celda.value, celda.data_type) == ("=1+1", "s")
+    assert libro.active["A2"].value == 1010  # los numeros siguen siendo numeros
+    with zipfile.ZipFile(io.BytesIO(respuesta.content)) as zip_xlsx:
+        assert "<f>" not in zip_xlsx.read("xl/worksheets/sheet1.xml").decode("utf-8")
 
 
 def test_generar_json_entrega_una_lista_de_objetos(cliente) -> None:

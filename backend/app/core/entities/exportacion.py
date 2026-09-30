@@ -46,6 +46,10 @@ class OpcionesArchivo:
     - `con_cabeceras`: CSV y XLSX.
     - `hoja`: XLSX.
     - `sangria`: JSON; `None` deja el archivo en una sola linea.
+    - `proteger_formulas`: CSV (RF-53). Un texto que una hoja de calculo podria tomar por formula
+      (empieza con `=`, `+`, `-`, `@`, tabulacion o retorno de carro) lleva un apostrofo delante,
+      salvo que sea solo un numero con signo. En XLSX no es una opcion: un texto siempre se escribe
+      como texto literal, sin cambiar su contenido. En JSON no aplica.
 
     `codificacion` admite `utf-8-sig` para que Excel abra el CSV con las tildes
     correctas, y codificaciones heredadas como `latin-1` cuando la plataforma de
@@ -57,6 +61,7 @@ class OpcionesArchivo:
     con_cabeceras: bool = True
     hoja: str = "Carga"
     sangria: int | None = None
+    proteger_formulas: bool = True
 
 
 OPCIONES_POR_DEFECTO = OpcionesArchivo()

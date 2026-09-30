@@ -3,6 +3,12 @@
 El delimitador y la codificacion son configurables porque es justo lo que
 cambia entre plataformas: coma o punto y coma, UTF-8 o una codificacion
 heredada como latin-1.
+
+Proteccion contra formulas (RF-53): con `proteger_formulas` (activa por defecto), un
+texto que empieza con `=`, `+`, `-`, `@`, tabulacion o retorno de carro lleva un apostrofo
+delante, salvo que sea solo un numero con signo. Solo cuenta lo que es texto en la tabla, y las
+cabeceras son texto: un nombre de columna `=...` de una definicion compartida (RF-51) es un
+valor exportado como cualquier otro.
 """
 
 import csv
@@ -36,10 +42,14 @@ def exportar(tabla: Tabla, opciones: OpcionesArchivo = OPCIONES_POR_DEFECTO) -> 
         quoting=csv.QUOTE_MINIMAL,
     )
     if opciones.con_cabeceras:
-        escritor.writerow(tabla.cabeceras)
+        escritor.writerow(
+            comunes.texto_para_csv(cabecera, opciones.proteger_formulas)
+            for cabecera in tabla.cabeceras
+        )
     for fila in tabla.filas:
         escritor.writerow(
-            comunes.a_texto(valor) for valor in comunes.columnas(fila, tabla.cabeceras)
+            comunes.texto_para_csv(valor, opciones.proteger_formulas)
+            for valor in comunes.columnas(fila, tabla.cabeceras)
         )
     return ArchivoGenerado(
         nombre=comunes.nombre_de_archivo(tabla.nombre, FORMATO),

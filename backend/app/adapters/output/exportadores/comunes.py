@@ -76,5 +76,40 @@ def a_texto(valor: Any) -> str:
     return str(valor)
 
 
+# RF-53: con lo que empieza un texto para que una hoja de calculo lo tome por formula.
+INICIOS_DE_FORMULA = ("=", "+", "-", "@", "\t", "\r")
+_DIGITOS = frozenset("0123456789")
+_CARACTERES_DE_NUMERO = frozenset("0123456789.,")
+
+
+def es_numero_con_signo(texto: str) -> bool:
+    """`[+-]?` un digito y luego solo digitos, puntos y comas: `-1,234.56`, `+51987654321`, `3.5`.
+
+    Un texto asi no es una formula y un apostrofo delante lo rompe en la plataforma. Equivale a
+    la expresion regular `^[+-]?\\d[\\d.,]*$`, pero sin expresiones regulares, con digitos ASCII
+    solamente (`\\d` acepta tambien digitos de otros alfabetos) y sin dejar pasar un salto de linea
+    al final (`$` lo admite). Ambas diferencias son mas estrictas: protegen de mas, nunca de menos.
+    """
+    resto = texto[1:] if texto[:1] in ("+", "-") else texto
+    return bool(resto) and resto[0] in _DIGITOS and all(c in _CARACTERES_DE_NUMERO for c in resto)
+
+
+def parece_formula(texto: str) -> bool:
+    """El texto empieza como una formula y no es solo un numero con signo (RF-53)."""
+    return texto.startswith(INICIOS_DE_FORMULA) and not es_numero_con_signo(texto)
+
+
+def texto_para_csv(valor: Any, proteger_formulas: bool = True) -> str:
+    """Como `a_texto`, con un apostrofo delante de un TEXTO que parece formula (RF-53).
+
+    Solo cuenta lo que en la tabla es `str`: un importe, un entero o una fecha no son formulas,
+    aunque su representacion empiece con `-`.
+    """
+    texto = a_texto(valor)
+    if proteger_formulas and isinstance(valor, str) and parece_formula(texto):
+        return "'" + texto
+    return texto
+
+
 def _sin_hora(valor: datetime) -> bool:
     return (valor.hour, valor.minute, valor.second, valor.microsecond) == (0, 0, 0, 0)

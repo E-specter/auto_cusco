@@ -8,12 +8,18 @@ Los tipos se respetan: un importe va como numero (openpyxl escribe Decimal sin
 pasar por float), una fecha como fecha de Excel, y un texto como texto aunque
 parezca un numero, que es lo que salva los ceros a la izquierda del pagare y
 del documento.
+
+Proteccion contra formulas (RF-53): un texto que empieza con `=` se escribe con el tipo de
+texto explicito, igual que el resto de los textos (`inlineStr`), y no como formula. El
+contenido no cambia nunca: sin apostrofo y sin `quotePrefix`. No es una opcion.
 """
 
 import io
 import re
+from typing import Any
 
 from openpyxl import Workbook
+from openpyxl.cell import WriteOnlyCell
 from openpyxl.utils.exceptions import IllegalCharacterError
 
 from app.adapters.output.exportadores import comunes
@@ -40,9 +46,9 @@ def exportar(tabla: Tabla, opciones: OpcionesArchivo = OPCIONES_POR_DEFECTO) -> 
     buffer = io.BytesIO()
     try:
         if opciones.con_cabeceras:
-            hoja.append(list(tabla.cabeceras))
+            hoja.append([_celda(hoja, cabecera) for cabecera in tabla.cabeceras])
         for fila in tabla.filas:
-            hoja.append(comunes.columnas(fila, tabla.cabeceras))
+            hoja.append([_celda(hoja, valor) for valor in comunes.columnas(fila, tabla.cabeceras)])
         libro.save(buffer)
     except IllegalCharacterError as exc:
         # Caracteres de control que Excel no puede guardar; se avisa en vez de
@@ -56,6 +62,15 @@ def exportar(tabla: Tabla, opciones: OpcionesArchivo = OPCIONES_POR_DEFECTO) -> 
         tipo_mime=TIPOS_MIME[FORMATO],
         formato=FORMATO,
     )
+
+
+def _celda(hoja: Any, valor: Any) -> Any:
+    """Un texto que empieza con `=` va como texto literal; todo lo demas, como siempre."""
+    if isinstance(valor, str) and valor.startswith("="):
+        celda = WriteOnlyCell(hoja, value=valor)
+        celda.data_type = "s"  # sin esto openpyxl lo escribe como formula
+        return celda
+    return valor
 
 
 def nombre_de_hoja(nombre: str) -> str:

@@ -140,3 +140,47 @@ En `expresion.ts`, el tipo a lo largo de la cadena solo filtra el menú de funci
 - **Borrar el camino viejo:** `plantilla_mensaje`, `contexto_fila`, `CAMPOS_CONTEXTO`, `enlace_whatsapp` de `speech.py` si ya nadie lo usa, y la comparación en vivo contra `GeneradorCargas` de `test_mowa_mes_speech_oro.py`. El oro sigue contra las constantes congeladas en HEAD `11f1184`: los 6 mensajes literales del original y el SHA-256 de la matriz. Pedido de `coordinador_modulo_mowa_mes`.
 - **Rendimiento:** si la medición de campaña de architec pasa el 10 %, se abre un corte del núcleo (validar el teléfono una vez por valor, o plegar las variables de contexto constantes al compilar), aparte de B5 y B6.
 - **Versión 92 del usuario:** después del commit de B5, `coordinador_modulo_mowa_mes` comprueba a mano que su huella no cambió.
+
+## 10. B7: plegar las variables de contexto constantes (2026-09-30)
+
+**Por qué:** en B5, la medición de architec con 46 000 filas dio previsualizar +9 % (de 5,06 s a 5,52 s) y crear +2 %. Queda dentro del 10 %, pero justo. Una causa conocida: `enlace_whatsapp` valida el teléfono (RF-02) en cada fila, aunque el número de contacto es el mismo en toda la campaña. Hay que hacerlo antes de B6, que suma la lectura de v1 y v2.
+
+**Qué:**
+- `evaluador.compilar` acepta, opcionalmente, un mapa de **constantes**: variables cuyo valor se conoce al compilar y es el mismo para todas las filas.
+- Un nodo `variable` cuya variable es constante, y cuyos argumentos variables también lo son o son literales, se evalúa **una vez al compilar** y queda como texto fijo en la compilada.
+- Los problemas de esa evaluación se informan al compilar, con su ubicación, en lugar de repetirse por fila.
+- Sin constantes, todo sigue igual que hoy.
+
+**Invariantes:**
+- `Compilada.cota` no cambia por plegar. Si el valor plegado mide menos que la cota del nodo, se conserva la cota del nodo, que es la que ve el usuario. Ejemplo: en `previsualizar`, el enlace mide 26 con o sin número.
+- El resultado de evaluar es idéntico con plegado y sin plegado para cualquier fila.
+- `Resultado.valor` (D11) no cambia.
+- Sin `eval`, y las constantes pasan por la misma comprobación de tipos que las variables.
+
+**MOWA MES:**
+- `ConstructorMensajes` compila con `{whatsapp_contacto: número}` como constante.
+- `previsualizar` sigue sin constantes, porque calcula el largo sin depender del número.
+- Consecuencia a documentar: un número inválido se detecta al construir, con `MensajeNoGenerable` o un error equivalente, y ya no por fila. Sigue siendo inalcanzable, porque configuración y campaña validan antes.
+- El oro de B5 (constantes congeladas, matriz de 4 992 casos y huellas) sigue en verde sin tocarlo.
+
+**Pruebas:**
+- Propiedad con semilla fija: para expresiones y filas aleatorias, evaluar con y sin constantes da el mismo texto, el mismo valor y los mismos problemas (salvo que los plegados se informan al compilar).
+- La cota es igual con y sin plegado.
+- Microbench `medir_mensajes_mowa_mes.py`: tiene que acercarse a HEAD antes de B5, unos 2,8 µs por fila.
+- Architec repite `medir_campana_mowa_mes.py`.
+- Mutación a mano en el worktree.
+
+**Condición de architec para B7 (2026-09-30): sin cambiar la semántica por segmento.**
+- Un segmento que usa `[whatsapp]` sin número sigue sin compilarse y lanza `FaltaWhatsapp` solo si se le pide un mensaje. Los demás segmentos se generan igual.
+- Con el número en `None`, no se pasa como constante. Un segmento que no lo usa compila igual que hoy.
+- Si el plegado da un problema al compilar (por ejemplo, un número inválido, que hoy es inalcanzable), el problema queda en **ese** segmento: se guarda y se lanza `MensajeNoGenerable` al pedirle un mensaje, sin romper el constructor ni los demás segmentos.
+- El oro de B5 sigue en verde sin tocarlo.
+
+**Criterios de `coordinador_modulo_mowa_mes` para B7**, con una prueba cada uno:
+- Una campaña cuyos productos no caen en segmentos con `[whatsapp]` se sigue generando.
+- "Sin número" sigue siendo `_sin_whatsapp`, no un error.
+- Previsualizar el speech con un número inválido sigue respondiendo el 400 de hoy, no un 500 ni `MensajeNoGenerable`.
+- El plegado depende solo del valor constante de la campaña: dos filas del mismo segmento dan mensajes distintos solo por titular y vencimiento.
+- El oro de B5 queda intacto, y architec vuelve a medir previsualizar y crear.
+
+**B5 cerrado para MOWA MES (2026-09-30):** sobre `63f845d`, las huellas de la versión 17 (Speech original) y de la 92 (v1 del usuario) siguen iguales. Lo comprobó `coordinador_modulo_mowa_mes`, solo leyendo.
