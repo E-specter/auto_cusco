@@ -46,6 +46,7 @@ from app.core.entities.texto_enriquecido import (
     Nodo,
     NodoTexto,
     NodoVariable,
+    Problema,
     TipoValor,
 )
 from app.core.services.gestiones_digitales.supervision import numero_valido
@@ -183,9 +184,15 @@ def _limites_de(expresion: Expresion) -> LimitesExpresion:
     )
 
 
-def compilar_segmento(partes: PartesSegmento) -> Compilada:
+def compilar_segmento(partes: PartesSegmento, whatsapp: str | None = None) -> Compilada:
+    """Compila un segmento. Con `whatsapp`, el contacto es una constante de la campana: el enlace
+    se arma y se valida una sola vez, aqui, y no en cada fila (B7). Sin numero no se pasa
+    constante alguna: un segmento que no usa `[whatsapp]` compila igual que siempre."""
     expresion = expresion_de(partes)
-    return evaluador.compilar(expresion, VARIABLES_DEL_MENSAJE, _limites_de(expresion))
+    constantes = {VARIABLE_CONTACTO: whatsapp} if whatsapp else None
+    return evaluador.compilar(
+        expresion, VARIABLES_DEL_MENSAJE, _limites_de(expresion), constantes=constantes
+    )
 
 
 class ConstructorMensajes:
@@ -194,17 +201,25 @@ class ConstructorMensajes:
     Sin numero de WhatsApp, los segmentos que lo usan quedan sin compilar:
     pedirles un mensaje lanza FaltaWhatsapp. Asi una campana cuyos productos no
     caen en esos segmentos se puede generar igual.
+
+    El numero es una constante de la campana (B7): el enlace se evalua al compilar. Si da un
+    problema (un numero fuera de RF-02, hoy inalcanzable), queda en ESE segmento y se lanza
+    `MensajeNoGenerable` al pedirle un mensaje; el constructor y los demas segmentos no se ven
+    afectados.
     """
 
     def __init__(self, partes: Sequence[PartesSegmento], whatsapp: str | None) -> None:
-        self._whatsapp = whatsapp
         self._compiladas: dict[Segmento, Compilada] = {}
         self._sin_whatsapp: set[Segmento] = set()
+        self._no_generables: dict[Segmento, tuple[Problema, ...]] = {}
         for segmento in partes:
             if usa_whatsapp(segmento) and not whatsapp:
                 self._sin_whatsapp.add(segmento.segmento)
                 continue
-            self._compiladas[segmento.segmento] = compilar_segmento(segmento)
+            compilada = compilar_segmento(segmento, whatsapp)
+            self._compiladas[segmento.segmento] = compilada
+            if compilada.problemas_plegados:
+                self._no_generables[segmento.segmento] = compilada.problemas_plegados
 
     def requiere_whatsapp_faltante(self, segmento: Segmento) -> bool:
         return segmento in self._sin_whatsapp
@@ -218,19 +233,17 @@ class ConstructorMensajes:
         """
         if segmento in self._sin_whatsapp:
             raise FaltaWhatsapp((segmento,))
+        if segmento in self._no_generables:
+            raise MensajeNoGenerable(segmento, self._no_generables[segmento])
         resultado = self._compiladas[segmento].evaluar(contexto)
         if resultado.problemas:
             raise MensajeNoGenerable(segmento, resultado.problemas)
         return resultado.texto
 
     def mensaje_de(self, segmento: Segmento, titular: str | None, vencimiento: date | None) -> str:
+        # El contacto es una constante ya plegada: la fila solo aporta titular y vencimiento.
         return self.mensaje(
-            segmento,
-            {
-                VARIABLE_TITULAR: titular,
-                VARIABLE_VENCIMIENTO: vencimiento,
-                VARIABLE_CONTACTO: self._whatsapp,
-            },
+            segmento, {VARIABLE_TITULAR: titular, VARIABLE_VENCIMIENTO: vencimiento}
         )
 
 

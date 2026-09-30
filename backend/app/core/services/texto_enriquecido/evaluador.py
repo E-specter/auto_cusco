@@ -10,6 +10,13 @@ Al evaluar, un problema de una fila no detiene nada: el nodo afectado queda
 vacio, el problema se informa con su ubicacion y el resto del texto se conserva.
 Una variable vacia hace que su cadena de funciones no se aplique y su nodo quede
 vacio, como en RF-12 (salvo las funciones `acepta_nulo`, como `si_vacio`).
+
+Variables de contexto constantes (B7): `compilar` acepta un mapa de variables cuyo valor se
+conoce al compilar y es el mismo en toda la carga (el WhatsApp de una campana). Un nodo cuya
+variable es constante, y cuyos argumentos variables tambien lo son, se evalua UNA vez al compilar
+y queda como texto fijo; sus problemas se informan al compilar (`problemas_plegados`) y salen
+igual en cada fila. Plegar no cambia nada observable: el texto, el valor tipado, los problemas y
+la cota de cada fila son los mismos que sin constantes.
 """
 
 from collections.abc import Mapping
@@ -33,6 +40,16 @@ from .cota import cota_de_expresion
 from .funciones import REGISTRO
 from .funciones.base import Funcion, ValorInvalido, normalizar_argumento
 from .tipos import NodoResuelto, PasoResuelto, coaccionar, es_vacio, resolver_variable
+
+
+@dataclass(frozen=True, slots=True)
+class _Plegado:
+    """El resultado de un nodo evaluado al compilar; ocupa el lugar del nodo."""
+
+    texto: str
+    valor: Any
+    problemas: tuple[Problema, ...]
+    tipo_final: TipoValor
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,21 +83,30 @@ def compilar(
     variables: Mapping[str, TipoValor],
     limites: LimitesExpresion = LIMITES,
     registro: Mapping[str, Funcion] = REGISTRO,
+    constantes: Mapping[str, Any] | None = None,
 ) -> "Compilada":
-    """Comprueba la expresion contra las variables disponibles y la deja lista para evaluar."""
+    """Comprueba la expresion contra las variables disponibles y la deja lista para evaluar.
+
+    `constantes` son variables del catalogo con un valor fijo para toda la carga: los nodos que
+    solo dependen de ellas se evaluan una vez, aqui. Un valor `None` es una constante vacia.
+    """
+    for nombre in constantes or ():
+        if nombre not in variables:
+            raise ValueError(f"La constante {nombre!r} no es una variable del catalogo")
     partes, problemas = _resolver(expresion, variables, limites, registro)
     if problemas:
         raise ExpresionInvalida(problemas)
-    return Compilada(expresion, tuple(partes))
+    return Compilada(expresion, tuple(partes), constantes or {})
 
 
 def compilar_texto(
     texto: str,
     variables: Mapping[str, TipoValor],
     limites: LimitesExpresion = LIMITES,
+    constantes: Mapping[str, Any] | None = None,
 ) -> "Compilada":
     """Puente de las plantillas `[@campo]` (RF-12): texto -> expresion -> compilada."""
-    return compilar(sintaxis.leer(texto, limites), variables, limites)
+    return compilar(sintaxis.leer(texto, limites), variables, limites, constantes=constantes)
 
 
 def _limites_excedidos(expresion: Expresion, limites: LimitesExpresion) -> list[Problema]:
@@ -157,12 +183,40 @@ def _resolver(
 class Compilada:
     """Una expresion comprobada y lista para evaluar muchas filas."""
 
-    def __init__(self, expresion: Expresion, partes: tuple[str | NodoResuelto, ...]) -> None:
+    def __init__(
+        self,
+        expresion: Expresion,
+        partes: tuple[str | NodoResuelto, ...],
+        constantes: Mapping[str, Any] | None = None,
+    ) -> None:
         self.expresion = expresion
-        self._partes = partes
         self._es_variable_unica = len(partes) == 1 and isinstance(partes[0], NodoResuelto)
-        self._variables = _variables_usadas(partes)
+        # La cota es la de la expresion sin plegar: lo que ve el usuario no depende de la carga.
         self._cota = cota_de_expresion(partes)
+        plegadas, problemas = _plegar(partes, constantes or {}, self._es_variable_unica)
+        # Cada parte conserva el indice del nodo de la expresion: los problemas de fila lo informan.
+        self._indices = tuple(indice for indice, _ in plegadas)
+        self._partes = tuple(parte for _, parte in plegadas)
+        self._nodos_plegados = sum(isinstance(p, NodoResuelto) for p in partes) - sum(
+            isinstance(p, NodoResuelto) for p in self._partes
+        )
+        self._problemas_plegados = problemas
+        usadas = _variables_usadas(tuple(p for p in self._partes if isinstance(p, NodoResuelto)))
+        # Los nodos que no se pliegan pueden leer una constante (un argumento): se la damos.
+        self._constantes_en_uso = {
+            n: constantes[n] for n in usadas if constantes and n in constantes
+        }
+        self._variables = tuple(n for n in usadas if n not in self._constantes_en_uso)
+
+    @property
+    def nodos_plegados(self) -> int:
+        """Cuantos nodos se evaluaron al compilar."""
+        return self._nodos_plegados
+
+    @property
+    def problemas_plegados(self) -> tuple[Problema, ...]:
+        """Problemas de los nodos plegados, con su ubicacion; cada fila los vuelve a informar."""
+        return self._problemas_plegados
 
     @property
     def variables(self) -> tuple[str, ...]:
@@ -191,20 +245,71 @@ class Compilada:
         return self._cota
 
     def evaluar(self, producto: Mapping[str, Any]) -> Resultado:
+        if self._constantes_en_uso:
+            producto = {**producto, **self._constantes_en_uso}  # la constante manda
         trozos: list[str] = []
         problemas: list[Problema] = []
         valor: Any = None
-        for indice, parte in enumerate(self._partes):
+        for indice, parte in zip(self._indices, self._partes, strict=True):
             if isinstance(parte, str):
                 trozos.append(parte)
-                continue
-            texto, valor = _evaluar_variable(parte, indice, producto, problemas)
-            trozos.append(texto)
+            elif isinstance(parte, _Plegado):
+                trozos.append(parte.texto)
+                valor = parte.valor
+                problemas.extend(parte.problemas)
+            else:
+                texto, valor = _evaluar_variable(parte, indice, producto, problemas)
+                trozos.append(texto)
         return Resultado(
             "".join(trozos),
             valor if self._es_variable_unica else None,
             tuple(problemas),
         )
+
+
+def _es_constante(nodo: NodoResuelto, constantes: Mapping[str, Any]) -> bool:
+    """La variable del nodo y las de sus argumentos son constantes."""
+    return nodo.nombre in constantes and all(
+        argumento.variable is None or argumento.variable in constantes
+        for paso in nodo.pasos
+        for argumento in paso.argumentos
+    )
+
+
+def _plegar(
+    partes: tuple[str | NodoResuelto, ...],
+    constantes: Mapping[str, Any],
+    es_variable_unica: bool,
+) -> tuple[tuple[tuple[int, str | _Plegado | NodoResuelto], ...], tuple[Problema, ...]]:
+    """Evalua los nodos constantes una vez. Devuelve (indice de nodo, parte) en orden."""
+    if not constantes:
+        return tuple(enumerate(partes)), ()
+    resultado: list[tuple[int, str | _Plegado | NodoResuelto]] = []
+    problemas: list[Problema] = []
+    for indice, parte in enumerate(partes):
+        if not (isinstance(parte, NodoResuelto) and _es_constante(parte, constantes)):
+            resultado.append((indice, parte))
+            continue
+        del_nodo: list[Problema] = []
+        texto, valor = _evaluar_variable(parte, indice, constantes, del_nodo)
+        problemas.extend(del_nodo)
+        plegado = _Plegado(texto, valor, tuple(del_nodo), parte.tipo_final)
+        # Sin problemas y sin valor tipado que conservar, es un texto fijo mas.
+        resultado.append((indice, texto if not del_nodo and not es_variable_unica else plegado))
+    return _unir_textos(resultado), tuple(problemas)
+
+
+def _unir_textos(
+    partes: list[tuple[int, str | _Plegado | NodoResuelto]],
+) -> tuple[tuple[int, str | _Plegado | NodoResuelto], ...]:
+    """Junta los textos fijos contiguos: una fila recorre menos trozos."""
+    unidas: list[tuple[int, str | _Plegado | NodoResuelto]] = []
+    for indice, parte in partes:
+        if isinstance(parte, str) and unidas and isinstance(unidas[-1][1], str):
+            unidas[-1] = (unidas[-1][0], unidas[-1][1] + parte)
+        else:
+            unidas.append((indice, parte))
+    return tuple(unidas)
 
 
 def _variables_usadas(partes: tuple[str | NodoResuelto, ...]) -> tuple[str, ...]:
