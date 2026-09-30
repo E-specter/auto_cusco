@@ -1,11 +1,10 @@
 """Enlaces (seccion 6): el de WhatsApp a partir de un telefono valido (RF-02)."""
 
-from app.core.entities.texto_enriquecido import CodigoTexto, TipoValor
+from app.core.entities.texto_enriquecido import PREFIJO_WHATSAPP, CodigoTexto, TipoValor
 from app.core.services.gestiones_digitales.supervision import numero_valido
 
 from .base import Funcion, Parametro, ValorInvalido
 
-PREFIJO_WHATSAPP = "https://wa.me/+51"
 LARGO_TELEFONO = 9  # 9 digitos que empiezan con 9 (RF-02)
 
 

@@ -109,7 +109,7 @@ En `expresion.ts`, el tipo a lo largo de la cadena solo filtra el menú de funci
 
 ## 8. Brief de B5 (MOWA MES M1), listo para lanzar cuando se acepte B1
 
-**Qué cambia:** solo `plataformas/mowa_mes/speech.py` por dentro, más la unificación de `PREFIJO_WHATSAPP` (j de B1: el núcleo es el dueño y `entities/mowa_mes.py` lo importa, sin copias). No cambian la API, la base de datos, la interfaz, `huella_speech` ni las firmas públicas que usan `campana.py` y `configuracion.py` (`ConstructorMensajes`, `mensaje_de`, `requiere_whatsapp_faltante`, `previsualizar`, `codigo_por_largo`, `whatsapp_valido`, `problemas_de`, `limpiar`).
+**Qué cambia:** solo `plataformas/mowa_mes/speech.py` por dentro, más la unificación de `PREFIJO_WHATSAPP` (j de B1). La constante vive en `entities/texto_enriquecido.py`, para que una entidad no dependa de un servicio; `funciones/enlaces.py` la importa y `entities/mowa_mes.py` la reexporta con el mismo nombre. El oro fija el largo del enlace en 26. No cambian la API, la base de datos, la interfaz, `huella_speech` ni las firmas públicas que usan `campana.py` y `configuracion.py` (`ConstructorMensajes`, `mensaje_de`, `requiere_whatsapp_faltante`, `previsualizar`, `codigo_por_largo`, `whatsapp_valido`, `problemas_de`, `limpiar`).
 
 **Cómo:**
 - Cada `PartesSegmento` v1 se convierte a una `Expresion`: variable `titular | primeros(8)`, texto de `parte_1` cortado en `[whatsapp]`, variable del vencimiento con `formato_fecha("dd/mm/aaaa")`, y lo mismo para `parte_2`. `[whatsapp]` pasa a ser una variable de contexto `whatsapp_contacto | enlace_whatsapp`, no un `str.replace`.
@@ -127,10 +127,16 @@ En `expresion.ts`, el tipo a lo largo de la cadena solo filtra el menú de funci
 
 **Huellas:** la constante del Speech original `297c227c…fcf88a`, más las huellas de las partes sintéticas **calculadas en HEAD antes de tocar el código** y fijadas como constantes.
 
-**Rendimiento:** `medir_campana_mowa_mes.py` con 46 000 filas, antes (HEAD) y después, contra `auto_cusco_test`, a no más de 10 % de diferencia. Necesita acceso a la base desde el worktree: ver el bloqueo de `.env` más abajo.
+**Rendimiento:** lo mide architec, antes (HEAD) y después (el corte), con `medir_campana_mowa_mes.py` sobre 46 000 filas contra `auto_cusco_test`, a no más de 10 % de diferencia. El dev informa el rendimiento del núcleo sin base.
 
-**Verificación:** `verificar.ps1 -ConBase`, incluidas `test_mowa_mes_*` y `test_speech_original.py`. Mutación a mano en el worktree sobre la conversión v1 a expresión, la cota y `FaltaWhatsapp`.
+**Verificación:** el dev corre las capas sin base. Las pruebas PostgreSQL se escriben con `@pytest.mark.postgres`, fechas de 2099 y limpieza de lo que crean, pero no se corren: se declaran "postgres escritas, no corridas". Mutación a mano en el worktree sobre la conversión v1 a expresión, la cota y `FaltaWhatsapp`.
 
 **Revisión:** `coordinador_modulo_mowa_mes` revisa antes de que el corte vaya a architec.
 
-**Bloqueo abierto (2026-09-30):** los worktrees no tienen `.env` y copiarlo fue denegado al dev. Afecta a `-ConBase` de B1 y a toda la capa PostgreSQL y de rendimiento de B5 en adelante. Escalado a architec y al usuario. Nadie lo elude.
+**Decisión del usuario (2026-09-30), vale para todos los cortes:** solo architec verifica con base. Nadie copia el `.env` ni pasa credenciales por variables de entorno. architec corre las capas PostgreSQL y el rendimiento al verificar cada corte, y si algo falla devuelve el corte con la salida.
+
+## 9. Arrastres de B5 para B6 (2026-09-30)
+
+- **Borrar el camino viejo:** `plantilla_mensaje`, `contexto_fila`, `CAMPOS_CONTEXTO`, `enlace_whatsapp` de `speech.py` si ya nadie lo usa, y la comparación en vivo contra `GeneradorCargas` de `test_mowa_mes_speech_oro.py`. El oro sigue contra las constantes congeladas en HEAD `11f1184`: los 6 mensajes literales del original y el SHA-256 de la matriz. Pedido de `coordinador_modulo_mowa_mes`.
+- **Rendimiento:** si la medición de campaña de architec pasa el 10 %, se abre un corte del núcleo (validar el teléfono una vez por valor, o plegar las variables de contexto constantes al compilar), aparte de B5 y B6.
+- **Versión 92 del usuario:** después del commit de B5, `coordinador_modulo_mowa_mes` comprueba a mano que su huella no cambió.

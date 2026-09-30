@@ -10,6 +10,14 @@ from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 
+# El prefijo lo posee el motor de texto enriquecido; se reexporta con el mismo nombre para que
+# ningun import de este modulo cambie.
+from app.core.entities.texto_enriquecido import (  # noqa: F401
+    PREFIJO_WHATSAPP,
+    CodigoTexto,
+    Problema,
+)
+
 LIMITE_MENSUAL_POR_DEFECTO = 2_500_000  # RF-MM-01
 TARIFA_SMS_POR_DEFECTO = Decimal("0.02")  # RF-MM-23, en soles
 DECIMALES_TARIFA = 4  # RF-MM-23
@@ -20,7 +28,6 @@ LARGO_TITULAR = 8  # RF-MM-14: [titular 8]
 FORMATO_VENCIMIENTO = "%d/%m/%Y"  # RF-MM-14: [fecha], dd/mm/yyyy en todos los segmentos
 LARGO_VENCIMIENTO = 10
 VARIABLE_WHATSAPP = "[whatsapp]"  # RF-MM-16
-PREFIJO_WHATSAPP = "https://wa.me/+51"
 LARGO_NUMERO_WHATSAPP = 9
 LARGO_MAXIMO_NOMBRE_SPEECH = 120
 NOMBRE_SPEECH_ORIGINAL = "Speech original"
@@ -238,6 +245,29 @@ class NombreDeSpeechRepetido(Exception):
     def __init__(self, nombre: str) -> None:
         super().__init__(f"Ya existe una version de speech llamada {nombre!r}")
         self.nombre = nombre
+
+
+class MensajeNoGenerable(Exception):
+    """El motor no pudo armar el mensaje de un segmento con los datos de esta fila.
+
+    Lleva el segmento y los problemas del motor (`CodigoTexto`: `telefono_invalido`,
+    `no_es_fecha`...). No debe ocurrir con datos validados: la configuracion y la campana validan el
+    WhatsApp (RF-02) y `evaluar_producto` excluye titular y vencimiento vacios antes de pedir el
+    mensaje. Si alguna de esas validaciones cambia, esto pasa a ser un error 500. Existe para
+    que un dato que se cuele no salga como un SMS sin enlace o con un hueco, en silencio.
+    """
+
+    def __init__(self, segmento: "Segmento", problemas: tuple[Problema, ...]) -> None:
+        self.segmento = segmento
+        self.problemas = problemas
+        super().__init__(
+            f"El mensaje del segmento {segmento.value} no se pudo armar: "
+            + ", ".join(p.codigo.value for p in problemas)
+        )
+
+    @property
+    def codigos(self) -> tuple[CodigoTexto, ...]:
+        return tuple(p.codigo for p in self.problemas)
 
 
 class FaltaWhatsapp(Exception):

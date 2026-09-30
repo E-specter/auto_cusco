@@ -12,6 +12,11 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
 
+# Prefijo del enlace de WhatsApp por defecto. Vive en la entidad para que `enlace_whatsapp` y MOWA
+# MES (`entities/mowa_mes.py` lo reexporta) tengan un solo dueno, sin que una entidad dependa de
+# un servicio.
+PREFIJO_WHATSAPP = "https://wa.me/+51"
+
 
 class TipoValor(StrEnum):
     """Tipos de valor del motor. Los montos son `Decimal`, nunca `float`."""

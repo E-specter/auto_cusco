@@ -1,28 +1,31 @@
-"""Construccion del mensaje sobre el motor de mapeo (RF-MM-14, RF-MM-16, RF-MM-19).
+"""Construccion del mensaje sobre el motor de texto enriquecido (RF-MM-14, RF-MM-16, RF-MM-19).
 
-El motor de mapeo (RF-12) no se modifica: el conector le pasa un contexto de
-fila derivado con campos propios y una plantilla por segmento:
+Cada segmento se convierte en una expresion del motor y se compila una vez:
 
-    [@titular_8] + parte 1 + [@vencimiento] + parte 2
+    titular | primeros(8)  +  parte 1  +  fecha_vencimiento_cuota | formato_fecha  +  parte 2
 
-`[whatsapp]` se reemplaza por el enlace antes de compilar. Como las partes no
-pueden contener `[@` (se valida al guardar), el texto del usuario nunca se
-interpreta como referencia a un campo.
+y cada `[whatsapp]` de una parte pasa a ser la variable `whatsapp_contacto | enlace_whatsapp`.
+La expresion se arma directamente con nodos, sin pasar por la sintaxis de texto del motor: las
+partes pueden tener corchetes sueltos, `[whatsapp` sin cerrar o hasta un `[@`, y todo eso es texto
+fijo que nunca se interpreta (`problemas_de` ademas rechaza `[@` al guardar).
+
+El largo maximo de un segmento es la cota de su expresion (`Compilada.cota`).
+
+`plantilla_mensaje` y `contexto_fila`, el camino de antes sobre el motor de mapeo (RF-12), quedan
+en el codigo hasta cerrar M2 solo como referencia de la prueba de oro
+(`tests/test_mowa_mes_speech_oro.py`): ya nada de produccion las llama.
 """
 
 from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Any
 
-from app.core.entities.mapeo import CampoSalida, DefinicionCarga
 from app.core.entities.mowa_mes import (
     FORMATO_VENCIMIENTO,
     LARGO_ADVERTENCIA,
     LARGO_MAXIMO,
     LARGO_MAXIMO_NOMBRE_SPEECH,
-    LARGO_NUMERO_WHATSAPP,
     LARGO_TITULAR,
-    LARGO_VENCIMIENTO,
     PREFIJO_WHATSAPP,
     RANGOS_SEGMENTO,
     VARIABLE_WHATSAPP,
@@ -30,18 +33,41 @@ from app.core.entities.mowa_mes import (
     DatosSpeech,
     FaltaWhatsapp,
     LargoSegmento,
+    MensajeNoGenerable,
     PartesSegmento,
     ProblemaSpeech,
     Segmento,
 )
+from app.core.entities.texto_enriquecido import (
+    LIMITES,
+    Expresion,
+    LimitesExpresion,
+    LlamadaFuncion,
+    Nodo,
+    NodoTexto,
+    NodoVariable,
+    TipoValor,
+)
 from app.core.services.gestiones_digitales.supervision import numero_valido
-from app.core.services.mapeo_campos.generador import GeneradorCargas
+from app.core.services.texto_enriquecido import evaluador
+from app.core.services.texto_enriquecido.evaluador import Compilada
 
 CAMPO_MENSAJE = "mensaje"
 CAMPOS_CONTEXTO = ("titular_8", "vencimiento", "whatsapp")
 _REFERENCIA = "[@"
 _TITULAR_EJEMPLO = "X" * LARGO_TITULAR
 _VENCIMIENTO_EJEMPLO = "dd/mm/yyyy"
+
+# Variables que la fila aporta al motor (RF-43): el conector las declara, el motor no lo conoce.
+VARIABLE_TITULAR = "titular"
+VARIABLE_VENCIMIENTO = "fecha_vencimiento_cuota"
+VARIABLE_CONTACTO = "whatsapp_contacto"
+VARIABLES_DEL_MENSAJE = {
+    VARIABLE_TITULAR: TipoValor.TEXTO,
+    VARIABLE_VENCIMIENTO: TipoValor.FECHA,
+    VARIABLE_CONTACTO: TipoValor.TEXTO,
+}
+_PATRON_VENCIMIENTO = "dd/mm/aaaa"  # el FORMATO_VENCIMIENTO de siempre, con marcas legibles
 
 
 def enlace_whatsapp(numero: str) -> str:
@@ -115,8 +141,55 @@ def plantilla_mensaje(partes: PartesSegmento, whatsapp: str | None) -> str:
     return f"[@titular_8]{parte_1}[@vencimiento]{parte_2}"
 
 
+def _texto_y_enlaces(texto: str) -> list[Nodo]:
+    """El texto de una parte, con cada `[whatsapp]` convertido en la variable del enlace."""
+    nodos: list[Nodo] = []
+    for posicion, trozo in enumerate(texto.split(VARIABLE_WHATSAPP)):
+        if posicion:
+            nodos.append(NodoVariable(VARIABLE_CONTACTO, (LlamadaFuncion("enlace_whatsapp"),)))
+        if trozo:
+            nodos.append(NodoTexto(trozo))
+    return nodos
+
+
+def expresion_de(partes: PartesSegmento) -> Expresion:
+    """La expresion de un segmento: titular 8, parte 1, fecha y parte 2 (RF-MM-14).
+
+    Se arma con nodos, nunca por la sintaxis de texto: lo que el usuario escribio en las partes
+    es texto fijo aunque tenga `[`, `]` o `[@`. Los espacios de los extremos se conservan.
+    """
+    return Expresion(
+        (
+            NodoVariable(VARIABLE_TITULAR, (LlamadaFuncion("primeros", (LARGO_TITULAR,)),)),
+            *_texto_y_enlaces(partes.parte_1),
+            NodoVariable(
+                VARIABLE_VENCIMIENTO, (LlamadaFuncion("formato_fecha", (_PATRON_VENCIMIENTO,)),)
+            ),
+            *_texto_y_enlaces(partes.parte_2),
+        )
+    )
+
+
+def _limites_de(expresion: Expresion) -> LimitesExpresion:
+    """Los limites de tamano protegen de expresiones ajenas; esta la arma el propio conector.
+
+    Un speech no tiene tope de largo al editarlo (el largo se mide y se advierte, RF-MM-19), asi
+    que el motor no debe rechazar lo que antes se aceptaba: los topes se ajustan a la expresion.
+    """
+    literal = max((len(n.valor) for n in expresion.nodos if isinstance(n, NodoTexto)), default=0)
+    return LimitesExpresion(
+        nodos=max(LIMITES.nodos, len(expresion.nodos)),
+        largo_literal=max(LIMITES.largo_literal, literal),
+    )
+
+
+def compilar_segmento(partes: PartesSegmento) -> Compilada:
+    expresion = expresion_de(partes)
+    return evaluador.compilar(expresion, VARIABLES_DEL_MENSAJE, _limites_de(expresion))
+
+
 class ConstructorMensajes:
-    """Compila una vez la plantilla de cada segmento y arma mensajes para muchos productos.
+    """Compila una vez la expresion de cada segmento y arma mensajes para muchos productos.
 
     Sin numero de WhatsApp, los segmentos que lo usan quedan sin compilar:
     pedirles un mensaje lanza FaltaWhatsapp. Asi una campana cuyos productos no
@@ -125,56 +198,63 @@ class ConstructorMensajes:
 
     def __init__(self, partes: Sequence[PartesSegmento], whatsapp: str | None) -> None:
         self._whatsapp = whatsapp
-        self._generadores: dict[Segmento, GeneradorCargas] = {}
+        self._compiladas: dict[Segmento, Compilada] = {}
         self._sin_whatsapp: set[Segmento] = set()
         for segmento in partes:
             if usa_whatsapp(segmento) and not whatsapp:
                 self._sin_whatsapp.add(segmento.segmento)
                 continue
-            definicion = DefinicionCarga(
-                nombre=f"mowa_mes {segmento.segmento.value}",
-                campos=(CampoSalida(CAMPO_MENSAJE, plantilla_mensaje(segmento, whatsapp)),),
-            )
-            self._generadores[segmento.segmento] = GeneradorCargas(definicion, CAMPOS_CONTEXTO)
+            self._compiladas[segmento.segmento] = compilar_segmento(segmento)
 
     def requiere_whatsapp_faltante(self, segmento: Segmento) -> bool:
         return segmento in self._sin_whatsapp
 
     def mensaje(self, segmento: Segmento, contexto: Mapping[str, Any]) -> str:
+        """El mensaje de un contexto con `titular`, `fecha_vencimiento_cuota` y el contacto.
+
+        Si el motor informa un problema (un WhatsApp fuera de RF-02, una fecha que no es fecha),
+        lanza `MensajeNoGenerable`: un SMS sin enlace o con un hueco no puede salir en silencio. Con
+        los datos que validan la configuracion y la campana, no ocurre.
+        """
         if segmento in self._sin_whatsapp:
             raise FaltaWhatsapp((segmento,))
-        fila, _ = self._generadores[segmento].generar_fila(contexto, 1)
-        return fila[CAMPO_MENSAJE]
+        resultado = self._compiladas[segmento].evaluar(contexto)
+        if resultado.problemas:
+            raise MensajeNoGenerable(segmento, resultado.problemas)
+        return resultado.texto
 
     def mensaje_de(self, segmento: Segmento, titular: str | None, vencimiento: date | None) -> str:
-        return self.mensaje(segmento, contexto_fila(titular, vencimiento, self._whatsapp))
+        return self.mensaje(
+            segmento,
+            {
+                VARIABLE_TITULAR: titular,
+                VARIABLE_VENCIMIENTO: vencimiento,
+                VARIABLE_CONTACTO: self._whatsapp,
+            },
+        )
 
 
 def previsualizar(
     partes: Sequence[PartesSegmento], whatsapp: str | None
 ) -> tuple[LargoSegmento, ...]:
-    """Largo maximo de cada segmento: titular de 8, fecha de 10 y el enlace de WhatsApp.
+    """Largo maximo de cada segmento: la cota de su expresion.
 
-    El largo se calcula sobre el texto aunque las partes tengan problemas, para
-    que quien edita vea el largo mientras corrige. El enlace mide lo mismo con
-    cualquier numero valido, asi que el largo no depende de que haya uno.
+    Titular de 8, fecha de 10 y el enlace de WhatsApp (largo del prefijo mas 9). El largo se
+    calcula sobre el texto aunque las partes tengan problemas, para que quien edita vea el largo
+    mientras corrige. El enlace mide lo mismo con cualquier numero valido, asi que el largo no
+    depende de que haya uno. El `ejemplo` sigue armandose con marcadores (`XXXXXXXX`,
+    `dd/mm/yyyy`), no con valores evaluados.
     """
     por_segmento = {p.segmento: p for p in partes}
-    largo_enlace = len(PREFIJO_WHATSAPP) + LARGO_NUMERO_WHATSAPP
     resultado: list[LargoSegmento] = []
     for rango in RANGOS_SEGMENTO:
         segmento = por_segmento.get(rango.segmento)
         if segmento is None:
             continue
-        texto = segmento.parte_1 + segmento.parte_2
-        cantidad_variables = texto.count(VARIABLE_WHATSAPP)
-        largo = (
-            LARGO_TITULAR
-            + LARGO_VENCIMIENTO
-            + len(texto)
-            - cantidad_variables * (len(VARIABLE_WHATSAPP) - largo_enlace)
-        )
-        con_whatsapp = cantidad_variables > 0
+        largo = compilar_segmento(segmento).cota
+        if largo is None:  # no ocurre: el titular, la fecha y el enlace siempre tienen cota
+            raise ValueError(f"El segmento {rango.segmento.value} no tiene largo maximo")
+        con_whatsapp = usa_whatsapp(segmento)
         ejemplo = None
         if not con_whatsapp or whatsapp:
             enlace = enlace_whatsapp(whatsapp) if whatsapp else ""

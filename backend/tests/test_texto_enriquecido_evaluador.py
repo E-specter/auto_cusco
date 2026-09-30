@@ -367,7 +367,9 @@ def test_una_variable_que_no_esta_en_el_catalogo_no_se_lee_del_producto() -> Non
 # --- compilar una vez, evaluar por fila ---
 
 
-def test_por_fila_no_se_usan_expresiones_regulares(monkeypatch) -> None:
+def test_por_fila_no_se_compilan_expresiones_regulares(monkeypatch) -> None:
+    # Solo comprueba que evaluar no COMPILA patrones (re._compile). `enlace_whatsapp` si aplica la
+    # regex ya compilada y lineal de RF-02 (`9\d{8}`) por fila, y eso esta permitido.
     compilada = _compilar(
         'ref [@titular | recortar | sin_tildes | mayusculas | reemplazar(".", "") | primeros(20)] '
         '[@vence | sumar_dias(1) | formato_fecha("dd de nombre_mes de aaaa")] '
@@ -376,7 +378,7 @@ def test_por_fila_no_se_usan_expresiones_regulares(monkeypatch) -> None:
     )
 
     def _sin_regex(*args, **kwargs):
-        raise AssertionError("se uso una expresion regular por fila")
+        raise AssertionError("se compilo una expresion regular por fila")
 
     monkeypatch.setattr(re, "_compile", _sin_regex)
     producto = {
