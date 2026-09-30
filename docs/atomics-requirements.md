@@ -169,7 +169,9 @@ Capacidad transversal que amplía RF-12: la usan todas las cargas digitales y Vo
 * **RF-54 — Compatibilidad con lo existente:** Incorporar el motor sin cambiar el resultado de las cargas actuales.
   * Las definiciones con `[@campo]` de `/archivos-carga` generan lo mismo que antes.
   * El speech de MOWA MES (RF-MM-14 a RF-MM-19) se representa con el motor produciendo exactamente los mismos mensajes y largos; las versiones existentes, incluido el Speech original, se siguen leyendo y siguen siendo inmutables.
-  * **Única excepción, por seguridad (RF-53):** un texto que antes se escribía en un XLSX como fórmula viva (por ejemplo `=1+1`) ahora se escribe como texto. El resto del archivo no cambia.
+  * **Excepciones, por seguridad (RF-53):** son las únicas dos, y solo afectan a los textos que empiezan con un carácter de fórmula; el resto del archivo no cambia.
+    * XLSX: un texto que antes se escribía como fórmula viva (por ejemplo `=1+1`) ahora se escribe como texto, con el mismo contenido.
+    * CSV: un texto que empieza con `=`, `+`, `-`, `@`, tabulación o retorno de carro, y que no es solo un número, ahora lleva un apóstrofo delante (por ejemplo `=SUMA(A1)` o `@usuario`), salvo que la definición desactive la protección.
 
 ## Registro de cambios de esta versión
 
