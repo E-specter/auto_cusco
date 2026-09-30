@@ -56,6 +56,8 @@ El motor no conoce ninguna plataforma. Las cabeceras y reglas concretas de cada 
 
 ## 6. Lo que falta
 
+> **Ampliación en curso (2026-09-29):** el motor de texto enriquecido y el constructor de columnas dinámicas (RF-42 a RF-54) extienden este módulo con funciones en cadena, segmentación, definiciones guardadas y protección contra fórmulas. Todo lo de este documento sigue valiendo (RF-54). Diseño en [motor-texto-enriquecido.md](motor-texto-enriquecido.md).
+
 - **Guardar definiciones** y editarlas desde la interfaz.
 - **Adaptadores por plataforma:** SMS y WhatsApp primero, luego Cisvox para VoIP. Su estructura exacta de campos debe levantarse con el usuario o su documentación antes de implementarlos (RF-10, RF-18).
 

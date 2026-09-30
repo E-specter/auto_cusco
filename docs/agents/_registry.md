@@ -42,6 +42,10 @@
 | /docs/agents/coordinador_modulo_mowa_mes/briefs-agregados.md | Doc | Encargos listos para enviar de los agregados RF-MM-23 a 26 (F6-A, B8 y F6-B), con las reglas de interfaz de `designer` | coordinador_modulo_mowa_mes | 2026-09-28 |
 | /docs/agents/coordinador_modulo_mowa_mes/revision-c3.md | Doc | Revisión de los agregados RF-MM-23 a 26 (T-MM-C3): commits, trazabilidad, decisiones, rendimiento y pasada manual | coordinador_modulo_mowa_mes | 2026-09-28 |
 | /docs/agents/coordinador_modulo_mowa_mes/revision-c2.md | Doc | Revisión integral del módulo `mowa_mes` (T-MM-C2): commits, trazabilidad de RF con pruebas, decisiones y pendientes | coordinador_modulo_mowa_mes | 2026-09-19 |
+| /docs/motor-texto-enriquecido.md | Doc | Diseño técnico del motor de texto enriquecido y del constructor de columnas dinámicas (RF-42 a RF-54): estado actual, migración de MOWA MES, contratos, catálogo de funciones, riesgos | architec (arquitectura) | 2026-09-29 |
+| /docs/agents/coordinador_motor_texto_enriquecido/profile.md | Doc | Perfil del coordinador del motor de texto enriquecido | architec; coordinador_motor_texto_enriquecido | 2026-09-29 |
+| /docs/agents/dev_backend_motor_texto_enriquecido/profile.md | Doc | Perfil del desarrollador backend del motor de texto enriquecido | architec; dev_backend_motor_texto_enriquecido | 2026-09-29 |
+| /docs/agents/dev_frontend_motor_texto_enriquecido/profile.md | Doc | Perfil del desarrollador frontend del motor de texto enriquecido (bajo las reglas de designer) | architec; dev_frontend_motor_texto_enriquecido | 2026-09-29 |
 | /docs/requerimientos-mowa-mes.md | Doc | Requerimientos del conector SMS MOWA MES (RF-MM-01 a RF-MM-22), decisiones y evidencia de los ejemplos | architec (requisitos) | 2026-09-13 |
 
 ## Pendientes de incorporar formalmente a la skill

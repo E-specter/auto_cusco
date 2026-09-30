@@ -10,6 +10,7 @@
 | [requirements.md](requirements.md) | Resumen de contexto y requerimientos no funcionales (remite a atomics-requirements.md para el detalle funcional) |
 | [modules.md](modules.md) | Módulos del sistema, requerimientos que cubren y responsabilidades |
 | [mapeo-campos.md](mapeo-campos.md) | Motor de reglas de mapeo y expresión de campos (RF-12): plantillas, tipado y formatos, compartido por las cargas digitales y VoIP |
+| [motor-texto-enriquecido.md](motor-texto-enriquecido.md) | Diseño del motor de texto enriquecido y del constructor de columnas dinámicas (RF-42 a RF-54), que amplía RF-12: funciones, segmentación, definiciones versionadas, protección contra fórmulas y migración del speech de MOWA MES |
 | [consulta-cartera.md](consulta-cartera.md) | Contrato de consulta de cartera: endpoints, sintaxis de filtros, tipos de campo y operadores, y reglas de selección |
 | [contrato-api.md](contrato-api.md) | Contrato entre la API y el frontend: `contratos/openapi.json`, cómo se regenera y qué garantizan sus pruebas |
 | [requerimientos-mowa-mes.md](requerimientos-mowa-mes.md) | Requerimientos del conector SMS de MOWA MES (`mowa_mes`): inputs de campaña, archivo de carga, speech, reporte de enviados, decisiones y evidencia |

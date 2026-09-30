@@ -18,6 +18,7 @@ Ver [atomics-requirements.md](atomics-requirements.md), organizado en las siguie
 8. Experiencia de usuario e interfaz (RF-34)
 9. Documentación y entorno de trabajo con agentes de IA (RF-35 – RF-36)
 10. Gestiones digitales: registros de supervisión (RF-37 – RF-41)
+11. Motor de texto enriquecido y constructor de columnas dinámicas (RF-42 – RF-54)
 
 La numeración `RF-1`…`RF-10` usada anteriormente en este documento queda **superseded** por la numeración `RF-01`… de `atomics-requirements.md`; no reutilizar la numeración antigua.
 
@@ -32,6 +33,10 @@ Aplican a toda plataforma digital (SMS, WhatsApp, correo y futuras). Texto forma
 | RF-39 | DNI no real y secuencial desde `00000001`, primero `Caja Cusco` y luego `nuestra empresa` |
 | RF-40 | Los demás campos de carga de la supervisión (p. ej. `mensaje`) se copian de la primera fila válida de los productos filtrados |
 | RF-41 | Los registros de supervisión se anexan a la carga, van en el primer archivo si se divide, y cuentan en el resumen de cargados y enviados |
+| RF-42 a RF-48 | Motor de texto enriquecido: texto fijo más variables y funciones en cadena, catálogo de funciones ampliable, vacíos definidos, validación al guardar, previsualización con largo máximo y sin ejecutar código del usuario. Amplía RF-12 |
+| RF-49 a RF-50 | Constructor de columnas dinámicas, con contenido por segmento; criterio por defecto: segmento financiero calculado desde los días de atraso |
+| RF-51 a RF-53 | Definiciones guardadas y versionadas, exportación independiente del formato y protección contra fórmulas en XLSX y CSV |
+| RF-54 | Compatibilidad: las cargas y el speech de MOWA MES actuales producen exactamente lo mismo |
 
 ## Requerimientos por plataforma
 

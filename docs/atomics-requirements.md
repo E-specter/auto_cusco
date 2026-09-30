@@ -127,8 +127,50 @@ Reglas transversales a toda **plataforma digital** (SMS, WhatsApp, correo y futu
   * El resumen muestra por separado los productos de la cartera y los registros de supervisión, además del total.
   * La posición exacta de los registros dentro del primer archivo la fija cada plataforma en su documento de módulo.
 
+## 11. Motor de texto enriquecido y constructor de columnas dinámicas
+
+Capacidad transversal que amplía RF-12: la usan todas las cargas digitales y VoIP, y el primer consumidor es el speech de MOWA MES. El diseño técnico está en [motor-texto-enriquecido.md](motor-texto-enriquecido.md).
+
+* **RF-42 — Composición de textos:** Permitir construir un texto combinando texto fijo, variables y funciones que transforman las variables, para usarlo como valor de una columna de carga.
+  * El texto fijo puede tener cualquier carácter UTF-8 y saltos de línea, y nunca se interpreta como variable ni como función.
+  * La notación `[@nombre_campo]` de RF-12 sigue siendo válida y produce el mismo resultado que hoy.
+* **RF-43 — Variables disponibles:** Ofrecer como variables los campos de la cartera y las variables de contexto que aporte el módulo que usa el motor, cada una con su tipo (`texto`, `numero` o `fecha`).
+  * Ejemplos de variables de contexto: número de WhatsApp de contacto, fecha de envío, días de atraso ajustados y segmento calculado (lista no exhaustiva, ampliable por cada módulo).
+* **RF-44 — Catálogo de funciones:** Mantener un catálogo de funciones aplicables en cadena a una variable, que como mínimo cubra:
+  * Texto: primeros y últimos N caracteres, mayúsculas y minúsculas, recorte y limpieza de espacios, quitar tildes, reemplazo literal y relleno a la izquierda.
+  * Número: sumar, restar, multiplicar y dividir por un valor fijo o por otra variable; redondeo; formato con separador de miles y cantidad de decimales.
+  * Fecha: sumar o restar días (fijos o de otra variable) y formato configurable con marcas legibles (`dd`, `mm`, `aaaa`).
+  * Conversión de texto a número, de texto a fecha y de número o fecha a texto.
+  * Enlace de WhatsApp: un prefijo configurable, por defecto `https://wa.me/+51`, más el teléfono de una variable, validado según RF-02.
+  * Valor alternativo cuando la variable está vacía.
+  * Se pueden agregar funciones nuevas sin modificar el núcleo del motor (RF-14).
+* **RF-45 — Valores vacíos:** Definir el resultado cuando falta un dato.
+  * Si una variable está vacía, entonces su parte del texto queda vacía y el resto del texto se conserva (como en RF-12), salvo que se aplique la función de valor alternativo.
+  * Una variable puede marcarse como obligatoria: si falta, la fila se informa con el nombre de la variable, y el módulo decide si la excluye o la reporta como error.
+  * Una columna puede tener un valor por defecto para cuando todo su resultado queda vacío.
+* **RF-46 — Validación al guardar:** Validar cada texto al guardarlo: que las variables existan, que las funciones existan, que sus parámetros sean válidos y que cada función reciba el tipo que admite.
+  * Si hay un problema, entonces se rechaza indicando en qué parte del texto está (variable, función o parámetro), antes de procesar ninguna fila.
+* **RF-47 — Previsualización:** Mostrar el resultado de un texto aplicado a un registro de ejemplo o a un producto real de la cartera, antes de guardarlo o de generar la carga.
+  * Cuando el texto se puede acotar, se muestra también el largo máximo que puede alcanzar (por ejemplo, para el límite de caracteres de un SMS).
+* **RF-48 — Seguridad de las expresiones:** Procesar los textos como estructuras declarativas con un conjunto cerrado de funciones, sin ejecutar código escrito por el usuario (`eval` ni equivalentes), y con límites de tamaño que se validan al guardar.
+* **RF-49 — Constructor de columnas:** Permitir definir N columnas de salida para una carga, cada una con nombre, orden, tipo de dato, formato, valor por defecto opcional y su contenido: una variable directa o un texto compuesto según RF-42.
+  * Una columna de variable directa conserva el valor original (fecha o importe) sin pasarlo por texto, como en RF-12.
+* **RF-50 — Segmentación de las columnas:** Permitir que el contenido de una columna varíe según el segmento de cada producto, con un contenido por segmento y uno por defecto opcional.
+  * **Criterio por defecto: segmento financiero calculado** a partir de los días de atraso del producto, con una tabla de rangos y etiquetas configurable. No se usa por defecto el campo de segmento financiero de la sábana, porque llega mal cargado (decisión del usuario, 2026-09-29).
+  * También se puede usar como criterio el valor de un campo de la cartera, incluido el segmento financiero de la sábana.
+  * Si un producto no cae en ningún segmento, entonces se excluye con su motivo o se usa el contenido por defecto, según lo que declare la definición.
+* **RF-51 — Definiciones guardadas y versionadas:** Guardar las definiciones de columnas con un nombre, compartidas entre usuarios y módulos, y versionarlas: una versión usada en una carga no se modifica, un cambio crea una versión nueva.
+* **RF-52 — Exportación independiente de la definición:** Exportar la tabla generada a XLSX, CSV o JSON (RF-13) sin que la definición de columnas dependa del formato.
+* **RF-53 — Protección contra fórmulas en la exportación:** Evitar que un valor exportado se ejecute como fórmula al abrir el archivo.
+  * XLSX: los textos se escriben siempre como texto literal, sin cambiar su contenido.
+  * CSV: un texto que empieza con `=`, `+`, `-`, `@`, tabulación o retorno de carro lleva un apóstrofo delante. La protección está activa por defecto y cada definición puede desactivarla si la plataforma de destino no la tolera.
+  * JSON: sin cambios.
+* **RF-54 — Compatibilidad con lo existente:** Incorporar el motor sin cambiar el resultado de las cargas actuales.
+  * Las definiciones con `[@campo]` de `/archivos-carga` generan lo mismo que antes.
+  * El speech de MOWA MES (RF-MM-14 a RF-MM-19) se representa con el motor produciendo exactamente los mismos mensajes y largos; las versiones existentes, incluido el Speech original, se siguen leyendo y siguen siendo inmutables.
+
 ## Registro de cambios de esta versión
 
-- **RF nuevos incorporados:** RF-37, RF-38, RF-39, RF-40, RF-41 (sección 10, 2026-09-13).
-- **RF existentes ampliados/modificados en su redacción:** ninguno.
+- **RF nuevos incorporados:** RF-37, RF-38, RF-39, RF-40, RF-41 (sección 10, 2026-09-13); RF-42 a RF-54 (sección 11, motor de texto enriquecido y constructor de columnas, 2026-09-29).
+- **RF existentes ampliados/modificados en su redacción:** ninguno. RF-12 conserva su texto: RF-42 a RF-54 lo amplían, y RF-54 exige que lo que hoy cumple RF-12 siga produciendo el mismo resultado.
 - **Nota de numeración:** los RF-01 a RF-36 conservan su número y su texto. Los nuevos se agregaron como sección 10 al final, sin renumerar, por decisión del usuario: RF-16 a RF-36 se citan por número en el código y en la documentación, y renumerarlos rompería esas referencias. Los requerimientos específicos de cada plataforma se numeran en su propio documento de módulo (por ejemplo, `RF-MM-01` en `requerimientos-mowa-mes.md`) para no mezclar su secuencia con la global.
