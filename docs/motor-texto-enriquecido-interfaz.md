@@ -181,7 +181,10 @@ Una sola fila expandida a la vez, debajo de la fila, con el patrón de divulgaci
 
 ### 5.5 Previsualización de la definición
 
-- Bajo la lista de columnas: una tabla con los primeros 5 registros de la muestra, una columna por columna definida, y el segmento de cada fila. Usa `POST /texto-enriquecido/previsualizacion` con la definición completa.
+- Bajo la lista de columnas va una tabla, con una columna por columna definida y el segmento de cada fila. Usa `POST /texto-enriquecido/previsualizacion` con la definición completa.
+- **De dónde salen las filas,** acordado con el coordinador del motor (2026-09-29). Un control de dos opciones:
+  - **Ejemplos por segmento** (por defecto): el registro de ejemplo del catálogo, una fila por segmento, con valores sintéticos que caen en cada rango. Es rápido, no depende de que haya una sábana cargada y muestra todas las variantes de una vez.
+  - **Cartera real:** una fecha de corte y una selección guardada o filtros, con `SelectorSeleccion` en modo compacto. Muestra los primeros 5 productos de esa selección, con el mismo orden que la carga.
 - Las celdas con problema de fila llevan su marca y el detalle en su nombre accesible.
 
 ### 5.6 Primer consumidor: speech de MOWA MES (fase M2)
