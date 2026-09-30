@@ -10,7 +10,7 @@
 ## Responsabilidades
 
 - Extender `app/core/services/mapeo_campos/` con el motor en `app/core/services/texto_enriquecido/`, con puertos y adaptadores (RF-30). El núcleo sin infraestructura.
-- Reutilizar lo que existe: `GeneradorCargas`, `formatos.formatear_importe`, `exportadores/comunes.a_texto`, `gestiones_digitales.supervision.numero_valido`, el patrón de versionado con `usada_en` y la regla de errores del contrato.
+- Reutilizar lo que existe: `GeneradorCargas`, `formatos.formatear_importe`, `gestiones_digitales.supervision.numero_valido`, el patrón de versionado con `usada_en` y la regla de errores del contrato. La conversión final a texto sigue siendo `str()`, como hoy en `plantillas.aplicar`: **no** se usa `exportadores/comunes.a_texto`, que cambia resultados y vive en `adapters/` (ajuste D1 del diseño).
 - Mover la tabla de rangos y el cálculo de días ajustados de MOWA MES al núcleo compartido, sin copiarlos.
 - Nada de `eval` ni ejecución de código del usuario. Funciones en un registro cerrado, con límites de tamaño.
 - `.\scripts\verificar.ps1 -ConBase` en verde contra `auto_cusco_test`. Migraciones con ida y vuelta y `alembic check` limpio. Contrato y tipos del frontend regenerados en la misma entrega.

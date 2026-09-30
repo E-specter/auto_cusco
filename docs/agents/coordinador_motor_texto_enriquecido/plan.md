@@ -58,3 +58,38 @@ Cambios respecto de la sugerencia de architec: B3 va antes que B2 porque es inde
 ## 4. Pendientes del usuario (no bloquean el arranque)
 
 Tabla de rangos por defecto, codificación SMS y días ajustados fuera de MOWA MES, según §14 del diseño. Se suma D5 si architec decide consultarlo.
+
+## 5. Criterios de `coordinador_modulo_mowa_mes` para sus cortes (2026-09-29)
+
+Congelamiento acordado: nadie más toca `speech.py`, `segmentos.py` ni los rangos de `entities/mowa_mes.py` mientras duren B5 y B2.
+
+- **B5:** el oro cubre, además de los 6 segmentos, los bordes:
+  - un segmento con `[whatsapp]` y sin número (`FaltaWhatsapp`, `ejemplo` nulo, `usa_whatsapp` verdadero);
+  - `mensaje_excede_150` y `mensaje_excede_160` en sus bordes (`9 a 30` da 156 con el original);
+  - titular y vencimiento vacíos, con el mismo orden de exclusiones;
+  - el rechazo de `[@` en las partes;
+  - un titular de menos de 8 caracteres.
+
+  `speech_huella` de las versiones existentes sin cambios: se compara con el valor del Speech original que da el coordinador de MOWA MES. El rendimiento se mide solo contra `auto_cusco_test` (`$env:DB_NAME = "auto_cusco_test"`).
+- **B3:** en XLSX, la protección se hace por tipo de celda y nunca cambia el contenido. Verificado con openpyxl: una celda con el tipo de texto explícito escribe `=1+1` como `inlineStr`, igual que el resto de las celdas. `-`, `+` y `@` ya salían como texto literal, así que solo cambia `=`. El apóstrofo es solo del CSV, y MOWA MES no usa CSV. Prueba: `mensaje` y `dni` del archivo idénticos a lo guardado en `mowa_mes_fila_cargada`.
+- **B2:** además de la prueba de claves contra el enum, otra que compare `desde`, `hasta` y `etiqueta` de los 6 rangos con los valores de hoy (S-MM-6: 0 días es Preventiva; más de 120 días queda sin speech). `contratos/openapi.json` sin cambios (`dias_desde` y `dias_hasta` de la previsualización del speech).
+- **Huella v1 (B5):** constante del Speech original, sacada del documento (`speech_del_documento()` de `tests/test_speech_original.py`): `297c227cfdd0bb5e1636e08d4ed6cebab971d724c84223acfdb0cfebc2fcf88a`. La comprobó el coordinador de MOWA MES y yo en HEAD `4e7ccc1`. Segunda prueba: varias `PartesSegmento` sintéticas (espacios en los extremos, tildes, `[whatsapp]`, corchetes sueltos, partes vacías) con sus huellas fijadas como constantes **antes** de tocar el código, calculadas en HEAD. Si no, la prueba compara la función consigo misma. La versión del usuario con id 92 se comprueba a mano después de B5 y nunca entra en pruebas.
+
+## 6. Reparto del frontend y lo que B4a tiene que traer (2026-09-29)
+
+Reparto según §8 de `motor-texto-enriquecido-interfaz.md` (F1, commit `05e5885`), aprobado por architec: F2 (componentes compartidos) es de `designer`; F3 (pantalla del constructor) y F4 (integración M2) son de `dev_frontend_motor_texto_enriquecido`. Orden: B4a → F2; F3 espera B4b y F2; F4 espera B6 y F2.
+
+B4a trae, además de §10 del diseño:
+
+- **Catálogo:**
+  - el registro de ejemplo;
+  - por función: nombre visible y descripción (claves i18n), familia, tipos de entrada y salida, y parámetros con tipo, rango, opciones de los enumerados y si admiten una variable;
+  - los patrones de fecha frecuentes con su ejemplo;
+  - por contexto: el límite de largo y el umbral de advertencia que aporta el módulo (MOWA MES: 160 y 150), o ninguno.
+- **Validación:** `ubicacion` con el índice de nodo, el índice de función y el nombre del parámetro, o nula cuando es de toda la expresión (por ejemplo, un límite de tamaño).
+- **Previsualización:**
+  - el resultado por nodo, que distingue una variable vacía (nula) de un texto vacío, para la marca punteada de §3 de la interfaz;
+  - el largo actual, la cota si existe y, si no, el motivo con su código;
+  - los problemas de fila aparte de los de validación.
+- **Prueba espejo `CodigoTexto` ↔ `textoEnriquecido.codigo.*`:** los códigos los fija B4a y las claves las agrega designer en F2. Las dos partes entran juntas, en el mismo commit de architec, o la prueba de uno de los dos lados queda en rojo.
+- **Abierto:** la previsualización de la definición (§5.5 de la interfaz) muestra los primeros 5 registros de "la muestra" con su segmento. El diseño solo prevé un registro de ejemplo o un producto real. Falta decidir de dónde sale la muestra (¿una selección guardada? ¿los primeros de la cartera de una fecha de corte?). Es de B4b; se lo pregunto a designer y a architec.
