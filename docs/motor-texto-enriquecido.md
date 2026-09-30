@@ -203,7 +203,7 @@ La forma exacta la fija el backend en `contratos/openapi.json`, como siempre. Es
 |---|---|
 | `GET /texto-enriquecido/catalogo?contexto=` | Variables del contexto con su tipo, y funciones con parámetros, tipos y claves i18n. La interfaz arma los menús con esto |
 | `POST /texto-enriquecido/validacion` | Recibe una expresión y un contexto. Devuelve los problemas con su ubicación (nodo, función, parámetro) y código, el tipo resultante y la cota de largo si existe |
-| `POST /texto-enriquecido/previsualizacion` | Recibe una expresión o una definición, y un registro: el ejemplo del catálogo o un producto real (fecha de corte y pagaré). Devuelve el resultado total y el de cada nodo, y los problemas de fila |
+| `POST /texto-enriquecido/previsualizacion` | Recibe una expresión o una definición, y una muestra. Devuelve por fila el resultado total, el de cada nodo, su segmento y los problemas de fila. La muestra puede ser: el registro de ejemplo del catálogo; **ejemplos por segmento**, que es la opción por defecto para una definición: una fila por segmento con un valor sintético de días que cae en cada rango, tomado de la tabla de rangos (B4a); un producto real (fecha de corte y pagaré); o **cartera real**: una fecha de corte y una selección con la forma de `/cartera` (filtros, orden y cantidad hasta 5), con el mismo orden y desempate que la carga (B4b). Solo lectura: no guarda nada |
 | `GET, POST /definiciones-columnas`, `GET /definiciones-columnas/{id}`, `POST /definiciones-columnas/{id}/versiones` | Definiciones guardadas y versionadas |
 | `/archivos-carga` | Acepta una definición guardada (id y versión) o una en línea, como hoy |
 | `/mowa-mes/speech` | Acepta versiones en formato v2 (una expresión por segmento) sin dejar de leer las v1 |
