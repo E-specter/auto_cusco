@@ -261,6 +261,11 @@ Vuelta atrás: el camino v1 queda en el código hasta cerrar M2.
 2. **Codificación SMS.** Un SMS con tildes o caracteres fuera de GSM-7 pasa a UCS-2 y su límite baja de 160 a 70 caracteres. Hoy MOWA MES cuenta caracteres, y MES quita las tildes al enviar. Hay que confirmar con MES cómo cobra y corta. Mientras tanto, `sin_tildes` queda disponible y la previsualización muestra el largo en caracteres.
 3. **Días ajustados en otros módulos.** El ajuste a la fecha de envío es de MOWA MES. En otro canal, el criterio usa `dias_atraso` sin ajuste, salvo que ese módulo aporte `fecha_envio`.
 
+**Decisiones del usuario del 2026-09-30:**
+
+- **Redondeo:** las columnas `financiero` de hoy (a la mitad al par) y las funciones del motor (a la mitad hacia arriba) quedan como están; la diferencia está documentada en `mapeo-campos.md`.
+- **Pruebas con base de datos:** solo `architec` las corre, al verificar cada entrega en su copia aislada. Los agentes delegados no copian el `.env` ni reciben credenciales: escriben sus pruebas `postgres` sin correrlas y lo declaran en la entrega. Las mediciones de rendimiento con base (antes y después) también las corre `architec`.
+
 **Fuera de alcance:** la plantilla del nombre de archivo de MOWA MES (`{campana}`, `{archivo}`…, en `mowa_mes/nombre_archivo.py`) es otro minilenguaje, con saneamiento para Windows. Queda como está (precisión D12 del coordinador).
 
 **Riesgos:**
