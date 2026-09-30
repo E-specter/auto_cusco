@@ -134,7 +134,7 @@ Capacidad transversal que amplía RF-12: la usan todas las cargas digitales y Vo
 * **RF-42 — Composición de textos:** Permitir construir un texto combinando texto fijo, variables y funciones que transforman las variables, para usarlo como valor de una columna de carga.
   * El texto fijo puede tener cualquier carácter UTF-8 y saltos de línea, y nunca se interpreta como variable ni como función.
   * La notación `[@nombre_campo]` de RF-12 sigue siendo válida y produce el mismo resultado que hoy.
-* **RF-43 — Variables disponibles:** Ofrecer como variables los campos de la cartera y las variables de contexto que aporte el módulo que usa el motor, cada una con su tipo (`texto`, `numero` o `fecha`).
+* **RF-43 — Variables disponibles:** Ofrecer como variables los campos de la cartera y las variables de contexto que aporte el módulo que usa el motor, cada una con su tipo (`texto`, `numero`, `fecha` o `booleano`).
   * Ejemplos de variables de contexto: número de WhatsApp de contacto, fecha de envío, días de atraso ajustados y segmento calculado (lista no exhaustiva, ampliable por cada módulo).
 * **RF-44 — Catálogo de funciones:** Mantener un catálogo de funciones aplicables en cadena a una variable, que como mínimo cubra:
   * Texto: primeros y últimos N caracteres, mayúsculas y minúsculas, recorte y limpieza de espacios, quitar tildes, reemplazo literal y relleno a la izquierda.
@@ -164,10 +164,12 @@ Capacidad transversal que amplía RF-12: la usan todas las cargas digitales y Vo
 * **RF-53 — Protección contra fórmulas en la exportación:** Evitar que un valor exportado se ejecute como fórmula al abrir el archivo.
   * XLSX: los textos se escriben siempre como texto literal, sin cambiar su contenido.
   * CSV: un texto que empieza con `=`, `+`, `-`, `@`, tabulación o retorno de carro lleva un apóstrofo delante. La protección está activa por defecto y cada definición puede desactivarla si la plataforma de destino no la tolera.
+  * No se protegen los valores que no son texto ni los textos que son solo un número, con o sin signo (por ejemplo, `-1,234.56` o `+51987654321`): no son fórmulas y el apóstrofo rompería la plataforma.
   * JSON: sin cambios.
 * **RF-54 — Compatibilidad con lo existente:** Incorporar el motor sin cambiar el resultado de las cargas actuales.
   * Las definiciones con `[@campo]` de `/archivos-carga` generan lo mismo que antes.
   * El speech de MOWA MES (RF-MM-14 a RF-MM-19) se representa con el motor produciendo exactamente los mismos mensajes y largos; las versiones existentes, incluido el Speech original, se siguen leyendo y siguen siendo inmutables.
+  * **Única excepción, por seguridad (RF-53):** un texto que antes se escribía en un XLSX como fórmula viva (por ejemplo `=1+1`) ahora se escribe como texto. El resto del archivo no cambia.
 
 ## Registro de cambios de esta versión
 

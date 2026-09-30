@@ -104,9 +104,11 @@ Representación canónica: JSON. La sintaxis de texto existe para compatibilidad
 
 ### 4.2 Tipos de valor
 
-`texto`, `numero` (Decimal, nunca float), `fecha`, `nulo`. Cada variable tiene tipo según el catálogo. Cada función declara qué tipo recibe, qué parámetros admite (con tipo y rango) y qué devuelve. Al compilar se comprueba la cadena entera: `formato_fecha` sobre un texto se rechaza al guardar, no al generar.
+`texto`, `numero` (Decimal, nunca float), `fecha`, `booleano`, `nulo`. `booleano` cubre los campos `BOOLEANO` y `*_aplica` del catálogo (ajuste D2 del coordinador, 2026-09-29). Cada variable tiene tipo según el catálogo. Cada función declara qué tipo recibe, qué parámetros admite (con tipo y rango) y qué devuelve. Al compilar se comprueba la cadena entera: `formato_fecha` sobre un texto se rechaza al guardar, no al generar.
 
-Al final de un nodo `variable`, el valor pasa a texto con una representación estable: la misma de `exportadores/comunes.a_texto`, ya usada por los exportadores, para no tener dos criterios. Para controlar el formato, se usan las funciones de formato.
+Al final de un nodo `variable`, el valor pasa a texto **igual que hoy en `plantillas.aplicar`** (`str(valor)`). No se usa `exportadores/comunes.a_texto`: el núcleo no puede importar de `adapters/`, y `a_texto` cambia resultados actuales (un booleano da `1` en lugar de `True`), lo que rompería RF-54 (ajuste D1). Para controlar el formato, se usan las funciones de formato.
+
+Una columna que es un solo nodo `variable` conserva el tipo del valor final, aunque lleve funciones (una fecha sumada sigue siendo fecha para XLSX), igual que hoy `valor_crudo` sin funciones (precisión D11).
 
 ### 4.3 Nulos
 
@@ -160,7 +162,7 @@ Una definición puede declarar **variantes por segmento**: para cada valor del c
 | **Segmento financiero calculado** (por defecto) | Días de atraso (`dias_atraso`, "días atraso hoy"), opcionalmente ajustados a la fecha de envío, contra una tabla de rangos con etiquetas | Es el criterio por defecto porque el `segmento_financiero` de la sábana llega mal cargado (decisión del usuario del 2026-09-29) |
 | Campo categórico | El valor de un campo de la cartera, tal cual | `segmento_financiero` crudo, `tramo_actual` u otro. Disponible, no por defecto |
 
-- La **tabla de rangos** son datos: etiqueta, desde, hasta. La de hoy (`RANGOS_SEGMENTO` de MOWA MES) pasa al núcleo compartido con el cálculo de días ajustados (`segmentos.dias_ajustados`). MOWA MES la importa de ahí, sin cambiar sus valores.
+- La **tabla de rangos** son datos: etiqueta, desde, hasta. La de hoy (`RANGOS_SEGMENTO` de MOWA MES) pasa al núcleo compartido con el cálculo de días ajustados (`segmentos.dias_ajustados`). En el núcleo, cada rango usa una clave de texto (`RangoDias`), porque el enum `Segmento` es de MOWA MES. MOWA MES arma su `RANGOS_SEGMENTO` desde la tabla del núcleo, con una prueba de que las claves coinciden con su enum; su API no cambia (precisión D3). Por eso la tarea de columnas y segmentación también toca MOWA MES.
 - **Sin segmento:** si un producto no cae en ningún rango o valor, la definición elige entre **excluir con motivo** (`sin_segmento`, lo que hace MOWA MES con `sin_speech`) o **usar la variante por defecto**.
 - Ningún código del motor nombra `segmento_financiero`: el criterio es un dato de la definición.
 
@@ -188,8 +190,8 @@ La definición no conoce el formato. Los exportadores reciben la tabla ya genera
 
 **Inyección de fórmulas** (decisión del usuario):
 
-- **XLSX:** todo valor de texto se escribe como texto literal, aunque empiece con `=`, `+`, `-` o `@`. No se ejecuta y el contenido no cambia. Los números y las fechas se escriben con su tipo nativo, como hoy.
-- **CSV:** por defecto, un texto que empieza con `=`, `+`, `-`, `@`, tabulación o retorno de carro lleva un apóstrofo delante. Cada definición puede apagarlo (`proteger_formulas: false`) cuando la plataforma no tolera el apóstrofo; queda registrado en la definición.
+- **XLSX:** todo valor de texto se escribe como texto literal, aunque empiece con `=`, `+`, `-` o `@`. No se ejecuta y el contenido no cambia. Los números y las fechas se escriben con su tipo nativo, como hoy. **Es la única excepción a RF-54:** hoy un texto como `=1+1` se escribe como fórmula viva, también en los archivos de MOWA MES; ahora se escribe como texto. El resto del archivo queda idéntico byte a byte, y una prueba lo comprueba (ajustes D6 y D7).
+- **CSV:** por defecto, un texto que empieza con `=`, `+`, `-`, `@`, tabulación o retorno de carro lleva un apóstrofo delante. **No se protegen los valores que no son texto ni los textos que son solo un número** (`^[+-]?\d[\d.,]*$`): un importe negativo (`-1,234.56`) o `+51987654321` no son fórmulas, y el apóstrofo rompería la plataforma. Un texto como `-2+3` sí se protege (ajuste D5, aprobado por architec como precisión de la decisión del usuario). Cada definición puede apagar la protección (`proteger_formulas: false`). La opción viaja en `OpcionesArchivo`, porque los exportadores no conocen la definición (precisión D4).
 - **JSON:** sin cambios. Se escribe con `ensure_ascii=False`, en UTF-8.
 - **Textos y canal:** UTF-8 en todo el camino. Los saltos de línea se conservan: el módulo CSV los entrecomilla y el XLSX los guarda en la celda. Cada plataforma declara si los admite; si no, la previsualización lo advierte.
 
@@ -258,6 +260,8 @@ Vuelta atrás: el camino v1 queda en el código hasta cerrar M2.
 1. **Tabla de rangos por defecto del segmento calculado.** La de MOWA MES es Preventiva, 1–8, 9–30, 31–60, 61–90 y 91–120. La partición del campo de la sábana es otra: 1–8, 9–15, 16–30, 31–60 y 61–90. Por ahora, la por defecto es la de MOWA MES, que es la que está en uso.
 2. **Codificación SMS.** Un SMS con tildes o caracteres fuera de GSM-7 pasa a UCS-2 y su límite baja de 160 a 70 caracteres. Hoy MOWA MES cuenta caracteres, y MES quita las tildes al enviar. Hay que confirmar con MES cómo cobra y corta. Mientras tanto, `sin_tildes` queda disponible y la previsualización muestra el largo en caracteres.
 3. **Días ajustados en otros módulos.** El ajuste a la fecha de envío es de MOWA MES. En otro canal, el criterio usa `dias_atraso` sin ajuste, salvo que ese módulo aporte `fecha_envio`.
+
+**Fuera de alcance:** la plantilla del nombre de archivo de MOWA MES (`{campana}`, `{archivo}`…, en `mowa_mes/nombre_archivo.py`) es otro minilenguaje, con saneamiento para Windows. Queda como está (precisión D12 del coordinador).
 
 **Riesgos:**
 
