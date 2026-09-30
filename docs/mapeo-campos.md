@@ -61,4 +61,6 @@ El motor no conoce ninguna plataforma. Las cabeceras y reglas concretas de cada 
 - **Guardar definiciones** y editarlas desde la interfaz.
 - **Adaptadores por plataforma:** SMS y WhatsApp primero, luego Cisvox para VoIP. Su estructura exacta de campos debe levantarse con el usuario o su documentación antes de implementarlos (RF-10, RF-18).
 
+**Motor de texto enriquecido.** Lo nuevo sobre estas plantillas (funciones en cadena como `[@titular | primeros(8)]`, cota de largo, valores vacíos, variables de contexto) vive en [motor-texto-enriquecido.md](motor-texto-enriquecido.md), sección 16 para el núcleo ya implementado. Toda plantilla de este documento produce el mismo texto por ese motor. Una diferencia a tener presente: las columnas `financiero` redondean a la mitad al par (`round()` de `Decimal`, `0.125` da `0.12`), mientras `redondear` y `formato_numero` del motor van a la mitad hacia arriba (`0.13`); RF-54 impide cambiar las primeras.
+
 La escritura del archivo ya está resuelta: cómo se convierte esta tabla en XLSX, CSV o JSON está en [generacion-cargas.md](generacion-cargas.md).

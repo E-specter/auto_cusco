@@ -276,3 +276,34 @@ Vuelta atrás: el camino v1 queda en el código hasta cerrar M2.
 ## 15. Documentación para reutilizar
 
 Al cerrar, `docs/motor-texto-enriquecido.md` queda como guía de uso: cómo un módulo aporta sus variables de contexto, cómo agrega una función, cómo declara una definición con segmentos y cómo elige la protección de fórmulas. `docs/mapeo-campos.md` apunta aquí para lo nuevo.
+
+## 16. Implementación del núcleo (B1)
+
+Estado: núcleo hecho y probado (2026-09-30), sin conectar todavía a `GeneradorCargas`, `/archivos-carga` ni MOWA MES (B2 y B5). Código en `backend/app/core/entities/texto_enriquecido.py` y `backend/app/core/services/texto_enriquecido/`. El puente de RF-54 existe: `evaluador.compilar_texto(plantilla, variables).evaluar(producto)` lee una plantilla `[@campo]` y da el mismo texto que `plantillas.aplicar`; `variables_desde_campos(CAMPOS_CARTERA)` arma las variables tipadas.
+
+### Decisiones
+
+- **Escape de `[@`.** Un `[@` literal en un nodo texto se escribe `[@@]`. Hoy ese texto es siempre inválido, así que ninguna plantilla existente cambia de significado. No se usa la barra invertida, porque `C:\[@campo]` vale hoy. Una variable no puede llamarse `@`: `[@@]` sería ambiguo (lo halló una prueba de propiedades).
+- **Sintaxis de argumentos.** Número (`3`, `-2`, `2.50`), texto entre comillas con `\"` y `\` como únicos escapes (puede llevar `]`, `|` y saltos de línea), o variable con `@nombre` (`sumar_dias(@dias)`). El analizador es de un solo paso, sin expresiones regulares, y corta la lectura al pasar un límite.
+- **Ida y vuelta.** `escribir(leer(t))` es la forma canónica y se lee igual que `t`; para un texto ya canónico es idéntico. Una expresión sin forma de texto se informa con `no_se_puede_escribir_como_texto`: por ejemplo, una variable marcada `obligatoria`, porque **la marca obligatoria no tiene sintaxis de texto** (solo existe en la forma JSON).
+- **Qué es vacío.** `None` o un texto en blanco (D10, igual que `_vacio` de MOWA MES). Un nodo sin funciones conserva `str(valor)` exacto, también con `"  "` (RF-54). Con funciones, el blanco cuenta como vacío: la cadena no se aplica y el nodo queda vacío, salvo `si_vacio`, la única función `acepta_nulo`. Un argumento que es una variable vacía da `argumento_vacio` (`si_vacio` lo admite).
+- **Conversión a texto.** `str(valor)` como hoy (D1): un booleano da `"True"`. Las funciones devuelven `Decimal` en texto plano, sin notación científica. Los booleanos (D2) no tienen funciones propias, salvo `si_vacio`.
+- **Valor tipado (D11).** `Resultado.valor` trae el valor final sin pasarlo por texto cuando la expresión es un solo nodo variable, aunque lleve funciones; en cualquier otra expresión es `None`.
+- **Redondeo.** `redondear` y `formato_numero` van a la mitad hacia arriba (`ROUND_HALF_UP`, lejos del cero), como los montos de MOWA MES. **Diferencia conocida:** las columnas `financiero` de hoy (`formatos.formatear_importe`) usan `round()` de `Decimal`, a la mitad al par (RF-54 exige no cambiarlas), así que con un valor como `0.125` una columna `financiero` da `0.12` y `formato_numero(2)` da `0.13`.
+- **Mayúsculas carácter a carácter.** `mayusculas`, `minusculas`, `capitalizar` y `sin_tildes` dejan igual el carácter que cambiaría de largo (`ß`, `İ`, una sílaba hangul), para que la cota sea un tope verdadero. Solo difieren de `str.upper()` en esos casos. `capitalizar` pone en mayúscula la primera letra del texto entero y en minúscula el resto; no es por palabra.
+- **Fechas sin `strftime`.** Marcas `dd`, `mm`, `aaaa`, `aa`, `nombre_mes` (meses en español, sin depender del idioma del sistema; cualquier otro carácter es literal, `%` incluido). El patrón necesita al menos una marca. `a_fecha` lee con el mismo patrón: `dd` y `mm` de dos dígitos exactos, `aa` = 2000 + `aa`, y necesita día, mes y año.
+- **Cota.** Siempre un tope verdadero. `primeros(n)` da `n` (o el menor, si la entrada ya estaba acotada); `formato_fecha("dd/mm/aaaa")` da 10; `enlace_whatsapp` da el largo del prefijo más 9; una fecha calculada (`sumar_dias`, `a_fecha`) mide 10. Las conversiones de número y `formato_numero` no tienen cota. Una variable sin funciones, o una sola parte sin cota, deja la expresión sin cota.
+- **Límites por defecto** (`LimitesExpresion`, se rechazan al compilar y cortan el lector): 200 nodos, 10 funciones por nodo, 8 argumentos por función, 5 000 caracteres por literal y 30 por número.
+- **Prefijo de WhatsApp.** `enlace_whatsapp` tiene su propio `PREFIJO_WHATSAPP` (`https://wa.me/+51`, mismo valor que el de MOWA MES). El núcleo es el dueño: B5 hace que MOWA MES lo importe, sin copias.
+
+### Códigos (`CodigoTexto`)
+
+Al compilar: `sintaxis_invalida`, `referencia_vacia`, `variable_desconocida`, `funcion_desconocida`, `parametro_invalido`, `tipo_incompatible`, `limite_excedido`, `no_se_puede_escribir_como_texto`. Al evaluar una fila: `variable_obligatoria_vacia`, `argumento_vacio`, `division_por_cero`, `no_es_numero`, `no_es_fecha`, `telefono_invalido`, `resultado_fuera_de_rango`. Una prueba exige que todos se emitan de verdad. La ubicación de un `Problema` es `nodo` y `funcion` (posiciones desde 0) y `parametro` (nombre del parámetro); con `nodo` en `None` el problema es de toda la expresión. B4a agrega `expresion_invalida` para la forma JSON.
+
+### Cómo se agrega una función
+
+1. Escribir su `Funcion` (nombre estable, familia, `recibe`, `devuelve`, `parametros` con tipo y rango, `aplicar`, y `cota` si se puede) en el módulo de su familia de `backend/app/core/services/texto_enriquecido/funciones/`, o en un módulo nuevo que declare `FUNCIONES` y se sume a `FAMILIAS` en `funciones/__init__.py`.
+2. `devuelve` es un `TipoValor`, o `MISMO_TIPO` (`"entrada"`) si devuelve lo que recibe. Un parámetro puede aceptar una variable (`acepta_variable`), tener valor por defecto y un `convertir` que prepara el literal una sola vez al compilar.
+3. Si una fila no admite la función, `aplicar` lanza `ValorInvalido(codigo, detalle)`; el evaluador lo informa como problema de la fila con su ubicación y el resto del texto se conserva.
+4. Nada más se toca: el comprobador de tipos, el evaluador y la cota leen el registro. Las claves i18n son `textoEnriquecido.funcion.<nombre>.nombre` y `.descripcion`.
+5. Sumar sus pruebas: bordes, nulos y, si declara `cota`, un caso en `test_texto_enriquecido_cota.py`.

@@ -96,3 +96,41 @@ B4a trae, además de §10 del diseño:
   - **«Ejemplos por segmento»** (por defecto, editor y constructor): una fila por segmento, con el registro de ejemplo y un valor sintético de días que cae en cada rango, derivado de la tabla de rangos y no escrito a mano. Va en **B4a**, porque F2 (el selector de variantes) lo necesita.
   - **«Cartera real»** (opcional, constructor): una fecha de corte más una selección con la misma forma que `/cartera` (filtros, orden y cantidad 5), con el mismo orden y desempate que la carga. Usa el recorrido de siempre (`seleccion_cartera/recorrido.py`), no una consulta nueva. Es de solo lectura y no guarda nada. Va en **B4b**, que solo agrega "primeros N de una selección" al endpoint de B4a, que ya acepta un producto real (fecha de corte y pagaré). Decisión de architec.
   - Los primeros 5 sin filtro, descartado: rara vez caen en segmentos distintos.
+
+## 7. Nombres que el frontend ya usa (2026-09-29)
+
+`frontend/src/lib/expresion.ts` (designer, `5ffeddf`) tiene tipos provisionales que pasarán a ser alias de los generados desde el contrato. B1 y B4a respetan estos nombres, o avisan a designer **antes** de entregar:
+
+- `Problema.ubicacion.nodo`: el índice de nodo;
+- por función del catálogo, `devuelve`, con el valor `entrada` para las funciones que devuelven el mismo tipo que reciben;
+- `obligatoria` en el nodo `variable`.
+
+En `expresion.ts`, el tipo a lo largo de la cadena solo filtra el menú de funciones compatibles a partir del catálogo. La validación sigue siendo del backend (regla 7).
+
+## 8. Brief de B5 (MOWA MES M1), listo para lanzar cuando se acepte B1
+
+**Qué cambia:** solo `plataformas/mowa_mes/speech.py` por dentro, más la unificación de `PREFIJO_WHATSAPP` (j de B1: el núcleo es el dueño y `entities/mowa_mes.py` lo importa, sin copias). No cambian la API, la base de datos, la interfaz, `huella_speech` ni las firmas públicas que usan `campana.py` y `configuracion.py` (`ConstructorMensajes`, `mensaje_de`, `requiere_whatsapp_faltante`, `previsualizar`, `codigo_por_largo`, `whatsapp_valido`, `problemas_de`, `limpiar`).
+
+**Cómo:**
+- Cada `PartesSegmento` v1 se convierte a una `Expresion`: variable `titular | primeros(8)`, texto de `parte_1` cortado en `[whatsapp]`, variable del vencimiento con `formato_fecha("dd/mm/aaaa")`, y lo mismo para `parte_2`. `[whatsapp]` pasa a ser una variable de contexto `whatsapp_contacto | enlace_whatsapp`, no un `str.replace`.
+- El contexto de la fila aporta `titular`, `fecha_vencimiento_cuota` y `whatsapp_contacto`. Se compila una vez por segmento.
+- `FaltaWhatsapp` sigue igual: los segmentos que usan WhatsApp sin número quedan sin compilar.
+- El largo máximo sale de `Compilada.cota`. Si una v1 da una cota distinta de la aritmética actual, es un defecto que se reporta; no se ajusta la prueba.
+- `ejemplo` puede seguir por el camino actual en M1 (D8).
+- El camino viejo (`plantilla_mensaje`, `contexto_fila`) queda en el código hasta cerrar M2, solo como referencia de la prueba de oro.
+
+**Prueba de oro** (con los criterios de `coordinador_modulo_mowa_mes`, §5):
+- Los 6 segmentos del Speech original más partes sintéticas: espacios en los extremos, tildes y ñ, corchetes sueltos (`[`, `]`, `[whatsapp` sin cerrar), `[whatsapp]` repetido, partes vacías.
+- Titulares: largo, corto (menos de 8), con tildes, con espacios al inicio, y vacío o en blanco (excluidos antes del mensaje).
+- Con y sin número de WhatsApp.
+- Se compara: mensaje byte a byte contra `plantilla_mensaje` más `GeneradorCargas`; `previsualizar` entero (`largo_maximo`, `codigo`, `usa_whatsapp`, `ejemplo`); los bordes de 150 y 160 (`9 a 30` da 156); el orden de exclusiones de `campana.py` (`falta_titular`, `falta_vencimiento` y `falta_whatsapp`) y el rechazo de `[@`.
+
+**Huellas:** la constante del Speech original `297c227c…fcf88a`, más las huellas de las partes sintéticas **calculadas en HEAD antes de tocar el código** y fijadas como constantes.
+
+**Rendimiento:** `medir_campana_mowa_mes.py` con 46 000 filas, antes (HEAD) y después, contra `auto_cusco_test`, a no más de 10 % de diferencia. Necesita acceso a la base desde el worktree: ver el bloqueo de `.env` más abajo.
+
+**Verificación:** `verificar.ps1 -ConBase`, incluidas `test_mowa_mes_*` y `test_speech_original.py`. Mutación a mano en el worktree sobre la conversión v1 a expresión, la cota y `FaltaWhatsapp`.
+
+**Revisión:** `coordinador_modulo_mowa_mes` revisa antes de que el corte vaya a architec.
+
+**Bloqueo abierto (2026-09-30):** los worktrees no tienen `.env` y copiarlo fue denegado al dev. Afecta a `-ConBase` de B1 y a toda la capa PostgreSQL y de rendimiento de B5 en adelante. Escalado a architec y al usuario. Nadie lo elude.
