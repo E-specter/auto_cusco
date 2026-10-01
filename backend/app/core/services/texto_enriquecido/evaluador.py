@@ -22,7 +22,7 @@ la cota de cada fila son los mismos que sin constantes.
 from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, NamedTuple
 
 from app.core.entities.texto_enriquecido import (
     LIMITES,
@@ -52,8 +52,7 @@ class _Plegado:
     tipo_final: TipoValor
 
 
-@dataclass(frozen=True, slots=True)
-class Resultado:
+class Resultado(NamedTuple):
     """Lo que produce una expresion para una fila.
 
     `texto` es el resultado completo. `valor` es el valor tipado final cuando la
@@ -61,6 +60,9 @@ class Resultado:
     sigue siendo fecha; D11): sin pasarlo por texto, para conservar el tipo en
     la columna. En cualquier otra expresion es None. Un valor vacio o un problema
     en ese nodo dejan `valor` en None.
+
+    Es una tupla con nombre: inmutable y mucho mas barata de crear que una dataclass congelada,
+    y se crea una vez por celda generada.
     """
 
     texto: str
@@ -207,6 +209,41 @@ class Compilada:
             n: constantes[n] for n in usadas if constantes and n in constantes
         }
         self._variables = tuple(n for n in usadas if n not in self._constantes_en_uso)
+        # Una operacion por parte, decidida al compilar: por fila no se vuelve a mirar su forma.
+        self._ops = tuple(_operacion(indice, parte) for indice, parte in plegadas)
+        self._fijo = self._resultado_fijo()
+
+    def _resultado_fijo(self) -> "Resultado | None":
+        """El resultado de una expresion que no lee nada de la fila: es el mismo en todas."""
+        if any(clase in (_SIMPLE, _NODO) for clase, _, _ in self._ops):
+            return None
+        valor: Any = None
+        problemas: list[Problema] = []
+        for clase, parte, _ in self._ops:
+            if clase == _PLEGADO:
+                valor = parte.valor
+                problemas.extend(parte.problemas)
+        texto = "".join(p if c == _TEXTO else p.texto for c, p, _ in self._ops)
+        return Resultado(texto, valor if self._es_variable_unica else None, tuple(problemas))
+
+    @property
+    def referencia_directa(self) -> str | None:
+        """El nombre de la variable si la expresion es exactamente `[@variable]` sin funciones.
+
+        Su resultado es `str(valor)` y su valor tipado el del producto, sin mas (D1, D11): quien
+        genera muchas filas puede evitar una evaluacion completa por celda.
+        """
+        if len(self._ops) == 1 and self._ops[0][0] == _SIMPLE:
+            return self._ops[0][1]
+        return None
+
+    @property
+    def texto_fijo(self) -> str | None:
+        """El texto si la expresion no lee nada de la fila, no tiene problemas ni valor tipado."""
+        fijo = self._fijo
+        if fijo is not None and not fijo.problemas and fijo.valor is None:
+            return fijo.texto
+        return None
 
     @property
     def nodos_plegados(self) -> int:
@@ -245,15 +282,21 @@ class Compilada:
         return self._cota
 
     def evaluar(self, producto: Mapping[str, Any]) -> Resultado:
+        if self._fijo is not None:
+            return self._fijo
         if self._constantes_en_uso:
             producto = {**producto, **self._constantes_en_uso}  # la constante manda
         trozos: list[str] = []
         problemas: list[Problema] = []
         valor: Any = None
-        for indice, parte in zip(self._indices, self._partes, strict=True):
-            if isinstance(parte, str):
+        for clase, parte, indice in self._ops:
+            if clase == _TEXTO:
                 trozos.append(parte)
-            elif isinstance(parte, _Plegado):
+            elif clase == _SIMPLE:
+                # Sin funciones: el mismo `str(valor)` que plantillas.aplicar (D1, RF-54).
+                valor = producto.get(parte)
+                trozos.append("" if valor is None else str(valor))
+            elif clase == _PLEGADO:
                 trozos.append(parte.texto)
                 valor = parte.valor
                 problemas.extend(parte.problemas)
@@ -263,8 +306,22 @@ class Compilada:
         return Resultado(
             "".join(trozos),
             valor if self._es_variable_unica else None,
-            tuple(problemas),
+            tuple(problemas) if problemas else (),
         )
+
+
+_TEXTO, _PLEGADO, _SIMPLE, _NODO = range(4)
+
+
+def _operacion(indice: int, parte: "str | _Plegado | NodoResuelto") -> tuple[int, Any, int]:
+    """(clase, dato, indice de nodo): texto fijo, plegado, variable directa o nodo con funciones."""
+    if isinstance(parte, str):
+        return _TEXTO, parte, indice
+    if isinstance(parte, _Plegado):
+        return _PLEGADO, parte, indice
+    if not parte.pasos and not parte.obligatoria:
+        return _SIMPLE, parte.nombre, indice
+    return _NODO, parte, indice
 
 
 def _es_constante(nodo: NodoResuelto, constantes: Mapping[str, Any]) -> bool:

@@ -360,3 +360,39 @@ Estado: hecha y probada sin base (2026-09-30). Motivo: en B5, `enlace_whatsapp` 
 - La fila ya no aporta el contacto: `mensaje_de` pasa solo titular y vencimiento; uno que llegue en `mensaje(contexto)` se ignora (la constante manda).
 - El oro de B5 (6 mensajes, matriz de 4 992 casos y huellas) sigue en verde **sin tocarlo**.
 - **Costo.** A/B intercalado en el mismo proceso, con la carga del microbench (46 000 mensajes, 6 segmentos, Speech original): sin plegar (camino de B5) 4,92 µs por fila, plegado 3,76 µs: **−23,5 %**. Las cifras absolutas varían mucho con la carga de la máquina (otras sesiones corrían a la vez); el comparativo intercalado es el fiable. El microbench suelto (`medir_mensajes_mowa_mes.py`) no muestra la mejora con claridad porque su ruido entre corridas (±5 %) es del orden del ahorro promedio. El costo restante es la evaluación genérica de los dos nodos de la fila (titular y fecha), que este corte no toca.
+
+## 20. Columnas dinámicas y segmentación (B2)
+
+Estado: hecha y probada sin base (2026-09-30). Sin cambios en la API ni en `contratos/openapi.json`: `/archivos-carga` sigue aceptando solo plantillas; las columnas nuevas llegan con B4a y B4b.
+
+### Entidades (`entities/mapeo.py`, `entities/segmentacion.py`)
+
+- `CampoSalida` gana, todos opcionales: `expresion` (manda sobre `plantilla`, que entonces se ignora), `valor_por_defecto` y `variantes` (`VarianteCampo(segmento, plantilla | expresion)`). El contenido de la columna (`expresion` o `plantilla`) es el **contenido por defecto**; las variantes lo sustituyen por segmento.
+- `DefinicionCarga` gana `segmentacion: Segmentacion | None`. `Segmentacion(criterio, politica)`:
+  - **`CriterioCalculado(tabla, variable_dias)`** (el de por defecto): los días de la variable `variable_dias` (`dias_atraso`) contra una tabla de `RangoDias(clave, etiqueta, desde, hasta)`; `None` en un extremo es sin límite. La fecha de envío **no** entra al núcleo: un módulo que la tenga aporta una variable ya ajustada (`dias_atraso_ajustados`) y la nombra aquí.
+  - **`CriterioCampo(campo)`**: el valor del campo tal cual (sin normalizar: `Vigente` y `vigente` son distintos; un valor vacío o en blanco no tiene segmento).
+  - **`PoliticaSinSegmento`**: `excluir` (por defecto) o `usar_por_defecto`.
+- Tabla por defecto: la de MOWA MES (`preventiva` hasta 0, `1_a_8`, `9_a_30`, `31_a_60`, `61_a_90`, `91_a_120`); más de 120 días queda sin segmento. Una tabla puede tener huecos pero no rangos que se pisen.
+- `ErrorGeneracion` gana `codigo` (el `CodigoTexto` cuando lo informa el motor). `CargaGenerada` gana `exclusiones` (`FilaExcluida(fila, codigo, detalle)`). Código nuevo `sin_segmento` en `CodigoTexto`.
+
+### `GeneradorCargas` (`services/mapeo_campos/generador.py`)
+
+- **Cada columna se evalúa con el motor.** Una plantilla se compila a expresión (admite `[@titular | primeros(8)]`) y el tipo de la columna lo sigue aplicando `formatos.convertir`, después del motor: **un solo camino de tipado**. D11: una columna de una sola variable con funciones conserva su valor tipado (una fecha sumada sigue siendo fecha).
+- **Variables.** Recibe un mapa nombre → tipo (`CAMPOS_CARTERA`, o ya `TipoValor`) o solo nombres (se toman como texto: una columna de variable directa sale igual).
+- **Problemas de fila del motor** (división por cero, variable obligatoria vacía, teléfono inválido…) son un `ErrorGeneracion` con `codigo`, la celda queda vacía y el resto de la carga sigue.
+- **Valor por defecto:** entra cuando todo el resultado queda vacío (no cuando hay un problema), y pasa por el tipo de la columna. Un campo en blanco (`"  "`) no cuenta como vacío (RF-12).
+- **Segmento.** Un segmento está *reconocido* si es un rango de la tabla (criterio calculado) o un valor que alguna columna contempla en sus variantes (criterio por campo). Reconocido: cada columna usa su variante, o su contenido por defecto si no tiene una. No reconocido: con `excluir` la fila **no sale** y queda en `CargaGenerada.exclusiones` con `sin_segmento` y su motivo; con `usar_por_defecto` sale con el contenido por defecto. Los números de fila de errores y exclusiones son los del producto en el pedido, no los de la salida.
+- **Se rechazan al compilar** (`PlantillaInvalida`, el 400 de hoy): variantes sin segmentación, clave de variante fuera de la tabla, variante repetida o sin contenido, plantilla y expresión a la vez, variable del criterio inexistente, criterio por campo sin variantes, tabla mal armada, y toda función mal usada (`formato_fecha` sobre un texto, parámetro inválido). Los errores de las plantillas de siempre (campo inexistente, `[@` sin cerrar, referencia vacía) conservan **su texto de antes**.
+- **Límites de tamaño (RF-48).** Una `expresion` explícita conserva los límites por defecto. Una `plantilla` es la ruta de compatibilidad (RF-54): sus topes de nodos y de texto fijo crecen con ella, porque una plantilla grande que funcionaba sin límite no puede empezar a rechazarse (lo detectó el oro de MOWA MES con una de 12 000 caracteres).
+
+### RF-54 a nivel de generador
+
+La prueba compara la `CargaGenerada` **entera** —cabeceras, filas con el tipo de cada celda y errores con su fila, campo y texto— sobre 7 definiciones × 8 productos (texto, número, fecha, financiero, vacíos, valores que no se pueden convertir): contra un SHA-256 congelado en HEAD b8b9025 con el generador original y contra el camino de antes en vivo (`plantillas` + `formatos`, que siguen en el código como referencia). También con el catálogo tipado de la cartera.
+
+### D3: la tabla de MOWA MES sale del núcleo
+
+`RANGOS_SEGMENTO` (`entities/mowa_mes.py`) se arma desde `TABLA_RANGOS_POR_DEFECTO`: hay **una sola tabla**. El enum `Segmento` sigue siendo de MOWA MES y una prueba exige que sus valores sean las claves del núcleo. MOWA MES no admite un `hasta` abierto (el armado lo rechaza): más de 120 días ajustados sigue sin speech. `segmentos.dias_ajustados` es la función del núcleo (misma firma) y `segmentos.rango_de` delega en `segmentacion.rango_de`. No cambió `campana.py`, `speech.py`, la API ni el oro de B5.
+
+### Rendimiento de la generación genérica
+
+A/B intercalado sin base, 60 000 filas, definición de 6 columnas (texto fijo, prefijo + campo, variable directa, financiero, fecha con formato y un mensaje): camino de antes 10,2 µs por fila, ahora entre 10,1 y 10,9 según la corrida (**entre −0,3 % y +7 %**: el ruido de la máquina es del orden de la diferencia). La primera versión llegaba a +71 %; se bajó con tres cambios que no alteran el resultado: `Compilada.evaluar` decide la forma de cada parte al compilar (texto fijo, variable directa, plegado, nodo con funciones) y devuelve el resultado ya armado si la expresión no lee nada de la fila; `Resultado` pasó de dataclass congelada a `NamedTuple` (mucho más barata de crear, igual de inmutable); y el generador no llama al evaluador para las columnas de texto fijo ni de variable directa (`Compilada.texto_fijo` y `referencia_directa`). Una variable directa no se evalúa: da `str(valor)` y el valor sin tocar, exactamente como el motor (D1, D11).

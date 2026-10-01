@@ -28,6 +28,8 @@ Texto plano con referencias a campos del producto entre `[@...]`:
 | `documento=[@documento_numero]` | Concatenación de texto y campo |
 | `Pagare [@pagare] vence el [@fecha_vencimiento_cuota]` | Varios campos en una frase |
 
+Una plantilla admite además **funciones en cadena** con tuberías (`[@titular | primeros(8)]`) y se evalúa con el motor de texto enriquecido; una columna también puede traer una `expresion`, un `valor_por_defecto` y un contenido por segmento. Todo eso, y la segmentación, está en [motor-texto-enriquecido.md](motor-texto-enriquecido.md), sección 20.
+
 Los campos disponibles son los mismos de la cartera (ver `consulta-cartera.md`). **Una plantilla se valida al guardarla**, no al generar: si nombra un campo que no existe o deja un `[@` sin cerrar, se rechaza ahí mismo, antes de procesar miles de filas.
 
 ## 3. Tipado y formato

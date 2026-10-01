@@ -45,7 +45,8 @@ class CodigoTexto(StrEnum):
     TIPO_INCOMPATIBLE = "tipo_incompatible"
     LIMITE_EXCEDIDO = "limite_excedido"
     NO_SE_PUEDE_ESCRIBIR_COMO_TEXTO = "no_se_puede_escribir_como_texto"
-    # Al evaluar una fila
+    # Al evaluar una fila (`sin_segmento`: el producto no cae en ningun segmento y se excluye)
+    SIN_SEGMENTO = "sin_segmento"
     VARIABLE_OBLIGATORIA_VACIA = "variable_obligatoria_vacia"
     ARGUMENTO_VACIO = "argumento_vacio"
     DIVISION_POR_CERO = "division_por_cero"

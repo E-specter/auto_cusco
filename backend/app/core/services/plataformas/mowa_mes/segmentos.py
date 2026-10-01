@@ -4,27 +4,19 @@ from collections.abc import Sequence
 from datetime import date
 
 from app.core.entities.mowa_mes import RANGOS_SEGMENTO, Programacion, RangoSegmento
+from app.core.services import segmentacion
+from app.core.services.segmentacion import dias_ajustados  # noqa: F401  (se reexporta)
 
 
 class ProgramacionInvalida(Exception):
     """Las fechas no corresponden a la modalidad de envio."""
 
 
-def dias_ajustados(dias_atraso: int, fecha_corte: date, fecha_envio: date) -> int:
-    """dias_atraso de la sabana + dias calendario entre la fecha de corte y la de envio."""
-    return dias_atraso + (fecha_envio - fecha_corte).days
-
-
 def rango_de(
     dias: int | None, rangos: Sequence[RangoSegmento] = RANGOS_SEGMENTO
 ) -> RangoSegmento | None:
     """Segmento que cubre los dias ajustados; None si no hay speech (vacio o fuera de rango)."""
-    if dias is None:
-        return None
-    for rango in rangos:
-        if (rango.desde is None or rango.desde <= dias) and dias <= rango.hasta:
-            return rango
-    return None
+    return segmentacion.rango_de(dias, rangos)
 
 
 def fecha_envio(

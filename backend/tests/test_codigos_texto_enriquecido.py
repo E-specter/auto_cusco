@@ -47,6 +47,17 @@ def test_cada_codigo_va_en_su_linea_con_la_forma_nombre_igual_a_codigo() -> None
         assert coincidencia.group(1).lower() == coincidencia.group(2), linea
 
 
+def _emitidos_por_el_generador() -> set[CodigoTexto]:
+    """`sin_segmento` lo emite GeneradorCargas al excluir un producto sin segmento (B2)."""
+    from app.core.entities.mapeo import CampoSalida, DefinicionCarga
+    from app.core.entities.segmentacion import Segmentacion
+    from app.core.services.mapeo_campos.generador import GeneradorCargas
+
+    definicion = DefinicionCarga("d", (CampoSalida("c", "x"),), Segmentacion())
+    carga = GeneradorCargas(definicion, {"dias_atraso": "numero"}).generar([{"dias_atraso": 999}])
+    return {CodigoTexto(e.codigo) for e in carga.exclusiones}
+
+
 def _emitidos() -> set[CodigoTexto]:
     emitidos: set[CodigoTexto] = set()
 
@@ -76,6 +87,7 @@ def _emitidos() -> set[CodigoTexto]:
     evaluando('[@t | a_fecha("dd/mm/aaaa")]', t="x")
     evaluando("[@tel | enlace_whatsapp]", tel="1")
     evaluando("[@f | sumar_dias(1)]", f=date(9999, 12, 31))
+    emitidos.update(_emitidos_por_el_generador())
     return emitidos
 
 

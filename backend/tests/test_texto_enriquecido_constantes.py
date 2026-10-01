@@ -385,3 +385,69 @@ def test_una_constante_vacia_sola_tambien_pliega() -> None:
 
     assert compilada.nodos_plegados == 1
     assert compilada.evaluar({"t": "de la fila"}).texto == "ab"
+
+
+# --- Atajos para quien genera muchas filas (B2) ---------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("plantilla", "directa"),
+    [
+        ("[@t]", "t"),
+        ("[@ n ]", "n"),
+        ("a[@t]", None),
+        ("[@t]b", None),
+        ("[@t][@u]", None),
+        ("[@t | mayusculas]", None),
+        ("hola", None),
+        ("", None),
+    ],
+)
+def test_referencia_directa_solo_si_es_exactamente_una_variable_sin_funciones(
+    plantilla, directa
+) -> None:
+    assert _compilar(plantilla).referencia_directa == directa
+
+
+def test_una_variable_obligatoria_no_es_una_referencia_directa() -> None:
+    expresion = Expresion((NodoVariable("t", obligatoria=True),))
+
+    assert evaluador.compilar(expresion, VARIABLES).referencia_directa is None
+
+
+def test_una_referencia_directa_da_str_del_valor_y_el_valor_sin_tocar() -> None:
+    compilada = _compilar("[@n]")
+
+    for valor in (None, Decimal("1.50"), 7, "x", date(2026, 1, 2), False):
+        resultado = compilada.evaluar({"n": valor})
+        assert resultado.texto == ("" if valor is None else str(valor))
+        assert resultado.valor is valor or resultado.valor == valor
+
+
+@pytest.mark.parametrize(
+    ("plantilla", "constantes", "fijo"),
+    [
+        ("hola", None, "hola"),
+        ("", None, ""),
+        ("[@t]", None, None),
+        ("a[@t]b", {"t": "X"}, "aXb"),  # plegado sin problemas y sin valor tipado que conservar
+        ("[@t]", {"t": "X"}, None),  # un nodo unico plegado conserva su valor tipado
+        ("a[@n | dividir(0)]b", {"n": 1}, None),  # con problema: nunca es fijo
+    ],
+)
+def test_texto_fijo_solo_si_nada_depende_de_la_fila(plantilla, constantes, fijo) -> None:
+    assert _compilar(plantilla, constantes).texto_fijo == fijo
+
+
+def test_una_expresion_fija_da_siempre_el_mismo_resultado() -> None:
+    compilada = _compilar("a[@t]b", {"t": "X"})
+
+    assert compilada.evaluar({"u": 1}) == compilada.evaluar({"u": 2})
+    assert compilada.evaluar({}).texto == "aXb"
+
+
+def test_el_resultado_es_inmutable() -> None:
+    resultado = _compilar("hola").evaluar({})
+
+    with pytest.raises(AttributeError):
+        resultado.texto = "otro"  # type: ignore[misc]

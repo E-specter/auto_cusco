@@ -12,6 +12,7 @@ from enum import StrEnum
 
 # El prefijo lo posee el motor de texto enriquecido; se reexporta con el mismo nombre para que
 # ningun import de este modulo cambie.
+from app.core.entities.segmentacion import TABLA_RANGOS_POR_DEFECTO, RangoDias
 from app.core.entities.texto_enriquecido import (  # noqa: F401
     PREFIJO_WHATSAPP,
     CodigoTexto,
@@ -52,14 +53,18 @@ class RangoSegmento:
     hasta: int
 
 
-# RF-MM-15, con S-MM-6 (0 es Preventiva). Son datos, no condiciones sueltas.
-RANGOS_SEGMENTO: tuple[RangoSegmento, ...] = (
-    RangoSegmento(Segmento.PREVENTIVA, "Preventiva", None, 0),
-    RangoSegmento(Segmento.DE_1_A_8, "1 a 8", 1, 8),
-    RangoSegmento(Segmento.DE_9_A_30, "9 a 30", 9, 30),
-    RangoSegmento(Segmento.DE_31_A_60, "31 a 60", 31, 60),
-    RangoSegmento(Segmento.DE_61_A_90, "61 a 90", 61, 90),
-    RangoSegmento(Segmento.DE_91_A_120, "91 a 120", 91, 120),
+def _desde_el_nucleo(rango: RangoDias) -> RangoSegmento:
+    """Un rango del nucleo con su clave convertida al enum. MOWA MES no admite `hasta` abierto:
+    mas de 120 dias ajustados queda sin speech (RF-MM-15)."""
+    if rango.hasta is None:
+        raise ValueError(f"El rango {rango.clave!r} de MOWA MES necesita un limite superior")
+    return RangoSegmento(Segmento(rango.clave), rango.etiqueta, rango.desde, rango.hasta)
+
+
+# RF-MM-15, con S-MM-6 (0 es Preventiva). La tabla es la del nucleo (D3): hay una sola, y la
+# prueba `test_mowa_mes_rangos_nucleo.py` comprueba que sus claves son las del enum `Segmento`.
+RANGOS_SEGMENTO: tuple[RangoSegmento, ...] = tuple(
+    _desde_el_nucleo(rango) for rango in TABLA_RANGOS_POR_DEFECTO
 )
 
 
