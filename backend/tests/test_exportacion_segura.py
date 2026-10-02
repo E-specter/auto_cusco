@@ -390,14 +390,21 @@ def test_el_json_es_identico_al_de_head_con_o_sin_proteccion(opciones) -> None:
     assert json.loads(peligrosa)[0]["valor"] == "=1+1"  # el JSON no es una hoja: sin apostrofo
 
 
-# --- La opcion no se expone todavia en la API ---------------------------------------------------
+# --- La opcion en la API ------------------------------------------------------------------------
 
 
-def test_la_opcion_no_esta_en_el_contrato_de_la_api_hasta_b4b() -> None:
+def test_la_opcion_solo_viaja_en_la_definicion_de_columnas_hasta_que_b4b_la_conecte() -> None:
+    """B4a la acepta en la definicion que previsualiza el constructor (C-10); `/archivos-carga`
+    sigue sin exponerla hasta que B4b pase la de una definicion guardada a `OpcionesArchivo`."""
     contrato = Path(__file__).resolve().parents[2] / "contratos" / "openapi.json"
 
     assert contrato.exists(), f"No se encontro {contrato}"
-    assert "proteger_formulas" not in contrato.read_text(encoding="utf-8")
+    esquemas = json.loads(contrato.read_text(encoding="utf-8"))["components"]["schemas"]
+    con_la_opcion = sorted(
+        n for n, e in esquemas.items() if "proteger_formulas" in e.get("properties", {})
+    )
+
+    assert con_la_opcion == ["DefinicionColumnasEntrada"]
 
 
 def test_el_valor_por_defecto_es_proteger() -> None:

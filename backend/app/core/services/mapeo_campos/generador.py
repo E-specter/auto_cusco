@@ -37,13 +37,14 @@ from app.core.entities.texto_enriquecido import (
     Expresion,
     ExpresionInvalida,
     LimitesExpresion,
+    MotivoSinCota,
     Problema,
     TipoValor,
 )
 from app.core.services import segmentacion as servicio_segmentacion
 from app.core.services.mapeo_campos import formatos
 from app.core.services.texto_enriquecido import evaluador, sintaxis
-from app.core.services.texto_enriquecido.evaluador import Compilada
+from app.core.services.texto_enriquecido.evaluador import Compilada, NodoEvaluado
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,34 @@ class CargaGenerada:
     @property
     def completa(self) -> bool:
         return not self.errores
+
+
+@dataclass(frozen=True)
+class CeldaDetallada:
+    """Una celda de una fila con el detalle que necesita la previsualizacion (RF-47).
+
+    `texto` es lo que produjo la columna (con el valor por defecto ya aplicado); `valor` es el
+    valor final tipado, el mismo que escribe la carga; `problemas` son los del motor y, si el
+    texto no cabe en el tipo de la columna, `valor_no_convertible`.
+    """
+
+    campo: CampoSalida
+    texto: str
+    valor: Any
+    nodos: tuple[NodoEvaluado, ...]
+    problemas: tuple[Problema, ...]
+    cota: int | None
+    motivo_sin_cota: MotivoSinCota | None
+    usa_variante: bool
+
+
+@dataclass(frozen=True)
+class FilaDetallada:
+    """Una fila con su segmento y el detalle de cada celda; sin celdas si se excluye."""
+
+    segmento: str | None
+    exclusion: FilaExcluida | None
+    celdas: tuple[CeldaDetallada, ...]
 
 
 @dataclass(frozen=True)
@@ -84,7 +113,7 @@ class GeneradorCargas:
     ) -> None:
         self._definicion = definicion
         self._validar_nombres(definicion.campos)
-        self._variables = _variables_de(campos_disponibles)
+        self._variables = variables_de(campos_disponibles)
         self._segmentacion = definicion.segmentacion
         self._columnas = tuple(self._compilar_columna(campo) for campo in definicion.campos)
         self._claves_con_variante = {
@@ -140,7 +169,7 @@ class GeneradorCargas:
                 # Una plantilla es la ruta de compatibilidad (RF-54): lo que funcionaba sin
                 # limite de tamano sigue funcionando, asi que los topes de nodos y de texto
                 # fijo crecen con ella. Una expresion explicita conserva los topes (RF-48).
-                limites = _limites_de_plantilla(plantilla)
+                limites = limites_de_plantilla(plantilla)
                 expresion = sintaxis.leer(plantilla, limites)
                 return evaluador.compilar(expresion, self._variables, limites)
             return evaluador.compilar(expresion, self._variables)
@@ -291,6 +320,59 @@ class GeneradorCargas:
             detalle = f"El valor {clave!r} de {criterio.campo!r} no tiene contenido por segmento"
         return FilaExcluida(numero_fila, CodigoTexto.SIN_SEGMENTO.value, detalle)
 
+    def detallar_fila(self, producto: Mapping[str, Any], numero_fila: int) -> FilaDetallada:
+        """Lo mismo que `generar_fila`, con el segmento, el texto de cada nodo y la cota.
+
+        Es para la previsualizacion, no para generar cargas: las celdas coinciden con las de
+        `generar_fila` (una prueba lo comprueba), pero aqui cada celda se evalua por nodo.
+        """
+        clave = None
+        if self._segmentacion is not None:
+            clave = servicio_segmentacion.segmento_de(self._segmentacion, producto)
+            if not self._reconocido(clave) and (
+                self._segmentacion.politica is PoliticaSinSegmento.EXCLUIR
+            ):
+                return FilaDetallada(clave, self._exclusion(numero_fila, clave, producto), ())
+        return FilaDetallada(
+            clave,
+            None,
+            tuple(self._detallar_celda(columna, clave, producto) for columna in self._columnas),
+        )
+
+    @staticmethod
+    def _detallar_celda(
+        columna: _Columna, clave: str | None, producto: Mapping[str, Any]
+    ) -> CeldaDetallada:
+        campo = columna.campo
+        usa_variante = clave is not None and clave in columna.variantes
+        compilada = columna.variantes[clave] if usa_variante else columna.por_defecto  # type: ignore[index]
+        resultado = compilada.evaluar_por_nodo(producto)
+        problemas = list(resultado.problemas)
+        texto = resultado.texto
+        if texto == "" and campo.valor_por_defecto is not None:
+            texto, crudo = campo.valor_por_defecto, None
+        else:
+            crudo = resultado.valor
+        valor = None
+        if not problemas:
+            fila: dict[str, Any] = {}
+            errores: list[ErrorGeneracion] = []
+            GeneradorCargas._convertir(campo, texto, crudo, 0, fila, errores)
+            valor = fila[campo.nombre]
+            problemas.extend(
+                Problema(CodigoTexto.VALOR_NO_CONVERTIBLE, error.detalle) for error in errores
+            )
+        return CeldaDetallada(
+            campo=campo,
+            texto=texto,
+            valor=valor,
+            nodos=resultado.nodos,
+            problemas=tuple(problemas),
+            cota=compilada.cota,
+            motivo_sin_cota=compilada.motivo_sin_cota,
+            usa_variante=usa_variante,
+        )
+
     def generar(self, productos: Iterable[Mapping[str, Any]]) -> CargaGenerada:
         filas: list[dict[str, Any]] = []
         errores: list[ErrorGeneracion] = []
@@ -310,14 +392,14 @@ class GeneradorCargas:
         )
 
 
-def _limites_de_plantilla(plantilla: str) -> LimitesExpresion:
+def limites_de_plantilla(plantilla: str) -> LimitesExpresion:
     return LimitesExpresion(
         nodos=max(LIMITES.nodos, len(plantilla)),
         largo_literal=max(LIMITES.largo_literal, len(plantilla)),
     )
 
 
-def _variables_de(campos: Iterable[str] | Mapping[str, Any]) -> dict[str, TipoValor]:
+def variables_de(campos: Iterable[str] | Mapping[str, Any]) -> dict[str, TipoValor]:
     if isinstance(campos, Mapping):
         return {nombre: TipoValor(getattr(tipo, "value", tipo)) for nombre, tipo in campos.items()}
     return {nombre: TipoValor.TEXTO for nombre in campos}

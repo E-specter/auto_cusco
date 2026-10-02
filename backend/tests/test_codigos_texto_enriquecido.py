@@ -1,8 +1,9 @@
 """Catalogo `CodigoTexto`: forma que lee la prueba espejo del frontend y codigos emitidos.
 
-La prueba espejo con `frontend/src/i18n/*.json` (`textoEnriquecido.codigo.<codigo>`) llega con el
-contrato de la API (B4a); aqui se fija la forma que necesita (un codigo por linea, `NOMBRE =
-"codigo"`, igual que `CodigoMowaMes`) y que no haya codigos muertos.
+La prueba espejo con `frontend/src/i18n/*.json` (`textoEnriquecido.codigo.<codigo>`) esta en
+`test_i18n_texto_enriquecido.py`; aqui se fija la forma que necesita (un codigo por linea, `NOMBRE =
+"codigo"` y, si hace falta, un comentario al final, igual que `CodigoMowaMes`) y que no haya codigos
+muertos: cada uno se emite de verdad, los de la API por la API.
 """
 
 import re
@@ -10,7 +11,11 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
+from fastapi.testclient import TestClient
+
+from app.api.cartera import obtener_servicio_cartera
 from app.core.entities import texto_enriquecido as entidades
+from app.core.entities.cartera import PaginaCartera, SinVersionVigente
 from app.core.entities.texto_enriquecido import (
     CodigoTexto,
     Expresion,
@@ -21,6 +26,7 @@ from app.core.entities.texto_enriquecido import (
     TipoValor,
 )
 from app.core.services.texto_enriquecido import evaluador, sintaxis
+from app.main import app
 
 VARIABLES = {
     "t": TipoValor.TEXTO,
@@ -42,7 +48,7 @@ def test_cada_codigo_va_en_su_linea_con_la_forma_nombre_igual_a_codigo() -> None
 
     assert len(lineas) == len(CodigoTexto)
     for linea in lineas:
-        coincidencia = re.fullmatch(r'    ([A-Z_]+) = "([a-z_]+)"', linea)
+        coincidencia = re.fullmatch(r'    ([A-Z_]+) = "([a-z_]+)"(?:  # .+)?', linea)
         assert coincidencia, linea
         assert coincidencia.group(1).lower() == coincidencia.group(2), linea
 
@@ -56,6 +62,90 @@ def _emitidos_por_el_generador() -> set[CodigoTexto]:
     definicion = DefinicionCarga("d", (CampoSalida("c", "x"),), Segmentacion())
     carga = GeneradorCargas(definicion, {"dias_atraso": "numero"}).generar([{"dias_atraso": 999}])
     return {CodigoTexto(e.codigo) for e in carga.exclusiones}
+
+
+class _CarteraVacia:
+    def __init__(self, error: Exception | None = None) -> None:
+        self.error = error
+
+    def consultar(self, fecha_corte, filtros, orden, limite, desplazamiento=0):
+        if self.error is not None:
+            raise self.error
+        return PaginaCartera(total=0, filas=(), limite=limite)
+
+
+def _emitidos_por_la_api() -> set[CodigoTexto]:
+    """Lo que solo informa la API del motor (B4a): se pide por HTTP, como lo hace la interfaz."""
+    cartera = _CarteraVacia()
+    app.dependency_overrides[obtener_servicio_cartera] = lambda: cartera
+    try:
+        return _pedir_a_la_api(TestClient(app), cartera)
+    finally:
+        app.dependency_overrides.pop(obtener_servicio_cartera, None)
+
+
+def _pedir_a_la_api(cliente: TestClient, cartera: _CarteraVacia) -> set[CodigoTexto]:
+    emitidos: set[CodigoTexto] = set()
+    nodo = {"tipo": "variable", "nombre": "titular", "funciones": []}
+    muestra = {"tipo": "producto_real", "fecha_corte": "2026-09-10", "pagare": "x"}
+    definicion = {
+        "columnas": [{"nombre": "c", "orden": 0, "expresion": {"nodos": [nodo]}, "tipo": "fecha"}]
+    }
+
+    def buscar(cuerpo, ruta: str, json: dict) -> None:
+        if ruta.startswith("/texto-enriquecido/catalogo"):
+            respuesta = cliente.get(ruta)
+        else:
+            respuesta = cliente.post(ruta, json=json)
+        if respuesta.status_code == 404:
+            emitidos.add(CodigoTexto(respuesta.json()["codigo"]))
+            return
+        cuerpo(respuesta.json())
+
+    def desde_problemas(cuerpo: dict) -> None:
+        for problema in cuerpo["problemas"]:
+            emitidos.add(CodigoTexto(problema["codigo"]))
+        for fila in cuerpo.get("filas", ()):
+            for columna in fila["columnas"]:
+                emitidos.update(CodigoTexto(p["codigo"]) for p in columna["problemas"])
+        sin_cota = cuerpo.get("sin_cota")
+        if sin_cota:
+            emitidos.add(CodigoTexto(sin_cota["codigo"]))
+
+    validacion = "/texto-enriquecido/validacion"
+    previa = "/texto-enriquecido/previsualizacion"
+    for contexto, nodos in [
+        ("cartera", [{"tipo": "inventado"}]),  # expresion_invalida
+        ("cartera", [nodo]),  # sin_cota_variable
+        ("cartera", [{**nodo, "funciones": [{"nombre": "a_texto", "args": []}]}]),
+    ]:
+        buscar(desde_problemas, validacion, {"contexto": contexto, "expresion": {"nodos": nodos}})
+    numero = {
+        "tipo": "variable",
+        "nombre": "saldo_capital_pendiente",
+        "funciones": [{"nombre": "a_texto", "args": []}],
+    }  # sin_cota_funcion
+    buscar(desde_problemas, validacion, {"contexto": "cartera", "expresion": {"nodos": [numero]}})
+    buscar(desde_problemas, previa, {"contexto": "cartera", "definicion": {"columnas": []}})
+    buscar(
+        desde_problemas,
+        previa,
+        {"contexto": "cartera", "definicion": definicion, "muestra": {"tipo": "ejemplo"}},
+    )  # valor_no_convertible
+    buscar(desde_problemas, "/texto-enriquecido/catalogo?contexto=nada", {})
+    expresion = {"nodos": [nodo]}
+    buscar(  # producto_no_encontrado
+        desde_problemas,
+        previa,
+        {"contexto": "cartera", "expresion": expresion, "muestra": muestra},
+    )
+    cartera.error = SinVersionVigente(date(2026, 9, 10))
+    buscar(  # sin_version_vigente
+        desde_problemas,
+        previa,
+        {"contexto": "cartera", "expresion": expresion, "muestra": muestra},
+    )
+    return emitidos
 
 
 def _emitidos() -> set[CodigoTexto]:
@@ -88,6 +178,7 @@ def _emitidos() -> set[CodigoTexto]:
     evaluando("[@tel | enlace_whatsapp]", tel="1")
     evaluando("[@f | sumar_dias(1)]", f=date(9999, 12, 31))
     emitidos.update(_emitidos_por_el_generador())
+    emitidos.update(_emitidos_por_la_api())
     return emitidos
 
 

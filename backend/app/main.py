@@ -28,6 +28,7 @@ from app.api.mowa_mes_campanas import CABECERAS_ARCHIVO
 from app.api.mowa_mes_campanas import router as mowa_mes_campanas_router
 from app.api.selecciones import router as selecciones_router
 from app.api.supervisores import router as supervisores_router
+from app.api.texto_enriquecido import router as texto_enriquecido_router
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -94,3 +95,4 @@ app.include_router(calendario_router)
 app.include_router(supervisores_router)
 app.include_router(mowa_mes_router)
 app.include_router(mowa_mes_campanas_router)
+app.include_router(texto_enriquecido_router)

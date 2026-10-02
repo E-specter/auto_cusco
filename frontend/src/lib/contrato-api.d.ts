@@ -719,6 +719,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/texto-enriquecido/catalogo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obtener Catalogo
+         * @description Variables del contexto con su tipo, funciones con sus parametros y claves i18n, patrones y
+         *     marcas de fecha, limites del motor y el registro de ejemplo (RF-44). Todo sale del registro de
+         *     funciones y de los contextos: una funcion o un contexto nuevo aparece sin tocar este endpoint.
+         */
+        get: operations["obtener_catalogo_texto_enriquecido_catalogo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/texto-enriquecido/validacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validar
+         * @description Los problemas de la expresion con su ubicacion, su tipo resultante y su largo maximo (RF-47).
+         *
+         *     Una expresion con problemas responde `200` con ellos: es lo que el editor muestra mientras se
+         *     escribe.
+         */
+        post: operations["validar_texto_enriquecido_validacion_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/texto-enriquecido/previsualizacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Previsualizar
+         * @description El resultado de una expresion o una definicion, por fila y por nodo, con una muestra (RF-47).
+         *
+         *     Solo lectura: no guarda nada. Con problemas de compilacion no hay filas y la respuesta trae los
+         *     problemas, cada uno con su columna y su segmento.
+         */
+        post: operations["previsualizar_texto_enriquecido_previsualizacion_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -930,6 +998,21 @@ export interface components {
             /** Aviso */
             aviso: string | null;
         };
+        /** CatalogoRespuesta */
+        CatalogoRespuesta: {
+            contexto: components["schemas"]["ContextoRespuesta"];
+            /** Contextos */
+            contextos: components["schemas"]["ContextoDisponibleRespuesta"][];
+            /** Funciones */
+            funciones: components["schemas"]["FuncionRespuesta"][];
+            /** Familias */
+            familias: string[];
+            /** Patrones Fecha */
+            patrones_fecha: components["schemas"]["PatronFechaRespuesta"][];
+            /** Marcas Fecha */
+            marcas_fecha: components["schemas"]["MarcaFechaRespuesta"][];
+            limites: components["schemas"]["LimitesRespuesta"];
+        };
         /** CifrasGrupoRespuesta */
         CifrasGrupoRespuesta: {
             /** Cargados */
@@ -979,6 +1062,51 @@ export interface components {
          * @enum {string}
          */
         CodigoMowaMes: "telefono_invalido" | "falta_documento" | "sin_speech" | "falta_titular" | "falta_vencimiento" | "mensaje_excede_160" | "mensaje_excede_150" | "documento_no_estandar" | "limite_mensual_excedido" | "id_sin_correspondencia" | "falta_whatsapp" | "sin_supervisores" | "sin_productos_cargables";
+        /**
+         * ColumnaEntrada
+         * @description Una columna de la definicion: la forma que guardara B4b. El contenido es solo expresion;
+         *     `formato_fecha` va con marcas legibles (`dd/mm/aaaa`) y el backend las traduce.
+         */
+        ColumnaEntrada: {
+            /** Nombre */
+            nombre: string;
+            /** Orden */
+            orden: number;
+            expresion: components["schemas"]["ExpresionEntrada"];
+            /** Tipo */
+            tipo?: string | null;
+            /** Formato Fecha */
+            formato_fecha?: string | null;
+            formato_financiero?: components["schemas"]["FormatoFinancieroColumnaEntrada"] | null;
+            /** Valor Por Defecto */
+            valor_por_defecto?: string | null;
+            /** Variantes */
+            variantes?: components["schemas"]["VarianteEntrada"][] | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** ColumnaRespuesta */
+        ColumnaRespuesta: {
+            /** Nombre */
+            nombre: string;
+            /** Tipo */
+            tipo: string;
+            /** Texto */
+            texto: string;
+            /** Valor */
+            valor: unknown;
+            /** Largo */
+            largo: number;
+            /** Cota */
+            cota: number | null;
+            sin_cota: components["schemas"]["SinCotaRespuesta"] | null;
+            /** Usa Variante */
+            usa_variante: boolean;
+            /** Nodos */
+            nodos: components["schemas"]["NodoRespuesta"][];
+            /** Problemas */
+            problemas: components["schemas"]["ProblemaTextoRespuesta"][];
+        };
         /** ConciliacionRespuesta */
         ConciliacionRespuesta: {
             /** Campana Id */
@@ -1118,6 +1246,34 @@ export interface components {
              */
             costo_total: string;
         };
+        /** ContextoDisponibleRespuesta */
+        ContextoDisponibleRespuesta: {
+            /** Nombre */
+            nombre: string;
+            /** Clave Nombre */
+            clave_nombre: string;
+        };
+        /** ContextoRespuesta */
+        ContextoRespuesta: {
+            /** Nombre */
+            nombre: string;
+            /** Clave Nombre */
+            clave_nombre: string;
+            /** Variables */
+            variables: components["schemas"]["VariableRespuesta"][];
+            /** Ejemplo */
+            ejemplo: {
+                [key: string]: unknown;
+            };
+            /** Limite Largo */
+            limite_largo: number | null;
+            /** Umbral Advertencia */
+            umbral_advertencia: number | null;
+            /** Variable Dias */
+            variable_dias: string;
+            /** Segmentos */
+            segmentos: components["schemas"]["RangoRespuesta"][];
+        };
         /** CreacionCampanaEntrada */
         CreacionCampanaEntrada: {
             /**
@@ -1197,6 +1353,35 @@ export interface components {
              */
             confirmar_limite: boolean;
         };
+        /** CriterioEntrada */
+        CriterioEntrada: {
+            /** Tipo */
+            tipo: string;
+            /** Campo */
+            campo?: string | null;
+            /** Variable Dias */
+            variable_dias?: string | null;
+            /** Tabla */
+            tabla?: components["schemas"]["RangoEntrada"][] | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * DefinicionColumnasEntrada
+         * @description Las columnas van con `orden` explicito y se identifican por su posicion en la lista;
+         *     `proteger_formulas` (por defecto verdadero) lo aplica el exportador (RF-53).
+         */
+        DefinicionColumnasEntrada: {
+            /** Nombre */
+            nombre?: string | null;
+            /** Columnas */
+            columnas: components["schemas"]["ColumnaEntrada"][];
+            segmentacion?: components["schemas"]["SegmentacionEntrada"] | null;
+            /** Proteger Formulas */
+            proteger_formulas?: boolean | null;
+        } & {
+            [key: string]: unknown;
+        };
         /** DefinicionEntrada */
         DefinicionEntrada: {
             /** Nombre */
@@ -1211,6 +1396,16 @@ export interface components {
         DetalleError: {
             /** Detail */
             detail: string;
+        };
+        /**
+         * DetalleErrorTexto
+         * @description El motivo y el `codigo` del catalogo (`CodigoTexto`) que la interfaz traduce.
+         */
+        DetalleErrorTexto: {
+            /** Detail */
+            detail: string;
+            /** Codigo */
+            codigo: string;
         };
         /** DiaNoLaborableRespuesta */
         DiaNoLaborableRespuesta: {
@@ -1319,11 +1514,25 @@ export interface components {
             /** Creado En */
             creado_en: string | null;
         };
+        /** ExclusionFilaRespuesta */
+        ExclusionFilaRespuesta: {
+            /** Codigo */
+            codigo: string;
+            /** Detalle */
+            detalle: string;
+        };
         /** ExclusionRespuesta */
         ExclusionRespuesta: {
             /** Pagare */
             pagare: string;
             codigo: components["schemas"]["CodigoMowaMes"];
+        };
+        /** ExpresionEntrada */
+        ExpresionEntrada: {
+            /** Nodos */
+            nodos: components["schemas"]["NodoEntrada"][];
+        } & {
+            [key: string]: unknown;
         };
         /** FeriadosRespuesta */
         FeriadosRespuesta: {
@@ -1350,12 +1559,35 @@ export interface components {
             /** Advertencias */
             advertencias: components["schemas"]["CodigoMowaMes"][];
         };
+        /** FilaRespuesta */
+        FilaRespuesta: {
+            /** Numero */
+            numero: number;
+            /** Etiqueta */
+            etiqueta: string | null;
+            /** Segmento */
+            segmento: string | null;
+            excluida: components["schemas"]["ExclusionFilaRespuesta"] | null;
+            /** Columnas */
+            columnas: components["schemas"]["ColumnaRespuesta"][];
+        };
         /**
          * FormatoArchivo
          * @description Formatos de archivo soportados (RF-13).
          * @enum {string}
          */
         FormatoArchivo: "xlsx" | "csv" | "json";
+        /** FormatoFinancieroColumnaEntrada */
+        FormatoFinancieroColumnaEntrada: {
+            /** Separador Miles */
+            separador_miles?: string | null;
+            /** Separador Decimal */
+            separador_decimal?: string | null;
+            /** Decimales */
+            decimales?: number | null;
+        } & {
+            [key: string]: unknown;
+        };
         /** FormatoFinancieroEntrada */
         FormatoFinancieroEntrada: {
             /**
@@ -1382,6 +1614,39 @@ export interface components {
             extension: string;
             /** Opciones */
             opciones: string[];
+        };
+        /** FuncionEntrada */
+        FuncionEntrada: {
+            /** Nombre */
+            nombre: string;
+            /** Args */
+            args?: unknown[] | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** FuncionRespuesta */
+        FuncionRespuesta: {
+            /** Nombre */
+            nombre: string;
+            /** Familia */
+            familia: string;
+            /** Clave Familia */
+            clave_familia: string;
+            /** Clave Nombre */
+            clave_nombre: string;
+            /** Clave Descripcion */
+            clave_descripcion: string;
+            /** Recibe */
+            recibe: ("texto" | "numero" | "fecha" | "booleano")[];
+            /**
+             * Devuelve
+             * @enum {string}
+             */
+            devuelve: "texto" | "numero" | "fecha" | "booleano" | "entrada";
+            /** Acepta Nulo */
+            acepta_nulo: boolean;
+            /** Parametros */
+            parametros: components["schemas"]["ParametroRespuesta"][];
         };
         /** GrupoRespuesta */
         GrupoRespuesta: {
@@ -1476,6 +1741,17 @@ export interface components {
             /** Ejemplo */
             ejemplo: string | null;
         };
+        /** LimitesRespuesta */
+        LimitesRespuesta: {
+            /** Nodos */
+            nodos: number;
+            /** Funciones Por Nodo */
+            funciones_por_nodo: number;
+            /** Argumentos Por Funcion */
+            argumentos_por_funcion: number;
+            /** Largo Literal */
+            largo_literal: number;
+        };
         /** ListaCampanasRespuesta */
         ListaCampanasRespuesta: {
             /** Total */
@@ -1486,6 +1762,15 @@ export interface components {
             desplazamiento: number;
             /** Campanas */
             campanas: components["schemas"]["CampanaRespuesta"][];
+        };
+        /** MarcaFechaRespuesta */
+        MarcaFechaRespuesta: {
+            /** Marca */
+            marca: string;
+            /** Clave */
+            clave: string;
+            /** Ejemplo */
+            ejemplo: string;
         };
         /** MetricasRespuesta */
         MetricasRespuesta: {
@@ -1505,6 +1790,58 @@ export interface components {
             adicionales: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * MuestraEntrada
+         * @description `ejemplos_por_segmento` (por defecto), `ejemplo` o `producto_real` (corte y pagare).
+         */
+        MuestraEntrada: {
+            /**
+             * Tipo
+             * @default ejemplos_por_segmento
+             * @enum {string}
+             */
+            tipo: "ejemplo" | "ejemplos_por_segmento" | "producto_real";
+            /** Fecha Corte */
+            fecha_corte?: string | null;
+            /** Pagare */
+            pagare?: string | null;
+        };
+        /** NodoEntrada */
+        NodoEntrada: {
+            /** Tipo */
+            tipo: string;
+            /** Valor */
+            valor?: string | null;
+            /** Nombre */
+            nombre?: string | null;
+            /** Funciones */
+            funciones?: components["schemas"]["FuncionEntrada"][] | null;
+            /** Obligatoria */
+            obligatoria?: boolean | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * NodoRespuesta
+         * @description El texto de un nodo. `vacio` es la variable que llego sin dato: no es un texto vacio.
+         */
+        NodoRespuesta: {
+            /** Indice */
+            indice: number;
+            /** Tipo */
+            tipo: string;
+            /** Texto */
+            texto: string;
+            /** Vacio */
+            vacio: boolean;
+        };
+        /** OpcionRespuesta */
+        OpcionRespuesta: {
+            /** Valor */
+            valor: string;
+            /** Ejemplo */
+            ejemplo: string | null;
         };
         /** OpcionesEntrada */
         OpcionesEntrada: {
@@ -1562,6 +1899,38 @@ export interface components {
                 [key: string]: unknown;
             }[];
         };
+        /** ParametroRespuesta */
+        ParametroRespuesta: {
+            /** Nombre */
+            nombre: string;
+            /** Clave Nombre */
+            clave_nombre: string;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "texto" | "numero" | "fecha" | "booleano" | "entrada";
+            /** Obligatorio */
+            obligatorio: boolean;
+            /** Por Defecto */
+            por_defecto: unknown;
+            /** Acepta Variable */
+            acepta_variable: boolean;
+            /** Entero */
+            entero: boolean;
+            /** Minimo */
+            minimo: number | null;
+            /** Maximo */
+            maximo: number | null;
+            /** Largo Minimo */
+            largo_minimo: number | null;
+            /** Largo Maximo */
+            largo_maximo: number | null;
+            /** Opciones */
+            opciones: components["schemas"]["OpcionRespuesta"][];
+            /** Opciones Cerradas */
+            opciones_cerradas: boolean;
+        };
         /**
          * ParteSeleccion
          * @enum {string}
@@ -1590,6 +1959,13 @@ export interface components {
             parte_2: string;
             /** Usa Whatsapp */
             usa_whatsapp: boolean;
+        };
+        /** PatronFechaRespuesta */
+        PatronFechaRespuesta: {
+            /** Patron */
+            patron: string;
+            /** Ejemplo */
+            ejemplo: string;
         };
         /** PeticionCampanaEntrada */
         PeticionCampanaEntrada: {
@@ -1682,6 +2058,28 @@ export interface components {
              */
             cantidad: number;
             opciones?: components["schemas"]["OpcionesEntrada"] | null;
+        };
+        /**
+         * PeticionPrevisualizacion
+         * @description Una `expresion` o una `definicion`, y la muestra con la que se evalua.
+         */
+        PeticionPrevisualizacion: {
+            /** Contexto */
+            contexto: string;
+            expresion?: components["schemas"]["ExpresionEntrada"] | null;
+            definicion?: components["schemas"]["DefinicionColumnasEntrada"] | null;
+            /**
+             * @default {
+             *       "tipo": "ejemplos_por_segmento"
+             *     }
+             */
+            muestra: components["schemas"]["MuestraEntrada"];
+        };
+        /** PeticionValidacion */
+        PeticionValidacion: {
+            /** Contexto */
+            contexto: string;
+            expresion: components["schemas"]["ExpresionEntrada"];
         };
         /** PlantillaNombreEntrada */
         PlantillaNombreEntrada: {
@@ -1796,6 +2194,20 @@ export interface components {
              */
             whatsapp?: string | null;
         };
+        /**
+         * PrevisualizacionTextoRespuesta
+         * @description O `problemas` (no compila: sin filas) o `filas`.
+         */
+        PrevisualizacionTextoRespuesta: {
+            /** Problemas */
+            problemas: components["schemas"]["ProblemaTextoRespuesta"][];
+            /** Filas */
+            filas: components["schemas"]["FilaRespuesta"][];
+            /** Limite Largo */
+            limite_largo: number | null;
+            /** Umbral Advertencia */
+            umbral_advertencia: number | null;
+        };
         /** ProblemaRespuesta */
         ProblemaRespuesta: {
             parte: components["schemas"]["ParteSeleccion"];
@@ -1813,11 +2225,56 @@ export interface components {
             detalle: string;
         };
         /**
+         * ProblemaTextoRespuesta
+         * @description `ubicacion` es nula cuando el problema es de toda la expresion. `columna` y `segmento`
+         *     ubican el problema dentro de una definicion; `campo` nombra el campo de la definicion cuando
+         *     no es de una columna (`definicion`, `nombre`, `campos`, `segmentacion`).
+         */
+        ProblemaTextoRespuesta: {
+            /** Codigo */
+            codigo: string;
+            /** Detalle */
+            detalle: string;
+            ubicacion: components["schemas"]["UbicacionRespuesta"] | null;
+            /** Nombre */
+            nombre: string | null;
+            /** Columna */
+            columna: number | null;
+            /** Segmento */
+            segmento: string | null;
+            /** Campo */
+            campo: string | null;
+        };
+        /**
          * Programacion
          * @description Modalidades de envio de RF-MM-07.
          * @enum {string}
          */
         Programacion: "enviar_ahora" | "hora_determinada" | "diferentes_horas";
+        /** RangoEntrada */
+        RangoEntrada: {
+            /** Clave */
+            clave: string;
+            /** Etiqueta */
+            etiqueta: string;
+            /** Desde */
+            desde?: number | null;
+            /** Hasta */
+            hasta?: number | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** RangoRespuesta */
+        RangoRespuesta: {
+            /** Clave */
+            clave: string;
+            /** Etiqueta */
+            etiqueta: string;
+            /** Desde */
+            desde: number | null;
+            /** Hasta */
+            hasta: number | null;
+        };
         /** ReporteImportadoRespuesta */
         ReporteImportadoRespuesta: {
             /** Mes Id */
@@ -1855,6 +2312,14 @@ export interface components {
          * @enum {string}
          */
         Salida: "numero_largo" | "numero_corto" | "numero_corto_flash";
+        /** SegmentacionEntrada */
+        SegmentacionEntrada: {
+            criterio?: components["schemas"]["CriterioEntrada"] | null;
+            /** Politica */
+            politica?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
         /** SegmentacionRespuesta */
         SegmentacionRespuesta: {
             /** Campo */
@@ -1941,6 +2406,14 @@ export interface components {
              * Format: date
              */
             fecha: string;
+        };
+        /** SinCotaRespuesta */
+        SinCotaRespuesta: {
+            /** Codigo */
+            codigo: string;
+            /** Detalle */
+            detalle: string;
+            ubicacion: components["schemas"]["UbicacionRespuesta"];
         };
         /** SpeechCampanaRespuesta */
         SpeechCampanaRespuesta: {
@@ -2030,6 +2503,31 @@ export interface components {
          * @enum {string}
          */
         TipoSalida: "texto" | "numero" | "fecha" | "financiero";
+        /** UbicacionRespuesta */
+        UbicacionRespuesta: {
+            /** Nodo */
+            nodo: number;
+            /** Funcion */
+            funcion: number | null;
+            /** Parametro */
+            parametro: string | null;
+        };
+        /**
+         * ValidacionRespuesta
+         * @description `tipo`, `cota` y `variables` solo tienen valor si la expresion es valida; `sin_cota` explica
+         *     por que no hay largo maximo cuando es valida y `cota` es nula.
+         */
+        ValidacionRespuesta: {
+            /** Problemas */
+            problemas: components["schemas"]["ProblemaTextoRespuesta"][];
+            /** Tipo */
+            tipo: string | null;
+            /** Cota */
+            cota: number | null;
+            sin_cota: components["schemas"]["SinCotaRespuesta"] | null;
+            /** Variables */
+            variables: string[];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -2049,6 +2547,32 @@ export interface components {
             nombre: string;
             /** Descripcion */
             descripcion: string;
+        };
+        /**
+         * VariableRespuesta
+         * @description `origen` es el contexto que aporta la variable: `cartera` para un campo de la cartera, o el
+         *     del modulo (`mowa_mes.speech`) para una variable suya. La interfaz las agrupa por origen.
+         */
+        VariableRespuesta: {
+            /** Nombre */
+            nombre: string;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "texto" | "numero" | "fecha" | "booleano";
+            /** Clave Nombre */
+            clave_nombre: string | null;
+            /** Origen */
+            origen: string;
+        };
+        /** VarianteEntrada */
+        VarianteEntrada: {
+            /** Segmento */
+            segmento: string;
+            expresion: components["schemas"]["ExpresionEntrada"];
+        } & {
+            [key: string]: unknown;
         };
         /** VersionRespuesta */
         VersionRespuesta: {
@@ -4043,6 +4567,131 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtener_catalogo_texto_enriquecido_catalogo_get: {
+        parameters: {
+            query?: {
+                /** @description Nombre del contexto de variables */
+                contexto?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogoRespuesta"];
+                };
+            };
+            /** @description No existe el contexto, el producto o la version de sabana pedidos */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validar_texto_enriquecido_validacion_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeticionValidacion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidacionRespuesta"];
+                };
+            };
+            /** @description No existe el contexto, el producto o la version de sabana pedidos */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    previsualizar_texto_enriquecido_previsualizacion_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeticionPrevisualizacion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrevisualizacionTextoRespuesta"];
+                };
+            };
+            /** @description No existe el contexto, el producto o la version de sabana pedidos */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
                 };
             };
             /** @description Validation Error */

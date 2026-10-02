@@ -60,4 +60,9 @@ def convertir(campo: CampoSalida, texto: str, crudo: Any) -> Any:
         monto = crudo if isinstance(crudo, Decimal) else _a_decimal(campo.nombre, texto)
         return formatear_importe(Decimal(monto), campo.formato_financiero)
     fecha = _a_fecha(campo.nombre, crudo, texto)
+    if campo.patron_fecha:
+        # Import local: las funciones numericas del motor importan `formatear_importe` de aqui.
+        from app.core.services.texto_enriquecido.funciones.fecha import formatear_con_marcas
+
+        return formatear_con_marcas(fecha, campo.patron_fecha)
     return fecha.strftime(campo.formato_fecha) if campo.formato_fecha else fecha

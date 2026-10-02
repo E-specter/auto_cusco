@@ -58,7 +58,9 @@ class CampoSalida:
         "documento=[@documento_numero]"   concatenacion
 
     `formato_fecha` usa la notacion de strftime, por ejemplo "%d/%m/%Y". Si un
-    campo de fecha no lo trae, el valor sale como fecha nativa.
+    campo de fecha no lo trae, el valor sale como fecha nativa. `patron_fecha` es lo mismo con las
+    marcas legibles del motor (`dd/mm/aaaa`, con `nombre_mes` en espanol): es lo que guardan las
+    definiciones (C-3) y manda sobre `formato_fecha`.
 
     Columnas dinamicas (RF-49, RF-50), todo opcional:
 
@@ -75,6 +77,7 @@ class CampoSalida:
     plantilla: str
     tipo: TipoSalida = TipoSalida.TEXTO
     formato_fecha: str | None = None
+    patron_fecha: str | None = None
     formato_financiero: FormatoFinanciero = field(default_factory=FormatoFinanciero)
     expresion: Expresion | None = None
     valor_por_defecto: str | None = None
@@ -92,6 +95,7 @@ class DefinicionCarga:
     nombre: str
     campos: tuple[CampoSalida, ...]
     segmentacion: Segmentacion | None = None
+    proteger_formulas: bool = True  # RF-53: lo aplica el exportador, no el generador
 
 
 class PlantillaInvalida(Exception):

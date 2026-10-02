@@ -208,8 +208,11 @@ La forma exacta la fija el backend en `contratos/openapi.json`, como siempre. Es
 | `/archivos-carga` | Acepta una definición guardada (id y versión) o una en línea, como hoy |
 | `/mowa-mes/speech` | Acepta versiones en formato v2 (una expresión por segmento) sin dejar de leer las v1 |
 
-- **Errores:** los 400 extienden `DetalleError` con `codigo` (catálogo `CodigoTexto`) y `ubicacion`, según la regla de `contrato-api.md` §3.
-- **i18n:** `textoEnriquecido.codigo.*`, con una prueba espejo entre el catálogo del backend y el i18n, como la de `CodigoMowaMes`.
+- **Errores:**
+  - **Una expresión o definición con problemas no es un error de la petición:** validar y previsualizar responden `200` con los problemas y su ubicación, porque es lo que el editor muestra mientras se escribe. Una forma JSON imposible (un tipo de nodo que no existe, un argumento nulo, una clave de más) es el problema `expresion_invalida` en su nodo y función, no un `422`; el `422` queda para lo que el esquema del pedido no admite (una `expresion` y una `definicion` a la vez, un producto real sin pagaré).
+  - **Lo que no existe es un `404`** que extiende `DetalleError` con `codigo` (`contexto_desconocido`, `producto_no_encontrado`, `sin_version_vigente`).
+  - **El `400` queda reservado para guardar** (B4b: nombre repetido, definición que no compila): extiende `DetalleError` con `codigo` y la ubicación, según la regla de `contrato-api.md` §3.
+- **i18n:** `textoEnriquecido.codigo.*`, con una prueba espejo entre el catálogo del backend y el i18n, como la de `CodigoMowaMes` (`backend/tests/test_i18n_texto_enriquecido.py`, que además cubre funciones, parámetros, familias, marcas de fecha y contextos, y `frontend/tests/nucleo/i18n-codigos-texto-enriquecido.test.ts`).
 - **La interfaz no evalúa ni valida reglas de negocio.** Pide validación y previsualización al backend, con espera tras cada cambio, como la selección de cartera.
 
 ## 11. Estrategia de migración de MOWA MES
@@ -304,7 +307,7 @@ Estado: núcleo hecho y probado (2026-09-30), sin conectar todavía a `Generador
 
 ### Códigos (`CodigoTexto`)
 
-Al compilar: `sintaxis_invalida`, `referencia_vacia`, `variable_desconocida`, `funcion_desconocida`, `parametro_invalido`, `tipo_incompatible`, `limite_excedido`, `no_se_puede_escribir_como_texto`. Al evaluar una fila: `variable_obligatoria_vacia`, `argumento_vacio`, `division_por_cero`, `no_es_numero`, `no_es_fecha`, `telefono_invalido`, `resultado_fuera_de_rango`. Una prueba exige que todos se emitan de verdad. La ubicación de un `Problema` es `nodo` y `funcion` (posiciones desde 0) y `parametro` (nombre del parámetro); con `nodo` en `None` el problema es de toda la expresión. B4a agrega `expresion_invalida` para la forma JSON.
+Al compilar: `sintaxis_invalida`, `referencia_vacia`, `variable_desconocida`, `funcion_desconocida`, `parametro_invalido`, `tipo_incompatible`, `limite_excedido`, `no_se_puede_escribir_como_texto`. Al evaluar una fila: `variable_obligatoria_vacia`, `argumento_vacio`, `division_por_cero`, `no_es_numero`, `no_es_fecha`, `telefono_invalido`, `resultado_fuera_de_rango`. Una prueba exige que todos se emitan de verdad. La ubicación de un `Problema` es `nodo` y `funcion` (posiciones desde 0) y `parametro` (nombre del parámetro); con `nodo` en `None` el problema es de toda la expresión. B4a agrega ocho (sección 21): `expresion_invalida` (la forma JSON), `definicion_invalida`, `valor_no_convertible`, `sin_cota_variable`, `sin_cota_funcion`, `contexto_desconocido`, `producto_no_encontrado` y `sin_version_vigente`.
 
 ### Cómo se agrega una función
 
@@ -396,3 +399,56 @@ La prueba compara la `CargaGenerada` **entera** —cabeceras, filas con el tipo 
 ### Rendimiento de la generación genérica
 
 A/B intercalado sin base, 60 000 filas, definición de 6 columnas (texto fijo, prefijo + campo, variable directa, financiero, fecha con formato y un mensaje): camino de antes 10,2 µs por fila, ahora entre 10,1 y 10,9 según la corrida (**entre −0,3 % y +7 %**: el ruido de la máquina es del orden de la diferencia). La primera versión llegaba a +71 %; se bajó con tres cambios que no alteran el resultado: `Compilada.evaluar` decide la forma de cada parte al compilar (texto fijo, variable directa, plegado, nodo con funciones) y devuelve el resultado ya armado si la expresión no lee nada de la fila; `Resultado` pasó de dataclass congelada a `NamedTuple` (mucho más barata de crear, igual de inmutable); y el generador no llama al evaluador para las columnas de texto fijo ni de variable directa (`Compilada.texto_fijo` y `referencia_directa`). Una variable directa no se evalúa: da `str(valor)` y el valor sin tocar, exactamente como el motor (D1, D11).
+
+## 21. Contrato del motor para la interfaz (B4a)
+
+Estado: hecho y probado sin base (2026-10-02). Solo lectura: nada de lo de esta sección guarda datos. Código en `backend/app/api/texto_enriquecido.py` (router), `services/previsualizar_texto.py` (casos de uso), `services/contextos_texto.py` y `entities/contexto_texto.py` (contextos), `services/mapeo_campos/serializacion.py` y `diagnostico.py` (la definición como JSON y todos sus problemas) y `services/texto_enriquecido/catalogo.py` y `serializacion.py` (el catálogo de funciones y la expresión como JSON). Los tipos del frontend se regeneran con `npm run contrato` (`frontend/src/lib/contrato-api.d.ts`).
+
+### Endpoints
+
+| Endpoint | Pedido | Respuesta (`200`) |
+|---|---|---|
+| `GET /texto-enriquecido/catalogo?contexto=` (por defecto `cartera`) | | `contexto` (variables con tipo y clave i18n si el módulo la aporta, registro de ejemplo, `limite_largo`, `umbral_advertencia`, `variable_dias` y `segmentos`, la tabla de rangos), `contextos` (los disponibles), `funciones`, `familias`, `patrones_fecha`, `marcas_fecha` y `limites` |
+| `POST /texto-enriquecido/validacion` | `contexto`, `expresion` | `problemas`, `tipo`, `cota`, `sin_cota` (el motivo con su código y su nodo, si es válida y no hay largo máximo) y `variables` |
+| `POST /texto-enriquecido/previsualizacion` | `contexto`, `expresion` **o** `definicion`, `muestra` | `problemas` (la expresión o definición no compila: sin filas) o `filas`; `limite_largo` y `umbral_advertencia` del contexto |
+
+- **Catálogo de funciones.** Todo sale del registro: una función nueva aparece con sus tipos (`recibe`, `devuelve`, con `entrada` si devuelve el mismo tipo que recibe), sus parámetros (tipo, `obligatorio`, `por_defecto`, `acepta_variable`, rango, largo, `opciones` con su ejemplo y si son `opciones_cerradas`) y sus claves i18n sin tocar la API. Los textos no viajan: viajan las claves (`textoEnriquecido.funcion.<f>.nombre`, `.descripcion`, `.parametro.<p>`, `textoEnriquecido.familia.<f>`, `textoEnriquecido.marcaFecha.<m>`). Los ejemplos de patrones y de marcas se calculan con la función de siempre sobre `2026-10-05`.
+- **Límites del motor** (`limites`): nodos, funciones por nodo, argumentos por función y largo de un texto fijo (`LimitesExpresion`), para que la interfaz no ofrezca lo que se rechazaría. El motor no limita el largo de un número: lo acotan `minimo` y `maximo` de cada parámetro.
+- **`ubicacion`** de un problema: `{nodo, funcion, parametro}` (posiciones desde 0 y el nombre del parámetro) o `null` si es de toda la expresión (un límite de tamaño). En una definición, además, `columna` (el índice en la lista del pedido), `segmento` (la clave de la variante, o `null` para el contenido por defecto) y `campo`: el campo con el problema, de la columna (`nombre`, `orden`, `tipo`, `formato_fecha`, `expresion`, `variantes`...) o, sin columna, de la definición (`definicion`, `nombre`, `columnas`, `segmentacion`, `proteger_formulas`).
+- **Pedido permisivo a propósito.** `tipo` de un nodo es un texto y los argumentos son cualquier valor JSON: una forma imposible llega al lector estricto (`expresion_desde_dict`, `definicion_desde_dict`) y vuelve como problema con su ubicación. Lo que el cliente envía como `null` equivale a un campo ausente. Una clave de más no se descarta: se informa.
+- **Tipos cerrados en la respuesta.** `VariableRespuesta.tipo`, `ParametroRespuesta.tipo` y `FuncionRespuesta.recibe`/`devuelve` son uniones (`texto | numero | fecha | booleano`, y `entrada` donde el tipo es el de lo que se recibe), no `string`: el cliente generado atrapa un tipo nuevo o mal escrito. `nulo` no sale (ninguna variable ni función lo declara; el vacío de un valor llega por fila en `nodos[].vacio`). Una prueba exige que la lista siga a `TipoValor`.
+- **`origen` de cada variable:** el contexto que la aporta (`cartera` para un campo de la cartera, `mowa_mes.speech` para `whatsapp_contacto` y `dias_atraso_ajustados`); la interfaz las agrupa por origen. `titular` y `fecha_vencimiento_cuota` son de la cartera aunque el speech los use.
+
+### La definición de la previsualización (la forma que guardará B4b)
+
+`definicion` = `{nombre, columnas[], segmentacion, proteger_formulas}`. Es una sola forma para el constructor y para guardar (C-1, C-3, C-4, C-10); la definición en línea de `/archivos-carga` no cambia (RF-54).
+
+- **Columna** = `{nombre, orden, expresion, tipo, formato_fecha, formato_financiero, valor_por_defecto, variantes[{segmento, expresion}]}`. El contenido es solo expresión (no hay `plantilla`). `orden` es un entero explícito desde 0, único; las columnas salen ordenadas por él. La columna se identifica por su **posición en la lista del pedido** (`columna` de los problemas), también cuando `orden` las reordena. Un nombre vacío o repetido y un `orden` repetido o inválido son problemas `definicion_invalida` de esa columna (`campo` = `nombre` u `orden`). Una columna recién creada (nombre vacío, `expresion` vacía) da su problema ubicado, nunca un error; una expresión vacía por sí sola no es un problema: la columna sale vacía.
+- **`formato_fecha` con marcas** (`dd`, `mm`, `aaaa`, `aa`, `nombre_mes`; C-3): se escribe con la misma traducción que `formato_fecha` del motor (`nombre_mes` en español). Un formato sin ninguna marca es un problema `parametro_invalido` de esa columna (`campo` = `formato_fecha`, `parametro` = `formato_fecha`), no un texto literal; el vacío es no tener formato. El `strftime` queda solo para `/archivos-carga` en línea: `CampoSalida.formato_fecha`; las marcas van en `CampoSalida.patron_fecha` y mandan sobre aquel.
+- **`proteger_formulas`** (por defecto verdadero) se lee y se valida; lo aplica el exportador (RF-53) cuando B4b pase la de una definición guardada a `OpcionesArchivo`. Hasta entonces solo viaja en esta definición, no en `/archivos-carga`.
+
+### Muestras de la previsualización
+
+- **`ejemplos_por_segmento`** (por defecto): una fila por rango de la tabla de la definición (o la del contexto si no tiene segmentación), con el registro de ejemplo y un valor de días que cae en el rango —su inicio, o su fin si no tiene inicio—, escrito en la variable de días del criterio solo si es numérica. Con un criterio por campo, una fila por cada valor que alguna columna contempla en sus variantes. `etiqueta` es la del rango y `segmento` es la **clave** del rango (o el valor del campo) que representa la fila, **también cuando se previsualiza una expresión suelta o una definición sin segmentación**: es lo que permite asociar la fila con su segmento (`VariantesSegmento`).
+- **`ejemplo`**: una fila con el registro de ejemplo del contexto.
+- **`producto_real`** (`fecha_corte` y `pagare`): el producto sale de `ConsultaCarteraService.consultar` con `pagare = valor` y se convierte al registro del contexto. «Primeros N de una selección» llega con B4b.
+
+Cada fila trae `numero`, `etiqueta`, `segmento` (en los ejemplos por segmento, la clave que representa la fila; en `ejemplo` y `producto_real`, el que calcula la definición, o `null` sin segmentación o si el producto no cae en ninguno, por ejemplo sin `dias_atraso`), `excluida` (`sin_segmento` con su motivo, si la política es excluir) y `columnas`. Cada columna: el `texto` (con el valor por defecto ya aplicado), el `valor` tipado que escribiría la carga, su `largo`, la `cota` o el motivo `sin_cota`, `usa_variante`, los `nodos` (`indice`, `tipo`, `texto`, `vacio`) y los `problemas` de esa fila. `vacio` distingue la variable que llegó sin dato de un texto vacío. Una prueba exige que las celdas coincidan con las de `generar_fila` sobre 300 productos con una semilla fija.
+
+### Cómo un módulo registra su contexto
+
+Un contexto (`ContextoTexto`) es lo que un módulo aporta al motor: sus variables con tipo, el registro de ejemplo, el límite de largo y el umbral de advertencia del canal (o ninguno), la variable de días y la tabla de rangos para segmentar, y cómo convertir un producto de la cartera a su registro. **El motor y el registro genérico no conocen a ningún módulo:** una prueba de arquitectura exige que `texto_enriquecido/`, `entities/contexto_texto.py` y `contextos_texto.py` no importen de `services/plataformas/`. Sumar un canal es:
+
+1. Un archivo en su paquete, `services/plataformas/<canal>/contexto_texto.py`, con una función que devuelva su `ContextoTexto` a partir de lo que el canal ya tiene (para MOWA MES: `VARIABLES_DEL_MENSAJE`, `LARGO_MAXIMO`, `LARGO_ADVERTENCIA` y `RANGOS_SEGMENTO`; no se modificó nada suyo).
+2. Una línea en `obtener_registro_contextos()` (`app/api/texto_enriquecido.py`), la capa de composición donde se cablean las dependencias de la API. No hay registro que se llene al importar un paquete.
+3. Sus claves i18n (`textoEnriquecido.contexto.<nombre>` y las de las variables que aporta) en es y en, en el mismo commit: la prueba espejo falla si faltan.
+
+Contextos hoy: `cartera` (el núcleo: los campos de la cartera con su tipo, sin límite de largo) y `mowa_mes.speech` (`titular`, `fecha_vencimiento_cuota`, `whatsapp_contacto` y `dias_atraso_ajustados`; límites 160 y 150; teléfono de ejemplo `900000123`). Los datos de ejemplo son sintéticos y a la vista (`TITULAR/SINTETICO,UNO`): ningún nombre que parezca de una persona.
+
+**Previsualizar un producto real en `mowa_mes.speech`:** los días ajustados parten de `dias_atraso` de la sábana, **sin el ajuste a la fecha de envío**: el segmento que se ve es el de la fecha de corte, y en una campaña el mismo producto puede caer en otro (RF-MM-15). Pendiente de B6/F4: que el editor se lo diga al usuario («segmento según días de atraso a la fecha de corte»).
+
+### Decisiones
+
+- **`valor_no_convertible`.** El generador de cargas conserva `codigo=None` en el error de un texto que no cabe en el tipo de su columna (lo fija la prueba de paridad de RF-54); solo la previsualización lo informa con `valor_no_convertible`.
+- **Previsualizar es evaluar.** La previsualización usa `GeneradorCargas.detallar_fila`, que evalúa cada celda por nodo con el mismo motor y el mismo tipado (`formatos.convertir`): no hay un segundo camino.
+- **Nombres del contrato.** Los modelos propios llevan sufijo (`ProblemaTextoRespuesta`, `ExclusionFilaRespuesta`, `PrevisualizacionTextoRespuesta`, `DefinicionColumnasEntrada`) para no chocar con los de otros routers y que los tipos generados tengan nombres limpios.

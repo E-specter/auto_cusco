@@ -2765,6 +2765,166 @@
           }
         }
       }
+    },
+    "/texto-enriquecido/catalogo": {
+      "get": {
+        "tags": [
+          "texto enriquecido"
+        ],
+        "summary": "Obtener Catalogo",
+        "description": "Variables del contexto con su tipo, funciones con sus parametros y claves i18n, patrones y\nmarcas de fecha, limites del motor y el registro de ejemplo (RF-44). Todo sale del registro de\nfunciones y de los contextos: una funcion o un contexto nuevo aparece sin tocar este endpoint.",
+        "operationId": "obtener_catalogo_texto_enriquecido_catalogo_get",
+        "parameters": [
+          {
+            "name": "contexto",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Nombre del contexto de variables",
+              "default": "cartera",
+              "title": "Contexto"
+            },
+            "description": "Nombre del contexto de variables"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogoRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el contexto, el producto o la version de sabana pedidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/texto-enriquecido/validacion": {
+      "post": {
+        "tags": [
+          "texto enriquecido"
+        ],
+        "summary": "Validar",
+        "description": "Los problemas de la expresion con su ubicacion, su tipo resultante y su largo maximo (RF-47).\n\nUna expresion con problemas responde `200` con ellos: es lo que el editor muestra mientras se\nescribe.",
+        "operationId": "validar_texto_enriquecido_validacion_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionValidacion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidacionRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el contexto, el producto o la version de sabana pedidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/texto-enriquecido/previsualizacion": {
+      "post": {
+        "tags": [
+          "texto enriquecido"
+        ],
+        "summary": "Previsualizar",
+        "description": "El resultado de una expresion o una definicion, por fila y por nodo, con una muestra (RF-47).\n\nSolo lectura: no guarda nada. Con problemas de compilacion no hay filas y la respuesta trae los\nproblemas, cada uno con su columna y su segmento.",
+        "operationId": "previsualizar_texto_enriquecido_previsualizacion_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionPrevisualizacion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrevisualizacionTextoRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el contexto, el producto o la version de sabana pedidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3294,6 +3454,62 @@
         ],
         "title": "CargaCreadaRespuesta"
       },
+      "CatalogoRespuesta": {
+        "properties": {
+          "contexto": {
+            "$ref": "#/components/schemas/ContextoRespuesta"
+          },
+          "contextos": {
+            "items": {
+              "$ref": "#/components/schemas/ContextoDisponibleRespuesta"
+            },
+            "type": "array",
+            "title": "Contextos"
+          },
+          "funciones": {
+            "items": {
+              "$ref": "#/components/schemas/FuncionRespuesta"
+            },
+            "type": "array",
+            "title": "Funciones"
+          },
+          "familias": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Familias"
+          },
+          "patrones_fecha": {
+            "items": {
+              "$ref": "#/components/schemas/PatronFechaRespuesta"
+            },
+            "type": "array",
+            "title": "Patrones Fecha"
+          },
+          "marcas_fecha": {
+            "items": {
+              "$ref": "#/components/schemas/MarcaFechaRespuesta"
+            },
+            "type": "array",
+            "title": "Marcas Fecha"
+          },
+          "limites": {
+            "$ref": "#/components/schemas/LimitesRespuesta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "contexto",
+          "contextos",
+          "funciones",
+          "familias",
+          "patrones_fecha",
+          "marcas_fecha",
+          "limites"
+        ],
+        "title": "CatalogoRespuesta"
+      },
       "CifrasGrupoRespuesta": {
         "properties": {
           "cargados": {
@@ -3397,6 +3613,163 @@
         ],
         "title": "CodigoMowaMes",
         "description": "Catalogo de codigos que el frontend traduce como `mowaMes.codigo.<codigo>`.\n\nLas exclusiones van en el orden en que se evaluan: un producto excluido lleva\nun solo motivo, el primero que falla. Un codigo por linea, con la forma\n`NOMBRE = \"codigo\"`: la prueba espejo del frontend lee esta clase."
+      },
+      "ColumnaEntrada": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "orden": {
+            "type": "integer",
+            "title": "Orden"
+          },
+          "expresion": {
+            "$ref": "#/components/schemas/ExpresionEntrada"
+          },
+          "tipo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo"
+          },
+          "formato_fecha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formato Fecha"
+          },
+          "formato_financiero": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FormatoFinancieroColumnaEntrada"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "valor_por_defecto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor Por Defecto"
+          },
+          "variantes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VarianteEntrada"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variantes"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "nombre",
+          "orden",
+          "expresion"
+        ],
+        "title": "ColumnaEntrada",
+        "description": "Una columna de la definicion: la forma que guardara B4b. El contenido es solo expresion;\n`formato_fecha` va con marcas legibles (`dd/mm/aaaa`) y el backend las traduce."
+      },
+      "ColumnaRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "texto": {
+            "type": "string",
+            "title": "Texto"
+          },
+          "valor": {
+            "title": "Valor"
+          },
+          "largo": {
+            "type": "integer",
+            "title": "Largo"
+          },
+          "cota": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cota"
+          },
+          "sin_cota": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SinCotaRespuesta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "usa_variante": {
+            "type": "boolean",
+            "title": "Usa Variante"
+          },
+          "nodos": {
+            "items": {
+              "$ref": "#/components/schemas/NodoRespuesta"
+            },
+            "type": "array",
+            "title": "Nodos"
+          },
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaTextoRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "tipo",
+          "texto",
+          "valor",
+          "largo",
+          "cota",
+          "sin_cota",
+          "usa_variante",
+          "nodos",
+          "problemas"
+        ],
+        "title": "ColumnaRespuesta"
       },
       "ConciliacionRespuesta": {
         "properties": {
@@ -3738,6 +4111,93 @@
         ],
         "title": "ConsumoLimiteRespuesta"
       },
+      "ContextoDisponibleRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "clave_nombre": {
+            "type": "string",
+            "title": "Clave Nombre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "clave_nombre"
+        ],
+        "title": "ContextoDisponibleRespuesta"
+      },
+      "ContextoRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "clave_nombre": {
+            "type": "string",
+            "title": "Clave Nombre"
+          },
+          "variables": {
+            "items": {
+              "$ref": "#/components/schemas/VariableRespuesta"
+            },
+            "type": "array",
+            "title": "Variables"
+          },
+          "ejemplo": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ejemplo"
+          },
+          "limite_largo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limite Largo"
+          },
+          "umbral_advertencia": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Umbral Advertencia"
+          },
+          "variable_dias": {
+            "type": "string",
+            "title": "Variable Dias"
+          },
+          "segmentos": {
+            "items": {
+              "$ref": "#/components/schemas/RangoRespuesta"
+            },
+            "type": "array",
+            "title": "Segmentos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "clave_nombre",
+          "variables",
+          "ejemplo",
+          "limite_largo",
+          "umbral_advertencia",
+          "variable_dias",
+          "segmentos"
+        ],
+        "title": "ContextoRespuesta"
+      },
       "CreacionCampanaEntrada": {
         "properties": {
           "fecha_corte": {
@@ -3903,6 +4363,106 @@
         ],
         "title": "CreacionCampanaEntrada"
       },
+      "CriterioEntrada": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "campo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campo"
+          },
+          "variable_dias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variable Dias"
+          },
+          "tabla": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RangoEntrada"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tabla"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "tipo"
+        ],
+        "title": "CriterioEntrada"
+      },
+      "DefinicionColumnasEntrada": {
+        "properties": {
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "columnas": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnaEntrada"
+            },
+            "type": "array",
+            "title": "Columnas"
+          },
+          "segmentacion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SegmentacionEntrada"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proteger_formulas": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proteger Formulas"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "columnas"
+        ],
+        "title": "DefinicionColumnasEntrada",
+        "description": "Las columnas van con `orden` explicito y se identifican por su posicion en la lista;\n`proteger_formulas` (por defecto verdadero) lo aplica el exportador (RF-53)."
+      },
       "DefinicionEntrada": {
         "properties": {
           "nombre": {
@@ -3938,6 +4498,25 @@
         ],
         "title": "DetalleError",
         "description": "Motivo legible por el que la API rechazo la peticion."
+      },
+      "DetalleErrorTexto": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "codigo"
+        ],
+        "title": "DetalleErrorTexto",
+        "description": "El motivo y el `codigo` del catalogo (`CodigoTexto`) que la interfaz traduce."
       },
       "DiaNoLaborableRespuesta": {
         "properties": {
@@ -4160,6 +4739,24 @@
         ],
         "title": "ExcepcionRespuesta"
       },
+      "ExclusionFilaRespuesta": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "detalle"
+        ],
+        "title": "ExclusionFilaRespuesta"
+      },
       "ExclusionRespuesta": {
         "properties": {
           "pagare": {
@@ -4176,6 +4773,23 @@
           "codigo"
         ],
         "title": "ExclusionRespuesta"
+      },
+      "ExpresionEntrada": {
+        "properties": {
+          "nodos": {
+            "items": {
+              "$ref": "#/components/schemas/NodoEntrada"
+            },
+            "type": "array",
+            "title": "Nodos"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "nodos"
+        ],
+        "title": "ExpresionEntrada"
       },
       "FeriadosRespuesta": {
         "properties": {
@@ -4262,6 +4876,62 @@
         ],
         "title": "FilaMuestraRespuesta"
       },
+      "FilaRespuesta": {
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "title": "Numero"
+          },
+          "etiqueta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etiqueta"
+          },
+          "segmento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segmento"
+          },
+          "excluida": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExclusionFilaRespuesta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "columnas": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnaRespuesta"
+            },
+            "type": "array",
+            "title": "Columnas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "etiqueta",
+          "segmento",
+          "excluida",
+          "columnas"
+        ],
+        "title": "FilaRespuesta"
+      },
       "FormatoArchivo": {
         "type": "string",
         "enum": [
@@ -4271,6 +4941,46 @@
         ],
         "title": "FormatoArchivo",
         "description": "Formatos de archivo soportados (RF-13)."
+      },
+      "FormatoFinancieroColumnaEntrada": {
+        "properties": {
+          "separador_miles": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Separador Miles"
+          },
+          "separador_decimal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Separador Decimal"
+          },
+          "decimales": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decimales"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "FormatoFinancieroColumnaEntrada"
       },
       "FormatoFinancieroEntrada": {
         "properties": {
@@ -4322,6 +5032,104 @@
           "opciones"
         ],
         "title": "FormatoRespuesta"
+      },
+      "FuncionEntrada": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "args": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Args"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "nombre"
+        ],
+        "title": "FuncionEntrada"
+      },
+      "FuncionRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "familia": {
+            "type": "string",
+            "title": "Familia"
+          },
+          "clave_familia": {
+            "type": "string",
+            "title": "Clave Familia"
+          },
+          "clave_nombre": {
+            "type": "string",
+            "title": "Clave Nombre"
+          },
+          "clave_descripcion": {
+            "type": "string",
+            "title": "Clave Descripcion"
+          },
+          "recibe": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "texto",
+                "numero",
+                "fecha",
+                "booleano"
+              ]
+            },
+            "type": "array",
+            "title": "Recibe"
+          },
+          "devuelve": {
+            "type": "string",
+            "enum": [
+              "texto",
+              "numero",
+              "fecha",
+              "booleano",
+              "entrada"
+            ],
+            "title": "Devuelve"
+          },
+          "acepta_nulo": {
+            "type": "boolean",
+            "title": "Acepta Nulo"
+          },
+          "parametros": {
+            "items": {
+              "$ref": "#/components/schemas/ParametroRespuesta"
+            },
+            "type": "array",
+            "title": "Parametros"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "familia",
+          "clave_familia",
+          "clave_nombre",
+          "clave_descripcion",
+          "recibe",
+          "devuelve",
+          "acepta_nulo",
+          "parametros"
+        ],
+        "title": "FuncionRespuesta"
       },
       "GrupoRespuesta": {
         "properties": {
@@ -4569,6 +5377,34 @@
         ],
         "title": "LargoSegmentoRespuesta"
       },
+      "LimitesRespuesta": {
+        "properties": {
+          "nodos": {
+            "type": "integer",
+            "title": "Nodos"
+          },
+          "funciones_por_nodo": {
+            "type": "integer",
+            "title": "Funciones Por Nodo"
+          },
+          "argumentos_por_funcion": {
+            "type": "integer",
+            "title": "Argumentos Por Funcion"
+          },
+          "largo_literal": {
+            "type": "integer",
+            "title": "Largo Literal"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nodos",
+          "funciones_por_nodo",
+          "argumentos_por_funcion",
+          "largo_literal"
+        ],
+        "title": "LimitesRespuesta"
+      },
       "ListaCampanasRespuesta": {
         "properties": {
           "total": {
@@ -4599,6 +5435,29 @@
           "campanas"
         ],
         "title": "ListaCampanasRespuesta"
+      },
+      "MarcaFechaRespuesta": {
+        "properties": {
+          "marca": {
+            "type": "string",
+            "title": "Marca"
+          },
+          "clave": {
+            "type": "string",
+            "title": "Clave"
+          },
+          "ejemplo": {
+            "type": "string",
+            "title": "Ejemplo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "marca",
+          "clave",
+          "ejemplo"
+        ],
+        "title": "MarcaFechaRespuesta"
       },
       "MetricasRespuesta": {
         "properties": {
@@ -4655,6 +5514,161 @@
           "adicionales"
         ],
         "title": "MetricasRespuesta"
+      },
+      "MuestraEntrada": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "ejemplo",
+              "ejemplos_por_segmento",
+              "producto_real"
+            ],
+            "title": "Tipo",
+            "default": "ejemplos_por_segmento"
+          },
+          "fecha_corte": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Corte"
+          },
+          "pagare": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagare"
+          }
+        },
+        "type": "object",
+        "title": "MuestraEntrada",
+        "description": "`ejemplos_por_segmento` (por defecto), `ejemplo` o `producto_real` (corte y pagare)."
+      },
+      "NodoEntrada": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "valor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "funciones": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FuncionEntrada"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funciones"
+          },
+          "obligatoria": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Obligatoria"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "tipo"
+        ],
+        "title": "NodoEntrada"
+      },
+      "NodoRespuesta": {
+        "properties": {
+          "indice": {
+            "type": "integer",
+            "title": "Indice"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "texto": {
+            "type": "string",
+            "title": "Texto"
+          },
+          "vacio": {
+            "type": "boolean",
+            "title": "Vacio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "indice",
+          "tipo",
+          "texto",
+          "vacio"
+        ],
+        "title": "NodoRespuesta",
+        "description": "El texto de un nodo. `vacio` es la variable que llego sin dato: no es un texto vacio."
+      },
+      "OpcionRespuesta": {
+        "properties": {
+          "valor": {
+            "type": "string",
+            "title": "Valor"
+          },
+          "ejemplo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ejemplo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valor",
+          "ejemplo"
+        ],
+        "title": "OpcionRespuesta"
       },
       "OpcionesEntrada": {
         "properties": {
@@ -4773,6 +5787,116 @@
         ],
         "title": "PaginaRespuesta"
       },
+      "ParametroRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "clave_nombre": {
+            "type": "string",
+            "title": "Clave Nombre"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "texto",
+              "numero",
+              "fecha",
+              "booleano",
+              "entrada"
+            ],
+            "title": "Tipo"
+          },
+          "obligatorio": {
+            "type": "boolean",
+            "title": "Obligatorio"
+          },
+          "por_defecto": {
+            "title": "Por Defecto"
+          },
+          "acepta_variable": {
+            "type": "boolean",
+            "title": "Acepta Variable"
+          },
+          "entero": {
+            "type": "boolean",
+            "title": "Entero"
+          },
+          "minimo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimo"
+          },
+          "maximo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximo"
+          },
+          "largo_minimo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Largo Minimo"
+          },
+          "largo_maximo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Largo Maximo"
+          },
+          "opciones": {
+            "items": {
+              "$ref": "#/components/schemas/OpcionRespuesta"
+            },
+            "type": "array",
+            "title": "Opciones"
+          },
+          "opciones_cerradas": {
+            "type": "boolean",
+            "title": "Opciones Cerradas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "clave_nombre",
+          "tipo",
+          "obligatorio",
+          "por_defecto",
+          "acepta_variable",
+          "entero",
+          "minimo",
+          "maximo",
+          "largo_minimo",
+          "largo_maximo",
+          "opciones",
+          "opciones_cerradas"
+        ],
+        "title": "ParametroRespuesta"
+      },
       "ParteSeleccion": {
         "type": "string",
         "enum": [
@@ -4856,6 +5980,24 @@
           "usa_whatsapp"
         ],
         "title": "PartesRespuesta"
+      },
+      "PatronFechaRespuesta": {
+        "properties": {
+          "patron": {
+            "type": "string",
+            "title": "Patron"
+          },
+          "ejemplo": {
+            "type": "string",
+            "title": "Ejemplo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patron",
+          "ejemplo"
+        ],
+        "title": "PatronFechaRespuesta"
       },
       "PeticionCampanaEntrada": {
         "properties": {
@@ -5065,6 +6207,63 @@
           "definicion"
         ],
         "title": "PeticionGeneracion"
+      },
+      "PeticionPrevisualizacion": {
+        "properties": {
+          "contexto": {
+            "type": "string",
+            "title": "Contexto"
+          },
+          "expresion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpresionEntrada"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "definicion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DefinicionColumnasEntrada"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "muestra": {
+            "$ref": "#/components/schemas/MuestraEntrada",
+            "default": {
+              "tipo": "ejemplos_por_segmento"
+            }
+          }
+        },
+        "type": "object",
+        "required": [
+          "contexto"
+        ],
+        "title": "PeticionPrevisualizacion",
+        "description": "Una `expresion` o una `definicion`, y la muestra con la que se evalua."
+      },
+      "PeticionValidacion": {
+        "properties": {
+          "contexto": {
+            "type": "string",
+            "title": "Contexto"
+          },
+          "expresion": {
+            "$ref": "#/components/schemas/ExpresionEntrada"
+          }
+        },
+        "type": "object",
+        "required": [
+          "contexto",
+          "expresion"
+        ],
+        "title": "PeticionValidacion"
       },
       "PlantillaNombreEntrada": {
         "properties": {
@@ -5329,6 +6528,55 @@
         ],
         "title": "PrevisualizacionEntrada"
       },
+      "PrevisualizacionTextoRespuesta": {
+        "properties": {
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaTextoRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
+          },
+          "filas": {
+            "items": {
+              "$ref": "#/components/schemas/FilaRespuesta"
+            },
+            "type": "array",
+            "title": "Filas"
+          },
+          "limite_largo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limite Largo"
+          },
+          "umbral_advertencia": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Umbral Advertencia"
+          }
+        },
+        "type": "object",
+        "required": [
+          "problemas",
+          "filas",
+          "limite_largo",
+          "umbral_advertencia"
+        ],
+        "title": "PrevisualizacionTextoRespuesta",
+        "description": "O `problemas` (no compila: sin filas) o `filas`."
+      },
       "ProblemaRespuesta": {
         "properties": {
           "parte": {
@@ -5380,6 +6628,84 @@
         ],
         "title": "ProblemaSpeechRespuesta"
       },
+      "ProblemaTextoRespuesta": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          },
+          "ubicacion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UbicacionRespuesta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "columna": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columna"
+          },
+          "segmento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segmento"
+          },
+          "campo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "detalle",
+          "ubicacion",
+          "nombre",
+          "columna",
+          "segmento",
+          "campo"
+        ],
+        "title": "ProblemaTextoRespuesta",
+        "description": "`ubicacion` es nula cuando el problema es de toda la expresion. `columna` y `segmento`\nubican el problema dentro de una definicion; `campo` nombra el campo de la definicion cuando\nno es de una columna (`definicion`, `nombre`, `campos`, `segmentacion`)."
+      },
       "Programacion": {
         "type": "string",
         "enum": [
@@ -5389,6 +6715,89 @@
         ],
         "title": "Programacion",
         "description": "Modalidades de envio de RF-MM-07."
+      },
+      "RangoEntrada": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "clave",
+          "etiqueta"
+        ],
+        "title": "RangoEntrada"
+      },
+      "RangoRespuesta": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "etiqueta",
+          "desde",
+          "hasta"
+        ],
+        "title": "RangoRespuesta"
       },
       "ReporteImportadoRespuesta": {
         "properties": {
@@ -5493,6 +6902,34 @@
           "numero_corto_flash"
         ],
         "title": "Salida"
+      },
+      "SegmentacionEntrada": {
+        "properties": {
+          "criterio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CriterioEntrada"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "politica": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Politica"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "SegmentacionEntrada"
       },
       "SegmentacionRespuesta": {
         "properties": {
@@ -5716,6 +7153,28 @@
           "fecha"
         ],
         "title": "SiguienteDiaRespuesta"
+      },
+      "SinCotaRespuesta": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          },
+          "ubicacion": {
+            "$ref": "#/components/schemas/UbicacionRespuesta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "detalle",
+          "ubicacion"
+        ],
+        "title": "SinCotaRespuesta"
       },
       "SpeechCampanaRespuesta": {
         "properties": {
@@ -5943,6 +7402,103 @@
         "title": "TipoSalida",
         "description": "Tipado explicito de cada campo generado (RF-12)."
       },
+      "UbicacionRespuesta": {
+        "properties": {
+          "nodo": {
+            "type": "integer",
+            "title": "Nodo"
+          },
+          "funcion": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funcion"
+          },
+          "parametro": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parametro"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nodo",
+          "funcion",
+          "parametro"
+        ],
+        "title": "UbicacionRespuesta"
+      },
+      "ValidacionRespuesta": {
+        "properties": {
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaTextoRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
+          },
+          "tipo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo"
+          },
+          "cota": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cota"
+          },
+          "sin_cota": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SinCotaRespuesta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variables": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Variables"
+          }
+        },
+        "type": "object",
+        "required": [
+          "problemas",
+          "tipo",
+          "cota",
+          "sin_cota",
+          "variables"
+        ],
+        "title": "ValidacionRespuesta",
+        "description": "`tipo`, `cota` y `variables` solo tienen valor si la expresion es valida; `sin_cota` explica\npor que no hay largo maximo cuando es valida y `cota` es nula."
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -6000,6 +7556,66 @@
           "descripcion"
         ],
         "title": "VariablePlantillaRespuesta"
+      },
+      "VariableRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "texto",
+              "numero",
+              "fecha",
+              "booleano"
+            ],
+            "title": "Tipo"
+          },
+          "clave_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clave Nombre"
+          },
+          "origen": {
+            "type": "string",
+            "title": "Origen"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "tipo",
+          "clave_nombre",
+          "origen"
+        ],
+        "title": "VariableRespuesta",
+        "description": "`origen` es el contexto que aporta la variable: `cartera` para un campo de la cartera, o el\ndel modulo (`mowa_mes.speech`) para una variable suya. La interfaz las agrupa por origen."
+      },
+      "VarianteEntrada": {
+        "properties": {
+          "segmento": {
+            "type": "string",
+            "title": "Segmento"
+          },
+          "expresion": {
+            "$ref": "#/components/schemas/ExpresionEntrada"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "segmento",
+          "expresion"
+        ],
+        "title": "VarianteEntrada"
       },
       "VersionRespuesta": {
         "properties": {

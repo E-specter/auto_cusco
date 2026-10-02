@@ -33,10 +33,14 @@ class CodigoTexto(StrEnum):
 
     Un codigo por linea, con la forma `NOMBRE = "codigo"`: la prueba espejo del
     frontend lee esta clase. Los primeros se detectan al compilar (una expresion
-    invalida no procesa ninguna fila); los ultimos, al evaluar una fila concreta.
+    invalida no procesa ninguna fila); los siguientes, al evaluar una fila concreta; al final,
+    los que solo informa la API del motor (B4a): lo que no se puede leer, el contexto o el
+    producto que no existen, y por que una expresion no tiene largo maximo.
     """
 
     # Al compilar
+    EXPRESION_INVALIDA = "expresion_invalida"  # la forma JSON es imposible (nodo, argumento)
+    DEFINICION_INVALIDA = "definicion_invalida"  # columnas, variantes o segmentacion mal armadas
     SINTAXIS_INVALIDA = "sintaxis_invalida"
     REFERENCIA_VACIA = "referencia_vacia"
     VARIABLE_DESCONOCIDA = "variable_desconocida"
@@ -54,6 +58,13 @@ class CodigoTexto(StrEnum):
     NO_ES_FECHA = "no_es_fecha"
     TELEFONO_INVALIDO = "telefono_invalido"
     RESULTADO_FUERA_DE_RANGO = "resultado_fuera_de_rango"
+    VALOR_NO_CONVERTIBLE = "valor_no_convertible"  # el texto no cabe en el tipo de la columna
+    # Solo la API del motor
+    SIN_COTA_VARIABLE = "sin_cota_variable"  # el largo de una variable depende del dato
+    SIN_COTA_FUNCION = "sin_cota_funcion"  # una funcion no puede acotar el largo
+    CONTEXTO_DESCONOCIDO = "contexto_desconocido"
+    PRODUCTO_NO_ENCONTRADO = "producto_no_encontrado"
+    SIN_VERSION_VIGENTE = "sin_version_vigente"
 
 
 @dataclass(frozen=True)
@@ -73,6 +84,17 @@ class Problema:
     funcion: int | None = None
     parametro: str | None = None
     nombre: str | None = None
+
+
+@dataclass(frozen=True)
+class MotivoSinCota:
+    """Por que una expresion no tiene largo maximo: una variable cuyo largo depende del dato
+    (`sin_cota_variable`) o una funcion que no puede acotarlo (`sin_cota_funcion`)."""
+
+    codigo: CodigoTexto
+    detalle: str
+    nodo: int
+    funcion: int | None = None
 
 
 @dataclass(frozen=True)

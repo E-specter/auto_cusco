@@ -56,6 +56,10 @@ class Parametro:
     largo_minimo: int | None = None
     largo_maximo: int | None = None
     convertir: Callable[[Any], Any] | None = None
+    # Valores que la interfaz ofrece en un menu. No se imponen al compilar: `opciones_cerradas`
+    # dice si la interfaz debe ofrecer solo estas o tambien un valor propio (un patron de fecha).
+    opciones: tuple[str, ...] = ()
+    opciones_cerradas: bool = False
 
     @property
     def obligatorio(self) -> bool:

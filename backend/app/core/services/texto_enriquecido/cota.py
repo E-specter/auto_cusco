@@ -15,6 +15,8 @@ menor que lo que el texto puede llegar a medir.
 
 from collections.abc import Sequence
 
+from app.core.entities.texto_enriquecido import CodigoTexto, MotivoSinCota
+
 from .tipos import NodoResuelto
 
 
@@ -27,6 +29,36 @@ def cota_de_nodo(nodo: NodoResuelto) -> int | None:
         args = tuple(a.literal if a.variable is None else None for a in paso.argumentos)
         cota = paso.funcion.cota(cota, args)
     return cota
+
+
+def _causa_de_nodo(nodo: NodoResuelto) -> tuple[CodigoTexto, int | None]:
+    """Donde se pierde (o nunca existio) la cota de un nodo que no la tiene."""
+    causa: tuple[CodigoTexto, int | None] | None = (CodigoTexto.SIN_COTA_VARIABLE, None)
+    cota: int | None = None
+    for posicion, paso in enumerate(nodo.pasos):
+        if paso.funcion.cota is None:
+            cota, causa = None, (CodigoTexto.SIN_COTA_FUNCION, posicion)
+            continue
+        args = tuple(a.literal if a.variable is None else None for a in paso.argumentos)
+        cota = paso.funcion.cota(cota, args)
+        if cota is not None:
+            causa = None
+    return causa or (CodigoTexto.SIN_COTA_VARIABLE, None)
+
+
+def motivo_sin_cota(partes: Sequence[str | NodoResuelto]) -> MotivoSinCota | None:
+    """Por que la expresion no tiene cota: el primer nodo que no la tiene. None si la tiene."""
+    for indice, parte in enumerate(partes):
+        if isinstance(parte, str) or cota_de_nodo(parte) is not None:
+            continue
+        codigo, funcion = _causa_de_nodo(parte)
+        if codigo is CodigoTexto.SIN_COTA_VARIABLE:
+            detalle = f"El largo de la variable {parte.nombre!r} depende del dato de cada producto"
+        else:
+            nombre = parte.pasos[funcion].funcion.nombre  # type: ignore[index]
+            detalle = f"La funcion {nombre!r} no permite calcular un largo maximo"
+        return MotivoSinCota(codigo, detalle, indice, funcion)
+    return None
 
 
 def cota_de_expresion(partes: Sequence[str | NodoResuelto]) -> int | None:

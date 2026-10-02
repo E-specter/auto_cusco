@@ -43,6 +43,19 @@ _LARGO_DE_MARCA = {_DIA: 2, _MES: 2, _ANIO: 4, _ANIO_CORTO: 2, _NOMBRE_MES: _LAR
 
 Patron = tuple[tuple[int, str], ...]
 
+# Las marcas que el usuario ve (en el orden en que la interfaz las ofrece) y los patrones que se
+# usan seguido. La interfaz tambien admite un patron propio armado con las marcas.
+MARCAS_LEGIBLES = ("dd", "mm", "aaaa", "aa", "nombre_mes")
+PATRONES_FRECUENTES = (
+    "dd/mm/aaaa",
+    "aaaa-mm-dd",
+    "dd-mm-aaaa",
+    "dd/mm/aa",
+    "dd de nombre_mes de aaaa",
+    "dd/mm",
+    "mm/aaaa",
+)
+
 
 def _convertir_patron(patron: str) -> Patron:
     trozos: list[tuple[int, str]] = []
@@ -65,6 +78,16 @@ def _convertir_patron(patron: str) -> Patron:
     if all(tipo == _LITERAL for tipo, _ in trozos):
         raise ValueError("debe tener al menos una marca: dd, mm, aaaa, aa o nombre_mes")
     return tuple(trozos)
+
+
+def validar_marcas(patron: str) -> None:
+    """Lanza `ValueError` si el patron no tiene ninguna marca (dd, mm, aaaa, aa, nombre_mes)."""
+    _convertir_patron(patron)
+
+
+def formatear_con_marcas(valor: date, patron: str) -> str:
+    """La fecha escrita con un patron de marcas: lo mismo que `formato_fecha` del motor."""
+    return _formato_fecha(valor, _convertir_patron(patron))
 
 
 def _convertir_patron_de_lectura(patron: str) -> Patron:
@@ -161,9 +184,21 @@ def _cota_fecha(_entrada: int | None, _args: tuple) -> int | None:
 
 
 _DIAS = Parametro("dias", N, acepta_variable=True, entero=True, minimo=-100_000, maximo=100_000)
-_PATRON = Parametro("patron", T, largo_minimo=1, largo_maximo=64, convertir=_convertir_patron)
+_PATRON = Parametro(
+    "patron",
+    T,
+    largo_minimo=1,
+    largo_maximo=64,
+    convertir=_convertir_patron,
+    opciones=PATRONES_FRECUENTES,
+)
 _PATRON_DE_LECTURA = Parametro(
-    "patron", T, largo_minimo=1, largo_maximo=64, convertir=_convertir_patron_de_lectura
+    "patron",
+    T,
+    largo_minimo=1,
+    largo_maximo=64,
+    convertir=_convertir_patron_de_lectura,
+    opciones=PATRONES_FRECUENTES,
 )
 
 FUNCIONES = (

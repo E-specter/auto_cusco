@@ -30,13 +30,14 @@ from app.core.entities.texto_enriquecido import (
     Expresion,
     ExpresionInvalida,
     LimitesExpresion,
+    MotivoSinCota,
     NodoTexto,
     Problema,
     TipoValor,
 )
 
 from . import sintaxis
-from .cota import cota_de_expresion
+from .cota import cota_de_expresion, motivo_sin_cota
 from .funciones import REGISTRO
 from .funciones.base import Funcion, ValorInvalido, normalizar_argumento
 from .tipos import NodoResuelto, PasoResuelto, coaccionar, es_vacio, resolver_variable
@@ -68,6 +69,26 @@ class Resultado(NamedTuple):
     texto: str
     valor: Any = None
     problemas: tuple[Problema, ...] = ()
+
+
+class NodoEvaluado(NamedTuple):
+    """El texto que produjo un nodo de la expresion para una fila (previsualizacion, RF-47).
+
+    `vacio` marca la variable que llego sin dato y quedo sin texto: la interfaz la distingue de
+    un texto vacio. Un texto fijo y una variable que `si_vacio` llena no son vacios.
+    """
+
+    indice: int
+    tipo: str  # "texto" o "variable"
+    texto: str
+    vacio: bool
+
+
+class ResultadoPorNodo(NamedTuple):
+    nodos: tuple[NodoEvaluado, ...]
+    texto: str
+    valor: Any
+    problemas: tuple[Problema, ...]
 
 
 def validar(
@@ -195,6 +216,7 @@ class Compilada:
         self._es_variable_unica = len(partes) == 1 and isinstance(partes[0], NodoResuelto)
         # La cota es la de la expresion sin plegar: lo que ve el usuario no depende de la carga.
         self._cota = cota_de_expresion(partes)
+        self._motivo_sin_cota = motivo_sin_cota(partes)
         plegadas, problemas = _plegar(partes, constantes or {}, self._es_variable_unica)
         # Cada parte conserva el indice del nodo de la expresion: los problemas de fila lo informan.
         self._indices = tuple(indice for indice, _ in plegadas)
@@ -225,6 +247,11 @@ class Compilada:
                 problemas.extend(parte.problemas)
         texto = "".join(p if c == _TEXTO else p.texto for c, p, _ in self._ops)
         return Resultado(texto, valor if self._es_variable_unica else None, tuple(problemas))
+
+    @property
+    def motivo_sin_cota(self) -> MotivoSinCota | None:
+        """Por que no hay largo maximo, o None si lo hay."""
+        return self._motivo_sin_cota
 
     @property
     def referencia_directa(self) -> str | None:
@@ -280,6 +307,39 @@ class Compilada:
     def cota(self) -> int | None:
         """Largo maximo del texto, o None si alguna parte no se puede acotar."""
         return self._cota
+
+    def evaluar_por_nodo(self, producto: Mapping[str, Any]) -> ResultadoPorNodo:
+        """Lo mismo que `evaluar`, con el texto de cada nodo. Para la previsualizacion, no para
+        generar filas: el resultado completo es siempre el de `evaluar`."""
+        if self._constantes_en_uso:
+            producto = {**producto, **self._constantes_en_uso}
+        nodos: list[NodoEvaluado] = []
+        problemas: list[Problema] = []
+        valor: Any = None
+        for clase, parte, indice in self._ops:
+            if clase == _TEXTO:
+                nodos.append(NodoEvaluado(indice, "texto", parte, False))
+                continue
+            if clase == _PLEGADO:
+                texto, valor = parte.texto, parte.valor
+                problemas.extend(parte.problemas)
+                nodos.append(NodoEvaluado(indice, "variable", texto, texto == ""))
+                continue
+            nombre = parte if clase == _SIMPLE else parte.nombre
+            vacia = es_vacio(producto.get(nombre))
+            if clase == _SIMPLE:
+                valor = producto.get(nombre)
+                texto = "" if valor is None else str(valor)
+            else:
+                texto, valor = _evaluar_variable(parte, indice, producto, problemas)
+            nodos.append(NodoEvaluado(indice, "variable", texto, texto == "" and vacia))
+        texto_total = "".join(n.texto for n in nodos)
+        return ResultadoPorNodo(
+            tuple(nodos),
+            texto_total,
+            valor if self._es_variable_unica else None,
+            tuple(problemas),
+        )
 
     def evaluar(self, producto: Mapping[str, Any]) -> Resultado:
         if self._fijo is not None:
