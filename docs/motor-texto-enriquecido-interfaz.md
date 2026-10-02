@@ -234,11 +234,114 @@ La versión, el nombre de la versión y el guardado conservan su forma actual. L
 | Pieza | Dónde | Quién |
 |---|---|---|
 | Estado puro del editor (árbol, inserción, cursor, problemas) | `src/lib/expresion.ts` | `designer` |
+| Estado puro de las variantes por segmento | `src/lib/variantes.ts` | `designer` |
 | Componente del editor y su comportamiento | `src/components/EditorTexto.astro`, `src/scripts/editor-texto.ts`, `src/styles/editor-texto.css` | `designer` |
-| Cliente de los endpoints del motor | `src/lib/api-texto-enriquecido.ts` | `designer`: lo usan varios módulos |
-| Textos `textoEnriquecido.*` y nombres de funciones | `src/i18n/*.json` | `designer`, con la prueba espejo del catálogo de códigos |
-| Selector de variantes por segmento | `src/components/VariantesSegmento.astro` | `designer` |
-| Pantalla del constructor de columnas y su ruta | `src/pages/` | `dev_frontend_motor_texto_enriquecido` |
-| Integración en el speech de MOWA MES (M2) | `src/pages/mowa-mes/configuracion.astro` | `dev_frontend_motor_texto_enriquecido` |
+| Selector de variantes por segmento | `src/components/VariantesSegmento.astro`, `src/scripts/variantes-segmento.ts` | `designer` |
+| Selector de variable y selector de patrón de fecha | `src/scripts/selector-variable.ts`, `src/scripts/selector-patron-fecha.ts` | `designer` |
+| Cliente de catálogo, validación y previsualización | `src/lib/api-texto-enriquecido.ts` | `designer` |
+| API falsa de catálogo, validación y previsualización | `e2e/api-falsa-texto-enriquecido.ts` | `designer` |
+| Fila expandida de tabla y marca de vacío | `src/styles/ui.css` (`.table__detalle`, `.marca-vacio`) | `designer` |
+| Textos `textoEnriquecido.*` | `src/i18n/*.json` | `designer`, con la prueba espejo del backend sobre todas sus claves |
+| Cliente de `/definiciones-columnas` y su API falsa | `src/lib/api-definiciones.ts`, `e2e/api-falsa-definiciones.ts` | `dev_frontend_motor_texto_enriquecido` |
+| Pantalla del constructor de columnas, su vista previa y sus textos `columnas.*` | `src/pages/columnas.astro`, `src/styles/columnas.css` | `dev_frontend_motor_texto_enriquecido` |
+| Integración en el speech de MOWA MES (M2) y sus textos `mowaMes.speech.v2.*` | `src/pages/mowa-mes/configuracion.astro` | `dev_frontend_motor_texto_enriquecido` |
+| Entrada de navegación y claves `nav.*` | `src/lib/navegacion.ts`, `src/i18n/*.json` | `designer`, cuando la página exista en el árbol |
 
-Los componentes compartidos se montan como `SelectorSeleccion`: la página los renderiza, escucha su evento (`expresioncambiada`, con el árbol y el estado de validez) y los monta. El orden lo fija el coordinador. El editor puede empezar apenas el backend fije el contrato (B4).
+El orden lo fija el coordinador. El editor empieza apenas el backend fije el contrato (B4a).
+
+## 9. Contrato de montaje y decisiones de detalle
+
+Respuestas a las dudas de `dev_frontend_motor_texto_enriquecido` (`docs/agents/dev_frontend_motor_texto_enriquecido/dudas-designer.md`), 2026-10-02. Son vinculantes como el resto del documento.
+
+### 9.1 Variantes por segmento (D-1, D-4)
+
+- El estado de una columna **transporta** sus `variantes` sin interpretarlas. Todo lo que las lee o las cambia vive en `src/lib/variantes.ts`:
+  - el estado de cada segmento (completo, vacío, con problema);
+  - copiar la variante de un segmento a otro;
+  - activar o quitar la variante por defecto.
+- `VariantesSegmento` contiene **un solo** `EditorTexto` y le cambia la expresión al elegir otro segmento (9.2).
+- **Niveles propios de un módulo** (Cabe, Más de 150, Más de 160, Falta WhatsApp): el componente no conoce las reglas de MOWA MES. La página los calcula con su propia previsualización y se los pasa con `fijarNiveles({ [segmento]: { tono, texto } })`. El tono es uno de los de `.tag`: `vigente`, `advertencia`, `error` o `neutral`. El componente pinta ese `.tag` junto al estado genérico del segmento.
+
+### 9.2 Montaje de `EditorTexto` (D-3)
+
+Mismo patrón que `SelectorSeleccion`: la página renderiza el componente, escucha su evento en la raíz y **después** lo monta.
+
+```ts
+<EditorTexto id="speech-editor" etiqueta="Speech" />
+
+const editor = await montarEditor(raiz, {
+  contexto: 'mowa_mes.speech',      // del catálogo salen variables, funciones, límite y umbral
+  expresion,                         // inicial; null es una expresión vacía
+  controlMuestra: true,              // false: la página fija la muestra (constructor)
+  resumen: 'propio',                 // 'ninguno': la pantalla muestra el resumen (9.4)
+});
+
+editor.fijarExpresion(otra);         // reemplaza, cierra paneles y vuelve a validar
+editor.fijarMuestra({ tipo: 'ejemplo', segmento: '9 a 30' });
+editor.irAProblema(indice);          // abre la pieza y enfoca el campo
+editor.expresion();                  // el árbol actual, para guardar
+```
+
+- **El componente llama al backend.** Pide validación y previsualización con espera de 500 ms y cancela el pedido anterior. La página no los llama para el editor.
+- **El catálogo** se pide una vez por contexto y por página: varias instancias comparten la misma respuesta.
+- **Varias instancias por página:** sí. Todos los `id` internos llevan el `id` de la raíz.
+- **El límite y el umbral** salen del catálogo del contexto, no de atributos. La interfaz no escribe 160 en ningún lado.
+- **Evento `expresioncambiada`,** con `bubbles`:
+
+  ```ts
+  {
+    expresion,        // árbol del contrato
+    origen,           // 'usuario' o 'externo': fijarExpresion no marca cambios sin guardar
+    pendiente,        // true mientras hay una validación en curso
+    valida,           // sin problemas en la última validación terminada
+    problemas,        // ya ubicados en piezas (ubicarProblemas)
+    largo,            // { actual, maximo, limite, sinCota } tal como lo dio el backend
+  }
+  ```
+
+  Guardar solo se permite con `valida && !pendiente`.
+
+`VariantesSegmento` sigue el mismo patrón: `montarVariantes(raiz, { contexto, segmentos, variantes, conPorDefecto })`, con `fijarVariantes`, `fijarNiveles` e `irAProblema(segmento, indice)`. Emite `variantescambiadas` con `{ variantes, seleccionado, origen, pendiente, valida, problemas }`, donde `problemas` lleva el segmento de cada uno.
+
+### 9.3 Clientes y APIs falsas (D-2)
+
+- **De `designer`:** `api-texto-enriquecido.ts` (catálogo, validación y previsualización) sobre `request` de `api.ts`, y `e2e/api-falsa-texto-enriquecido.ts`, tipada con el contrato.
+- **De `dev_frontend_motor_texto_enriquecido`:** el cliente de `/definiciones-columnas` en `api-definiciones.ts`.
+- **Cómo se componen las APIs falsas:** la mía exporta un manejador `manejarTextoEnriquecido(estado)` con la forma `(route, ruta, metodo, url) => Promise<boolean>`, que devuelve `true` si atendió la ruta. La suya hace lo mismo para sus rutas, y `montarApi` los encadena antes de responder 404.
+
+### 9.4 Resumen de problemas (D-9)
+
+**Un solo resumen por pantalla.**
+- En el constructor, la pantalla muestra el resumen de toda la definición, con columna y segmento, y monta cada editor con `resumen: 'ninguno'`.
+- «Ir al problema» abre la fila de la columna y el segmento, y llama a `irAProblema`.
+- En el speech de MOWA MES vale lo mismo: el resumen de la pantalla nombra el segmento.
+- Un editor suelto, sin pantalla que lo agregue, usa `resumen: 'propio'`.
+- Nunca dos `role="alert"` a la vez.
+
+### 9.5 Selectores compartidos (D-8)
+
+- **`crearSelectorVariable` y `crearSelectorPatronFecha`** son míos, en `src/scripts/`, porque el editor los construye en tiempo de ejecución.
+- **El constructor los reutiliza:** el selector de variable para la variable directa y el de patrón para el formato de fecha de la columna. No se arma una versión propia.
+
+### 9.6 Fila expandida, vacíos y esqueletos (D-6, D-10, D-12)
+
+- **Fila expandida:** patrón compartido `.table__detalle` en `ui.css`.
+  - Es una `tr` justo debajo de su fila, con una sola `td` que ocupa todas las columnas, fondo `--color-surface` y hairline.
+  - El botón que la abre lleva `aria-expanded` y `aria-controls`, y su chevron rota.
+  - Funciona dentro de `.table--apilable-ancha`.
+- **Vista previa de la definición:** es de la pantalla. Usa `.marca-vacio`, de `ui.css`, para la marca de vacío; marca las celdas con problema con el icono `triangle-alert` y pone el detalle en su nombre accesible.
+- **Vacíos y esqueletos:** se reutilizan `.empty`, `.empty__title`, `.skeleton` y `.standIn` de `ui.css`. No se copian de `console.css` ni de `mowa-mes.css`.
+
+### 9.7 Navegación (D-5)
+
+- **Ruta y título:** `/columnas`, con el título «Columnas de carga» y el patrón de encabezado de `/cartera`: `h1` más un párrafo de introducción. **Sin eyebrow:** el sistema no usa etiquetas sobre los títulos.
+- **Una tercera sección, «Configuración»** (`nav.seccion.configuracion`), después de los canales, con el enlace «Columnas de carga» (`nav.columnas`). No va en el flujo diario porque no es un paso diario: es lo que se configura una vez y usan todas las cargas. Así queda la estructura que pidió el usuario para la navegación: `Cargas · Cartera | MOWA MES | Columnas de carga`.
+- `designer` agrega la entrada **cuando la página exista en el árbol,** para no publicar un enlace que lleve a un 404.
+
+### 9.8 Diccionarios y selección (D-7, D-11)
+
+- **Orden de los bloques en `es.json` y `en.json`:** primero `textoEnriquecido.*`, que entra con B4a; después `columnas.*` y `mowaMes.speech.v2.*`, contiguos y al final. Nadie reformatea el bloque de otro.
+- **Prueba espejo:** la del backend cubre todas las claves `textoEnriquecido.*`, no solo los códigos. Las de `columnas.*` y `mowaMes.speech.v2.*` no tienen espejo: las comprueban las pruebas de su pantalla.
+- **«Cartera real»** monta `SelectorSeleccion` en modo compacto con el patrón de `campana.astro`: suscribirse a `seleccioncambiada` antes de montar. Dos diferencias:
+  - el pedido de vista previa usa siempre cantidad 5, sea cual sea la cantidad de la selección;
+  - recalcula con la misma espera de 500 ms y la misma cancelación que el editor.
