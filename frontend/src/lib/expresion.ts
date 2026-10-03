@@ -18,24 +18,29 @@
  */
 
 // ---- Contract shapes (provisional until B4a) -------------------------------------
+//
+// Shapes that travel to the backend are `type` aliases, never `interface`s:
+// the generated request models accept extra keys (an index signature), and
+// TypeScript lets an object type alias be assigned to one but not an
+// interface. An `interface` here would stop `aExpresion(...)` from being sent.
 
 export type TipoValor = 'texto' | 'numero' | 'fecha' | 'booleano';
 
 /** A function argument: a literal, or a reference to another variable. */
 export type Argumento = string | number | { variable: string };
 
-export interface LlamadaFuncion {
+export type LlamadaFuncion = {
   nombre: string;
   args: Argumento[];
-}
+};
 
 export type Nodo =
   | { tipo: 'texto'; valor: string }
   | { tipo: 'variable'; nombre: string; funciones: LlamadaFuncion[]; obligatoria?: boolean };
 
-export interface Expresion {
+export type Expresion = {
   nodos: Nodo[];
-}
+};
 
 export interface VariableCatalogo {
   nombre: string;
@@ -63,17 +68,17 @@ export interface Catalogo {
  * received, not the editor's pieces: `aExpresion` drops empty runs, so the two
  * differ, and `ubicarProblemas` translates. `null` means the whole expression.
  */
-export interface Ubicacion {
+export type Ubicacion = {
   nodo: number;
   funcion?: number | null;
   parametro?: string | null;
-}
+};
 
-export interface Problema {
+export type Problema = {
   codigo: string;
   detalle: string;
   ubicacion: Ubicacion | null;
-}
+};
 
 // ---- Editor pieces ----------------------------------------------------------------------
 
@@ -314,10 +319,10 @@ export function funcionesCompatibles(catalogo: Catalogo, tipo: TipoValor | null)
 
 // ---- Problems from the backend ------------------------------------------------------------------
 
-export interface ProblemaUbicado extends Problema {
+export type ProblemaUbicado = Problema & {
   /** The editor piece, or `null` for a problem of the whole expression. */
   pieza: number | null;
-}
+};
 
 /**
  * Translate each problem's node index into the editor piece it points at.
