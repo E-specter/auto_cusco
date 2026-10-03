@@ -22,6 +22,8 @@ from app.api.calendario import router as calendario_router
 from app.api.cargas import crear_servicio_ingesta
 from app.api.cargas import router as cargas_router
 from app.api.cartera import router as cartera_router
+from app.api.definiciones_columnas import router as definiciones_columnas_router
+from app.api.errores import ErrorConCodigo, manejar_error_con_codigo
 from app.api.health import router as health_router
 from app.api.mowa_mes import router as mowa_mes_router
 from app.api.mowa_mes_campanas import CABECERAS_ARCHIVO
@@ -86,6 +88,7 @@ app = FastAPI(
 
 configurar_cors(app, get_settings().origenes_cors)
 
+app.add_exception_handler(ErrorConCodigo, manejar_error_con_codigo)
 app.include_router(health_router)
 app.include_router(cargas_router)
 app.include_router(cartera_router)
@@ -96,3 +99,4 @@ app.include_router(supervisores_router)
 app.include_router(mowa_mes_router)
 app.include_router(mowa_mes_campanas_router)
 app.include_router(texto_enriquecido_router)
+app.include_router(definiciones_columnas_router)

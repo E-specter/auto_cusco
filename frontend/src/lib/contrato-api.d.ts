@@ -260,7 +260,9 @@ export interface paths {
          * @description Genera la carga completa y devuelve el archivo (RF-09, RF-13, RF-15).
          *
          *     El resumen viaja en cabeceras `X-Carga-*` porque el cuerpo es el archivo;
-         *     el detalle de los errores se consulta en `/previsualizacion`.
+         *     el detalle de los errores se consulta en `/previsualizacion`. Con una definicion guardada, su
+         *     `proteger_formulas` rige el archivo y, una vez generado, la version queda marcada como usada
+         *     (`usada_en`): la previsualizacion no la marca.
          */
         post: operations["generar_archivo_archivos_carga_post"];
         delete?: never;
@@ -787,6 +789,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/definiciones-columnas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar Definiciones
+         * @description Las definiciones, ordenadas por nombre, con su version vigente (C-7). Sin paginar.
+         */
+        get: operations["listar_definiciones_definiciones_columnas_get"];
+        put?: never;
+        /**
+         * Crear Definicion
+         * @description Guarda una definicion nueva con su version 1. El nombre es obligatorio y unico.
+         */
+        post: operations["crear_definicion_definiciones_columnas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/definiciones-columnas/{definicion_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obtener Definicion
+         * @description Una definicion con la version vigente o con la `version` pedida.
+         */
+        get: operations["obtener_definicion_definiciones_columnas__definicion_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/definiciones-columnas/{definicion_id}/versiones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Agregar Version
+         * @description Guarda el cambio como una version nueva, que pasa a ser la vigente.
+         *
+         *     El nombre no cambia: si viene, debe ser el de la definicion (sin distinguir mayusculas).
+         */
+        post: operations["agregar_version_definiciones_columnas__definicion_id__versiones_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -824,6 +892,11 @@ export interface components {
              * @description El nombre resuelto al crear la campana, con extension
              */
             nombre: string;
+        };
+        /** ArgumentoVariableGuardadoRespuesta */
+        ArgumentoVariableGuardadoRespuesta: {
+            /** Variable */
+            variable: string;
         };
         /** AvisoCampanaRespuesta */
         AvisoCampanaRespuesta: {
@@ -1085,6 +1158,26 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** ColumnaGuardadaRespuesta */
+        ColumnaGuardadaRespuesta: {
+            /** Nombre */
+            nombre: string;
+            /** Orden */
+            orden: number;
+            expresion: components["schemas"]["ExpresionGuardadaRespuesta"];
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "texto" | "numero" | "fecha" | "financiero";
+            /** Formato Fecha */
+            formato_fecha: string | null;
+            formato_financiero: components["schemas"]["FormatoFinancieroGuardadoRespuesta"];
+            /** Valor Por Defecto */
+            valor_por_defecto: string | null;
+            /** Variantes */
+            variantes: components["schemas"]["VarianteGuardadaRespuesta"][];
+        };
         /** ColumnaRespuesta */
         ColumnaRespuesta: {
             /** Nombre */
@@ -1246,6 +1339,17 @@ export interface components {
              */
             costo_total: string;
         };
+        /**
+         * ContenidoGuardadoRespuesta
+         * @description La definicion de una version, con la tabla de rangos resuelta y las columnas por `orden`.
+         */
+        ContenidoGuardadoRespuesta: {
+            /** Proteger Formulas */
+            proteger_formulas: boolean;
+            /** Columnas */
+            columnas: components["schemas"]["ColumnaGuardadaRespuesta"][];
+            segmentacion: components["schemas"]["SegmentacionGuardadaRespuesta"] | null;
+        };
         /** ContextoDisponibleRespuesta */
         ContextoDisponibleRespuesta: {
             /** Nombre */
@@ -1353,6 +1457,28 @@ export interface components {
              */
             confirmar_limite: boolean;
         };
+        /** CriterioCalculadoGuardadoRespuesta */
+        CriterioCalculadoGuardadoRespuesta: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            tipo: "calculado";
+            /** Variable Dias */
+            variable_dias: string;
+            /** Tabla */
+            tabla: components["schemas"]["RangoRespuesta"][];
+        };
+        /** CriterioCampoGuardadoRespuesta */
+        CriterioCampoGuardadoRespuesta: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            tipo: "campo";
+            /** Campo */
+            campo: string;
+        };
         /** CriterioEntrada */
         CriterioEntrada: {
             /** Tipo */
@@ -1390,12 +1516,72 @@ export interface components {
             campos: components["schemas"]["CampoEntrada"][];
         };
         /**
+         * DefinicionGuardadaEntrada
+         * @description Una definicion de `/definiciones-columnas`: la version pedida o, sin ella, la vigente.
+         */
+        DefinicionGuardadaEntrada: {
+            /** Id */
+            id: number;
+            /** Version */
+            version?: number | null;
+        };
+        /**
+         * DefinicionRespuesta
+         * @description La definicion, todas sus versiones (sin contenido) y la pedida (la vigente por defecto).
+         */
+        DefinicionRespuesta: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+            /**
+             * Actualizado En
+             * Format: date-time
+             */
+            actualizado_en: string;
+            /** Version Vigente */
+            version_vigente: number;
+            /** Versiones */
+            versiones: components["schemas"]["VersionDefinicionResumenRespuesta"][];
+            version: components["schemas"]["VersionDefinicionRespuesta"];
+        };
+        /**
          * DetalleError
          * @description Motivo legible por el que la API rechazo la peticion.
          */
         DetalleError: {
             /** Detail */
             detail: string;
+        };
+        /**
+         * DetalleErrorConCodigo
+         * @description Un error que, ademas del motivo, puede traer el `codigo` que la interfaz traduce.
+         *
+         *     `codigo` es nulo en los errores que todavia no tienen uno (una seleccion mal armada, una
+         *     plantilla invalida); siempre viaja, para que el cliente no tenga que adivinar si falta.
+         */
+        DetalleErrorConCodigo: {
+            /** Detail */
+            detail: string;
+            /** Codigo */
+            codigo: string | null;
+        };
+        /**
+         * DetalleErrorDefinicion
+         * @description Un `400` al guardar: el motivo, el `codigo` y todos los problemas con su ubicacion.
+         */
+        DetalleErrorDefinicion: {
+            /** Detail */
+            detail: string;
+            /** Codigo */
+            codigo: string;
+            /** Problemas */
+            problemas: components["schemas"]["ProblemaTextoRespuesta"][];
         };
         /**
          * DetalleErrorTexto
@@ -1534,6 +1720,11 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** ExpresionGuardadaRespuesta */
+        ExpresionGuardadaRespuesta: {
+            /** Nodos */
+            nodos: (components["schemas"]["NodoTextoGuardadoRespuesta"] | components["schemas"]["NodoVariableGuardadoRespuesta"])[];
+        };
         /** FeriadosRespuesta */
         FeriadosRespuesta: {
             /** Anio */
@@ -1604,6 +1795,15 @@ export interface components {
              * Decimales
              * @default 2
              */
+            decimales: number;
+        };
+        /** FormatoFinancieroGuardadoRespuesta */
+        FormatoFinancieroGuardadoRespuesta: {
+            /** Separador Miles */
+            separador_miles: string;
+            /** Separador Decimal */
+            separador_decimal: string;
+            /** Decimales */
             decimales: number;
         };
         /** FormatoRespuesta */
@@ -1741,7 +1941,10 @@ export interface components {
             /** Ejemplo */
             ejemplo: string | null;
         };
-        /** LimitesRespuesta */
+        /**
+         * LimitesRespuesta
+         * @description Los del motor (`LimitesExpresion`) y los de una definicion guardada (C-9).
+         */
         LimitesRespuesta: {
             /** Nodos */
             nodos: number;
@@ -1751,6 +1954,12 @@ export interface components {
             argumentos_por_funcion: number;
             /** Largo Literal */
             largo_literal: number;
+            /** Columnas Por Definicion */
+            columnas_por_definicion: number;
+            /** Variantes Por Columna */
+            variantes_por_columna: number;
+            /** Largo Nombre Definicion */
+            largo_nombre_definicion: number;
         };
         /** ListaCampanasRespuesta */
         ListaCampanasRespuesta: {
@@ -1762,6 +1971,13 @@ export interface components {
             desplazamiento: number;
             /** Campanas */
             campanas: components["schemas"]["CampanaRespuesta"][];
+        };
+        /** LlamadaGuardadaRespuesta */
+        LlamadaGuardadaRespuesta: {
+            /** Nombre */
+            nombre: string;
+            /** Args */
+            args: (string | number | components["schemas"]["ArgumentoVariableGuardadoRespuesta"])[];
         };
         /** MarcaFechaRespuesta */
         MarcaFechaRespuesta: {
@@ -1793,7 +2009,12 @@ export interface components {
         };
         /**
          * MuestraEntrada
-         * @description `ejemplos_por_segmento` (por defecto), `ejemplo` o `producto_real` (corte y pagare).
+         * @description La muestra con la que se evalua.
+         *
+         *     `ejemplos_por_segmento` (por defecto), `ejemplo`, `producto_real` (`fecha_corte` y `pagare`) o
+         *     `primeros_de_seleccion`: la `fecha_corte` y una seleccion con la forma de `/cartera`
+         *     (`filtros` y `orden`) o una guardada (`seleccion_id`), con `cantidad` de 1 a 5 (5 por
+         *     defecto), el mismo orden y desempate que la carga. Solo lectura.
          */
         MuestraEntrada: {
             /**
@@ -1801,11 +2022,22 @@ export interface components {
              * @default ejemplos_por_segmento
              * @enum {string}
              */
-            tipo: "ejemplo" | "ejemplos_por_segmento" | "producto_real";
+            tipo: "ejemplo" | "ejemplos_por_segmento" | "producto_real" | "primeros_de_seleccion";
             /** Fecha Corte */
             fecha_corte?: string | null;
             /** Pagare */
             pagare?: string | null;
+            /** Filtros */
+            filtros?: string[] | null;
+            /** Orden */
+            orden?: string | null;
+            /** Seleccion Id */
+            seleccion_id?: number | null;
+            /**
+             * Cantidad
+             * @default 5
+             */
+            cantidad: number;
         };
         /** NodoEntrada */
         NodoEntrada: {
@@ -1835,6 +2067,30 @@ export interface components {
             texto: string;
             /** Vacio */
             vacio: boolean;
+        };
+        /** NodoTextoGuardadoRespuesta */
+        NodoTextoGuardadoRespuesta: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            tipo: "texto";
+            /** Valor */
+            valor: string;
+        };
+        /** NodoVariableGuardadoRespuesta */
+        NodoVariableGuardadoRespuesta: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            tipo: "variable";
+            /** Nombre */
+            nombre: string;
+            /** Funciones */
+            funciones: components["schemas"]["LlamadaGuardadaRespuesta"][];
+            /** Obligatoria */
+            obligatoria: boolean;
         };
         /** OpcionRespuesta */
         OpcionRespuesta: {
@@ -2035,14 +2291,21 @@ export interface components {
              */
             plantilla_nombre_archivo?: string | null;
         };
-        /** PeticionGeneracion */
+        /**
+         * PeticionGeneracion
+         * @description Una definicion en linea (como siempre, RF-54) o una `definicion_guardada`: exactamente una.
+         *
+         *     Con una guardada, `proteger_formulas` de la definicion pasa a las opciones del archivo y, al
+         *     generar el archivo, la version queda marcada como usada.
+         */
         PeticionGeneracion: {
             /**
              * Fecha Corte
              * Format: date
              */
             fecha_corte: string;
-            definicion: components["schemas"]["DefinicionEntrada"];
+            definicion?: components["schemas"]["DefinicionEntrada"] | null;
+            definicion_guardada?: components["schemas"]["DefinicionGuardadaEntrada"] | null;
             /** @default xlsx */
             formato: components["schemas"]["FormatoArchivo"];
             /**
@@ -2070,7 +2333,8 @@ export interface components {
             definicion?: components["schemas"]["DefinicionColumnasEntrada"] | null;
             /**
              * @default {
-             *       "tipo": "ejemplos_por_segmento"
+             *       "tipo": "ejemplos_por_segmento",
+             *       "cantidad": 5
              *     }
              */
             muestra: components["schemas"]["MuestraEntrada"];
@@ -2207,6 +2471,8 @@ export interface components {
             limite_largo: number | null;
             /** Umbral Advertencia */
             umbral_advertencia: number | null;
+            /** Disponibles */
+            disponibles: number | null;
         };
         /** ProblemaRespuesta */
         ProblemaRespuesta: {
@@ -2289,6 +2555,24 @@ export interface components {
              */
             importado_en: string;
         };
+        /** ResumenDefinicionRespuesta */
+        ResumenDefinicionRespuesta: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Version Vigente */
+            version_vigente: number;
+            /** Cantidad Versiones */
+            cantidad_versiones: number;
+            /**
+             * Actualizado En
+             * Format: date-time
+             */
+            actualizado_en: string;
+            /** Vigente Usada */
+            vigente_usada: boolean;
+        };
         /** ResumenRespuesta */
         ResumenRespuesta: {
             /** Disponibles */
@@ -2319,6 +2603,16 @@ export interface components {
             politica?: string | null;
         } & {
             [key: string]: unknown;
+        };
+        /** SegmentacionGuardadaRespuesta */
+        SegmentacionGuardadaRespuesta: {
+            /** Criterio */
+            criterio: components["schemas"]["CriterioCalculadoGuardadoRespuesta"] | components["schemas"]["CriterioCampoGuardadoRespuesta"];
+            /**
+             * Politica
+             * @enum {string}
+             */
+            politica: "excluir" | "usar_por_defecto";
         };
         /** SegmentacionRespuesta */
         SegmentacionRespuesta: {
@@ -2573,6 +2867,41 @@ export interface components {
             expresion: components["schemas"]["ExpresionEntrada"];
         } & {
             [key: string]: unknown;
+        };
+        /** VarianteGuardadaRespuesta */
+        VarianteGuardadaRespuesta: {
+            /** Segmento */
+            segmento: string;
+            expresion: components["schemas"]["ExpresionGuardadaRespuesta"];
+        };
+        /** VersionDefinicionRespuesta */
+        VersionDefinicionRespuesta: {
+            /** Numero */
+            numero: number;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+            /** Usada En */
+            usada_en: string | null;
+            /** Usada */
+            usada: boolean;
+            contenido: components["schemas"]["ContenidoGuardadoRespuesta"];
+        };
+        /** VersionDefinicionResumenRespuesta */
+        VersionDefinicionResumenRespuesta: {
+            /** Numero */
+            numero: number;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+            /** Usada En */
+            usada_en: string | null;
+            /** Usada */
+            usada: boolean;
         };
         /** VersionRespuesta */
         VersionRespuesta: {
@@ -3262,7 +3591,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleError"];
+                    "application/json": components["schemas"]["DetalleErrorConCodigo"];
                 };
             };
             /** @description No existe lo pedido */
@@ -3271,7 +3600,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleError"];
+                    "application/json": components["schemas"]["DetalleErrorConCodigo"];
                 };
             };
             /** @description Validation Error */
@@ -3327,7 +3656,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleError"];
+                    "application/json": components["schemas"]["DetalleErrorConCodigo"];
                 };
             };
             /** @description No existe lo pedido */
@@ -3336,7 +3665,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleError"];
+                    "application/json": components["schemas"]["DetalleErrorConCodigo"];
                 };
             };
             /** @description Validation Error */
@@ -4685,8 +5014,202 @@ export interface operations {
                     "application/json": components["schemas"]["PrevisualizacionTextoRespuesta"];
                 };
             };
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorConCodigo"];
+                };
+            };
             /** @description No existe el contexto, el producto o la version de sabana pedidos */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_definiciones_definiciones_columnas_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumenDefinicionRespuesta"][];
+                };
+            };
+        };
+    };
+    crear_definicion_definiciones_columnas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefinicionColumnasEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefinicionRespuesta"];
+                };
+            };
+            /** @description La definicion no se puede guardar: los problemas dicen donde esta cada uno */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorDefinicion"];
+                };
+            };
+            /** @description No existe la definicion */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Ya hay una definicion con ese nombre */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtener_definicion_definiciones_columnas__definicion_id__get: {
+        parameters: {
+            query?: {
+                /** @description Por defecto, la vigente */
+                version?: number | null;
+            };
+            header?: never;
+            path: {
+                definicion_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefinicionRespuesta"];
+                };
+            };
+            /** @description No existe la definicion o su version */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agregar_version_definiciones_columnas__definicion_id__versiones_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definicion_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefinicionColumnasEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefinicionRespuesta"];
+                };
+            };
+            /** @description La definicion no se puede guardar: los problemas dicen donde esta cada uno */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorDefinicion"];
+                };
+            };
+            /** @description No existe la definicion */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Ya hay una definicion con ese nombre */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

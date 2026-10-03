@@ -23,31 +23,42 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.api.cartera import obtener_servicio_cartera
-from app.api.errores import DetalleError
+from app.api.errores import DetalleError, ErrorConCodigo, respuestas_de_error_con_codigo
 from app.api.respuestas import ModeloRespuesta
-from app.core.entities.cartera import SinVersionVigente
+from app.api.selecciones import obtener_servicio_selecciones
+from app.core.entities.cartera import ConsultaInvalida, SinVersionVigente
 from app.core.entities.contexto_texto import ContextoDesconocido, ContextoTexto
+from app.core.entities.definiciones_columnas import (
+    LARGO_MAXIMO_NOMBRE,
+    MAXIMO_COLUMNAS,
+    MAXIMO_VARIANTES,
+)
 from app.core.entities.segmentacion import RangoDias
+from app.core.entities.selecciones import SeleccionNoEncontrada
 from app.core.entities.texto_enriquecido import CodigoTexto, MotivoSinCota, Problema
 from app.core.services.contextos_texto import RegistroContextos, contexto_cartera
 from app.core.services.mapeo_campos.serializacion import ProblemaDeDefinicion
 from app.core.services.plataformas.mowa_mes.contexto_texto import contexto_speech
 from app.core.services.previsualizar_texto import (
+    MAXIMO_MUESTRA,
+    MUESTRA_POR_DEFECTO,
     CatalogoTexto,
     ColumnaPrevia,
     FilaPrevia,
     Muestra,
     MuestraEjemplo,
     MuestraEjemplosPorSegmento,
+    MuestraPrimerosDeSeleccion,
     MuestraProductoReal,
     PrevisualizacionTextoService,
     ProductoNoEncontrado,
     ValidacionTexto,
 )
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
+from app.core.services.selecciones.servicio import SeleccionesService
 from app.core.services.texto_enriquecido import catalogo as catalogo_funciones
 
 router = APIRouter(prefix="/texto-enriquecido", tags=["texto enriquecido"])
@@ -69,9 +80,10 @@ def obtener_registro_contextos() -> RegistroContextos:
 def obtener_servicio_texto(
     contextos: RegistroContextos = Depends(obtener_registro_contextos),
     cartera: ConsultaCarteraService = Depends(obtener_servicio_cartera),
+    selecciones: SeleccionesService = Depends(obtener_servicio_selecciones),
 ) -> PrevisualizacionTextoService:
     """Dependencia de FastAPI; los tests la sustituyen por un doble de prueba."""
-    return PrevisualizacionTextoService(contextos, cartera)
+    return PrevisualizacionTextoService(contextos, cartera, selecciones)
 
 
 # --- Errores ------------------------------------------------------------------------------------
@@ -91,9 +103,17 @@ RESPUESTAS_404: dict[int | str, dict[str, Any]] = {
 }
 
 
+def respuesta_de_error(
+    estado: int, codigo: CodigoTexto, detalle: str, **extra: Any
+) -> JSONResponse:
+    """El cuerpo es `{"detail", "codigo", ...}`: `HTTPException` solo sabe enviar `{"detail"}`."""
+    return JSONResponse(
+        status_code=estado, content={"detail": detalle, "codigo": codigo.value, **extra}
+    )
+
+
 def _no_existe(codigo: CodigoTexto, detalle: str) -> JSONResponse:
-    """El cuerpo es `{"detail", "codigo"}`: `HTTPException` solo sabe enviar `{"detail"}`."""
-    return JSONResponse(status_code=404, content={"detail": detalle, "codigo": codigo.value})
+    return respuesta_de_error(404, codigo, detalle)
 
 
 # --- Entrada ------------------------------------------------------------------------------------
@@ -177,21 +197,46 @@ class DefinicionColumnasEntrada(_Entrada):
 
 
 class MuestraEntrada(BaseModel):
-    """`ejemplos_por_segmento` (por defecto), `ejemplo` o `producto_real` (corte y pagare)."""
+    """La muestra con la que se evalua.
 
-    tipo: Literal["ejemplo", "ejemplos_por_segmento", "producto_real"] = "ejemplos_por_segmento"
+    `ejemplos_por_segmento` (por defecto), `ejemplo`, `producto_real` (`fecha_corte` y `pagare`) o
+    `primeros_de_seleccion`: la `fecha_corte` y una seleccion con la forma de `/cartera`
+    (`filtros` y `orden`) o una guardada (`seleccion_id`), con `cantidad` de 1 a 5 (5 por
+    defecto), el mismo orden y desempate que la carga. Solo lectura.
+    """
+
+    tipo: Literal["ejemplo", "ejemplos_por_segmento", "producto_real", "primeros_de_seleccion"] = (
+        "ejemplos_por_segmento"
+    )
     fecha_corte: date | None = None
     pagare: str | None = None
+    filtros: list[str] | None = None
+    orden: str | None = None
+    seleccion_id: int | None = None
+    cantidad: int = Field(default=MUESTRA_POR_DEFECTO, ge=1, le=MAXIMO_MUESTRA)
 
     @model_validator(mode="after")
-    def _el_producto_real_se_identifica(self) -> "MuestraEntrada":
+    def _la_muestra_se_identifica(self) -> "MuestraEntrada":
         if self.tipo == "producto_real" and (self.fecha_corte is None or not self.pagare):
             raise ValueError("Un producto real se pide con `fecha_corte` y `pagare`")
+        if self.tipo == "primeros_de_seleccion":
+            if self.fecha_corte is None:
+                raise ValueError("Los primeros de una seleccion se piden con `fecha_corte`")
+            if self.seleccion_id is not None and (self.filtros or self.orden):
+                raise ValueError("Una seleccion guardada o `filtros` y `orden`, no las dos")
         return self
 
     def a_muestra(self) -> Muestra:
         if self.tipo == "producto_real":
             return MuestraProductoReal(self.fecha_corte, self.pagare)  # type: ignore[arg-type]
+        if self.tipo == "primeros_de_seleccion":
+            return MuestraPrimerosDeSeleccion(
+                fecha_corte=self.fecha_corte,  # type: ignore[arg-type]
+                filtros=tuple(self.filtros or ()),
+                orden=self.orden,
+                seleccion_id=self.seleccion_id,
+                cantidad=self.cantidad,
+            )
         if self.tipo == "ejemplo":
             return MuestraEjemplo()
         return MuestraEjemplosPorSegmento()
@@ -336,10 +381,15 @@ class MarcaFechaRespuesta(ModeloRespuesta):
 
 
 class LimitesRespuesta(ModeloRespuesta):
+    """Los del motor (`LimitesExpresion`) y los de una definicion guardada (C-9)."""
+
     nodos: int
     funciones_por_nodo: int
     argumentos_por_funcion: int
     largo_literal: int
+    columnas_por_definicion: int
+    variantes_por_columna: int
+    largo_nombre_definicion: int
 
 
 class CatalogoRespuesta(ModeloRespuesta):
@@ -405,6 +455,7 @@ class PrevisualizacionTextoRespuesta(ModeloRespuesta):
     filas: list[FilaRespuesta]
     limite_largo: int | None
     umbral_advertencia: int | None
+    disponibles: int | None  # los productos de la seleccion, si la muestra es una seleccion
 
 
 # --- Conversion ---------------------------------------------------------------------------------
@@ -429,7 +480,7 @@ def _ubicacion(
     )
 
 
-def _problema(
+def problema_respuesta(
     problema: Problema, de_definicion: ProblemaDeDefinicion | None = None
 ) -> ProblemaTextoRespuesta:
     return ProblemaTextoRespuesta(
@@ -532,6 +583,9 @@ def _catalogo(catalogo: CatalogoTexto, contextos: list[ContextoTexto]) -> Catalo
             funciones_por_nodo=limites.funciones_por_nodo,
             argumentos_por_funcion=limites.argumentos_por_funcion,
             largo_literal=limites.largo_literal,
+            columnas_por_definicion=MAXIMO_COLUMNAS,
+            variantes_por_columna=MAXIMO_VARIANTES,
+            largo_nombre_definicion=LARGO_MAXIMO_NOMBRE,
         ),
     )
 
@@ -550,7 +604,7 @@ def _columna(c: ColumnaPrevia) -> ColumnaRespuesta:
             NodoRespuesta(indice=n.indice, tipo=n.tipo, texto=n.texto, vacio=n.vacio)
             for n in c.nodos
         ],
-        problemas=[_problema(p) for p in c.problemas],
+        problemas=[problema_respuesta(p) for p in c.problemas],
     )
 
 
@@ -570,7 +624,7 @@ def _fila(f: FilaPrevia) -> FilaRespuesta:
 
 def _validacion(v: ValidacionTexto) -> ValidacionRespuesta:
     return ValidacionRespuesta(
-        problemas=[_problema(p) for p in v.problemas],
+        problemas=[problema_respuesta(p) for p in v.problemas],
         tipo=None if v.tipo is None else v.tipo.value,
         cota=v.cota,
         sin_cota=_sin_cota(v.sin_cota),
@@ -613,7 +667,9 @@ def validar(
 
 
 @router.post(
-    "/previsualizacion", response_model=PrevisualizacionTextoRespuesta, responses=RESPUESTAS_404
+    "/previsualizacion",
+    response_model=PrevisualizacionTextoRespuesta,
+    responses={**RESPUESTAS_404, **respuestas_de_error_con_codigo(400)},
 )
 def previsualizar(
     peticion: PeticionPrevisualizacion,
@@ -635,11 +691,16 @@ def previsualizar(
         return _no_existe(CodigoTexto.CONTEXTO_DESCONOCIDO, str(error))
     except ProductoNoEncontrado as error:
         return _no_existe(CodigoTexto.PRODUCTO_NO_ENCONTRADO, str(error))
+    except SeleccionNoEncontrada as error:
+        return _no_existe(CodigoTexto.SELECCION_NO_ENCONTRADA, str(error))
+    except ConsultaInvalida as error:
+        raise ErrorConCodigo(400, str(error), None) from error
     except SinVersionVigente as error:
         return _no_existe(CodigoTexto.SIN_VERSION_VIGENTE, str(error))
     return PrevisualizacionTextoRespuesta(
-        problemas=[_problema(p.problema, p) for p in resultado.problemas],
+        problemas=[problema_respuesta(p.problema, p) for p in resultado.problemas],
         filas=[_fila(f) for f in resultado.filas],
         limite_largo=resultado.limite_largo,
         umbral_advertencia=resultado.umbral_advertencia,
+        disponibles=resultado.disponibles,
     )

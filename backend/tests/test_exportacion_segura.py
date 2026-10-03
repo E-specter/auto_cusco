@@ -393,9 +393,10 @@ def test_el_json_es_identico_al_de_head_con_o_sin_proteccion(opciones) -> None:
 # --- La opcion en la API ------------------------------------------------------------------------
 
 
-def test_la_opcion_solo_viaja_en_la_definicion_de_columnas_hasta_que_b4b_la_conecte() -> None:
-    """B4a la acepta en la definicion que previsualiza el constructor (C-10); `/archivos-carga`
-    sigue sin exponerla hasta que B4b pase la de una definicion guardada a `OpcionesArchivo`."""
+def test_la_opcion_la_fija_la_definicion_y_no_las_opciones_de_archivos_carga() -> None:
+    """D4: `proteger_formulas` viaja en la definicion (la que se arma, la que se guarda y la que
+    se devuelve) y pasa a las opciones del archivo al generar con una guardada; `/archivos-carga`
+    no la expone como opcion propia (la definicion en linea sigue protegiendo por defecto)."""
     contrato = Path(__file__).resolve().parents[2] / "contratos" / "openapi.json"
 
     assert contrato.exists(), f"No se encontro {contrato}"
@@ -404,7 +405,7 @@ def test_la_opcion_solo_viaja_en_la_definicion_de_columnas_hasta_que_b4b_la_cone
         n for n, e in esquemas.items() if "proteger_formulas" in e.get("properties", {})
     )
 
-    assert con_la_opcion == ["DefinicionColumnasEntrada"]
+    assert con_la_opcion == ["ContenidoGuardadoRespuesta", "DefinicionColumnasEntrada"]
 
 
 def test_el_valor_por_defecto_es_proteger() -> None:

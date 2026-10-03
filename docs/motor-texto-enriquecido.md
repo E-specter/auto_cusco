@@ -182,7 +182,7 @@ Extiende `DefinicionCarga` y `CampoSalida` en su lugar, con campos nuevos y opci
 
 Una columna con variable directa es una expresión de un solo nodo `variable` sin funciones. Conserva el valor original sin pasarlo por texto, igual que hoy (`valor_crudo`).
 
-**Definiciones guardadas** (decisión del usuario): con nombre único normalizado y versiones. Una versión usada en una carga no se modifica: se crea otra. Son compartidas entre usuarios y módulos, siguiendo el patrón de selecciones guardadas y del speech.
+**Definiciones guardadas** (decisión del usuario): con nombre único normalizado y versiones. Una versión usada en una carga no se modifica: se crea otra. Son compartidas entre usuarios y módulos, siguiendo el patrón de selecciones guardadas y del speech. **Precisión de B4b:** como la API solo crea versiones nuevas (no hay `PUT`), ninguna versión se modifica nunca y `usada_en` es informativo: dice que la versión ya generó una carga, no habilita ni bloquea nada (sección 22).
 
 ## 9. Exportación y seguridad de la salida
 
@@ -204,11 +204,11 @@ La forma exacta la fija el backend en `contratos/openapi.json`, como siempre. Es
 | `GET /texto-enriquecido/catalogo?contexto=` | Variables del contexto con su tipo, y funciones con parámetros, tipos y claves i18n. La interfaz arma los menús con esto |
 | `POST /texto-enriquecido/validacion` | Recibe una expresión y un contexto. Devuelve los problemas con su ubicación (nodo, función, parámetro) y código, el tipo resultante y la cota de largo si existe |
 | `POST /texto-enriquecido/previsualizacion` | Recibe una expresión o una definición, y una muestra. Devuelve por fila el resultado total, el de cada nodo, su segmento y los problemas de fila. La muestra puede ser: el registro de ejemplo del catálogo; **ejemplos por segmento**, que es la opción por defecto para una definición: una fila por segmento con un valor sintético de días que cae en cada rango, tomado de la tabla de rangos (B4a); un producto real (fecha de corte y pagaré); o **cartera real**: una fecha de corte y una selección con la forma de `/cartera` (filtros, orden y cantidad hasta 5), con el mismo orden y desempate que la carga (B4b). Solo lectura: no guarda nada |
-| `GET, POST /definiciones-columnas`, `GET /definiciones-columnas/{id}`, `POST /definiciones-columnas/{id}/versiones` | Definiciones guardadas y versionadas |
-| `/archivos-carga` | Acepta una definición guardada (id y versión) o una en línea, como hoy |
+| `GET, POST /definiciones-columnas`, `GET /definiciones-columnas/{id}?version=N`, `POST /definiciones-columnas/{id}/versiones` | Definiciones guardadas y versionadas (B4b, sección 22) |
+| `/archivos-carga` | Acepta una definición guardada (`definicion_guardada`: id y versión) o una en línea, como hoy; exactamente una de las dos (B4b) |
 | `/mowa-mes/speech` | Acepta versiones en formato v2 (una expresión por segmento) sin dejar de leer las v1 |
 
-- **Errores:**
+- **Errores:** (los de las definiciones guardadas, `400` con `problemas`, `404` y `409` con `codigo`, están en la sección 22)
   - **Una expresión o definición con problemas no es un error de la petición:** validar y previsualizar responden `200` con los problemas y su ubicación, porque es lo que el editor muestra mientras se escribe. Una forma JSON imposible (un tipo de nodo que no existe, un argumento nulo, una clave de más) es el problema `expresion_invalida` en su nodo y función, no un `422`; el `422` queda para lo que el esquema del pedido no admite (una `expresion` y una `definicion` a la vez, un producto real sin pagaré).
   - **Lo que no existe es un `404`** que extiende `DetalleError` con `codigo` (`contexto_desconocido`, `producto_no_encontrado`, `sin_version_vigente`).
   - **El `400` queda reservado para guardar** (B4b: nombre repetido, definición que no compila): extiende `DetalleError` con `codigo` y la ubicación, según la regla de `contrato-api.md` §3.
@@ -452,3 +452,49 @@ Contextos hoy: `cartera` (el núcleo: los campos de la cartera con su tipo, sin 
 - **`valor_no_convertible`.** El generador de cargas conserva `codigo=None` en el error de un texto que no cabe en el tipo de su columna (lo fija la prueba de paridad de RF-54); solo la previsualización lo informa con `valor_no_convertible`.
 - **Previsualizar es evaluar.** La previsualización usa `GeneradorCargas.detallar_fila`, que evalúa cada celda por nodo con el mismo motor y el mismo tipado (`formatos.convertir`): no hay un segundo camino.
 - **Nombres del contrato.** Los modelos propios llevan sufijo (`ProblemaTextoRespuesta`, `ExclusionFilaRespuesta`, `PrevisualizacionTextoRespuesta`, `DefinicionColumnasEntrada`) para no chocar con los de otros routers y que los tipos generados tengan nombres limpios.
+
+## 22. Definiciones guardadas y versionadas (B4b)
+
+Estado: hecho y probado sin base (2026-10-03); las pruebas de PostgreSQL (`@pytest.mark.postgres`, fechas de 2099, con limpieza) están escritas y **no corridas**, y la migración (`d5a7c1e9b342`) la verifica architec con ida y vuelta y `alembic check`. RF-51 y lo que quedaba de RF-46 y RF-47. Código en `entities/definiciones_columnas.py`, `ports/repositorio_definiciones_port.py`, `services/definiciones_columnas/servicio.py`, `adapters/persistence/repositorio_definiciones_postgres.py` (tablas `definicion_carga` y `definicion_carga_version`), `api/definiciones_columnas.py`, y los cambios en `api/archivos_carga.py`, `api/texto_enriquecido.py` y `services/previsualizar_texto.py`.
+
+### Qué se guarda
+
+- La **definición** (nombre y marcas de tiempo) y sus **versiones** numeradas desde 1; la vigente es la de mayor número. El nombre es único **sin distinguir mayúsculas ni espacios en los extremos** (lo impone la base sobre `nombre_normalizado`), compartido entre usuarios y módulos, hasta 120 caracteres. El nombre no cambia con una versión nueva.
+- El contenido de cada versión es la **forma canónica del constructor** (la misma que acepta `/texto-enriquecido/previsualizacion`, sección 21): columnas con `orden` explícito, **siempre expresiones** (una `plantilla` `[@...]` que llega al servicio se convierte con la sintaxis de siempre; el modelo HTTP no la expone, así que `expresion` sigue obligatoria), `formato_fecha` con marcas, `segmentacion` y `proteger_formulas`. Se guarda **resuelta**: con la tabla de rangos y la variable de días explícitas, para que cambiar el valor por defecto después no cambie una definición guardada.
+- Se valida **contra el contexto `cartera`** (las definiciones guardadas alimentan `/archivos-carga`), con el mismo lector y el mismo diagnóstico de la previsualización (RF-46): primero la forma, después el contenido. Límites (en el catálogo, C-9): `columnas_por_definicion` 100, `variantes_por_columna` 50 y `largo_nombre_definicion` 120.
+
+### Endpoints
+
+| Endpoint | Qué hace |
+|---|---|
+| `GET /definiciones-columnas` | El listado (C-7): `id`, `nombre`, `version_vigente`, `cantidad_versiones`, `actualizado_en`, `vigente_usada`. Ordenado por nombre, sin paginar (como las selecciones guardadas) |
+| `POST /definiciones-columnas` | Guarda una definición nueva con su versión 1. `201` con la definición |
+| `GET /definiciones-columnas/{id}?version=N` | La definición con todas sus versiones (sin contenido) y el contenido de la versión pedida (la vigente por defecto) |
+| `POST /definiciones-columnas/{id}/versiones` | Guarda el cambio como una versión nueva, que pasa a ser la vigente. `201` |
+
+- **Ninguna versión se modifica:** no hay `PUT`. Un cambio es una versión nueva y las anteriores quedan intactas; `usada_en` es informativo.
+- **Pedido:** el mismo `DefinicionColumnasEntrada` de la previsualización (una sola forma para armar, previsualizar y guardar). En una versión nueva el `nombre` puede faltar o repetir el de la definición (sin distinguir mayúsculas); otro nombre es `400`.
+- **Respuesta:** siempre expresiones, con tipos cerrados (`nodos` es una unión discriminada por `tipo`: `texto | variable`; el criterio, por `tipo`: `calculado | campo`) y las columnas por `orden`.
+- **Errores:** `400` con `codigo` `definicion_invalida` y `problemas` (los mismos `ProblemaTextoRespuesta`: `columna` —posición en el pedido—, `segmento`, `campo`, ubicación de nodo, función y parámetro; C-2); `404` con `definicion_no_encontrada` o `version_no_encontrada`; `409` con `nombre_repetido`. Un `422` queda para lo que el esquema no admite (sin `columnas`, columna sin `orden` o sin `expresion`).
+
+### Con `/archivos-carga`
+
+- `PeticionGeneracion` acepta `definicion` (en línea, como hoy y sin cambios, RF-54) **o** `definicion_guardada` `{id, version?}` (sin versión, la vigente): **exactamente una**; si no, `400` con `codigo` `definicion_invalida` (no `422`). La definición del pedido pasó a ser opcional en el esquema.
+- Con una guardada, `proteger_formulas` de la definición pasa a `OpcionesArchivo` (D4); con una en línea sigue en su valor por defecto (activa).
+- **`usada_en`:** al generar el **archivo** (`POST /archivos-carga`) la versión usada queda marcada, la primera vez y sin cambiar después; la previsualización no la marca, ni una generación que falla. Solo `usada_en`: no hay tabla de usos (C-8, decisión del coordinador: nada en la interfaz la mostraría).
+- Los errores de `/archivos-carga` ahora declaran `codigo` (nulo en los de siempre, y `sin_version_vigente` para una fecha sin sábana); el `detail` es el mismo de antes.
+
+### La muestra «primeros N de una selección»
+
+`muestra` de la previsualización gana `tipo: primeros_de_seleccion`: `fecha_corte` más `filtros` y `orden` con la sintaxis de `/cartera`, o `seleccion_id` de una selección guardada (no las dos), y `cantidad` de 1 a 5 (5 por defecto). Recorre con `SeleccionPaginada` (`seleccion_cartera/recorrido.py`), así que lleva el mismo orden y desempate por pagaré que la carga, y es de solo lectura. De una selección guardada toma sus filtros y su orden, **no su cantidad** (es una muestra). La respuesta gana `disponibles` (el total de la selección; `null` en las otras muestras). Errores: `404` `seleccion_no_encontrada` o `sin_version_vigente`; `400` (sin código) si un filtro o el orden no valen.
+
+### Códigos nuevos
+
+`definicion_no_encontrada`, `version_no_encontrada`, `nombre_repetido` y `seleccion_no_encontrada`, con sus claves `textoEnriquecido.codigo.*` en es y en (borradores a revisar por designer) y la prueba espejo del backend y del frontend.
+
+### Decisiones y límites
+
+- **Concurrencia:** una versión nueva toma el siguiente número con la fila de la definición bloqueada (`SELECT ... FOR UPDATE`) y la base impone `unique(definicion_id, numero)`.
+- **Un problema de forma tapa los de contenido:** el lector estricto se detiene antes de compilar; el editor ve primero los de forma y, al corregirlos, los de contenido.
+- **Una definición guardada puede quedar inválida** si cambia el catálogo de la cartera: se rechaza al generar, como una plantilla inválida (`400`), sin marcar la versión.
+- **Nombres del contrato:** `VersionDefinicionRespuesta` y `DefinicionRespuesta` llevan sufijo para no chocar con `VersionRespuesta` de `/cargas`.

@@ -8,6 +8,9 @@ que lo descubra en produccion.
 
 from typing import Any
 
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
 from app.api.respuestas import ModeloRespuesta
 
 
@@ -23,6 +26,44 @@ _DESCRIPCIONES = {
     409: "La operacion choca con el estado actual",
     413: "El archivo supera el tamano maximo",
 }
+
+
+class DetalleErrorConCodigo(DetalleError):
+    """Un error que, ademas del motivo, puede traer el `codigo` que la interfaz traduce.
+
+    `codigo` es nulo en los errores que todavia no tienen uno (una seleccion mal armada, una
+    plantilla invalida); siempre viaja, para que el cliente no tenga que adivinar si falta.
+    """
+
+    codigo: str | None
+
+
+class ErrorConCodigo(Exception):
+    """Se lanza desde un endpoint y el manejador de `main.py` lo responde con `codigo`.
+
+    `HTTPException` solo sabe enviar `{"detail": ...}`.
+    """
+
+    def __init__(self, estado: int, detalle: str, codigo: str | None) -> None:
+        super().__init__(detalle)
+        self.estado = estado
+        self.detalle = detalle
+        self.codigo = codigo
+
+
+def manejar_error_con_codigo(_: Request, error: Exception) -> JSONResponse:
+    assert isinstance(error, ErrorConCodigo)
+    return JSONResponse(
+        status_code=error.estado, content={"detail": error.detalle, "codigo": error.codigo}
+    )
+
+
+def respuestas_de_error_con_codigo(*codigos: int) -> dict[int | str, dict[str, Any]]:
+    """Como `respuestas_de_error`, para los endpoints que responden con `ErrorConCodigo`."""
+    return {
+        codigo: {"model": DetalleErrorConCodigo, "description": _DESCRIPCIONES[codigo]}
+        for codigo in codigos
+    }
 
 
 def respuestas_de_error(*codigos: int) -> dict[int | str, dict[str, Any]]:

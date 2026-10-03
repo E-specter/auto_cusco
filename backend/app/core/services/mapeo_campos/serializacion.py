@@ -20,6 +20,11 @@ La columna se identifica por su posicion en la lista del pedido (`columna` de ca
 0); las columnas de la definicion salen ordenadas por `orden` y `DefinicionLeida.posiciones` dice
 a que posicion del pedido corresponde cada una.
 
+Al guardar (B4b) se admite ademas una `plantilla` (`[@campo]`) en lugar de la `expresion`, en la
+columna y en cada variante: se convierte a expresion con la misma sintaxis de siempre y lo que se
+guarda y se devuelve es siempre expresion (C-4). `definicion_a_dict` es la forma canonica que se
+guarda: la lectura de su resultado da la misma definicion.
+
 Como la expresion, la lectura no revienta con lo imposible: informa cada falla como un problema con
 su columna, su variante y el campo (`ProblemaDeDefinicion`). Que las variables y funciones
 existan, y los limites de tamano, los comprueba despues `diagnostico.diagnosticar`.
@@ -49,8 +54,13 @@ from app.core.entities.texto_enriquecido import (
     ExpresionInvalida,
     Problema,
 )
+from app.core.services.mapeo_campos.generador import limites_de_plantilla
+from app.core.services.texto_enriquecido import sintaxis
 from app.core.services.texto_enriquecido.funciones.fecha import validar_marcas
-from app.core.services.texto_enriquecido.serializacion import expresion_desde_dict
+from app.core.services.texto_enriquecido.serializacion import (
+    expresion_a_dict,
+    expresion_desde_dict,
+)
 
 
 @dataclass(frozen=True)
@@ -72,11 +82,13 @@ class ProblemaDeDefinicion:
 class DefinicionLeida(NamedTuple):
     """La definicion con sus columnas ya ordenadas por `orden`.
 
-    `posiciones[i]` es la posicion en el pedido de la columna `i` de la definicion.
+    `posiciones[i]` es la posicion en el pedido de la columna `i` de la definicion y `ordenes[i]`
+    su `orden` explicito.
     """
 
     definicion: DefinicionCarga
     posiciones: tuple[int, ...]
+    ordenes: tuple[int, ...] = ()
 
 
 class DefinicionIlegible(Exception):
@@ -91,10 +103,16 @@ def definicion_desde_dict(
     dato: Any,
     tabla_por_defecto: Sequence[RangoDias],
     variable_dias_por_defecto: str,
+    admitir_plantillas: bool = False,
 ) -> DefinicionLeida:
-    """Lee la forma JSON. Si no la tiene, `DefinicionIlegible` con todos los problemas."""
+    """Lee la forma JSON. Si no la tiene, `DefinicionIlegible` con todos los problemas.
+
+    Con `admitir_plantillas`, una `plantilla` ocupa el lugar de la `expresion` y se convierte.
+    """
     problemas: list[ProblemaDeDefinicion] = []
-    lector = _Lector(problemas, tuple(tabla_por_defecto), variable_dias_por_defecto)
+    lector = _Lector(
+        problemas, tuple(tabla_por_defecto), variable_dias_por_defecto, admitir_plantillas
+    )
     leida = lector.definicion(dato)
     if problemas or leida is None:
         raise DefinicionIlegible(problemas)
@@ -107,10 +125,12 @@ class _Lector:
         problemas: list[ProblemaDeDefinicion],
         tabla: tuple[RangoDias, ...],
         variable_dias: str,
+        admitir_plantillas: bool = False,
     ) -> None:
         self._problemas = problemas
         self._tabla = tabla
         self._variable_dias = variable_dias
+        self._plantillas = admitir_plantillas
 
     def _falla(
         self,
@@ -176,7 +196,9 @@ class _Lector:
         segmentacion = self._segmentacion(dato.get("segmentacion"))
         columnas.sort(key=lambda c: (c[0], c[1]))
         definicion = DefinicionCarga(nombre, tuple(c[2] for c in columnas), segmentacion, proteger)
-        return DefinicionLeida(definicion, tuple(c[1] for c in columnas))
+        return DefinicionLeida(
+            definicion, tuple(c[1] for c in columnas), tuple(c[0] for c in columnas)
+        )
 
     # --- columnas ---
 
@@ -198,6 +220,7 @@ class _Lector:
                 "formato_financiero",
                 "valor_por_defecto",
                 "variantes",
+                *(("plantilla",) if self._plantillas else ()),
             },
             "Una columna",
             indice,
@@ -206,7 +229,7 @@ class _Lector:
         orden = self._orden(crudo.get("orden"), indice, ordenes)
         por_defecto = self._texto(crudo, "valor_por_defecto", indice)
         patron_fecha = self._formato_fecha(crudo.get("formato_fecha"), indice)
-        expresion = self._expresion(crudo.get("expresion"), indice, requerida=True)
+        expresion = self._contenido(crudo, indice)
         tipo = self._tipo(crudo.get("tipo"), indice)
         financiero = self._financiero(crudo.get("formato_financiero"), indice)
         variantes = self._variantes(crudo.get("variantes"), indice)
@@ -273,6 +296,28 @@ class _Lector:
             )
             return None
         return valor
+
+    def _contenido(
+        self, crudo: Mapping[str, Any], columna: int, segmento: str | None = None
+    ) -> Expresion | None:
+        """El contenido: la `expresion`, o la `plantilla` convertida si se admiten."""
+        plantilla = crudo.get("plantilla") if self._plantillas else None
+        if plantilla is None:
+            return self._expresion(crudo.get("expresion"), columna, segmento, requerida=True)
+        if crudo.get("expresion") is not None:
+            self._falla("Trae `plantilla` y `expresion` a la vez", columna, segmento, "plantilla")
+            return None
+        if not isinstance(plantilla, str):
+            self._falla("`plantilla` es un texto", columna, segmento, "plantilla")
+            return None
+        try:
+            return sintaxis.leer(plantilla, limites_de_plantilla(plantilla))
+        except ExpresionInvalida as error:
+            self._problemas.extend(
+                ProblemaDeDefinicion(problema, columna, segmento, "plantilla")
+                for problema in error.problemas
+            )
+            return None
 
     def _expresion(
         self, crudo: Any, columna: int, segmento: str | None = None, requerida: bool = False
@@ -351,8 +396,14 @@ class _Lector:
                     campo="variantes",
                 )
                 continue
-            self._claves(cruda, {"segmento", "expresion"}, "Una variante", columna, segmento)
-            expresion = self._expresion(cruda.get("expresion"), columna, segmento, requerida=True)
+            self._claves(
+                cruda,
+                {"segmento", "expresion", *(("plantilla",) if self._plantillas else ())},
+                "Una variante",
+                columna,
+                segmento,
+            )
+            expresion = self._contenido(cruda, columna, segmento)
             variantes.append(VarianteCampo(segmento, None, expresion))
         return tuple(variantes)
 
@@ -452,3 +503,66 @@ class _Lector:
                 )
                 return None
         return RangoDias(clave, etiqueta, desde, hasta)
+
+
+# --- Forma canonica -------------------------------------------------------------------------------
+
+
+def definicion_a_dict(leida: DefinicionLeida, con_nombre: bool = True) -> dict[str, Any]:
+    """La forma JSON canonica, con la tabla de rangos y la variable de dias resueltas.
+
+    Es la que se guarda: una definicion guardada no cambia si cambia la tabla por defecto. Las
+    columnas salen ordenadas por `orden`. `con_nombre=False` la deja sin `nombre`, que en una
+    definicion guardada es de la definicion y no de cada version.
+    """
+    definicion = leida.definicion
+    dato: dict[str, Any] = {} if not con_nombre else {"nombre": definicion.nombre}
+    dato["proteger_formulas"] = definicion.proteger_formulas
+    dato["columnas"] = [
+        _columna_a_dict(campo, orden)
+        for campo, orden in zip(definicion.campos, leida.ordenes, strict=True)
+    ]
+    dato["segmentacion"] = _segmentacion_a_dict(definicion.segmentacion)
+    return dato
+
+
+def _columna_a_dict(campo: CampoSalida, orden: int) -> dict[str, Any]:
+    formato = campo.formato_financiero
+    return {
+        "nombre": campo.nombre,
+        "orden": orden,
+        "expresion": expresion_a_dict(campo.expresion or Expresion()),
+        "tipo": campo.tipo.value,
+        "formato_fecha": campo.patron_fecha,
+        "formato_financiero": {
+            "separador_miles": formato.separador_miles,
+            "separador_decimal": formato.separador_decimal,
+            "decimales": formato.decimales,
+        },
+        "valor_por_defecto": campo.valor_por_defecto,
+        "variantes": [
+            {
+                "segmento": variante.segmento,
+                "expresion": expresion_a_dict(variante.expresion or Expresion()),
+            }
+            for variante in campo.variantes
+        ],
+    }
+
+
+def _segmentacion_a_dict(segmentacion: Segmentacion | None) -> dict[str, Any] | None:
+    if segmentacion is None:
+        return None
+    criterio = segmentacion.criterio
+    if isinstance(criterio, CriterioCampo):
+        dato_criterio: dict[str, Any] = {"tipo": "campo", "campo": criterio.campo}
+    else:
+        dato_criterio = {
+            "tipo": "calculado",
+            "variable_dias": criterio.variable_dias,
+            "tabla": [
+                {"clave": r.clave, "etiqueta": r.etiqueta, "desde": r.desde, "hasta": r.hasta}
+                for r in criterio.tabla
+            ],
+        }
+    return {"criterio": dato_criterio, "politica": segmentacion.politica.value}

@@ -33,7 +33,7 @@ from app.core.entities.texto_enriquecido import (
     TipoValor,
 )
 from app.core.services.contextos_texto import RegistroContextos
-from app.core.services.mapeo_campos.diagnostico import diagnosticar
+from app.core.services.mapeo_campos.diagnostico import diagnosticar_leida
 from app.core.services.mapeo_campos.generador import GeneradorCargas
 from app.core.services.mapeo_campos.serializacion import (
     DefinicionIlegible,
@@ -41,7 +41,10 @@ from app.core.services.mapeo_campos.serializacion import (
     ProblemaDeDefinicion,
     definicion_desde_dict,
 )
+from app.core.services.seleccion_cartera import expresiones
+from app.core.services.seleccion_cartera.recorrido import SeleccionPaginada
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
+from app.core.services.selecciones.servicio import SeleccionesService
 from app.core.services.texto_enriquecido import catalogo, evaluador
 from app.core.services.texto_enriquecido.evaluador import NodoEvaluado
 from app.core.services.texto_enriquecido.serializacion import expresion_desde_dict
@@ -108,7 +111,26 @@ class MuestraProductoReal:
     pagare: str
 
 
-Muestra = MuestraEjemplo | MuestraEjemplosPorSegmento | MuestraProductoReal
+MAXIMO_MUESTRA = 5  # los primeros N de una seleccion: lo bastante para ver, poco para esperar
+MUESTRA_POR_DEFECTO = 5
+
+
+@dataclass(frozen=True)
+class MuestraPrimerosDeSeleccion:
+    """Los primeros `cantidad` productos de una seleccion, en el orden y con el desempate de la
+    carga. La seleccion es `filtros` y `orden` (la sintaxis de `/cartera`) o una guardada
+    (`seleccion_id`), no las dos."""
+
+    fecha_corte: date
+    filtros: tuple[str, ...] = ()
+    orden: str | None = None
+    seleccion_id: int | None = None
+    cantidad: int = MUESTRA_POR_DEFECTO
+
+
+Muestra = (
+    MuestraEjemplo | MuestraEjemplosPorSegmento | MuestraProductoReal | MuestraPrimerosDeSeleccion
+)
 
 
 @dataclass(frozen=True)
@@ -145,6 +167,7 @@ class Previsualizacion:
     filas: tuple[FilaPrevia, ...]
     limite_largo: int | None
     umbral_advertencia: int | None
+    disponibles: int | None = None  # el total de la seleccion, si la muestra es una seleccion
 
 
 class PrevisualizacionTextoService:
@@ -152,9 +175,11 @@ class PrevisualizacionTextoService:
         self,
         contextos: RegistroContextos,
         cartera: ConsultaCarteraService | None = None,
+        selecciones: SeleccionesService | None = None,
     ) -> None:
         self._contextos = contextos
         self._cartera = cartera
+        self._selecciones = selecciones
 
     # --- catalogo ---
 
@@ -224,29 +249,20 @@ class PrevisualizacionTextoService:
         except DefinicionIlegible as error:
             return sin_filas(error.problemas)
         definicion_leida = leida.definicion
-        problemas = diagnosticar(definicion_leida, ctx.tipos)
+        problemas = diagnosticar_leida(leida, ctx.tipos)
         if problemas:
-            # El diagnostico cuenta las columnas ya ordenadas; el pedido, en su propia lista. Una
-            # expresion suelta no tiene columnas: sus problemas no llevan `columna`.
-            return sin_filas(
-                tuple(
-                    p
-                    if p.columna is None
-                    else replace(
-                        p, columna=None if expresion is not None else leida.posiciones[p.columna]
-                    )
-                    for p in problemas
-                )
-            )
+            # Una expresion suelta no tiene columnas: sus problemas no llevan `columna`.
+            if expresion is not None:
+                problemas = tuple(replace(p, columna=None) for p in problemas)
+            return sin_filas(problemas)
 
         generador = GeneradorCargas(definicion_leida, ctx.tipos)
+        registros, disponibles = self._registros(ctx, definicion_leida, muestra)
         filas = tuple(
             self._fila(generador, numero, representado, registro)
-            for numero, (representado, registro) in enumerate(
-                self._registros(ctx, definicion_leida, muestra), 1
-            )
+            for numero, (representado, registro) in enumerate(registros, 1)
         )
-        return Previsualizacion((), filas, ctx.limite_largo, ctx.umbral_advertencia)
+        return Previsualizacion((), filas, ctx.limite_largo, ctx.umbral_advertencia, disponibles)
 
     @staticmethod
     def _fila(
@@ -282,12 +298,40 @@ class PrevisualizacionTextoService:
 
     def _registros(
         self, contexto: ContextoTexto, definicion: DefinicionCarga, muestra: Muestra
-    ) -> list[tuple[Representado | None, dict[str, Any]]]:
+    ) -> tuple[list[tuple[Representado | None, dict[str, Any]]], int | None]:
+        """Los registros de la muestra y, si es una seleccion, cuantos productos tiene."""
         if isinstance(muestra, MuestraProductoReal):
-            return [(None, contexto.registro_de_producto(self._producto(muestra)))]
+            return [(None, contexto.registro_de_producto(self._producto(muestra)))], None
+        if isinstance(muestra, MuestraPrimerosDeSeleccion):
+            productos, disponibles = self._primeros(muestra)
+            return [(None, contexto.registro_de_producto(p)) for p in productos], disponibles
         if isinstance(muestra, MuestraEjemplosPorSegmento):
-            return _ejemplos_por_segmento(contexto, definicion)
-        return [(None, dict(contexto.ejemplo))]
+            return _ejemplos_por_segmento(contexto, definicion), None
+        return [(None, dict(contexto.ejemplo))], None
+
+    def _primeros(self, muestra: MuestraPrimerosDeSeleccion) -> tuple[list[Mapping[str, Any]], int]:
+        """Los primeros productos de la seleccion, con el recorrido de la carga.
+
+        `ConsultaInvalida` si un filtro o el orden no valen; `SeleccionNoEncontrada` si la
+        guardada no existe; `SinVersionVigente` si la fecha no tiene sabana.
+        """
+        if self._cartera is None:
+            raise RuntimeError("La previsualizacion con una seleccion necesita la cartera")
+        filtros, orden = muestra.filtros, muestra.orden
+        if muestra.seleccion_id is not None:
+            if self._selecciones is None:
+                raise RuntimeError("La previsualizacion con una seleccion guardada la necesita")
+            datos = self._selecciones.obtener(muestra.seleccion_id).seleccion.datos
+            filtros, orden = datos.filtros, datos.orden
+        cantidad = min(max(muestra.cantidad, 1), MAXIMO_MUESTRA)
+        recorrido = SeleccionPaginada(
+            self._cartera,
+            muestra.fecha_corte,
+            [expresiones.parsear_filtro(crudo) for crudo in filtros],
+            expresiones.parsear_orden(orden),
+            cantidad,
+        )
+        return list(recorrido), recorrido.disponibles
 
     def _producto(self, muestra: MuestraProductoReal) -> Mapping[str, Any]:
         if self._cartera is None:

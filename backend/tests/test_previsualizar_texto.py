@@ -8,6 +8,7 @@ from app.core.services.plataformas.mowa_mes.contexto_texto import contexto_speec
 from app.core.services.previsualizar_texto import (
     MuestraEjemplo,
     MuestraEjemplosPorSegmento,
+    MuestraPrimerosDeSeleccion,
     MuestraProductoReal,
     PrevisualizacionTextoService,
 )
@@ -168,3 +169,25 @@ def test_un_producto_real_con_mas_de_120_dias_tampoco_cae_en_un_segmento() -> No
     previa = _real(_con_producto({"titular": "UNO", "dias_atraso": 500}), "excluir")
 
     assert [(f.segmento, f.excluida.codigo) for f in previa.filas] == [(None, "sin_segmento")]  # type: ignore[union-attr]
+
+
+def test_los_primeros_de_una_seleccion_se_acotan_a_cinco_aunque_se_pidan_mas() -> None:
+    pedidas = []
+
+    class Cartera:
+        def consultar(self, fecha_corte, filtros, orden, limite, desplazamiento=0):
+            pedidas.append(limite)
+            filas = tuple({"titular": f"T{i}"} for i in range(min(limite, 40)))
+            return PaginaCartera(total=40, filas=filas, limite=limite)
+
+    servicio = PrevisualizacionTextoService(RegistroContextos([CARTERA]), Cartera())
+
+    previa = servicio.previsualizar(
+        "cartera",
+        MuestraPrimerosDeSeleccion(date(2026, 9, 10), cantidad=50),
+        expresion={"nodos": [_variable("titular")]},
+    )
+
+    assert pedidas == [5]
+    assert len(previa.filas) == 5
+    assert previa.disponibles == 40

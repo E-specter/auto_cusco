@@ -101,6 +101,9 @@ def test_el_catalogo_de_la_cartera_trae_variables_funciones_y_limites(cliente) -
         "funciones_por_nodo": 10,
         "argumentos_por_funcion": 8,
         "largo_literal": 5000,
+        "columnas_por_definicion": 100,
+        "variantes_por_columna": 50,
+        "largo_nombre_definicion": 120,
     }
     assert cuerpo["familias"] == ["texto", "numero", "conversion", "fecha", "nulos", "enlaces"]
     assert [c["nombre"] for c in cuerpo["contextos"]] == ["cartera", "mowa_mes.speech"]

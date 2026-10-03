@@ -962,7 +962,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DetalleError"
+                  "$ref": "#/components/schemas/DetalleErrorConCodigo"
                 }
               }
             }
@@ -972,7 +972,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DetalleError"
+                  "$ref": "#/components/schemas/DetalleErrorConCodigo"
                 }
               }
             }
@@ -996,7 +996,7 @@
           "archivos de carga"
         ],
         "summary": "Generar Archivo",
-        "description": "Genera la carga completa y devuelve el archivo (RF-09, RF-13, RF-15).\n\nEl resumen viaja en cabeceras `X-Carga-*` porque el cuerpo es el archivo;\nel detalle de los errores se consulta en `/previsualizacion`.",
+        "description": "Genera la carga completa y devuelve el archivo (RF-09, RF-13, RF-15).\n\nEl resumen viaja en cabeceras `X-Carga-*` porque el cuerpo es el archivo;\nel detalle de los errores se consulta en `/previsualizacion`. Con una definicion guardada, su\n`proteger_formulas` rige el archivo y, una vez generado, la version queda marcada como usada\n(`usada_en`): la previsualizacion no la marca.",
         "operationId": "generar_archivo_archivos_carga_post",
         "requestBody": {
           "content": {
@@ -1083,7 +1083,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DetalleError"
+                  "$ref": "#/components/schemas/DetalleErrorConCodigo"
                 }
               }
             }
@@ -1093,7 +1093,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DetalleError"
+                  "$ref": "#/components/schemas/DetalleErrorConCodigo"
                 }
               }
             }
@@ -2913,6 +2913,267 @@
               }
             }
           },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorConCodigo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/definiciones-columnas": {
+      "get": {
+        "tags": [
+          "definiciones de columnas"
+        ],
+        "summary": "Listar Definiciones",
+        "description": "Las definiciones, ordenadas por nombre, con su version vigente (C-7). Sin paginar.",
+        "operationId": "listar_definiciones_definiciones_columnas_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResumenDefinicionRespuesta"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Definiciones Definiciones Columnas Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "definiciones de columnas"
+        ],
+        "summary": "Crear Definicion",
+        "description": "Guarda una definicion nueva con su version 1. El nombre es obligatorio y unico.",
+        "operationId": "crear_definicion_definiciones_columnas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefinicionColumnasEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefinicionRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La definicion no se puede guardar: los problemas dicen donde esta cada uno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorDefinicion"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la definicion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ya hay una definicion con ese nombre",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/definiciones-columnas/{definicion_id}": {
+      "get": {
+        "tags": [
+          "definiciones de columnas"
+        ],
+        "summary": "Obtener Definicion",
+        "description": "Una definicion con la version vigente o con la `version` pedida.",
+        "operationId": "obtener_definicion_definiciones_columnas__definicion_id__get",
+        "parameters": [
+          {
+            "name": "definicion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Definicion Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Por defecto, la vigente",
+              "title": "Version"
+            },
+            "description": "Por defecto, la vigente"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefinicionRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la definicion o su version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/definiciones-columnas/{definicion_id}/versiones": {
+      "post": {
+        "tags": [
+          "definiciones de columnas"
+        ],
+        "summary": "Agregar Version",
+        "description": "Guarda el cambio como una version nueva, que pasa a ser la vigente.\n\nEl nombre no cambia: si viene, debe ser el de la definicion (sin distinguir mayusculas).",
+        "operationId": "agregar_version_definiciones_columnas__definicion_id__versiones_post",
+        "parameters": [
+          {
+            "name": "definicion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Definicion Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefinicionColumnasEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefinicionRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La definicion no se puede guardar: los problemas dicen donde esta cada uno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorDefinicion"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la definicion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ya hay una definicion con ese nombre",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3011,6 +3272,19 @@
           "nombre"
         ],
         "title": "ArchivoRespuesta"
+      },
+      "ArgumentoVariableGuardadoRespuesta": {
+        "properties": {
+          "variable": {
+            "type": "string",
+            "title": "Variable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "variable"
+        ],
+        "title": "ArgumentoVariableGuardadoRespuesta"
       },
       "AvisoCampanaRespuesta": {
         "properties": {
@@ -3695,6 +3969,75 @@
         "title": "ColumnaEntrada",
         "description": "Una columna de la definicion: la forma que guardara B4b. El contenido es solo expresion;\n`formato_fecha` va con marcas legibles (`dd/mm/aaaa`) y el backend las traduce."
       },
+      "ColumnaGuardadaRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "orden": {
+            "type": "integer",
+            "title": "Orden"
+          },
+          "expresion": {
+            "$ref": "#/components/schemas/ExpresionGuardadaRespuesta"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "texto",
+              "numero",
+              "fecha",
+              "financiero"
+            ],
+            "title": "Tipo"
+          },
+          "formato_fecha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formato Fecha"
+          },
+          "formato_financiero": {
+            "$ref": "#/components/schemas/FormatoFinancieroGuardadoRespuesta"
+          },
+          "valor_por_defecto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor Por Defecto"
+          },
+          "variantes": {
+            "items": {
+              "$ref": "#/components/schemas/VarianteGuardadaRespuesta"
+            },
+            "type": "array",
+            "title": "Variantes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "orden",
+          "expresion",
+          "tipo",
+          "formato_fecha",
+          "formato_financiero",
+          "valor_por_defecto",
+          "variantes"
+        ],
+        "title": "ColumnaGuardadaRespuesta"
+      },
       "ColumnaRespuesta": {
         "properties": {
           "nombre": {
@@ -4111,6 +4454,39 @@
         ],
         "title": "ConsumoLimiteRespuesta"
       },
+      "ContenidoGuardadoRespuesta": {
+        "properties": {
+          "proteger_formulas": {
+            "type": "boolean",
+            "title": "Proteger Formulas"
+          },
+          "columnas": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnaGuardadaRespuesta"
+            },
+            "type": "array",
+            "title": "Columnas"
+          },
+          "segmentacion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SegmentacionGuardadaRespuesta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "proteger_formulas",
+          "columnas",
+          "segmentacion"
+        ],
+        "title": "ContenidoGuardadoRespuesta",
+        "description": "La definicion de una version, con la tabla de rangos resuelta y las columnas por `orden`."
+      },
       "ContextoDisponibleRespuesta": {
         "properties": {
           "nombre": {
@@ -4363,6 +4739,52 @@
         ],
         "title": "CreacionCampanaEntrada"
       },
+      "CriterioCalculadoGuardadoRespuesta": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "const": "calculado",
+            "title": "Tipo"
+          },
+          "variable_dias": {
+            "type": "string",
+            "title": "Variable Dias"
+          },
+          "tabla": {
+            "items": {
+              "$ref": "#/components/schemas/RangoRespuesta"
+            },
+            "type": "array",
+            "title": "Tabla"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "variable_dias",
+          "tabla"
+        ],
+        "title": "CriterioCalculadoGuardadoRespuesta"
+      },
+      "CriterioCampoGuardadoRespuesta": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "const": "campo",
+            "title": "Tipo"
+          },
+          "campo": {
+            "type": "string",
+            "title": "Campo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "campo"
+        ],
+        "title": "CriterioCampoGuardadoRespuesta"
+      },
       "CriterioEntrada": {
         "properties": {
           "tipo": {
@@ -4485,6 +4907,80 @@
         ],
         "title": "DefinicionEntrada"
       },
+      "DefinicionGuardadaEntrada": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "DefinicionGuardadaEntrada",
+        "description": "Una definicion de `/definiciones-columnas`: la version pedida o, sin ella, la vigente."
+      },
+      "DefinicionRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "actualizado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Actualizado En"
+          },
+          "version_vigente": {
+            "type": "integer",
+            "title": "Version Vigente"
+          },
+          "versiones": {
+            "items": {
+              "$ref": "#/components/schemas/VersionDefinicionResumenRespuesta"
+            },
+            "type": "array",
+            "title": "Versiones"
+          },
+          "version": {
+            "$ref": "#/components/schemas/VersionDefinicionRespuesta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "creado_en",
+          "actualizado_en",
+          "version_vigente",
+          "versiones",
+          "version"
+        ],
+        "title": "DefinicionRespuesta",
+        "description": "La definicion, todas sus versiones (sin contenido) y la pedida (la vigente por defecto)."
+      },
       "DetalleError": {
         "properties": {
           "detail": {
@@ -4498,6 +4994,59 @@
         ],
         "title": "DetalleError",
         "description": "Motivo legible por el que la API rechazo la peticion."
+      },
+      "DetalleErrorConCodigo": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "codigo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "codigo"
+        ],
+        "title": "DetalleErrorConCodigo",
+        "description": "Un error que, ademas del motivo, puede traer el `codigo` que la interfaz traduce.\n\n`codigo` es nulo en los errores que todavia no tienen uno (una seleccion mal armada, una\nplantilla invalida); siempre viaja, para que el cliente no tenga que adivinar si falta."
+      },
+      "DetalleErrorDefinicion": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaTextoRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "codigo",
+          "problemas"
+        ],
+        "title": "DetalleErrorDefinicion",
+        "description": "Un `400` al guardar: el motivo, el `codigo` y todos los problemas con su ubicacion."
       },
       "DetalleErrorTexto": {
         "properties": {
@@ -4791,6 +5340,36 @@
         ],
         "title": "ExpresionEntrada"
       },
+      "ExpresionGuardadaRespuesta": {
+        "properties": {
+          "nodos": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/NodoTextoGuardadoRespuesta"
+                },
+                {
+                  "$ref": "#/components/schemas/NodoVariableGuardadoRespuesta"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "tipo",
+                "mapping": {
+                  "texto": "#/components/schemas/NodoTextoGuardadoRespuesta",
+                  "variable": "#/components/schemas/NodoVariableGuardadoRespuesta"
+                }
+              }
+            },
+            "type": "array",
+            "title": "Nodos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nodos"
+        ],
+        "title": "ExpresionGuardadaRespuesta"
+      },
       "FeriadosRespuesta": {
         "properties": {
           "anio": {
@@ -5006,6 +5585,29 @@
         },
         "type": "object",
         "title": "FormatoFinancieroEntrada"
+      },
+      "FormatoFinancieroGuardadoRespuesta": {
+        "properties": {
+          "separador_miles": {
+            "type": "string",
+            "title": "Separador Miles"
+          },
+          "separador_decimal": {
+            "type": "string",
+            "title": "Separador Decimal"
+          },
+          "decimales": {
+            "type": "integer",
+            "title": "Decimales"
+          }
+        },
+        "type": "object",
+        "required": [
+          "separador_miles",
+          "separador_decimal",
+          "decimales"
+        ],
+        "title": "FormatoFinancieroGuardadoRespuesta"
       },
       "FormatoRespuesta": {
         "properties": {
@@ -5394,6 +5996,18 @@
           "largo_literal": {
             "type": "integer",
             "title": "Largo Literal"
+          },
+          "columnas_por_definicion": {
+            "type": "integer",
+            "title": "Columnas Por Definicion"
+          },
+          "variantes_por_columna": {
+            "type": "integer",
+            "title": "Variantes Por Columna"
+          },
+          "largo_nombre_definicion": {
+            "type": "integer",
+            "title": "Largo Nombre Definicion"
           }
         },
         "type": "object",
@@ -5401,9 +6015,13 @@
           "nodos",
           "funciones_por_nodo",
           "argumentos_por_funcion",
-          "largo_literal"
+          "largo_literal",
+          "columnas_por_definicion",
+          "variantes_por_columna",
+          "largo_nombre_definicion"
         ],
-        "title": "LimitesRespuesta"
+        "title": "LimitesRespuesta",
+        "description": "Los del motor (`LimitesExpresion`) y los de una definicion guardada (C-9)."
       },
       "ListaCampanasRespuesta": {
         "properties": {
@@ -5435,6 +6053,40 @@
           "campanas"
         ],
         "title": "ListaCampanasRespuesta"
+      },
+      "LlamadaGuardadaRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "args": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "$ref": "#/components/schemas/ArgumentoVariableGuardadoRespuesta"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Args"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "args"
+        ],
+        "title": "LlamadaGuardadaRespuesta"
       },
       "MarcaFechaRespuesta": {
         "properties": {
@@ -5522,7 +6174,8 @@
             "enum": [
               "ejemplo",
               "ejemplos_por_segmento",
-              "producto_real"
+              "producto_real",
+              "primeros_de_seleccion"
             ],
             "title": "Tipo",
             "default": "ejemplos_por_segmento"
@@ -5549,11 +6202,54 @@
               }
             ],
             "title": "Pagare"
+          },
+          "filtros": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filtros"
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          },
+          "seleccion_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seleccion Id"
+          },
+          "cantidad": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Cantidad",
+            "default": 5
           }
         },
         "type": "object",
         "title": "MuestraEntrada",
-        "description": "`ejemplos_por_segmento` (por defecto), `ejemplo` o `producto_real` (corte y pagare)."
+        "description": "La muestra con la que se evalua.\n\n`ejemplos_por_segmento` (por defecto), `ejemplo`, `producto_real` (`fecha_corte` y `pagare`) o\n`primeros_de_seleccion`: la `fecha_corte` y una seleccion con la forma de `/cartera`\n(`filtros` y `orden`) o una guardada (`seleccion_id`), con `cantidad` de 1 a 5 (5 por\ndefecto), el mismo orden y desempate que la carga. Solo lectura."
       },
       "NodoEntrada": {
         "properties": {
@@ -5644,6 +6340,57 @@
         ],
         "title": "NodoRespuesta",
         "description": "El texto de un nodo. `vacio` es la variable que llego sin dato: no es un texto vacio."
+      },
+      "NodoTextoGuardadoRespuesta": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "const": "texto",
+            "title": "Tipo"
+          },
+          "valor": {
+            "type": "string",
+            "title": "Valor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "valor"
+        ],
+        "title": "NodoTextoGuardadoRespuesta"
+      },
+      "NodoVariableGuardadoRespuesta": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "const": "variable",
+            "title": "Tipo"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "funciones": {
+            "items": {
+              "$ref": "#/components/schemas/LlamadaGuardadaRespuesta"
+            },
+            "type": "array",
+            "title": "Funciones"
+          },
+          "obligatoria": {
+            "type": "boolean",
+            "title": "Obligatoria"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "nombre",
+          "funciones",
+          "obligatoria"
+        ],
+        "title": "NodoVariableGuardadoRespuesta"
       },
       "OpcionRespuesta": {
         "properties": {
@@ -6158,7 +6905,24 @@
             "title": "Fecha Corte"
           },
           "definicion": {
-            "$ref": "#/components/schemas/DefinicionEntrada"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DefinicionEntrada"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "definicion_guardada": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DefinicionGuardadaEntrada"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "formato": {
             "$ref": "#/components/schemas/FormatoArchivo",
@@ -6203,10 +6967,10 @@
         },
         "type": "object",
         "required": [
-          "fecha_corte",
-          "definicion"
+          "fecha_corte"
         ],
-        "title": "PeticionGeneracion"
+        "title": "PeticionGeneracion",
+        "description": "Una definicion en linea (como siempre, RF-54) o una `definicion_guardada`: exactamente una.\n\nCon una guardada, `proteger_formulas` de la definicion pasa a las opciones del archivo y, al\ngenerar el archivo, la version queda marcada como usada."
       },
       "PeticionPrevisualizacion": {
         "properties": {
@@ -6237,7 +7001,8 @@
           "muestra": {
             "$ref": "#/components/schemas/MuestraEntrada",
             "default": {
-              "tipo": "ejemplos_por_segmento"
+              "tipo": "ejemplos_por_segmento",
+              "cantidad": 5
             }
           }
         },
@@ -6565,6 +7330,17 @@
               }
             ],
             "title": "Umbral Advertencia"
+          },
+          "disponibles": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disponibles"
           }
         },
         "type": "object",
@@ -6572,7 +7348,8 @@
           "problemas",
           "filas",
           "limite_largo",
-          "umbral_advertencia"
+          "umbral_advertencia",
+          "disponibles"
         ],
         "title": "PrevisualizacionTextoRespuesta",
         "description": "O `problemas` (no compila: sin filas) o `filas`."
@@ -6828,6 +7605,45 @@
         ],
         "title": "ReporteImportadoRespuesta"
       },
+      "ResumenDefinicionRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "version_vigente": {
+            "type": "integer",
+            "title": "Version Vigente"
+          },
+          "cantidad_versiones": {
+            "type": "integer",
+            "title": "Cantidad Versiones"
+          },
+          "actualizado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Actualizado En"
+          },
+          "vigente_usada": {
+            "type": "boolean",
+            "title": "Vigente Usada"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "version_vigente",
+          "cantidad_versiones",
+          "actualizado_en",
+          "vigente_usada"
+        ],
+        "title": "ResumenDefinicionRespuesta"
+      },
       "ResumenRespuesta": {
         "properties": {
           "disponibles": {
@@ -6930,6 +7746,42 @@
         "additionalProperties": true,
         "type": "object",
         "title": "SegmentacionEntrada"
+      },
+      "SegmentacionGuardadaRespuesta": {
+        "properties": {
+          "criterio": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CriterioCalculadoGuardadoRespuesta"
+              },
+              {
+                "$ref": "#/components/schemas/CriterioCampoGuardadoRespuesta"
+              }
+            ],
+            "title": "Criterio",
+            "discriminator": {
+              "propertyName": "tipo",
+              "mapping": {
+                "calculado": "#/components/schemas/CriterioCalculadoGuardadoRespuesta",
+                "campo": "#/components/schemas/CriterioCampoGuardadoRespuesta"
+              }
+            }
+          },
+          "politica": {
+            "type": "string",
+            "enum": [
+              "excluir",
+              "usar_por_defecto"
+            ],
+            "title": "Politica"
+          }
+        },
+        "type": "object",
+        "required": [
+          "criterio",
+          "politica"
+        ],
+        "title": "SegmentacionGuardadaRespuesta"
       },
       "SegmentacionRespuesta": {
         "properties": {
@@ -7616,6 +8468,101 @@
           "expresion"
         ],
         "title": "VarianteEntrada"
+      },
+      "VarianteGuardadaRespuesta": {
+        "properties": {
+          "segmento": {
+            "type": "string",
+            "title": "Segmento"
+          },
+          "expresion": {
+            "$ref": "#/components/schemas/ExpresionGuardadaRespuesta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "segmento",
+          "expresion"
+        ],
+        "title": "VarianteGuardadaRespuesta"
+      },
+      "VersionDefinicionRespuesta": {
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "title": "Numero"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "usada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usada En"
+          },
+          "usada": {
+            "type": "boolean",
+            "title": "Usada"
+          },
+          "contenido": {
+            "$ref": "#/components/schemas/ContenidoGuardadoRespuesta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "creado_en",
+          "usada_en",
+          "usada",
+          "contenido"
+        ],
+        "title": "VersionDefinicionRespuesta"
+      },
+      "VersionDefinicionResumenRespuesta": {
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "title": "Numero"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "usada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usada En"
+          },
+          "usada": {
+            "type": "boolean",
+            "title": "Usada"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "creado_en",
+          "usada_en",
+          "usada"
+        ],
+        "title": "VersionDefinicionResumenRespuesta"
       },
       "VersionRespuesta": {
         "properties": {

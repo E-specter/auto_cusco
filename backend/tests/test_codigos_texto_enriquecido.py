@@ -14,8 +14,11 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.api.cartera import obtener_servicio_cartera
+from app.api.definiciones_columnas import obtener_servicio_definiciones
+from app.api.selecciones import obtener_servicio_selecciones
 from app.core.entities import texto_enriquecido as entidades
 from app.core.entities.cartera import PaginaCartera, SinVersionVigente
+from app.core.entities.selecciones import SeleccionNoEncontrada
 from app.core.entities.texto_enriquecido import (
     CodigoTexto,
     Expresion,
@@ -25,8 +28,11 @@ from app.core.entities.texto_enriquecido import (
     NodoVariable,
     TipoValor,
 )
+from app.core.services.contextos_texto import contexto_cartera
+from app.core.services.definiciones_columnas.servicio import DefinicionesColumnasService
 from app.core.services.texto_enriquecido import evaluador, sintaxis
 from app.main import app
+from tests.definiciones_memoria import RepositorioEnMemoria
 
 VARIABLES = {
     "t": TipoValor.TEXTO,
@@ -74,14 +80,27 @@ class _CarteraVacia:
         return PaginaCartera(total=0, filas=(), limite=limite)
 
 
+class _SeleccionesVacias:
+    def obtener(self, seleccion_id: int):
+        raise SeleccionNoEncontrada(seleccion_id)
+
+
 def _emitidos_por_la_api() -> set[CodigoTexto]:
     """Lo que solo informa la API del motor (B4a): se pide por HTTP, como lo hace la interfaz."""
     cartera = _CarteraVacia()
+    definiciones = DefinicionesColumnasService(RepositorioEnMemoria(), contexto_cartera())
     app.dependency_overrides[obtener_servicio_cartera] = lambda: cartera
+    app.dependency_overrides[obtener_servicio_definiciones] = lambda: definiciones
+    app.dependency_overrides[obtener_servicio_selecciones] = lambda: _SeleccionesVacias()
     try:
         return _pedir_a_la_api(TestClient(app), cartera)
     finally:
-        app.dependency_overrides.pop(obtener_servicio_cartera, None)
+        for dependencia in (
+            obtener_servicio_cartera,
+            obtener_servicio_definiciones,
+            obtener_servicio_selecciones,
+        ):
+            app.dependency_overrides.pop(dependencia, None)
 
 
 def _pedir_a_la_api(cliente: TestClient, cartera: _CarteraVacia) -> set[CodigoTexto]:
@@ -97,7 +116,7 @@ def _pedir_a_la_api(cliente: TestClient, cartera: _CarteraVacia) -> set[CodigoTe
             respuesta = cliente.get(ruta)
         else:
             respuesta = cliente.post(ruta, json=json)
-        if respuesta.status_code == 404:
+        if respuesta.status_code in (404, 409):
             emitidos.add(CodigoTexto(respuesta.json()["codigo"]))
             return
         cuerpo(respuesta.json())
@@ -145,6 +164,30 @@ def _pedir_a_la_api(cliente: TestClient, cartera: _CarteraVacia) -> set[CodigoTe
         previa,
         {"contexto": "cartera", "expresion": expresion, "muestra": muestra},
     )
+    cartera.error = None
+    buscar(  # seleccion_no_encontrada
+        desde_problemas,
+        previa,
+        {
+            "contexto": "cartera",
+            "expresion": expresion,
+            "muestra": {
+                "tipo": "primeros_de_seleccion",
+                "fecha_corte": "2026-09-10",
+                "seleccion_id": 99,
+            },
+        },
+    )
+    guardada = {"nombre": "Una", "columnas": [{"nombre": "a", "orden": 0, "expresion": expresion}]}
+    cliente.post("/definiciones-columnas", json=guardada)
+    buscar(desde_problemas, "/definiciones-columnas", guardada)  # nombre_repetido
+    buscar(
+        desde_problemas, "/definiciones-columnas/999/versiones", guardada
+    )  # definicion_no_encontrada
+    respuesta = cliente.get(
+        "/definiciones-columnas/1", params={"version": 9}
+    )  # version_no_encontrada
+    emitidos.add(CodigoTexto(respuesta.json()["codigo"]))
     return emitidos
 
 

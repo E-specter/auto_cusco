@@ -260,6 +260,51 @@ class Seleccion(Base):
     )
 
 
+class DefinicionCargaGuardada(Base):
+    """Definicion de columnas guardada y compartida (RF-51, docs/motor-texto-enriquecido.md).
+
+    Solo el nombre y las marcas de tiempo; el contenido vive en sus versiones. Sin usuario hasta que
+    exista autenticacion (como las selecciones).
+    """
+
+    __tablename__ = "definicion_carga"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    nombre: Mapped[str] = mapped_column(Text)
+    # Sin espacios en los extremos y en minusculas: la unicidad no distingue mayusculas.
+    nombre_normalizado: Mapped[str] = mapped_column(Text)
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    actualizado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (UniqueConstraint("nombre_normalizado"),)
+
+
+class DefinicionCargaVersion(Base):
+    """Una version de una definicion: la forma JSON canonica del constructor, sin el nombre.
+
+    Ninguna version se modifica: un cambio crea la siguiente (la vigente es la de mayor numero).
+    `usada_en` marca la primera carga generada con ella; es informativo.
+    """
+
+    __tablename__ = "definicion_carga_version"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    definicion_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("definicion_carga.id", ondelete="CASCADE")
+    )
+    numero: Mapped[int] = mapped_column(Integer)
+    contenido: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    usada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("definicion_id", "numero"),
+        CheckConstraint("numero >= 1", name="numero_positivo"),
+    )
+
+
 # --- Calendario laboral (RF-MM-08) ---------------------------------------
 
 _TELEFONO_RF02 = "'^9[0-9]{8}$'"

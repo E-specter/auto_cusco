@@ -65,6 +65,11 @@ class CodigoTexto(StrEnum):
     CONTEXTO_DESCONOCIDO = "contexto_desconocido"
     PRODUCTO_NO_ENCONTRADO = "producto_no_encontrado"
     SIN_VERSION_VIGENTE = "sin_version_vigente"
+    # Definiciones guardadas (B4b) y la seleccion de una muestra
+    DEFINICION_NO_ENCONTRADA = "definicion_no_encontrada"
+    VERSION_NO_ENCONTRADA = "version_no_encontrada"
+    NOMBRE_REPETIDO = "nombre_repetido"  # ya hay una definicion con ese nombre
+    SELECCION_NO_ENCONTRADA = "seleccion_no_encontrada"
 
 
 @dataclass(frozen=True)

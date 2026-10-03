@@ -184,3 +184,265 @@ En `expresion.ts`, el tipo a lo largo de la cadena solo filtra el menú de funci
 - El oro de B5 queda intacto, y architec vuelve a medir previsualizar y crear.
 
 **B5 cerrado para MOWA MES (2026-09-30):** sobre `63f845d`, las huellas de la versión 17 (Speech original) y de la 92 (v1 del usuario) siguen iguales. Lo comprobó `coordinador_modulo_mowa_mes`, solo leyendo.
+
+## 11. Cierre de B3, B7 y B2 (2026-09-30, decisiones de architec mientras el coordinador estuvo desconectado)
+
+- **B3** (`0772e78`): con las dos correcciones de la revisión (largo del XLSX sin `core.xml` y cabeceras del CSV protegidas).
+- **B7** (`b8b9025`): aprobado **sin** un camino rápido en el evaluador.
+  - Campaña con 46 000 filas contra `auto_cusco_test`: previsualizar de 7,40 s a 7,56 s y crear de 6,17 s a 6,23 s, dentro del ruido.
+  - El ahorro (-23,5 %) solo se ve en el A/B de mensajes.
+  - Los problemas plegados quedan en `Compilada.problemas_plegados` y cada fila los repite.
+- **B2** (`2f0b3b3`): aprobado con las cuatro condiciones de architec, todas cumplidas:
+  - paridad sobre la `CargaGenerada` entera, con SHA-256 congelado en `b8b9025`;
+  - un solo tipado (`formatos.convertir`);
+  - `medir_generacion.py` con 60 000 y 120 000 filas, igual o mejor;
+  - D3 con una sola tabla (`entities/segmentacion.py` y `services/segmentacion.py`) y prueba de claves contra el enum `Segmento`.
+
+  Aceptado además:
+  - en la ruta de compatibilidad, los topes crecen con la plantilla (RF-54);
+  - una plantilla `[@a b]` da otro texto de error, pero sigue siendo 400.
+
+  Visto bueno de `coordinador_modulo_mowa_mes`. Su congelamiento de `speech.py`, `segmentos.py` y los rangos terminó con `2f0b3b3`.
+
+## 12. B4a (lanzado por architec el 2026-09-30; desde el 2026-10-01 la entrega vuelve a pasar por el coordinador)
+
+**Alcance:**
+- `GET /texto-enriquecido/catalogo`, `POST /texto-enriquecido/validacion` y `POST /texto-enriquecido/previsualizacion`;
+- `CodigoTexto` con prueba espejo contra `textoEnriquecido.codigo.*`;
+- `contratos/openapi.json` y `contrato-api.d.ts` regenerados en la misma entrega.
+
+**Requisitos:** los de §6 (pedidos de designer y las cuatro precisiones), los nombres de §7 y §10 del diseño. Las filas sintéticas por segmento van en B4a; "primeros N de una selección" queda para B4b.
+
+**Commit conjunto:** los códigos de B4a y las claves i18n de designer entran en el mismo commit de architec, coordinados con designer.
+
+**Al revisar la entrega, mirar en especial:**
+- la ubicación (`nodo`, `funcion`, `parametro`), nula para toda la expresión;
+- `devuelve` / `entrada`;
+- `obligatoria`;
+- por contexto, el límite y la advertencia (160 y 150 en MOWA MES);
+- en la previsualización, un nodo nulo distinto de un texto vacío;
+- el motivo con código cuando no hay cota;
+- los problemas de fila separados de los de validación;
+- la forma JSON con `{"variable": ...}` y su validación estructural (`expresion_invalida`, anunciado en §16);
+- los errores 4xx que extienden `detail` (`contrato-api.md` §3);
+- que el frontend no tenga que reimplementar nada.
+
+## 13. Circuito de revisión con MOWA MES (2026-10-01)
+
+Todo corte que toque código, pruebas o documentación de MOWA MES pasa, **con su worktree y antes de ir a architec**, por la revisión de `coordinador_modulo_mowa_mes`. Sin su visto bueno, el coordinador no lo entrega.
+
+- Aplica a **B6 y F4** (speech v2: API, base de datos e interfaz de MOWA MES), y a cualquier corte futuro que toque `plataformas/mowa_mes/`, `entities/mowa_mes*.py`, `adapters/output/plataformas/mowa_mes/`, `api/mowa_mes*.py` o `frontend/src/pages/mowa-mes/`.
+- B3 y B7 se commitearon sin esa revisión previa. B3 por un descuido del coordinador; B7, mientras el coordinador estuvo desconectado. La revisión se hizo después del commit, sobre `2f0b3b3`: 299 pruebas en verde y huellas 17 y 92 sin cambios. No hubo nada que deshacer.
+
+**Decisiones de B4a confirmadas al dev (2026-10-01):**
+- `/validacion` y `/previsualizacion` responden 200 con `problemas` aunque la expresión sea inválida. Lo estructuralmente imposible que Pydantic acepta va como `expresion_invalida` con su ubicación. El 422 queda solo para un cuerpo ilegible. Los 400 con `codigo` y `ubicacion` son para guardar (B4b).
+- Contexto desconocido, producto inexistente o fecha sin versión vigente: 404 que extiende `DetalleError` con `codigo` (en `CodigoTexto`), para que la interfaz lo ubique bajo su campo.
+- Contextos `cartera` y `mowa_mes.speech`:
+  - el registro vive fuera del motor, en la capa que compone;
+  - el proveedor de MOWA MES vive en su paquete;
+  - si se crea o se toca un archivo de MOWA MES, aplica §13.
+- Los motivos de "sin cota" son códigos de `CodigoTexto`.
+- `/archivos-carga` no se toca en B4a.
+- i18n: el dev manda a designer la lista de claves con borradores en es y en. Designer escribe los diccionarios y todo entra en el mismo commit.
+- **Contextos (corregido el 2026-10-01, a partir de una nota de `coordinador_modulo_mowa_mes`):**
+  - en el núcleo, solo un `ContextoTexto` genérico y un registro por nombre, sin imports de `plataformas/` (con prueba de arquitectura);
+  - `cartera` lo provee el núcleo;
+  - `mowa_mes.speech` lo declara MOWA MES en `plataformas/mowa_mes/contexto_texto.py`;
+  - el registro se arma en la capa de composición, con una línea por contexto, así que un canal nuevo no edita el núcleo (RF-31).
+
+  B4a crea un archivo de MOWA MES, así que **pasa por la revisión de §13**. La primera versión, un módulo del núcleo que importaba de MOWA MES, invertía la dependencia.
+
+  Aprobado por architec, con dos precisiones:
+  - el registro se arma donde hoy se cablean las dependencias de la API (`app/main.py` o las dependencias de `app/api`), sin imports con efectos secundarios;
+  - la prueba de arquitectura cubre `services/texto_enriquecido/` y el registro genérico.
+- **i18n:** el dev mandó a designer 105 claves por idioma (24 códigos, 23 funciones con nombre y descripción, 21 parámetros, 6 familias, 5 marcas de fecha, 2 contextos y 2 variables).
+
+## 14. Frontend en espera de B4a (2026-10-01)
+
+`dev_frontend_motor_texto_enriquecido` prepara sin código de producto:
+- lectura de `configuracion.astro`, `api-mowa-mes.ts`, la api falsa de e2e y `expresion.ts`;
+- un plan de F3 y F4 en su carpeta (`plan-f3-f4.md`), con pantallas, estados, Playwright, Vitest y axe;
+- dudas para designer, que pasan antes por el coordinador.
+
+Puede adelantar el estado puro del constructor (`src/lib/constructor-columnas.ts`, con Vitest) con tipos provisionales tomados de las entidades de B2. El estado de las variantes por segmento lo acuerda antes con designer (`VariantesSegmento`).
+
+Ruta propuesta: `/columnas` («Columnas de carga»). La navegación es de designer.
+
+## 15. Contrato de B4b y B6: respuestas a C-1 a C-10 de `dev_frontend_motor_texto_enriquecido` (2026-10-01)
+
+Requisitos para los briefs de B4b y B6. Si el backend encuentra que alguno no se sostiene, lo plantea antes de forzarlo.
+
+| # | Decisión | Corte |
+|---|---|---|
+| C-1 | Las columnas viajan como lista ordenada. `orden` es un entero explícito en el almacenamiento y en la respuesta. La columna se identifica por su posición en la lista del pedido; el nombre es único dentro de la definición y se valida. El frontend asocia esa posición con su propio id local | B4b |
+| C-2 | El problema de una definición extiende la ubicación con `columna` (índice en el pedido) y `segmento` (clave, o `null` para el contenido por defecto), además de `nodo`, `funcion` y `parametro`. Los problemas de un campo de la definición (`nombre`, `segmentacion`) llevan `campo`. Al guardar: 400 que extiende `DetalleError` con esa ubicación | B4b |
+| C-3 | `/definiciones-columnas` expone `formato_fecha` con las marcas legibles (`dd/mm/aaaa`). El backend traduce. El `strftime` sigue solo en la definición en línea de `/archivos-carga` (RF-54) | B4b |
+| C-4 | Una definición guardada guarda solo expresiones. Si al guardar llega una plantilla `[@…]`, se convierte. Lo que devuelve la API es siempre expresión | B4b |
+| C-5 | B6 ofrece crear una v2 **a partir de una v1**: el backend convierte cada segmento con `expresion_de` y lo devuelve como borrador v2. La versión lleva `formato` (`v1` o `v2`), y una v1 se sigue leyendo con sus partes, en solo lectura | B6 |
+| C-6 | La previsualización en vivo del editor usa `POST /texto-enriquecido/previsualizacion` con `contexto=mowa_mes.speech`, que trae el largo, la cota, el límite y la advertencia. Los niveles por segmento de la configuración (`Cabe`, `Más de 150`, `Más de 160`, `Falta WhatsApp`, con los códigos de `CodigoMowaMes`) los devuelve `/mowa-mes/speech/previsualizacion`, ampliado para v2, porque son reglas de MOWA MES | B6 |
+| C-7 | El listado trae id, nombre, versión vigente, cantidad de versiones, `actualizado_en` y si la vigente está usada. La paginación sigue el patrón de las selecciones guardadas | B4b |
+| C-8 | Cada versión trae `usada_en` (patrón del speech), y además `usos` si B4b registra cada carga generada con una definición guardada, que conviene hacer. La interfaz muestra «usada» con `usada_en` aunque `usos` no venga | B4b |
+| C-9 | Los límites se exponen en el catálogo: los del motor (nodos, funciones por nodo y largo de los literales) en **B4a**; los de columnas por definición y variantes, en **B4b**. La interfaz no ofrece lo que el backend rechazaría | B4a y B4b |
+| C-10 | `proteger_formulas` y `segmentacion` viajan en la definición. El servicio pasa `proteger_formulas` a `OpcionesArchivo` (D4) | B4b |
+
+**Aprobado por architec (2026-10-01), con dos condiciones:**
+- **B6, C-5:** una v2 creada a partir de una v1 produce **los mismos mensajes y largos** que esa v1. La prueba recorre el Speech original y las 12 versiones sintéticas del oro de B5, sobre la misma matriz. La v2 es una versión nueva con huella propia; la v1 queda intacta e inmutable.
+- **B4b, C-8:** si se registra cada carga generada con una definición guardada, solo se guardan metadatos (versión, fecha de corte, fecha y hora, cantidad de filas y formato). Nunca filas ni datos de la cartera. Si `usos` no aporta algo que la interfaz vaya a mostrar, alcanza con `usada_en`.
+
+**F3-a** (2026-10-02, sin commit): `frontend/src/lib/constructor-columnas.ts` y sus 64 pruebas de Vitest, en verde en el árbol principal. Tiene tipos provisionales con las respuestas C-1 a C-10, un id estable que nunca sale hacia el backend, y las variantes solo se transportan. Al revisar B4a, `dev_frontend_motor_texto_enriquecido` y designer revisan el OpenAPI y `contrato-api.d.ts` como consumidores antes de que vaya a architec.
+
+**Respuestas de designer a D-1 a D-12** (`1f7dacd`, interfaz §8 y §9):
+- F2 suma `lib/variantes.ts` (la frontera de D-1), los selectores de variable y de patrón de fecha, la API falsa del motor, y `.table__detalle` y `.marca-vacio` en `ui.css`.
+- `/columnas` va en una tercera sección de navegación, «Configuración», aprobada por el usuario. Designer agrega la entrada cuando la página exista.
+
+**Revisión de B4a (2026-10-02):**
+- El dev la entregó directo a architec. Se corrigió la ruta y architec esperó las tres revisiones: la del coordinador, la de `coordinador_modulo_mowa_mes` (por `plataformas/mowa_mes/contexto_texto.py`) y la de los consumidores (designer y dev_frontend).
+- Ajustes antes del commit:
+  - `origen` en cada variable del catálogo, y tipos cerrados con `Literal` (designer);
+  - la clave del segmento en cada fila de "ejemplos por segmento", que venía `null` (coordinador);
+  - un titular de ejemplo claramente sintético, el docstring del segmento de un producto real (días de la sábana, sin ajuste) y una prueba con `dias_atraso` en `None` (MOWA MES).
+- Designer aprueba o edita el bloque `textoEnriquecido.*` de los diccionarios, que redactó el dev.
+- Los cambios del usuario en `backend/pyproject.toml` y `uv.lock` (dependencias mcp y fastmcp) no entran en ningún corte del motor.
+
+**Pendiente para B6 y F4** (pedido de `coordinador_modulo_mowa_mes`): en la previsualización con un producto real, el editor le dice al usuario «segmento según días de atraso a la fecha de corte». El segmento de un producto real sale de los días de la sábana, sin el ajuste a la fecha de envío.
+- **Revisión de dev_frontend como consumidor (2026-10-02):**
+  - `/previsualizacion` acepta la forma de definición del **constructor** (`columnas` con `orden`, `segmentacion`, `proteger_formulas` y `formato_fecha` con marcas que traduce el backend). Es el mismo modelo que B4b va a guardar.
+  - Un formato de fecha sin marcas válidas es un problema de su columna, no un texto literal.
+  - La forma en línea de `/archivos-carga`, con `strftime`, no cambia.
+  - Una columna nueva vacía da problemas con `columna`, nunca un 500.
+  - Para B4b: la expresión de respuesta va con tipos cerrados.
+  - Para B6: los niveles por segmento siguen saliendo de `/mowa-mes/speech/previsualizacion` (C-6), no de la cota en la página.
+  - Nombres visibles de las variables de cartera: lo decide designer.
+- **Nombres de las variables de cartera** (decisión de designer, 2026-10-02):
+  - en F2 se crea un juego compartido `campo.<nombre>` en es y en, que usan `/cartera`, el selector de variables y el constructor;
+  - el cliente usa `clave_nombre` si viene; si no y el origen es `cartera`, `campo.<nombre>`; si tampoco hay, el nombre técnico con espacios;
+  - una prueba de Vitest contra el catálogo de campos del backend exige que no falte ni sobre ninguna etiqueta;
+  - el catálogo de B4a no cambia.
+
+**B4a entregado a architec (2026-10-02)** con las tres revisiones: coordinador, `coordinador_modulo_mowa_mes` (sin condiciones) y consumidores (designer y dev_frontend, sin observaciones al backend). Falta `-ConBase`, que corre architec.
+
+Nota para F2: los modelos de entrada aceptan claves extra (para informarlas como problema), así que los tipos generados llevan firma de índice y solo admiten `type`, no `interface`. dev_frontend ya ajustó `constructor-columnas.ts`; designer tiene que ajustar `expresion.ts`.
+
+## 16. Brief de B4b (2026-10-02)
+
+**Base:** `c25801e` (B4a en main). RF-51 (definiciones guardadas y versionadas) y lo que queda de RF-46 y RF-47.
+
+**Persistencia:**
+- Tablas de definición y de versión, con una migración que hace ida y vuelta y `alembic check` limpio. Patrón de las selecciones guardadas y del speech:
+  - nombre único normalizado;
+  - definiciones compartidas;
+  - una versión usada (`usada_en`) no se modifica: un cambio crea otra versión.
+- Se guarda la forma del constructor de B4a: columnas con `orden`, expresiones (nunca plantillas; una plantilla que llega se convierte), `formato_fecha` con marcas, `segmentacion` y `proteger_formulas`.
+
+**Endpoints:**
+- `GET` y `POST /definiciones-columnas`, `GET /definiciones-columnas/{id}` y `POST /definiciones-columnas/{id}/versiones`.
+- El listado trae id, nombre, versión vigente, cantidad de versiones, `actualizado_en` y si la vigente está usada (C-7).
+- Al guardar, un 400 que extiende `DetalleError` con los problemas ubicados (columna, segmento, campo, nodo, función y parámetro; C-2).
+- La expresión de respuesta va con tipos cerrados (`'texto' | 'variable'`).
+- Límites de columnas por definición y de variantes en el catálogo (C-9).
+
+**/archivos-carga:**
+- Acepta una definición guardada (id y versión), además de la definición en línea, que no cambia (RF-54).
+- Al generar con una guardada, marca `usada_en`. Si se registran usos (C-8), solo metadatos: versión, fecha de corte, fecha y hora, cantidad de filas y formato. Nunca filas ni datos de la cartera. Si nada en la interfaz lo muestra, alcanza con `usada_en`.
+- `proteger_formulas` de la definición pasa a `OpcionesArchivo` (D4).
+
+**Previsualización:** se agrega la muestra "primeros N de una selección". Es una fecha de corte más una selección con la forma de `/cartera` (o una selección guardada), con N acotado (5 por defecto), el mismo orden y desempate que la carga, y `seleccion_cartera/recorrido.py`. Solo lectura.
+
+**Pruebas:**
+- núcleo y API;
+- PostgreSQL escritas con `@pytest.mark.postgres`, fechas de 2099 y limpieza de lo que crean, no corridas;
+- migración con ida y vuelta (la corre architec);
+- contrato y tipos regenerados;
+- prueba espejo si aparecen códigos nuevos, con designer;
+- mutación a mano en worktree.
+
+**Revisiones antes de architec:** el coordinador y los consumidores (designer y dev_frontend sobre el contrato). Si toca archivos de MOWA MES, también §13.
+
+**Decisiones de diseño de B4b aceptadas (2026-10-02):**
+- Tablas `definicion_columnas` y `definicion_columnas_version`. Se guarda la definición **resuelta**, con la tabla de rangos y la variable de días explícitas.
+- Versiones inmutables por construcción: solo `POST /{id}/versiones`, y `usada_en` es informativo. Se agrega `GET /{id}?version=N`. El nombre no cambia entre versiones. El listado no se pagina y va ordenado por nombre.
+- Se valida siempre contra `cartera`. Límites: 100 columnas por definición y 50 variantes por columna, en el catálogo.
+- `plantilla` no se expone en HTTP: el lector la convierte, pero el modelo mantiene `expresion` obligatoria.
+- Solo `usada_en`, sin tabla de usos.
+- `/archivos-carga` recibe `definicion` (en línea) o `definicion_guardada {id, version?}`, exactamente una de las dos, con un 400 con código si no. Se marca `usada_en` al generar el archivo, y `proteger_formulas` pasa a `OpcionesArchivo`. Precaución: afloja un tipo que usa la consola de cargas, así que se corren `contrato:comprobar`, `astro check` y Vitest antes de entregar.
+- Muestra `primeros_de_seleccion` (cantidad de 1 a 5) y `disponibles` en la respuesta.
+- Códigos nuevos: `definicion_no_encontrada`, `version_no_encontrada`, `nombre_repetido` (409) y `seleccion_no_encontrada`. Sus claves i18n van con designer.
+
+## 17. `tsc --noEmit` en la verificación del frontend (2026-10-03)
+
+dev_frontend encontró, con mutaciones, que `astro check` no detecta una asignación incompatible cuando el tipo está anidado (por ejemplo, `LlamadaFuncion` vuelta a `interface`). `tsc --noEmit -p tsconfig.json` sí la detecta.
+
+architec lo adoptó y comprobó que en `e207c46` pasa limpio, en unos 5 s. Lo implementa designer:
+- `npm run verificar` corre `tsc --noEmit` después de `astro check`;
+- el workflow de CI del frontend hace lo mismo;
+- se menciona en `testing.md` §4 y en la skill `verificar`;
+- la prueba de la regresión va en el mensaje del commit.
+
+La guarda de dev_frontend que lee el código fuente queda solo para sus propios archivos y sale de `expresion.ts` en F3.
+
+**Revisión de B4b por dev_frontend (2026-10-03):** sin observaciones al backend.
+- Confirmado: las definiciones guardadas se validan solo contra `cartera`, y F3 no ofrece selector de contexto.
+- Para designer (§5.1 de la interfaz):
+  - el hint «se crea la versión N+1» se ve siempre, porque todo guardado crea una versión;
+  - el nombre es de solo lectura después de crear la definición.
+- **Pendiente de producto:** renombrar una definición guardada. Hoy no se puede, porque el nombre no cambia entre versiones. No bloquea.
+
+## 18. Borrador del brief de B6 (MOWA MES M2, backend), para lanzar cuando B4b esté en main
+
+**Toca MOWA MES:** pasa por `coordinador_modulo_mowa_mes` con su worktree antes de architec (§13).
+
+**Persistencia:**
+- `mowa_mes_speech_version` gana `formato` (`v1` por defecto en las filas existentes) y `expresiones` (JSONB, una expresión por segmento; nula en las v1).
+- Migración con ida y vuelta.
+- Las v1, incluido el Speech original, no se tocan: conservan `partes` y su huella (`huella_speech`).
+- Se mantiene el patrón actual: editable hasta que se usa (`usada_en`) y después inmutable.
+
+**Huella v2:** SHA-256 de la forma canónica de las expresiones por segmento. El 409 de crear una campaña funciona igual para v1 y v2.
+
+**Crear v2 desde v1 (C-5):**
+- El backend convierte cada segmento con `expresion_de` y lo devuelve como borrador v2 (por ejemplo, `GET /mowa-mes/speech/{id}/como-v2`; la forma la decide el dev).
+- **Condición de architec:** la v2 creada desde una v1 produce los mismos mensajes y largos que esa v1. La prueba recorre el Speech original y las 12 versiones sintéticas del oro de B5, sobre la misma matriz.
+- La v2 es una versión nueva, con `basada_en_id` y huella propia.
+
+**Campaña:**
+- `ConstructorMensajes` acepta v1 (por `expresion_de`, como hoy) o v2 (expresiones guardadas), con `whatsapp_contacto` constante (B7).
+- `FaltaWhatsapp`, `MensajeNoGenerable` y el orden de exclusiones no cambian.
+
+**Exclusiones `falta_titular` y `falta_vencimiento` en v2: PROPUESTA A CONFIRMAR con `coordinador_modulo_mowa_mes`, y con el usuario si hace falta, porque es una regla de MOWA MES.**
+- Hoy se aplican siempre.
+- En v2 se aplicarían si la expresión del segmento usa esa variable marcada `obligatoria`. La conversión desde v1 las marca obligatorias, así que da lo mismo que hoy.
+- Una v2 que no use el titular dejaría de excluir a los productos sin titular.
+- Lo "vacío" de una variable obligatoria coincide con `campana._vacio` (D10).
+
+**Previsualización (C-6):**
+- `/mowa-mes/speech/previsualizacion` acepta v2 y devuelve, por segmento: largo máximo (la cota), el nivel con los códigos de `CodigoMowaMes` (Cabe, 150, 160, Falta WhatsApp) y el ejemplo.
+- Una expresión sin cota se informa como "sin máximo calculable", con su motivo. En la campaña, el control por fila del 160 sigue igual.
+
+**Contexto `mowa_mes.speech`:**
+- Ya trae `titular`, `fecha_vencimiento_cuota`, `whatsapp_contacto` y `dias_atraso_ajustados`. Si v2 necesita más, crece en `plataformas/mowa_mes/contexto_texto.py`.
+- Pendiente para F4: el aviso «segmento según días de atraso a la fecha de corte» en la previsualización con un producto real.
+
+**Limpieza de M1 (§9):**
+- Se borran `plantilla_mensaje`, `contexto_fila`, `CAMPOS_CONTEXTO` y lo que nadie use, y las pruebas `test_en_vivo_*`.
+- El oro sigue contra las constantes congeladas (6 mensajes y el SHA-256 de la matriz).
+
+**Pruebas:**
+- de punta a punta contra `auto_cusco_test` (las corre architec): crear una v2 desde la interfaz o la API, generar una campaña y conciliarla;
+- las PostgreSQL escritas, no corridas;
+- architec repite la medición de la campaña con 46 000 filas;
+- contrato regenerado;
+- mutación a mano en el worktree.
+
+**B6, exclusiones en v2: DECIDIDO por el usuario (2026-10-03, consultado por `coordinador_modulo_mowa_mes`).** `falta_titular` y `falta_vencimiento` se aplican solo si la expresión del segmento usa la variable. Coincide con RF-MM-13 («le falta un dato que el speech necesita»). Condiciones, cada una con su prueba:
+
+1. El orden de exclusiones no cambia (`telefono_invalido`, `falta_documento`, `sin_speech`, `falta_titular`, `falta_vencimiento`, `mensaje_excede_160`). Lo único nuevo: las dos del medio se saltean si el segmento no usa la variable. Se prueba en los dos sentidos: una v2 sin titular carga un producto sin titular, y una v2 con titular lo excluye igual que hoy.
+2. "Usa la variable" se decide sobre la expresión compilada (nodos variables, también como argumento de una función), nunca buscando el nombre en el texto fijo.
+3. Si el segmento no usa el titular y el producto no lo tiene, el mensaje sale sin huecos: ni "None" ni un vacío en medio. Se prueba con el texto exacto.
+4. Una v2 convertida desde una v1 marca las dos variables como obligatorias y da los mismos mensajes, largos, exclusiones y orden que la v1, en la matriz de oro completa.
+5. architec registra la decisión en §6 de `requerimientos-mowa-mes.md` y precisa RF-MM-13 para v2.
+
+Además, para la revisión de MOWA MES:
+- las huellas 17 y 92 sin cambios;
+- el 409 (`huella_cambiada`) para una v2 cambiada entre previsualizar y crear;
+- las constantes congeladas del oro se quedan;
+- con un speech sin cota, `mensaje_excede_160` sigue excluyendo por fila sobre el mensaje real.

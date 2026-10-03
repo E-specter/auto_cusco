@@ -22,10 +22,12 @@ from pydantic import BaseModel, Field
 
 from app.adapters.output import exportadores
 from app.api.cartera import obtener_servicio_cartera
-from app.api.consultas import parsear_filtro, parsear_orden, texto_si_es_monto, traducir_errores
-from app.api.errores import respuestas_de_error
+from app.api.consultas import parsear_filtro, parsear_orden, texto_si_es_monto
+from app.api.definiciones_columnas import obtener_servicio_definiciones
+from app.api.errores import ErrorConCodigo, respuestas_de_error_con_codigo
 from app.api.respuestas import ModeloRespuesta
 from app.core.entities.cartera import ConsultaInvalida, SinVersionVigente
+from app.core.entities.definiciones_columnas import DefinicionNoEncontrada, VersionNoEncontrada
 from app.core.entities.exportacion import (
     EXTENSIONES,
     TIPOS_MIME,
@@ -39,6 +41,11 @@ from app.core.entities.mapeo import (
     FormatoFinanciero,
     PlantillaInvalida,
     TipoSalida,
+)
+from app.core.entities.texto_enriquecido import CodigoTexto
+from app.core.services.definiciones_columnas.servicio import (
+    DefinicionCargada,
+    DefinicionesColumnasService,
 )
 from app.core.services.generacion_cargas.servicio import (
     CANTIDAD_MAXIMA,
@@ -97,9 +104,23 @@ class OpcionesEntrada(BaseModel):
     sangria: int | None = Field(default=None, ge=0, le=8)
 
 
+class DefinicionGuardadaEntrada(BaseModel):
+    """Una definicion de `/definiciones-columnas`: la version pedida o, sin ella, la vigente."""
+
+    id: int
+    version: int | None = Field(default=None, ge=1)
+
+
 class PeticionGeneracion(BaseModel):
+    """Una definicion en linea (como siempre, RF-54) o una `definicion_guardada`: exactamente una.
+
+    Con una guardada, `proteger_formulas` de la definicion pasa a las opciones del archivo y, al
+    generar el archivo, la version queda marcada como usada.
+    """
+
     fecha_corte: date
-    definicion: DefinicionEntrada
+    definicion: DefinicionEntrada | None = None
+    definicion_guardada: DefinicionGuardadaEntrada | None = None
     formato: FormatoArchivo = FormatoArchivo.XLSX
     filtros: list[str] = []
     orden: str | None = None
@@ -160,23 +181,56 @@ def _definicion(entrada: DefinicionEntrada) -> DefinicionCarga:
     )
 
 
-def _opciones(entrada: OpcionesEntrada | None) -> OpcionesArchivo:
-    return OpcionesArchivo() if entrada is None else OpcionesArchivo(**entrada.model_dump())
+def _opciones(entrada: OpcionesEntrada | None, proteger_formulas: bool = True) -> OpcionesArchivo:
+    valores = {} if entrada is None else entrada.model_dump()
+    return OpcionesArchivo(**valores, proteger_formulas=proteger_formulas)
+
+
+def _resolver_definicion(
+    peticion: PeticionGeneracion, definiciones: DefinicionesColumnasService
+) -> tuple[DefinicionCarga, DefinicionCargada | None]:
+    """La definicion en linea, o la guardada ya cargada. Exactamente una de las dos."""
+    if (peticion.definicion is None) == (peticion.definicion_guardada is None):
+        raise ErrorConCodigo(
+            400,
+            "Se pide una definicion en linea o una definicion guardada, no las dos ni ninguna",
+            CodigoTexto.DEFINICION_INVALIDA.value,
+        )
+    if peticion.definicion is not None:
+        return _definicion(peticion.definicion), None
+    guardada = peticion.definicion_guardada
+    try:
+        cargada = definiciones.cargar(guardada.id, guardada.version)  # type: ignore[union-attr]
+    except DefinicionNoEncontrada as exc:
+        raise ErrorConCodigo(404, str(exc), CodigoTexto.DEFINICION_NO_ENCONTRADA.value) from exc
+    except VersionNoEncontrada as exc:
+        raise ErrorConCodigo(404, str(exc), CodigoTexto.VERSION_NO_ENCONTRADA.value) from exc
+    return cargada.definicion, cargada
+
+
+def _error(exc: Exception) -> ErrorConCodigo:
+    """Los errores de siempre, sin codigo: el `detail` es el mismo que antes."""
+    if isinstance(exc, SinVersionVigente):
+        return ErrorConCodigo(404, str(exc), CodigoTexto.SIN_VERSION_VIGENTE.value)
+    return ErrorConCodigo(400, str(exc), None)
 
 
 def _generar(
-    servicio: GeneracionCargasService, peticion: PeticionGeneracion, cantidad: int
+    servicio: GeneracionCargasService,
+    peticion: PeticionGeneracion,
+    cantidad: int,
+    definicion: DefinicionCarga,
 ) -> ResultadoGeneracion:
     try:
         return servicio.generar(
             peticion.fecha_corte,
-            _definicion(peticion.definicion),
+            definicion,
             [parsear_filtro(crudo) for crudo in peticion.filtros],
             parsear_orden(peticion.orden),
             cantidad,
         )
     except (ConsultaInvalida, PlantillaInvalida, SinVersionVigente) as exc:
-        raise traducir_errores(exc) from exc
+        raise _error(exc) from exc
 
 
 def _valor_json(valor: Any) -> Any:
@@ -199,11 +253,12 @@ def listar_formatos() -> list[FormatoRespuesta]:
 @router.post(
     "/previsualizacion",
     response_model=PrevisualizacionRespuesta,
-    responses=respuestas_de_error(400, 404),
+    responses=respuestas_de_error_con_codigo(400, 404),
 )
 def previsualizar(
     peticion: PeticionGeneracion,
     servicio: GeneracionCargasService = Depends(obtener_servicio_generacion),
+    definiciones: DefinicionesColumnasService = Depends(obtener_servicio_definiciones),
 ) -> PrevisualizacionRespuesta:
     """Primeras filas y errores de la carga, sin escribir el archivo.
 
@@ -211,7 +266,8 @@ def previsualizar(
     lo que dice si alcanzan los productos para la cantidad pedida (RF-08).
     """
     muestra = min(peticion.cantidad, FILAS_DE_MUESTRA)
-    resultado = _generar(servicio, peticion, muestra)
+    definicion, _ = _resolver_definicion(peticion, definiciones)
+    resultado = _generar(servicio, peticion, muestra, definicion)
     tabla = resultado.tabla
     return PrevisualizacionRespuesta(
         nombre_archivo=exportadores.nombre_de_archivo(tabla.nombre, peticion.formato),
@@ -254,7 +310,7 @@ def _respuesta_de_descarga() -> dict[int | str, dict[str, Any]]:
                 },
             },
         },
-        **respuestas_de_error(400, 404),
+        **respuestas_de_error_con_codigo(400, 404),
     }
 
 
@@ -262,19 +318,27 @@ def _respuesta_de_descarga() -> dict[int | str, dict[str, Any]]:
 def generar_archivo(
     peticion: PeticionGeneracion,
     servicio: GeneracionCargasService = Depends(obtener_servicio_generacion),
+    definiciones: DefinicionesColumnasService = Depends(obtener_servicio_definiciones),
 ) -> Response:
     """Genera la carga completa y devuelve el archivo (RF-09, RF-13, RF-15).
 
     El resumen viaja en cabeceras `X-Carga-*` porque el cuerpo es el archivo;
-    el detalle de los errores se consulta en `/previsualizacion`.
+    el detalle de los errores se consulta en `/previsualizacion`. Con una definicion guardada, su
+    `proteger_formulas` rige el archivo y, una vez generado, la version queda marcada como usada
+    (`usada_en`): la previsualizacion no la marca.
     """
-    resultado = _generar(servicio, peticion, peticion.cantidad)
+    definicion, guardada = _resolver_definicion(peticion, definiciones)
+    resultado = _generar(servicio, peticion, peticion.cantidad, definicion)
     try:
         archivo = exportadores.exportar(
-            resultado.tabla, peticion.formato, _opciones(peticion.opciones)
+            resultado.tabla,
+            peticion.formato,
+            _opciones(peticion.opciones, definicion.proteger_formulas),
         )
     except ExportacionInvalida as exc:
-        raise traducir_errores(exc) from exc
+        raise _error(exc) from exc
+    if guardada is not None:
+        definiciones.marcar_usada(guardada.id, guardada.numero)
     return Response(
         content=archivo.contenido,
         media_type=archivo.tipo_mime,

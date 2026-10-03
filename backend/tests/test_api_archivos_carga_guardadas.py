@@ -1,0 +1,289 @@
+"""`/archivos-carga` con una definicion guardada (B4b, RF-51, D4): sobre el repositorio en memoria.
+
+Lo unico simulado es la consulta a la cartera y el repositorio de definiciones. La definicion en
+linea (RF-54) no cambia y la cubre `test_api_archivos_carga.py`.
+"""
+
+from datetime import date
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.api.cartera import obtener_servicio_cartera
+from app.api.definiciones_columnas import obtener_servicio_definiciones
+from app.core.entities.cartera import SinVersionVigente
+from app.core.services.contextos_texto import contexto_cartera
+from app.core.services.definiciones_columnas.servicio import DefinicionesColumnasService
+from app.main import app
+from tests.definiciones_memoria import RepositorioEnMemoria
+from tests.test_api_archivos_carga import ConsultaFalsa, _definicion_con_formula, _peticion
+
+FECHA = "2026-09-10"
+
+
+@pytest.fixture
+def cliente():
+    consulta = ConsultaFalsa()
+    servicio = DefinicionesColumnasService(RepositorioEnMemoria(), contexto_cartera())
+    app.dependency_overrides[obtener_servicio_cartera] = lambda: consulta
+    app.dependency_overrides[obtener_servicio_definiciones] = lambda: servicio
+    try:
+        yield TestClient(app), consulta, servicio
+    finally:
+        app.dependency_overrides.clear()
+
+
+def _texto(valor: str) -> dict:
+    return {"tipo": "texto", "valor": valor}
+
+
+def _variable(nombre: str) -> dict:
+    return {"tipo": "variable", "nombre": nombre, "funciones": []}
+
+
+def _columna(nombre: str, orden: int, *nodos: dict, **extra) -> dict:
+    return {"nombre": nombre, "orden": orden, "expresion": {"nodos": list(nodos)}, **extra}
+
+
+def _guardada(nombre: str = "SMS preventiva", *, proteger: bool = True, extra: str = "") -> dict:
+    return {
+        "nombre": nombre,
+        "proteger_formulas": proteger,
+        "columnas": [
+            _columna("anexo", 0, _texto("1010"), tipo="numero"),
+            _columna("numero", 1, _texto("51"), _variable("telefono")),
+            _columna(
+                "deuda",
+                2,
+                _variable("saldo_capital_pendiente"),
+                tipo="financiero",
+                formato_financiero={
+                    "separador_miles": ".",
+                    "separador_decimal": ",",
+                    "decimales": 2,
+                },
+            ),
+            _columna(
+                "vence",
+                3,
+                _variable("fecha_vencimiento_cuota"),
+                tipo="fecha",
+                formato_fecha="dd/mm/aaaa",
+            ),
+            _columna("nota", 4, _texto(extra or "=1+1")),
+        ],
+    }
+
+
+def _pedido(id_: int, version: int | None = None, **extra) -> dict:
+    guardada = {"id": id_} if version is None else {"id": id_, "version": version}
+    cuerpo = {"fecha_corte": FECHA, "definicion_guardada": guardada, "cantidad": 2, **extra}
+    return cuerpo
+
+
+# --- La definicion guardada genera lo mismo que la equivalente en linea ---------------------------
+
+
+def test_la_previsualizacion_con_una_guardada_da_las_mismas_filas_que_la_en_linea(cliente) -> None:
+    client, _, servicio = cliente
+    id_ = servicio.crear(_guardada()).definicion.id
+
+    guardada = client.post("/archivos-carga/previsualizacion", json=_pedido(id_)).json()
+    en_linea = client.post(
+        "/archivos-carga/previsualizacion",
+        json=_peticion(definicion=_definicion_con_formula()),
+    ).json()
+
+    assert guardada["cabeceras"] == ["anexo", "numero", "deuda", "vence", "nota"]
+    assert guardada["filas"] == en_linea["filas"]
+    assert guardada["nombre_archivo"] == "SMS_preventiva.xlsx"
+    assert (guardada["disponibles"], guardada["generados"], guardada["completa"]) == (2, 2, True)
+
+
+def test_con_una_guardada_se_usa_la_version_pedida_o_la_vigente(cliente) -> None:
+    client, _, servicio = cliente
+    id_ = servicio.crear(_guardada(extra="uno")).definicion.id
+    servicio.agregar_version(id_, _guardada(extra="dos"))
+
+    vigente = client.post("/archivos-carga/previsualizacion", json=_pedido(id_)).json()
+    primera = client.post("/archivos-carga/previsualizacion", json=_pedido(id_, 1)).json()
+    segunda = client.post("/archivos-carga/previsualizacion", json=_pedido(id_, 2)).json()
+
+    assert vigente["filas"][0]["nota"] == "dos"
+    assert primera["filas"][0]["nota"] == "uno"
+    assert segunda["filas"] == vigente["filas"]
+
+
+def test_la_seleccion_y_el_formato_siguen_en_la_peticion(cliente) -> None:
+    client, consulta, servicio = cliente
+    id_ = servicio.crear(_guardada()).definicion.id
+
+    respuesta = client.post(
+        "/archivos-carga",
+        json=_pedido(
+            id_, filtros=["telefono:no_vacio"], orden="-saldo_capital_pendiente", formato="csv"
+        ),
+    )
+
+    assert respuesta.status_code == 200
+    assert respuesta.headers["content-type"].startswith("text/csv")
+    assert consulta.recibido["filtros"][0].campo == "telefono"
+    assert consulta.recibido["orden"].descendente
+
+
+# --- usada_en -------------------------------------------------------------------------------------
+
+
+def test_generar_el_archivo_marca_la_version_usada_y_solo_esa(cliente) -> None:
+    client, _, servicio = cliente
+    id_ = servicio.crear(_guardada()).definicion.id
+    servicio.agregar_version(id_, _guardada())
+
+    respuesta = client.post("/archivos-carga", json=_pedido(id_, 1, formato="csv"))
+
+    assert respuesta.status_code == 200
+    assert servicio.obtener(id_, 1).version.usada is True
+    assert servicio.obtener(id_, 2).version.usada is False
+
+
+def test_sin_version_se_marca_la_vigente(cliente) -> None:
+    client, _, servicio = cliente
+    id_ = servicio.crear(_guardada()).definicion.id
+    servicio.agregar_version(id_, _guardada())
+
+    client.post("/archivos-carga", json=_pedido(id_, formato="csv"))
+
+    assert [servicio.obtener(id_, n).version.usada for n in (1, 2)] == [False, True]
+
+
+def test_la_previsualizacion_no_marca_la_version_usada(cliente) -> None:
+    client, _, servicio = cliente
+    id_ = servicio.crear(_guardada()).definicion.id
+
+    client.post("/archivos-carga/previsualizacion", json=_pedido(id_))
+
+    assert servicio.obtener(id_).version.usada is False
+
+
+def test_si_la_generacion_falla_la_version_no_queda_usada(cliente) -> None:
+    client, consulta, servicio = cliente
+    id_ = servicio.crear(_guardada()).definicion.id
+    consulta.error = SinVersionVigente(date(2026, 9, 10))
+
+    respuesta = client.post("/archivos-carga", json=_pedido(id_, formato="csv"))
+
+    assert respuesta.status_code == 404
+    assert servicio.obtener(id_).version.usada is False
+
+
+def test_la_definicion_en_linea_no_toca_las_definiciones_guardadas(cliente) -> None:
+    client, _, servicio = cliente
+    servicio.crear(_guardada())
+
+    client.post("/archivos-carga", json=_peticion(formato="csv"))
+
+    assert servicio.listar()[0].vigente_usada is False
+
+
+# --- proteger_formulas (D4) ----------------------------------------------------------------------
+
+
+def _nota_del_csv(respuesta) -> list[str]:
+    filas = respuesta.content.decode("utf-8").splitlines()
+    return [fila.rsplit(",", 1)[1] for fila in filas[1:]]
+
+
+def test_proteger_formulas_de_la_definicion_rige_el_csv(cliente) -> None:
+    client, _, servicio = cliente
+    protegida = servicio.crear(_guardada("protegida", proteger=True)).definicion.id
+    libre = servicio.crear(_guardada("libre", proteger=False)).definicion.id
+
+    con = client.post("/archivos-carga", json=_pedido(protegida, formato="csv"))
+    sin = client.post("/archivos-carga", json=_pedido(libre, formato="csv"))
+
+    assert _nota_del_csv(con) == ["'=1+1", "'=1+1"]
+    assert _nota_del_csv(sin) == ["=1+1", "=1+1"]
+
+
+def test_la_definicion_en_linea_sigue_protegiendo_por_defecto(cliente) -> None:
+    client, _, _ = cliente
+
+    respuesta = client.post(
+        "/archivos-carga", json=_peticion(formato="csv", definicion=_definicion_con_formula())
+    )
+
+    assert _nota_del_csv(respuesta) == ["'=1+1", "'=1+1"]
+
+
+# --- Errores --------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("ruta", ["/archivos-carga", "/archivos-carga/previsualizacion"])
+def test_exactamente_una_definicion_y_si_no_es_400_con_codigo(cliente, ruta) -> None:
+    client, consulta, servicio = cliente
+    id_ = servicio.crear(_guardada()).definicion.id
+
+    con_las_dos = client.post(ruta, json={**_peticion(), **_pedido(id_)})
+    con_ninguna = client.post(ruta, json={"fecha_corte": FECHA, "cantidad": 2})
+
+    for respuesta in (con_las_dos, con_ninguna):
+        assert respuesta.status_code == 400
+        assert respuesta.json()["codigo"] == "definicion_invalida"
+        assert respuesta.json()["detail"]
+    assert consulta.recibido == {}
+
+
+def test_una_definicion_guardada_inexistente_es_404_con_su_codigo(cliente) -> None:
+    client, consulta, _ = cliente
+
+    respuesta = client.post("/archivos-carga/previsualizacion", json=_pedido(999))
+
+    assert respuesta.status_code == 404
+    assert respuesta.json()["codigo"] == "definicion_no_encontrada"
+    assert consulta.recibido == {}
+
+
+def test_una_version_inexistente_es_404_con_su_codigo(cliente) -> None:
+    client, _, servicio = cliente
+    id_ = servicio.crear(_guardada()).definicion.id
+
+    respuesta = client.post("/archivos-carga", json=_pedido(id_, 7))
+
+    assert respuesta.status_code == 404
+    assert respuesta.json()["codigo"] == "version_no_encontrada"
+
+
+def test_los_errores_de_siempre_traen_codigo_nulo_y_el_mismo_detalle(cliente) -> None:
+    client, _, _ = cliente
+    definicion = {"nombre": "mala", "campos": [{"nombre": "x", "plantilla": "[@no_existe]"}]}
+
+    respuesta = client.post("/archivos-carga", json=_peticion(definicion=definicion))
+
+    assert respuesta.status_code == 400
+    assert "no_existe" in respuesta.json()["detail"]
+    assert respuesta.json()["codigo"] is None
+
+
+def test_una_fecha_sin_version_vigente_trae_su_codigo(cliente) -> None:
+    client, consulta, _ = cliente
+    consulta.error = SinVersionVigente(date(2026, 9, 10))
+
+    respuesta = client.post("/archivos-carga", json=_peticion())
+
+    assert respuesta.status_code == 404
+    assert respuesta.json()["codigo"] == "sin_version_vigente"
+
+
+def test_una_guardada_con_un_campo_que_ya_no_existe_es_400_sin_marcar_nada(cliente) -> None:
+    """Si el catalogo de la cartera cambia, la generacion lo rechaza como antes."""
+    client, _, servicio = cliente
+    id_ = servicio.crear(_guardada()).definicion.id
+    # Simula el cambio de catalogo: lo guardado nombra un campo que el catalogo ya no tiene.
+    servicio._repositorio.reemplazar_contenido(  # noqa: SLF001
+        id_, 1, {"columnas": [_columna("x", 0, _variable("campo_que_ya_no_existe"))]}
+    )
+
+    respuesta = client.post("/archivos-carga", json=_pedido(id_, formato="csv"))
+
+    assert respuesta.status_code == 400
+    assert servicio.obtener(id_).version.usada is False
