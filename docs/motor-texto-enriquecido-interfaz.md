@@ -135,6 +135,14 @@ El backend devuelve cada problema con su `codigo` (catálogo `CodigoTexto`, trad
 
 - **Nombre** (único, RF-51). Se escribe al crear la definición y **no cambia entre versiones** (B4b rechaza un nombre distinto con un problema en `campo=nombre`). Después de la primera versión se muestra de solo lectura, con el hint «El nombre se fija al crear la definición». Renombrar queda como pendiente de producto.
 - **Línea de versión:** «Versión 3» o, si se usó, «Versión 3 · usada en 2 cargas». Ninguna versión se modifica: guardar **siempre** crea una nueva. Por eso, bajo el botón de guardar va **siempre** el hint «Al guardar se crea la versión 4; la 3 no cambia», se haya usado o no. Para una definición nueva: «Al guardar se crea la versión 1». Ajuste de la revisión de B4b, 2026-10-03.
+- **Versiones antiguas: solo lectura hasta que el analista decida partir de ellas.** Guardar crea siempre la vigente + 1 con el contenido en pantalla. Por eso, abrir para mirar una versión que no es la vigente nunca deja listo un guardado que la reemplace (principio «nada cambia sin confirmación explícita», PRODUCT.md):
+  - Se muestra **en solo lectura:** editores deshabilitados, sin `+ Agregar columna` ni guardar. Arriba, un `.notice--info`: «Estás viendo la versión 2. La vigente es la 5».
+  - En ese aviso van dos acciones: «Ir a la vigente», el botón por defecto, y «Usar como base», un botón secundario.
+  - **«Usar como base»** habilita la edición y cambia el aviso a `.notice--warning`, visible hasta guardar o descartar: «Partes de la versión 2. Al guardar se crea la versión 6 con este contenido y pasa a ser la vigente; la 5 no cambia». El hint bajo el botón de guardar dice lo mismo en corto.
+  - Descartar los cambios vuelve a la versión 2 en solo lectura.
+  - La vigente se abre editable, como siempre.
+
+  Decisión de `designer` del 2026-10-03, ante la propuesta del coordinador del motor.
 - **Segmentación:** una sección colapsable, cerrada por defecto si la definición no tiene variantes.
   - **Criterio:** `select` con «Segmento financiero calculado por días de atraso» (por defecto, RF-50) y «Valor de un campo de la cartera». Con el segundo aparece el `select` del campo.
   - **Tabla de rangos:** solo lectura en esta pantalla, con etiqueta, desde y hasta, tal como la devuelve el backend.
