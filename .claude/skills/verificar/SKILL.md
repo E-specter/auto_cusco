@@ -28,7 +28,7 @@ Son el mínimo. Existen y están configuradas.
 | Algo que atraviesa varias capas | Además, una prueba de la cadena completa contra PostgreSQL |
 | Lógica de interfaz (`frontend/src/lib/`) | Núcleo del frontend (`node`) o DOM (`jsdom`) según toque el documento |
 | Una pantalla | Lo anterior, más extremo a extremo con Playwright |
-| Cualquier cosa | Formato, lint y tipos (`ruff`; `astro check` en el frontend) |
+| Cualquier cosa | Formato, lint y tipos (`ruff`; `astro check` y `npm run tipos` en el frontend) |
 
 El hueco que más se cuela: **un caso de uso nuevo que consulta la base queda con todas sus pruebas en verde usando un repositorio en memoria.** Eso deja sin verificar la paginación real, el orden real y los tipos que devuelve PostgreSQL. Si tu caso de uso consulta o escribe, le toca una prueba `postgres`.
 
@@ -38,7 +38,7 @@ Atrapan lo que las clásicas dejan pasar. **Ninguna está configurada todavía s
 
 | Capa | Qué pregunta responde | Aplica sobre todo a | Estado |
 |---|---|---|---|
-| Tipos estáticos | ¿El código es coherente antes de ejecutarlo? | Todo el backend | Frontend sí (`astro check`); backend no |
+| Tipos estáticos | ¿El código es coherente antes de ejecutarlo? | Todo el backend | Frontend sí (`astro check` y `tsc --noEmit`, porque el primero no informa errores en tipos anidados); backend no |
 | Contratos | ¿Dos piezas que deben coincidir siguen coincidiendo? | Frontera frontend-backend, catálogos compartidos | Sí: códigos de incidencia, columnas y esquema de la API ↔ tipos del frontend |
 | Basadas en propiedades | ¿La regla se cumple para *cualquier* entrada, no solo las que imaginé? | Normalización (N-1 a N-8), mapeo de campos, fecha desde el nombre | No |
 | Mutación | ¿Mis pruebas fallarían si el código estuviera mal? | Núcleo de ingesta, versionado, mapeo | Solo a mano ("romper a propósito") |

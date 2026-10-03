@@ -14,7 +14,7 @@ Detalle de las capas que complementan a las clásicas de [SKILL.md](SKILL.md). P
 
 | Lado | Herramienta | Estado |
 |---|---|---|
-| Frontend | `npx astro check` (TypeScript estricto sobre `.astro` y `.ts`) | **Configurado**, en CI |
+| Frontend | `npx astro check` (TypeScript estricto sobre `.astro` y `.ts`) y `npm run tipos` (`tsc --noEmit` sobre todo el proyecto) | **Configurado**, los dos en CI. Hacen falta los dos: `astro check` no informó un error de asignación en un tipo anidado (una `interface` dentro de un modelo de entrada con firma de índice) que `tsc` sí detecta. Las asignaciones entre el editor y el contrato están en `frontend/tests/tipos/` |
 | Backend | `mypy` o `pyright` en modo estricto sobre `app/` | No configurado |
 
 **Cuidado:** en un backend que ya existe, activar el modo estricto de golpe produce cientos de avisos y la tentación de silenciarlos. Se activa por paquete, empezando por `app/core/`.

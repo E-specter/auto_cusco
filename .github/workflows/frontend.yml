@@ -32,6 +32,9 @@ jobs:
       - run: npm run contrato:comprobar
       # La comprobacion de tipos de Astro sobre .astro, .ts y el marcado.
       - run: npx astro check
+      # tsc sobre todo el proyecto: atrapa errores de asignacion en tipos
+      # anidados que astro check no informa (ver tests/tipos/).
+      - run: npm run tipos
       - run: npm run build
       # Incluye el contrato con los codigos de incidencia del backend, que lee
       # el codigo Python del propio repositorio.

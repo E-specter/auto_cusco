@@ -82,6 +82,7 @@ Equivale a, en orden:
 |---|---|---|
 | Contrato | `npm run contrato:comprobar` | Siempre. Falla si los tipos del frontend no coinciden con `contratos/openapi.json` |
 | Tipos | `npx astro check` | Siempre |
+| Tipos de todo el proyecto | `npm run tipos` (`tsc --noEmit -p tsconfig.json`) | Siempre. `astro check` no informa un error de asignación cuando el tipo que falla está anidado, por ejemplo una `interface` dentro de un modelo de entrada del contrato con firma de índice; `tsc` sí. Las asignaciones entre el editor y el contrato están explícitas en `tests/tipos/`, para que esa regresión tenga dónde fallar |
 | Build | `npm run build` | Siempre |
 | Núcleo y DOM | `npm run test` | Siempre |
 | Extremo a extremo | `npm run test:e2e` | Siempre. Playwright construye y levanta `preview` por su cuenta |
@@ -133,7 +134,7 @@ Son cosas distintas y se tratan distinto.
 
 `.github/workflows/frontend.yml` corre con los mismos disparadores, también con dos trabajos:
 
-- **Build y pruebas de núcleo:** tipos con `astro check`, build y `vitest`. Aquí vive la mitad frontend del contrato de códigos de incidencia: si el catálogo gana un código y nadie lo traduce, este trabajo falla.
+- **Build y pruebas de núcleo:** tipos con `astro check` y con `tsc --noEmit` (`npm run tipos`), build y `vitest`. Aquí vive la mitad frontend del contrato de códigos de incidencia: si el catálogo gana un código y nadie lo traduce, este trabajo falla.
 - **Extremo a extremo:** instala Chromium en el runner, construye el sitio y corre Playwright, que levanta `preview` por su cuenta. No necesita backend ni PostgreSQL porque cada prueba intercepta la API. Sube el reporte como artefacto cuando algo falla.
 
 Si un trabajo falla, se corrige antes de seguir. La integración continua no reemplaza la verificación local: es la red que atrapa lo que se olvidó correr.
