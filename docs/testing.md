@@ -80,7 +80,7 @@ Equivale a, en orden:
 
 | Paso | Comando | Cuándo |
 |---|---|---|
-| Contrato | `npm run contrato:comprobar` | Siempre. Falla si los tipos del frontend no coinciden con `contratos/openapi.json` |
+| Contrato | `npm run contrato:comprobar` | Siempre. Falla si los tipos del frontend no coinciden con `contratos/openapi.json`. En una copia nueva (clon o worktree) necesita antes `npm ci` en `frontend/herramientas/contrato` ([setup.md](setup.md), sección 2.1) |
 | Tipos | `npx astro check` | Siempre |
 | Tipos de todo el proyecto | `npm run tipos` (`tsc --noEmit -p tsconfig.json`) | Siempre. `astro check` no informa un error de asignación cuando el tipo que falla está anidado, por ejemplo una `interface` dentro de un modelo de entrada del contrato con firma de índice; `tsc` sí. Las asignaciones entre el editor y el contrato están explícitas en `tests/tipos/`, para que esa regresión tenga dónde fallar |
 | Build | `npm run build` | Siempre |

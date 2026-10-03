@@ -40,10 +40,12 @@ El repo incluye `auto_cusco.code-workspace`: ábrelo con VS Code (`File > Open W
 
 ```powershell
 cd frontend
-npm install
+npm ci
+cd herramientas\contrato
+npm ci
 ```
 
-Esto crea `frontend/node_modules/` (ignorado por git) a partir de `package.json`. La única dependencia actual es `astro`.
+El primer `npm ci` crea `frontend/node_modules/` (ignorado por git) a partir de `package-lock.json`. El segundo instala el generador de tipos del contrato, que vive aparte con su propio `package.json` porque exige TypeScript 5 y la app usa el 6. Sin él, `npm run contrato:comprobar` y por lo tanto `npm run verificar` fallan. Hay que hacerlo también en cada copia nueva del repositorio (un clon o un worktree), igual que el workflow de CI.
 
 ### 2.2 Levantar el servidor de desarrollo
 

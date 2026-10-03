@@ -85,6 +85,9 @@ Formato confirmado con el ejemplo de carga (sección 7).
   * No tiene documento de identidad para la columna `dni`; no se carga con `dni` vacío.
   * No tiene speech: sus días de atraso ajustados quedan fuera de los segmentos de RF-MM-15.
   * Le falta un dato que el speech necesita (titular o fecha de vencimiento de cuota).
+    * En un speech con estructura fija (versiones v1, incluido el Speech original), el titular y la fecha de vencimiento siempre se necesitan.
+    * En un speech armado con el motor de texto enriquecido (versiones v2), se excluye por falta de titular o de fecha solo si la expresión del segmento del producto usa esa variable. Se decide sobre la expresión compilada, no sobre el texto. El orden de las exclusiones no cambia.
+    * Una v2 creada a partir de una v1 marca el titular y la fecha como obligatorios, así que excluye igual que la v1.
   * Su mensaje supera los 160 caracteres (RF-MM-19).
   * Un mismo teléfono puede recibir más de un mensaje si tiene varios productos en la selección: no es motivo de exclusión (así ocurre en el ejemplo).
   * Un documento que no es DNI ni RUC tampoco es motivo de exclusión: se carga y se advierte (RF-MM-10).
@@ -217,6 +220,7 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Sobre qué se calcula el costo | Estimado sobre cargados al previsualizar y crear; real sobre enviados al importar el reporte; tarifa congelada en cada campaña (RF-MM-23, RF-MM-24) | Usuario (2026-09-28) |
 | Dónde se define el nombre de los archivos | Plantilla por defecto en la configuración, editable al crear cada campaña (RF-MM-25) | Usuario (2026-09-28) |
 | Qué se pagina en la previsualización | Las 20 filas de muestra y las 100 exclusiones que ya devuelve, sin recalcular; la lista completa sigue en el seguimiento (RF-MM-26) | Usuario (2026-09-28) |
+| Falta de titular o de fecha en un speech v2 | Se excluye solo si la expresión del segmento usa esa variable, según la expresión compilada; el orden de exclusiones no cambia; una v2 convertida desde una v1 las marca obligatorias y excluye igual (RF-MM-13) | Usuario (2026-10-03), consultado por coordinador_modulo_mowa_mes |
 
 ## 7. Evidencia de los ejemplos
 
@@ -254,3 +258,6 @@ Quedan abiertos S-MM-1, S-MM-3 y S-MM-4: los tres dependen de información exter
 - **RF nuevos incorporados:** RF-MM-23 (tarifa por SMS) y RF-MM-24 (costo de la campaña) en la sección 1; RF-MM-25 (nombre de los archivos de carga) y RF-MM-26 (paginación de la previsualización) en la sección 3.
 - **RF existentes ampliados o modificados:** ninguno.
 - **Nota de numeración:** como el resto del módulo, los RF nuevos continúan la secuencia sin renumerar los existentes (decisión del usuario del 2026-09-13), así que dentro de cada sección los números pueden no ser consecutivos.
+
+**2026-10-03**
+- **RF existentes ampliados:** RF-MM-13, para el speech armado con el motor de texto enriquecido (v2): la falta de titular o de fecha excluye solo si el segmento usa esa variable. Decisión del usuario en la sección 6.
