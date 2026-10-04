@@ -446,3 +446,20 @@ Además, para la revisión de MOWA MES:
 - el 409 (`huella_cambiada`) para una v2 cambiada entre previsualizar y crear;
 - las constantes congeladas del oro se quedan;
 - con un speech sin cota, `mensaje_excede_160` sigue excluyendo por fila sobre el mensaje real.
+
+## 19. Revisión de B6 (2026-10-04)
+
+Worktree `auto_cusco_mte_b6`, sobre `01e11c5`.
+- **Backend:** ruff limpio, 1927 pruebas en verde y el oro de B5 en verde (reproducido por el coordinador).
+- **Bloquea el commit:** con el contrato nuevo, `npm run tipos` da 20 errores en cuatro archivos de pruebas del frontend de MOWA MES (`e2e/api-falsa-mowa-mes.ts`, `e2e/mowa-mes-campana.spec.ts`, `tests/nucleo/mowa-mes.test.ts` y `tests/nucleo/mowa-mes-campana.test.ts`). Son del equipo de MOWA MES. Se pidió que los adapte `dev_frontend_modulo_mowa_mes` en el mismo worktree, solo tipos y datos nuevos, para que entren en el mismo commit.
+- **Revisiones en curso:** `coordinador_modulo_mowa_mes` (§13) y los consumidores (designer y dev_frontend, para F4).
+- **Pendiente para F4:** el aviso «segmento según días de atraso a la fecha de corte». En B6, la v2 recibe `dias_atraso_ajustados` (a la fecha de envío) como variable, y el ejemplo la evalúa con el inicio del rango.
+- **Revisión de designer (2026-10-04):**
+  - Visto bueno, salvo un punto: `ProblemaSpeechRespuesta.codigo` es un texto libre que puede venir de `CodigoTexto` o de `CodigoMowaMes`, y los dos comparten `telefono_invalido`. Se agrega el discriminador `catalogo: "texto" | "mowa_mes"`, y `campo` pasa a Literal.
+  - Orden: primero el ajuste del backend y después los fixtures de MOWA MES.
+- **Pendiente, como corte aparte:** `CodigoTexto` como enum en el OpenAPI, para que la compilación del frontend atrape un código mal escrito. Afecta las respuestas de B4a y B4b.
+- **Fixtures de MOWA MES (2026-10-04):** `dev_frontend_modulo_mowa_mes` adaptó los cuatro archivos de pruebas, con tipos, Vitest y Playwright en verde. Además encontró que `astro check` falla en `src/pages/mowa-mes/configuracion.astro:1278`: `largo_maximo` ahora puede ser `null`, y `npm run tipos` no revisa los `.astro`. `coordinador_modulo_mowa_mes` autorizó un arreglo mínimo en esa pantalla, que es suya: con `null` muestra «—», con su prueba. La interfaz completa de `sin_maximo` queda para F4. B6 lleva entonces cinco archivos del frontend de MOWA MES.
+- **Pendiente:** el contrato definitivo, con `catalogo` y `campo` en Literal. Después, la pasada final con `npm run verificar` completo.
+- **B6 devuelto por architec (2026-10-04):** 5 de 104 pruebas de integración fallan; 3 son de MOWA MES y ya existían. Causa probable: `expresiones` es JSONB sin `none_as_null`, así que un `None` se guarda como `'null'::jsonb` y no como NULL. El CHECK nuevo rechaza entonces guardar una v1, y acepta una v2 sin expresiones. Habría roto el guardado del speech en la base de trabajo del usuario.
+  - Arreglo: lo hace el dev en el mismo worktree, con una prueba de SQL crudo y una revisión de las demás pruebas `@postgres`.
+  - **Lección para los briefs que tocan persistencia:** como los devs no pueden correr las pruebas con base (decisión del usuario), deben compilar con el dialecto de PostgreSQL las sentencias que escriben columnas nulas, JSON o con zona horaria, y revisar los literales. En B4b y B6 los fallos con base aparecieron recién en architec.

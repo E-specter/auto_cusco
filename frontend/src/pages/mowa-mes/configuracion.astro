@@ -448,7 +448,7 @@ import '../../styles/mowa-mes.css';
     hayCambiosSpeech,
     modoGuardado,
     moverElemento,
-    nivelLargo,
+    nivelDeFila,
     problemasSupervision,
     rangoSegmento,
     renombrarProcedencia,
@@ -1273,15 +1273,20 @@ import '../../styles/mowa-mes.css';
         return;
       }
 
-      const nivel = nivelLargo(segmento);
-      fila.dataset.nivelLargo = nivel;
-      largo.textContent = segmento.falta_whatsapp ? '—' : formatNumber(segmento.largo_maximo);
+      // A segment with no maximum (`largo_maximo` null) shows "—" and no level, the same
+      // criterion as when the WhatsApp is missing; a number never goes to `formatNumber` as null.
+      const nivel = nivelDeFila(segmento);
+      fila.dataset.nivelLargo = nivel ?? '';
+      largo.textContent =
+        segmento.falta_whatsapp || segmento.largo_maximo === null ? '—' : formatNumber(segmento.largo_maximo);
 
-      const tag = document.createElement('span');
-      const variante = { ok: 'vigente', advertencia: 'advertencia', excede: 'error', falta_whatsapp: 'neutral' }[nivel];
-      tag.className = `tag tag--${variante}`;
-      tag.textContent = t(`mowaMes.speech.nivel.${nivel}`);
-      nivelCelda.append(tag);
+      if (nivel !== null) {
+        const tag = document.createElement('span');
+        const variante = { ok: 'vigente', advertencia: 'advertencia', excede: 'error', falta_whatsapp: 'neutral' }[nivel];
+        tag.className = `tag tag--${variante}`;
+        tag.textContent = t(`mowaMes.speech.nivel.${nivel}`);
+        nivelCelda.append(tag);
+      }
 
       if (segmento.codigo) {
         const detalle = document.createElement('span');

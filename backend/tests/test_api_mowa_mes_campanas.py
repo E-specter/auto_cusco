@@ -99,7 +99,12 @@ def test_previsualizacion_de_una_campana_valida() -> None:
     cuerpo = respuesta.json()
     assert respuesta.status_code == 200
     assert cuerpo["puede_crear"] is True and cuerpo["errores"] == []
-    assert cuerpo["speech"] == {"id": 1, "nombre": "Speech original", "huella": HUELLA_ORIGINAL}
+    assert cuerpo["speech"] == {
+        "id": 1,
+        "nombre": "Speech original",
+        "formato": "v1",
+        "huella": HUELLA_ORIGINAL,
+    }
     assert (cuerpo["productos_cargados"], cuerpo["supervision_cargados"]) == (1, 5)
     assert cuerpo["exclusiones_por_codigo"] == [
         {"codigo": "telefono_invalido", "tipo": "exclusion", "cantidad": 1}

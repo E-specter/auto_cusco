@@ -21,6 +21,9 @@ from app.core.entities.gestiones_digitales import ConfiguracionSupervision, Supe
 from app.core.entities.mowa_mes import (
     CampoConfiguracion,
     CodigoMowaMes,
+    DatosSpeech,
+    ExpresionSegmento,
+    FormatoSpeech,
     PartesSegmento,
     Programacion,
     Segmento,
@@ -65,6 +68,7 @@ from app.core.services.plataformas.mowa_mes.segmentos import ProgramacionInvalid
 from app.core.services.seleccion_cartera import expresiones
 from app.core.services.seleccion_cartera.recorrido import SeleccionPaginada
 from app.core.services.seleccion_cartera.servicio import CANTIDAD_MAXIMA, ConsultaCarteraService
+from app.core.services.texto_enriquecido.serializacion import expresion_a_dict
 
 COLUMNA_NUMERO = "numero"
 COLUMNA_DOCUMENTO = "dni"
@@ -83,10 +87,38 @@ _SIMBOLOS = {
 
 
 def huella_speech(partes: Sequence[PartesSegmento]) -> str:
-    """SHA-256 del texto de las partes: con esto la creacion sabe si el speech cambio."""
+    """SHA-256 del texto de las partes de una v1: con esto la creacion sabe si el speech cambio.
+
+    No cambia nunca: las huellas de las versiones v1 ya usadas (el Speech original y las del
+    usuario) son las que registraron sus campanas.
+    """
     datos = [[p.segmento.value, p.parte_1, p.parte_2] for p in partes]
     texto = json.dumps(datos, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(texto.encode("utf-8")).hexdigest()
+
+
+def huella_expresiones(expresiones: Sequence[ExpresionSegmento]) -> str:
+    """SHA-256 de la forma canonica de las expresiones de una v2, en el orden de los segmentos.
+
+    Propia de la v2: lleva el formato por delante, asi que no puede coincidir con la de una v1
+    aunque el texto de los mensajes fuera igual.
+    """
+    orden = {s: i for i, s in enumerate(Segmento)}
+    canonica = [
+        [e.segmento.value, expresion_a_dict(e.expresion)]
+        for e in sorted(expresiones, key=lambda e: orden[e.segmento])
+    ]
+    texto = json.dumps(
+        [FormatoSpeech.V2.value, canonica], ensure_ascii=False, separators=(",", ":")
+    )
+    return hashlib.sha256(texto.encode("utf-8")).hexdigest()
+
+
+def huella_de(datos: DatosSpeech) -> str:
+    """La huella de una version, segun su formato: la creacion de campanas compara esta."""
+    if datos.formato is FormatoSpeech.V2:
+        return huella_expresiones(datos.expresiones)
+    return huella_speech(datos.partes)
 
 
 def _texto(valor: Any) -> str:
@@ -161,20 +193,23 @@ def evaluar_producto(
     if _vacio(documento):
         return Exclusion(pagare, CodigoMowaMes.FALTA_DOCUMENTO)
     dias = producto.get("dias_atraso")
-    rango = segmentos.rango_de(
+    dias_ajustados = (
         None if dias is None else segmentos.dias_ajustados(dias, fecha_corte, fecha_envio)
     )
+    rango = segmentos.rango_de(dias_ajustados)
     if rango is None:
         return Exclusion(pagare, CodigoMowaMes.SIN_SPEECH)
+    # Una v1 siempre necesita el titular y la fecha; una v2, solo si la expresion del segmento usa
+    # la variable (RF-MM-13). El orden de las exclusiones no cambia.
     titular = producto.get("titular")
-    if _vacio(titular):
+    if constructor.usa_titular(rango.segmento) and _vacio(titular):
         return Exclusion(pagare, CodigoMowaMes.FALTA_TITULAR)
     vencimiento = producto.get("fecha_vencimiento_cuota")
-    if vencimiento is None:
+    if constructor.usa_vencimiento(rango.segmento) and vencimiento is None:
         return Exclusion(pagare, CodigoMowaMes.FALTA_VENCIMIENTO)
     if constructor.requiere_whatsapp_faltante(rango.segmento):
         return rango.segmento
-    mensaje = constructor.mensaje_de(rango.segmento, titular, vencimiento)
+    mensaje = constructor.mensaje_de(rango.segmento, titular, vencimiento, dias_ajustados)
     codigo = speech.codigo_por_largo(len(mensaje))
     if codigo is CodigoMowaMes.MENSAJE_EXCEDE_160:
         return Exclusion(pagare, codigo)
@@ -232,7 +267,7 @@ class CampanasMowaMesService:
         supervisores, procedencias = self._supervisores_de(peticion)
         documentos = supervision.documentos_por_posicion(supervisores, procedencias)
 
-        constructor = speech.ConstructorMensajes(version.datos.partes, whatsapp)
+        constructor = speech.ConstructorMensajes(version.datos, whatsapp)
         seleccion = SeleccionPaginada(
             self._consulta, peticion.fecha_corte, filtros, orden, peticion.cantidad
         )
@@ -285,7 +320,7 @@ class CampanasMowaMesService:
             fecha_generacion=fecha_generacion,
             fecha_envio=fecha_envio,
             speech=version,
-            speech_huella=huella_speech(version.datos.partes),
+            speech_huella=huella_de(version.datos),
             whatsapp=whatsapp,
             supervisores=tuple(
                 SupervisorAsignado(s.numero, s.procedencia, documento)

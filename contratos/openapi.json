@@ -1873,7 +1873,7 @@
           "mowa-mes"
         ],
         "summary": "Crear Speech",
-        "description": "Guarda una version nueva. 404 si `basada_en_id` no existe.",
+        "description": "Guarda una version nueva, v1 (`partes`) o v2 (`expresiones`). 404 si `basada_en_id` no\nexiste.",
         "operationId": "crear_speech_mowa_mes_speech_post",
         "requestBody": {
           "content": {
@@ -1897,11 +1897,11 @@
             }
           },
           "400": {
-            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "description": "La peticion no vale: `detail` es el motivo y `problemas` dice donde",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DetalleError"
+                  "$ref": "#/components/schemas/DetalleErrorSpeech"
                 }
               }
             }
@@ -1945,7 +1945,7 @@
           "mowa-mes"
         ],
         "summary": "Previsualizar Speech",
-        "description": "Largo maximo de cada segmento, con titular de 8 y fecha de 10 (RF-MM-19).\n\nUn segmento que usa [whatsapp] sin numero se marca con `falta_whatsapp` y sin\nejemplo: nunca se muestra un enlace roto.",
+        "description": "Largo maximo de cada segmento, con titular de 8 y fecha de 10 (RF-MM-19).\n\nCon `expresiones` (v2) devuelve por segmento el largo maximo (la cota de la expresion), el\nnivel (`codigo`: 150 o 160 si lo cruza) y el ejemplo evaluado; sin maximo calculable,\n`largo_maximo` es nulo y `sin_maximo` dice por que. El control de los 160 caracteres de la\ncampana es por fila, sobre el mensaje real.\n\nUn segmento que usa [whatsapp] sin numero se marca con `falta_whatsapp` y sin\nejemplo: nunca se muestra un enlace roto.",
         "operationId": "previsualizar_speech_mowa_mes_speech_previsualizacion_post",
         "requestBody": {
           "content": {
@@ -1969,11 +1969,11 @@
             }
           },
           "400": {
-            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "description": "La peticion no vale: `detail` es el motivo y `problemas` dice donde",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DetalleError"
+                  "$ref": "#/components/schemas/DetalleErrorSpeech"
                 }
               }
             }
@@ -2047,7 +2047,7 @@
           "mowa-mes"
         ],
         "summary": "Actualizar Speech",
-        "description": "Reemplaza una version que nadie uso. Si ya se uso o es la original, 409.",
+        "description": "Reemplaza una version que nadie uso, en su mismo formato. Si ya se uso o es la original,\n409; si el contenido es del otro formato, 400.",
         "operationId": "actualizar_speech_mowa_mes_speech__speech_id__put",
         "parameters": [
           {
@@ -2082,11 +2082,11 @@
             }
           },
           "400": {
-            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "description": "La peticion no vale: `detail` es el motivo y `problemas` dice donde",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DetalleError"
+                  "$ref": "#/components/schemas/DetalleErrorSpeech"
                 }
               }
             }
@@ -2103,6 +2103,69 @@
           },
           "409": {
             "description": "La operacion choca con el estado actual",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mowa-mes/speech/{speech_id}/como-v2": {
+      "get": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Convertir A V2",
+        "description": "El borrador v2 de una v1: la misma estructura expresada con el motor, que da los mismos\nmensajes y largos (con el titular y la fecha obligatorios). No guarda nada: se edita y se\nguarda con `POST /speech` y `basada_en_id`, como una version nueva con huella propia. La v1\nqueda intacta. Una version que ya es v2 responde 400.",
+        "operationId": "convertir_a_v2_mowa_mes_speech__speech_id__como_v2_get",
+        "parameters": [
+          {
+            "name": "speech_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Speech Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BorradorV2Respuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no vale: `detail` es el motivo y `problemas` dice donde",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorSpeech"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
             "content": {
               "application/json": {
                 "schema": {
@@ -3377,6 +3440,41 @@
           "archivo"
         ],
         "title": "Body_subir_sabana_cargas_post"
+      },
+      "BorradorV2Respuesta": {
+        "properties": {
+          "basada_en_id": {
+            "type": "integer",
+            "title": "Basada En Id"
+          },
+          "nombre_sugerido": {
+            "type": "string",
+            "title": "Nombre Sugerido"
+          },
+          "expresiones": {
+            "items": {
+              "$ref": "#/components/schemas/ExpresionSegmentoRespuesta"
+            },
+            "type": "array",
+            "title": "Expresiones"
+          },
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaSpeechRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "basada_en_id",
+          "nombre_sugerido",
+          "expresiones",
+          "problemas"
+        ],
+        "title": "BorradorV2Respuesta",
+        "description": "Una v1 convertida a v2, sin guardar: se edita y se guarda como version nueva."
       },
       "CampanaRespuesta": {
         "properties": {
@@ -5048,6 +5146,28 @@
         "title": "DetalleErrorDefinicion",
         "description": "Un `400` al guardar: el motivo, el `codigo` y todos los problemas con su ubicacion."
       },
+      "DetalleErrorSpeech": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaSpeechRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "problemas"
+        ],
+        "title": "DetalleErrorSpeech",
+        "description": "Un 400 de speech: el motivo y los problemas, cada uno con su ubicacion."
+      },
       "DetalleErrorTexto": {
         "properties": {
           "detail": {
@@ -5370,6 +5490,77 @@
         ],
         "title": "ExpresionGuardadaRespuesta"
       },
+      "ExpresionSegmentoEntrada": {
+        "properties": {
+          "segmento": {
+            "$ref": "#/components/schemas/Segmento"
+          },
+          "expresion": {
+            "$ref": "#/components/schemas/ExpresionEntrada"
+          }
+        },
+        "type": "object",
+        "required": [
+          "segmento",
+          "expresion"
+        ],
+        "title": "ExpresionSegmentoEntrada",
+        "description": "El contenido de un segmento de una v2: su expresion completa (el modelo del motor)."
+      },
+      "ExpresionSegmentoRespuesta": {
+        "properties": {
+          "segmento": {
+            "$ref": "#/components/schemas/Segmento"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta"
+          },
+          "dias_desde": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Desde"
+          },
+          "dias_hasta": {
+            "type": "integer",
+            "title": "Dias Hasta"
+          },
+          "expresion": {
+            "$ref": "#/components/schemas/ExpresionGuardadaRespuesta"
+          },
+          "usa_titular": {
+            "type": "boolean",
+            "title": "Usa Titular"
+          },
+          "usa_vencimiento": {
+            "type": "boolean",
+            "title": "Usa Vencimiento"
+          },
+          "usa_whatsapp": {
+            "type": "boolean",
+            "title": "Usa Whatsapp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "segmento",
+          "etiqueta",
+          "dias_desde",
+          "dias_hasta",
+          "expresion",
+          "usa_titular",
+          "usa_vencimiento",
+          "usa_whatsapp"
+        ],
+        "title": "ExpresionSegmentoRespuesta",
+        "description": "El segmento de una v2. `usa_titular` y `usa_vencimiento` dicen si un producto sin ese dato\nse excluye en este segmento (RF-MM-13): solo si la expresion usa la variable."
+      },
       "FeriadosRespuesta": {
         "properties": {
           "anio": {
@@ -5634,6 +5825,15 @@
           "opciones"
         ],
         "title": "FormatoRespuesta"
+      },
+      "FormatoSpeech": {
+        "type": "string",
+        "enum": [
+          "v1",
+          "v2"
+        ],
+        "title": "FormatoSpeech",
+        "description": "Como se guarda el contenido de una version del speech.\n\n`v1` es la estructura fija de siempre (dos partes por segmento, RF-MM-14), incluido el Speech\noriginal. `v2` es una expresion del motor de texto enriquecido por segmento (RF-42 a RF-48)."
       },
       "FuncionEntrada": {
         "properties": {
@@ -5942,8 +6142,25 @@
             "title": "Falta Whatsapp"
           },
           "largo_maximo": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Largo Maximo"
+          },
+          "sin_maximo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SinCotaRespuesta"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "codigo": {
             "anyOf": [
@@ -5974,10 +6191,12 @@
           "usa_whatsapp",
           "falta_whatsapp",
           "largo_maximo",
+          "sin_maximo",
           "codigo",
           "ejemplo"
         ],
-        "title": "LargoSegmentoRespuesta"
+        "title": "LargoSegmentoRespuesta",
+        "description": "`largo_maximo` es nulo cuando la expresion de una v2 no tiene maximo calculable: `sin_maximo`\ndice por que (una variable cuyo largo depende del dato, o una funcion que no lo acota)."
       },
       "LimitesRespuesta": {
         "properties": {
@@ -7267,11 +7486,34 @@
       "PrevisualizacionEntrada": {
         "properties": {
           "partes": {
-            "items": {
-              "$ref": "#/components/schemas/PartesEntrada"
-            },
-            "type": "array",
-            "title": "Partes"
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PartesEntrada"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partes",
+            "description": "Las `partes` de una v1 o las `expresiones` de una v2: una de las dos"
+          },
+          "expresiones": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExpresionSegmentoEntrada"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expresiones",
+            "description": "Las `partes` de una v1 o las `expresiones` de una v2: una de las dos"
           },
           "whatsapp": {
             "anyOf": [
@@ -7288,9 +7530,6 @@
           }
         },
         "type": "object",
-        "required": [
-          "partes"
-        ],
         "title": "PrevisualizacionEntrada"
       },
       "PrevisualizacionTextoRespuesta": {
@@ -7390,20 +7629,68 @@
           },
           "campo": {
             "type": "string",
+            "enum": [
+              "nombre",
+              "segmentos",
+              "formato",
+              "parte_1",
+              "parte_2",
+              "expresion"
+            ],
             "title": "Campo"
           },
           "detalle": {
             "type": "string",
             "title": "Detalle"
+          },
+          "codigo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo"
+          },
+          "catalogo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "texto",
+                  "mowa_mes"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalogo"
+          },
+          "ubicacion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UbicacionRespuesta"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
           "segmento",
           "campo",
-          "detalle"
+          "detalle",
+          "codigo",
+          "catalogo",
+          "ubicacion"
         ],
-        "title": "ProblemaSpeechRespuesta"
+        "title": "ProblemaSpeechRespuesta",
+        "description": "`codigo` y `ubicacion` (nodo, funcion y parametro) vienen en los problemas de una v2.\n\n`catalogo` dice en cual catalogo i18n se traduce `codigo`: `texto` (`textoEnriquecido.codigo.*`,\nel del motor) o `mowa_mes` (`mowaMes.codigo.*`). Los dos catalogos comparten nombres\n(`telefono_invalido`) con textos distintos, asi que el codigo solo no basta. Es nulo cuando\n`codigo` lo es."
       },
       "ProblemaTextoRespuesta": {
         "properties": {
@@ -8038,6 +8325,9 @@
             "type": "string",
             "title": "Nombre"
           },
+          "formato": {
+            "$ref": "#/components/schemas/FormatoSpeech"
+          },
           "huella": {
             "type": "string",
             "title": "Huella"
@@ -8047,6 +8337,7 @@
         "required": [
           "id",
           "nombre",
+          "formato",
           "huella"
         ],
         "title": "SpeechCampanaRespuesta"
@@ -8060,17 +8351,39 @@
             "title": "Nombre"
           },
           "partes": {
-            "items": {
-              "$ref": "#/components/schemas/PartesEntrada"
-            },
-            "type": "array",
-            "title": "Partes"
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PartesEntrada"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partes",
+            "description": "Las `partes` de una v1 o las `expresiones` de una v2: una de las dos"
+          },
+          "expresiones": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExpresionSegmentoEntrada"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expresiones",
+            "description": "Las `partes` de una v1 o las `expresiones` de una v2: una de las dos"
           }
         },
         "type": "object",
         "required": [
-          "nombre",
-          "partes"
+          "nombre"
         ],
         "title": "SpeechEdicionEntrada"
       },
@@ -8101,17 +8414,37 @@
             "title": "Basada En Id"
           },
           "partes": {
-            "items": {
-              "$ref": "#/components/schemas/PartesEntrada"
-            },
-            "type": "array",
-            "title": "Partes"
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PartesEntrada"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partes",
+            "description": "Las `partes` de una v1 o las `expresiones` de una v2: una de las dos"
+          },
+          "expresiones": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExpresionSegmentoEntrada"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expresiones",
+            "description": "Las `partes` de una v1 o las `expresiones` de una v2: una de las dos"
           }
         },
         "type": "object",
-        "required": [
-          "partes"
-        ],
         "title": "SpeechNuevoEntrada"
       },
       "SpeechRegistradoRespuesta": {
@@ -8707,6 +9040,9 @@
             "type": "string",
             "title": "Nombre"
           },
+          "formato": {
+            "$ref": "#/components/schemas/FormatoSpeech"
+          },
           "original": {
             "type": "boolean",
             "title": "Original"
@@ -8741,20 +9077,30 @@
             },
             "type": "array",
             "title": "Partes"
+          },
+          "expresiones": {
+            "items": {
+              "$ref": "#/components/schemas/ExpresionSegmentoRespuesta"
+            },
+            "type": "array",
+            "title": "Expresiones"
           }
         },
         "type": "object",
         "required": [
           "id",
           "nombre",
+          "formato",
           "original",
           "basada_en_id",
           "usada",
           "editable",
           "creado_en",
-          "partes"
+          "partes",
+          "expresiones"
         ],
-        "title": "VersionSpeechRespuesta"
+        "title": "VersionSpeechRespuesta",
+        "description": "`partes` si es v1 y `expresiones` si es v2; la otra lista viene vacia."
       },
       "app__api__archivos_carga__PrevisualizacionRespuesta": {
         "properties": {

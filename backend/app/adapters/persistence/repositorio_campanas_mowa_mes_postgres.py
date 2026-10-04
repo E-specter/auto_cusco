@@ -24,9 +24,9 @@ from app.adapters.persistence.modelos import (
     MowaMesReporteFila,
     MowaMesSpeechVersion,
 )
+from app.adapters.persistence.repositorio_mowa_mes_postgres import datos_de_fila
 from app.core.entities.mowa_mes import (
     CodigoMowaMes,
-    PartesSegmento,
     Programacion,
     Segmento,
     SpeechNoEncontrado,
@@ -51,7 +51,7 @@ from app.core.ports.repositorio_campanas_mowa_mes_port import (
     NombradorDeArchivos,
     RepositorioCampanasMowaMesPort,
 )
-from app.core.services.plataformas.mowa_mes.campana import huella_speech
+from app.core.services.plataformas.mowa_mes.campana import huella_de
 
 _CAMPANA = MowaMesCampana.__table__
 _ARCHIVO = MowaMesArchivo.__table__
@@ -203,15 +203,14 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
     ) -> CampanaRegistrada:
         with self._engine.begin() as cx:
             version = cx.execute(
-                select(_SPEECH.c.partes).where(_SPEECH.c.id == armada.speech.id).with_for_update()
+                select(_SPEECH.c.partes, _SPEECH.c.formato, _SPEECH.c.expresiones)
+                .where(_SPEECH.c.id == armada.speech.id)
+                .with_for_update()
             ).one_or_none()
             if version is None:
                 raise SpeechNoEncontrado(armada.speech.id)
-            partes = tuple(
-                PartesSegmento(Segmento(p["segmento"]), p["parte_1"], p["parte_2"])
-                for p in version.partes
-            )
-            if huella_speech(partes) != armada.speech_huella:
+            guardada = datos_de_fila("", version.partes, version.formato, version.expresiones)
+            if huella_de(guardada) != armada.speech_huella:
                 raise SpeechCambiado(armada.speech.id)
             cx.execute(
                 update(_SPEECH)

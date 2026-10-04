@@ -18,6 +18,7 @@ import {
   insertarVariable,
   modoGuardado,
   moverElemento,
+  nivelDeFila,
   nivelLargo,
   paginar,
   presentarCosto,
@@ -51,6 +52,7 @@ function version(parcial: Partial<VersionSpeech> = {}): VersionSpeech {
   return {
     id: 2,
     nombre: 'Speech 2',
+    formato: 'v1',
     original: false,
     basada_en_id: 1,
     usada: false,
@@ -58,6 +60,7 @@ function version(parcial: Partial<VersionSpeech> = {}): VersionSpeech {
     creado_en: '2099-01-01T08:00:00-05:00',
     // Desordenadas a propósito: el borrador sigue el orden de RF-MM-15.
     partes: [parte('9_a_30'), parte('preventiva'), parte('1_a_8')],
+    expresiones: [],
     ...parcial,
   };
 }
@@ -69,6 +72,7 @@ function largo(parcial: Partial<LargoSegmento> = {}): LargoSegmento {
     usa_whatsapp: false,
     falta_whatsapp: false,
     largo_maximo: 120,
+    sin_maximo: null,
     codigo: null,
     ejemplo: 'ejemplo',
     ...parcial,
@@ -579,5 +583,29 @@ describe('campoDeError', () => {
   it('un cuerpo que no llegó (no era un objeto JSON) tampoco', () => {
     expect(campoDeError(null)).toBeNull();
     expect(campoDeError({})).toBeNull();
+  });
+});
+
+describe('nivelDeFila (un segmento sin máximo no tiene nivel)', () => {
+  const sinMaximo = {
+    largo_maximo: null,
+    sin_maximo: { codigo: 'sin_cota', detalle: 'sin máximo', ubicacion: { nodo: 1, funcion: null, parametro: null } },
+  } as const;
+
+  it('con largo máximo es el nivel de siempre', () => {
+    expect(nivelDeFila(largo())).toBe('ok');
+    expect(nivelDeFila(largo({ largo_maximo: 156, codigo: 'mensaje_excede_150' }))).toBe('advertencia');
+    expect(nivelDeFila(largo({ largo_maximo: 161, codigo: 'mensaje_excede_160' }))).toBe('excede');
+  });
+
+  it('sin largo máximo no hay nivel: no se afirma que «cabe»', () => {
+    expect(nivelDeFila(largo(sinMaximo))).toBeNull();
+    expect(nivelDeFila(largo({ ...sinMaximo, codigo: null }))).toBeNull();
+  });
+
+  it('faltar el WhatsApp es un estado propio y se muestra aunque no haya máximo', () => {
+    expect(nivelDeFila(largo({ ...sinMaximo, falta_whatsapp: true, usa_whatsapp: true, ejemplo: null }))).toBe(
+      'falta_whatsapp',
+    );
   });
 });

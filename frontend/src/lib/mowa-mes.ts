@@ -76,6 +76,17 @@ export function nivelLargo(segmento: LargoSegmento): NivelLargo {
 }
 
 /**
+ * The level a segment's row shows, or `null` when it has none to show: a segment
+ * with no maximum length (`largo_maximo` is `null`) has nothing to fit under the
+ * 150 or the 160, so no "Cabe" is claimed for it. Missing the WhatsApp is a state
+ * of its own and does not depend on the length, so it still shows.
+ */
+export function nivelDeFila(segmento: LargoSegmento): NivelLargo | null {
+  if (segmento.falta_whatsapp) return 'falta_whatsapp';
+  return segmento.largo_maximo === null ? null : nivelLargo(segmento);
+}
+
+/**
  * One sentence for assistive tech about the whole preview: how many segments
  * cannot be generated, are excluded or are warned. It is written once per
  * preview (after the same debounce), never per keystroke. No preview, no text.

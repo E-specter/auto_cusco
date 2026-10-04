@@ -10,12 +10,18 @@ from app.adapters.persistence.modelos import MowaMesConfiguracion, MowaMesSpeech
 from app.core.entities.mowa_mes import (
     ConfiguracionMowaMes,
     DatosSpeech,
+    ExpresionSegmento,
+    FormatoSpeech,
     NombreDeSpeechRepetido,
     PartesSegmento,
     Segmento,
     VersionSpeech,
 )
 from app.core.ports.repositorio_mowa_mes_port import RepositorioMowaMesPort
+from app.core.services.texto_enriquecido.serializacion import (
+    expresion_a_dict,
+    expresion_desde_dict,
+)
 
 _CONFIGURACION = MowaMesConfiguracion.__table__
 _SPEECH = MowaMesSpeechVersion.__table__
@@ -33,16 +39,56 @@ def _partes_a_json(partes: tuple[PartesSegmento, ...]) -> list[dict[str, str]]:
     ]
 
 
+def _expresiones_a_json(expresiones: tuple[ExpresionSegmento, ...]) -> list[dict[str, Any]]:
+    return [
+        {"segmento": e.segmento.value, "expresion": expresion_a_dict(e.expresion)}
+        for e in expresiones
+    ]
+
+
+def _valores_de_contenido(datos: DatosSpeech) -> dict[str, Any]:
+    """Columnas del contenido: una v1 guarda `partes`; una v2, `expresiones` (y `partes` vacio)."""
+    if datos.formato is FormatoSpeech.V2:
+        return {
+            "formato": FormatoSpeech.V2.value,
+            "partes": [],
+            "expresiones": _expresiones_a_json(datos.expresiones),
+        }
+    return {
+        "formato": FormatoSpeech.V1.value,
+        "partes": _partes_a_json(datos.partes),
+        "expresiones": None,
+    }
+
+
+def datos_de_fila(
+    nombre: str,
+    partes: list[dict[str, Any]],
+    formato: str,
+    expresiones: list[dict[str, Any]] | None,
+) -> DatosSpeech:
+    """El contenido de una version tal como esta guardado (lo que la huella y los mensajes leen)."""
+    if formato == FormatoSpeech.V2.value:
+        return DatosSpeech(
+            nombre=nombre,
+            expresiones=tuple(
+                ExpresionSegmento(Segmento(e["segmento"]), expresion_desde_dict(e["expresion"]))
+                for e in expresiones or []
+            ),
+            formato=FormatoSpeech.V2,
+        )
+    return DatosSpeech(
+        nombre=nombre,
+        partes=tuple(
+            PartesSegmento(Segmento(p["segmento"]), p["parte_1"], p["parte_2"]) for p in partes
+        ),
+    )
+
+
 def _version(fila: Row) -> VersionSpeech:
-    partes: list[dict[str, Any]] = fila.partes
     return VersionSpeech(
         id=fila.id,
-        datos=DatosSpeech(
-            nombre=fila.nombre,
-            partes=tuple(
-                PartesSegmento(Segmento(p["segmento"]), p["parte_1"], p["parte_2"]) for p in partes
-            ),
-        ),
+        datos=datos_de_fila(fila.nombre, fila.partes, fila.formato, fila.expresiones),
         original=fila.original,
         basada_en_id=fila.basada_en_id,
         usada_en=fila.usada_en,
@@ -119,7 +165,7 @@ class RepositorioMowaMesPostgres(RepositorioMowaMesPort):
             .values(
                 nombre=datos.nombre,
                 nombre_normalizado=normalizar_nombre(datos.nombre),
-                partes=_partes_a_json(datos.partes),
+                **_valores_de_contenido(datos),
                 basada_en_id=basada_en_id,
             )
             .returning(*_SPEECH.c)
@@ -140,11 +186,13 @@ class RepositorioMowaMesPostgres(RepositorioMowaMesPort):
                 _SPEECH.c.id == speech_id,
                 _SPEECH.c.usada_en.is_(None),
                 _SPEECH.c.original.is_(False),
+                # El formato no cambia al editar: una v1 sigue siendo v1 y una v2, v2.
+                _SPEECH.c.formato == datos.formato.value,
             )
             .values(
                 nombre=datos.nombre,
                 nombre_normalizado=normalizar_nombre(datos.nombre),
-                partes=_partes_a_json(datos.partes),
+                **_valores_de_contenido(datos),
             )
             .returning(*_SPEECH.c)
         )

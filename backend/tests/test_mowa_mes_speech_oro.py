@@ -2,13 +2,12 @@
 """Prueba de oro de MOWA MES M1 (B5, RF-54): el speech evaluado con el motor de texto enriquecido
 da exactamente lo mismo que el camino de antes.
 
-Se compara de dos maneras. Contra CONSTANTES congeladas en HEAD 3e567d7 con el codigo viejo
-(`oro_mowa_mes_congelados.py`: los 6 mensajes del Speech original y un SHA-256 de toda la matriz),
-siempre: sobreviven al retiro del camino viejo. Y contra el camino viejo EN VIVO
-(`plantilla_mensaje` + `GeneradorCargas` + `contexto_fila`), que sigue en el codigo solo como
-referencia hasta cerrar M2: al retirarlo (B6) se borran solo las comparaciones en vivo (las pruebas
-marcadas "en vivo"). `previsualizar` se compara contra una copia textual de su aritmetica anterior y
-contra los valores del Speech original congelados en HEAD.
+Se compara contra CONSTANTES congeladas en HEAD 3e567d7 con el codigo viejo
+(`oro_mowa_mes_congelados.py`: los 6 mensajes del Speech original y un SHA-256 de toda la matriz).
+El camino viejo (`plantilla_mensaje` + `GeneradorCargas` + `contexto_fila`) se retiro en B6 (M2) junto
+con las comparaciones en vivo: las constantes son lo que queda de referencia. `previsualizar` se
+compara contra una copia textual de su aritmetica anterior y contra los valores del Speech original
+congelados en HEAD.
 
 Titulares, numeros y textos sinteticos.
 """
@@ -18,7 +17,6 @@ from datetime import date
 
 import pytest
 
-from app.core.entities.mapeo import CampoSalida, DefinicionCarga
 from app.core.entities.mowa_mes import (
     LARGO_NUMERO_WHATSAPP,
     LARGO_TITULAR,
@@ -42,7 +40,6 @@ from app.core.entities.texto_enriquecido import (
     NodoVariable,
     TipoValor,
 )
-from app.core.services.mapeo_campos.generador import GeneradorCargas
 from app.core.services.plataformas.mowa_mes import speech
 from app.core.services.plataformas.mowa_mes.campana import (
     Exclusion,
@@ -112,21 +109,6 @@ def test_las_huellas_del_speech_original_y_de_las_partes_sinteticas_no_cambian()
 # --- Referencias: el camino de antes -----------------------------------------------------------
 
 
-def _mensaje_de_antes(
-    partes: PartesSegmento, whatsapp: str | None, titular, vencimiento
-) -> str | FaltaWhatsapp:
-    try:
-        plantilla = speech.plantilla_mensaje(partes, whatsapp)
-    except FaltaWhatsapp as error:
-        return error
-    definicion = DefinicionCarga(
-        nombre="referencia", campos=(CampoSalida(speech.CAMPO_MENSAJE, plantilla),)
-    )
-    generador = GeneradorCargas(definicion, speech.CAMPOS_CONTEXTO)
-    fila, _ = generador.generar_fila(speech.contexto_fila(titular, vencimiento, whatsapp), 1)
-    return fila[speech.CAMPO_MENSAJE]
-
-
 def _previsualizar_de_antes(partes, whatsapp):
     """Copia textual de `previsualizar` antes de M1: aritmetica fija de 8 + 10 + texto + enlace."""
     por_segmento = {p.segmento: p for p in partes}
@@ -164,31 +146,6 @@ def _de_ahora(largos):
 
 
 # --- Mensajes: byte a byte contra el camino de antes --------------------------------------------
-
-
-@pytest.mark.parametrize("nombre", list(TODAS_LAS_VERSIONES))
-def test_en_vivo_el_mensaje_es_identico_byte_a_byte_al_camino_de_antes(nombre) -> None:
-    version = TODAS_LAS_VERSIONES[nombre]
-    comparados = 0
-
-    for whatsapp in NUMEROS:
-        constructor = speech.ConstructorMensajes(version, whatsapp)
-        for partes in version:
-            for titular in TITULARES:
-                for vencimiento in VENCIMIENTOS:
-                    esperado = _mensaje_de_antes(partes, whatsapp, titular, vencimiento)
-                    if isinstance(esperado, FaltaWhatsapp):
-                        with pytest.raises(FaltaWhatsapp):
-                            constructor.mensaje_de(partes.segmento, titular, vencimiento)
-                        assert constructor.requiere_whatsapp_faltante(partes.segmento)
-                        continue
-                    obtenido = constructor.mensaje_de(partes.segmento, titular, vencimiento)
-
-                    assert obtenido == esperado, (nombre, partes.segmento, whatsapp, titular)
-                    assert obtenido.encode("utf-8") == esperado.encode("utf-8")
-                    comparados += 1
-
-    assert comparados > 100  # la comparacion se ejercita de verdad
 
 
 def test_los_seis_mensajes_del_speech_original_son_los_congelados_en_head() -> None:
@@ -324,7 +281,13 @@ def test_partes_muy_largas_y_con_muchos_whatsapp_no_topan_con_los_limites_del_mo
 
     mensaje = constructor.mensaje_de(partes.segmento, "ZZPRUEBA", VENCIMIENTO)
 
-    assert mensaje == _mensaje_de_antes(partes, WHATSAPP, "ZZPRUEBA", VENCIMIENTO)
+    enlace = speech.enlace_whatsapp(WHATSAPP)
+    assert mensaje == (
+        "ZZPRUEBA"
+        + partes.parte_1.replace(VARIABLE_WHATSAPP, enlace)
+        + VENCIMIENTO.strftime("%d/%m/%Y")
+        + partes.parte_2
+    )
     largo = speech.previsualizar((partes,), WHATSAPP)[0]
     assert largo.largo_maximo == len(mensaje)
 
@@ -453,12 +416,18 @@ def test_la_falta_de_whatsapp_va_despues_del_titular_y_del_vencimiento() -> None
     assert isinstance(_evaluar(constructor), FilaCarga)  # 4 dias: segmento sin whatsapp
 
 
-def test_una_fila_cargada_lleva_el_mismo_mensaje_que_el_camino_de_antes() -> None:
+def test_una_fila_cargada_lleva_el_mensaje_del_speech_con_titular_de_8_y_fecha() -> None:
     constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
 
     fila = _evaluar(constructor, dias_atraso=45, titular="  Peña Ruiz Jose")
 
-    esperado = _mensaje_de_antes(ORIGINAL[3], WHATSAPP, "  Peña Ruiz Jose", VENCIMIENTO)
+    enlace = speech.enlace_whatsapp(WHATSAPP)
+    esperado = (  # titular de 8 caracteres, tal cual (con sus espacios), y la fecha dd/mm/aaaa
+        "  Peña R"
+        + ORIGINAL[3].parte_1.replace(VARIABLE_WHATSAPP, enlace)
+        + "05/09/2026"
+        + ORIGINAL[3].parte_2.replace(VARIABLE_WHATSAPP, enlace)
+    )
     assert fila.segmento is Segmento.DE_31_A_60
     assert fila.mensaje == esperado
 
@@ -571,9 +540,9 @@ class ConstructorEspia(speech.ConstructorMensajes):
         super().__init__(*args, **kwargs)
         self.pedidos: list[tuple] = []
 
-    def mensaje_de(self, segmento, titular, vencimiento):
+    def mensaje_de(self, segmento, titular, vencimiento, dias_ajustados=None):
         self.pedidos.append((segmento, titular, vencimiento))
-        return super().mensaje_de(segmento, titular, vencimiento)
+        return super().mensaje_de(segmento, titular, vencimiento, dias_ajustados)
 
 
 @pytest.mark.parametrize("titular", [None, "", "   ", "\t\n "])

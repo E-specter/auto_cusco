@@ -269,7 +269,7 @@ describe('previsualización completa (contrato)', () => {
       descripcion_sugerida: 'CajaCusco 9 <= dias atraso <= 30',
       fecha_generacion: '2026-09-13',
       fecha_envio: '2026-09-15',
-      speech: { id: 1, nombre: 'Speech original', huella: 'a'.repeat(64) },
+      speech: { id: 1, nombre: 'Speech original', formato: 'v1', huella: 'a'.repeat(64) },
       whatsapp: '900000999',
       supervisores: [{ numero: '900000101', procedencia: 'Procedencia A', documento: '00000001' }],
       disponibles: 1200,

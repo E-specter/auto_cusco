@@ -3,9 +3,14 @@
 Una version de speech usada por una campana no se modifica (RF-MM-17), y el
 Speech original tampoco: es la referencia de RF-MM-18. Editar cualquiera de las
 dos crea una version nueva.
+
+Una version es v1 (dos partes por segmento) o v2 (una expresion del motor por segmento, M2); el
+formato no cambia al editarla. `como_v2` convierte una v1 en el borrador de una v2 que da los
+mismos mensajes, sin guardar nada: guardarlo es crear una version nueva basada en la v1.
 """
 
 import re
+from dataclasses import dataclass, replace
 
 from app.core.entities.mowa_mes import (
     BYTES_POR_ARCHIVO,
@@ -15,9 +20,12 @@ from app.core.entities.mowa_mes import (
     ConfiguracionInvalida,
     ConfiguracionMowaMes,
     DatosSpeech,
+    ExpresionSegmento,
+    FormatoSpeech,
     LargoSegmento,
     PartesSegmento,
     ProblemaSpeech,
+    Segmento,
     SpeechInmutable,
     SpeechInvalido,
     SpeechNoEncontrado,
@@ -38,6 +46,16 @@ def nombre_siguiente(nombres: list[str]) -> str:
         if (coincidencia := _NOMBRE_AUTOMATICO.fullmatch(nombre.strip()))
     ]
     return f"Speech {max([1, *numeros]) + 1}"
+
+
+@dataclass(frozen=True)
+class BorradorV2:
+    """Una v1 convertida a v2, sin guardar: lo que el editor muestra para seguir editando."""
+
+    basada_en_id: int
+    nombre_sugerido: str
+    expresiones: tuple[ExpresionSegmento, ...]
+    problemas: tuple[ProblemaSpeech, ...]
 
 
 class ConfiguracionMowaMesService:
@@ -123,17 +141,58 @@ class ConfiguracionMowaMesService:
     def crear_speech(
         self, nombre: str | None, partes: tuple[PartesSegmento, ...], basada_en_id: int | None
     ) -> VersionSpeech:
+        """Una version v1 nueva."""
+        return self._crear(nombre, DatosSpeech(nombre="", partes=partes), basada_en_id)
+
+    def crear_speech_v2(
+        self,
+        nombre: str | None,
+        expresiones: tuple[ExpresionSegmento, ...],
+        basada_en_id: int | None,
+    ) -> VersionSpeech:
+        """Una version v2 nueva: una expresion por segmento, validada con el motor (RF-46)."""
+        datos = DatosSpeech(nombre="", expresiones=expresiones, formato=FormatoSpeech.V2)
+        return self._crear(nombre, datos, basada_en_id)
+
+    def _crear(
+        self, nombre: str | None, contenido: DatosSpeech, basada_en_id: int | None
+    ) -> VersionSpeech:
         if basada_en_id is not None:
             self.obtener_speech(basada_en_id)
         if not (nombre or "").strip():
             nombre = nombre_siguiente([v.datos.nombre for v in self._repositorio.listar_speech()])
-        datos = self._validos(DatosSpeech(nombre=nombre, partes=partes))
+        datos = self._validos(replace(contenido, nombre=nombre))
         return self._repositorio.crear_speech(datos, basada_en_id)
+
+    def como_v2(self, speech_id: int) -> BorradorV2:
+        """El borrador v2 de una v1: sus mismos mensajes, con titular y fecha obligatorios (C-5)."""
+        version = self.obtener_speech(speech_id)
+        if version.datos.formato is not FormatoSpeech.V1:
+            raise SpeechInvalido(
+                (ProblemaSpeech(None, "formato", "La version ya es v2: no hay nada que convertir"),)
+            )
+        expresiones = speech.convertir_a_v2(version.datos.partes)
+        nombre = nombre_siguiente([v.datos.nombre for v in self._repositorio.listar_speech()])
+        problemas = speech.problemas_de(
+            DatosSpeech(nombre=nombre, expresiones=expresiones, formato=FormatoSpeech.V2)
+        )
+        return BorradorV2(version.id, nombre, expresiones, problemas)
 
     def actualizar_speech(self, speech_id: int, datos: DatosSpeech) -> VersionSpeech:
         version = self.obtener_speech(speech_id)
         if not version.editable:
             raise SpeechInmutable(version)
+        if datos.formato is not version.datos.formato:
+            raise SpeechInvalido(
+                (
+                    ProblemaSpeech(
+                        None,
+                        "formato",
+                        f"La version es {version.datos.formato.value} y no cambia de formato al "
+                        "editarla; guarda el cambio como una version nueva",
+                    ),
+                )
+            )
         actualizada = self._repositorio.actualizar_speech(speech_id, self._validos(datos))
         if actualizada is None:
             # Entre la lectura y la escritura, una campana la uso o alguien la borro.
@@ -151,13 +210,33 @@ class ConfiguracionMowaMesService:
         problemas = speech.problemas_de(DatosSpeech(nombre="previsualizacion", partes=partes))
         return numero, problemas, speech.previsualizar(partes, numero)
 
+    def previsualizar_speech_v2(
+        self, expresiones: tuple[ExpresionSegmento, ...], whatsapp: str | None
+    ) -> tuple[str | None, tuple[ProblemaSpeech, ...], tuple[LargoSegmento, ...]]:
+        """Largo maximo (la cota), nivel y ejemplo por segmento de una v2, sin guardar (C-6).
+
+        Un segmento sin cota se informa con `largo_maximo` nulo y su motivo; el control por fila
+        de los 160 caracteres es de la campana, sobre el mensaje real.
+        """
+        if whatsapp is not None and not speech.whatsapp_valido(whatsapp):
+            raise ConfiguracionInvalida("El WhatsApp debe tener 9 digitos y empezar con 9")
+        numero = whatsapp or self._repositorio.obtener_configuracion().whatsapp_contacto
+        problemas = speech.problemas_de(
+            DatosSpeech(
+                nombre="previsualizacion", expresiones=expresiones, formato=FormatoSpeech.V2
+            )
+        )
+        return numero, problemas, speech.previsualizar_v2(expresiones, numero)
+
     @staticmethod
     def _validos(datos: DatosSpeech) -> DatosSpeech:
         limpios = speech.limpiar(datos)
         problemas = speech.problemas_de(limpios)
         if problemas:
             raise SpeechInvalido(problemas)
-        ordenadas = tuple(
-            sorted(limpios.partes, key=lambda p: list(type(p.segmento)).index(p.segmento))
+        orden = {segmento: i for i, segmento in enumerate(Segmento)}
+        return replace(
+            limpios,
+            partes=tuple(sorted(limpios.partes, key=lambda p: orden[p.segmento])),
+            expresiones=tuple(sorted(limpios.expresiones, key=lambda e: orden[e.segmento])),
         )
-        return DatosSpeech(nombre=limpios.nombre, partes=ordenadas)

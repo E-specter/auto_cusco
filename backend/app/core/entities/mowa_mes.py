@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import Literal
 
 # El prefijo lo posee el motor de texto enriquecido; se reexporta con el mismo nombre para que
 # ningun import de este modulo cambie.
@@ -16,6 +17,8 @@ from app.core.entities.segmentacion import TABLA_RANGOS_POR_DEFECTO, RangoDias
 from app.core.entities.texto_enriquecido import (  # noqa: F401
     PREFIJO_WHATSAPP,
     CodigoTexto,
+    Expresion,
+    MotivoSinCota,
     Problema,
 )
 
@@ -152,10 +155,33 @@ class PartesSegmento:
     parte_2: str
 
 
+class FormatoSpeech(StrEnum):
+    """Como se guarda el contenido de una version del speech.
+
+    `v1` es la estructura fija de siempre (dos partes por segmento, RF-MM-14), incluido el Speech
+    original. `v2` es una expresion del motor de texto enriquecido por segmento (RF-42 a RF-48).
+    """
+
+    V1 = "v1"
+    V2 = "v2"
+
+
+@dataclass(frozen=True)
+class ExpresionSegmento:
+    """El contenido de un segmento de una version v2: la expresion completa del mensaje."""
+
+    segmento: Segmento
+    expresion: Expresion
+
+
 @dataclass(frozen=True)
 class DatosSpeech:
+    """El contenido de una version: `partes` si es v1, `expresiones` si es v2 (nunca las dos)."""
+
     nombre: str
-    partes: tuple[PartesSegmento, ...]
+    partes: tuple[PartesSegmento, ...] = ()
+    expresiones: tuple[ExpresionSegmento, ...] = ()
+    formato: FormatoSpeech = FormatoSpeech.V1
 
 
 @dataclass(frozen=True)
@@ -177,13 +203,24 @@ class VersionSpeech:
         return not self.original and not self.usada
 
 
+# Los campos que un problema de speech puede senalar: la API los publica tal cual.
+CampoProblemaSpeech = Literal["nombre", "segmentos", "formato", "parte_1", "parte_2", "expresion"]
+
+
 @dataclass(frozen=True)
 class ProblemaSpeech:
-    """`segmento` None es un problema de la version entera (nombre, segmentos)."""
+    """`segmento` None es un problema de la version entera (nombre, segmentos).
+
+    En una version v2, `problema` es el del motor de texto enriquecido (con su codigo y su
+    ubicacion: nodo, funcion y parametro) y `campo` es `expresion`. `codigo_mowa_mes` es para un
+    problema que es un codigo del catalogo de MOWA MES; nunca va junto con `problema`.
+    """
 
     segmento: Segmento | None
-    campo: str  # "nombre", "segmentos", "parte_1" o "parte_2"
+    campo: CampoProblemaSpeech
     detalle: str
+    problema: Problema | None = None
+    codigo_mowa_mes: CodigoMowaMes | None = None
 
 
 @dataclass(frozen=True)
@@ -192,9 +229,10 @@ class LargoSegmento:
 
     rango: RangoSegmento
     usa_whatsapp: bool
-    largo_maximo: int
+    largo_maximo: int | None  # None: "sin maximo calculable" (solo una expresion v2), con su motivo
     codigo: CodigoMowaMes | None  # MENSAJE_EXCEDE_150, MENSAJE_EXCEDE_160 o None
     ejemplo: str | None  # None si usa [whatsapp] y no hay numero: nunca un enlace roto
+    motivo_sin_cota: MotivoSinCota | None = None
 
 
 class CampoConfiguracion(StrEnum):

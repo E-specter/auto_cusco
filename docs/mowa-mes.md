@@ -45,6 +45,7 @@ Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6
   - `marcar_speech_usado` lo llama la creación de campaña (B4) en su transacción.
   - Sin nombre, una versión nueva se llama `Speech N`, uno más que el mayor número usado.
   - Los espacios de los extremos de cada parte son texto y no se recortan.
+- **Speech v2 (M2, B6):** una versión puede ser v2, con una expresión del motor por segmento (`formato`, `expresiones`). Conviven con las v1, que conservan su huella. En una v2, `falta_titular` y `falta_vencimiento` excluyen solo si la expresión del segmento usa la variable. Ver [motor-texto-enriquecido.md](motor-texto-enriquecido.md), sección 23.
 
 ## 5. Configuración del conector
 
@@ -65,9 +66,10 @@ Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6
 | `PUT /mowa-mes/configuracion` | Igual que `GET` | 400 WhatsApp fuera de RF-02 |
 | `GET /mowa-mes/speech` | Versiones, la original primero, con `usada` y `editable` y cada segmento con etiqueta, rango y `usa_whatsapp` | |
 | `GET /mowa-mes/speech/{id}` | Una versión | 404 |
-| `POST /mowa-mes/speech` | `201` con la versión nueva | 400 partes inválidas, 404 `basada_en_id`, 409 nombre repetido |
+| `POST /mowa-mes/speech` | `201` con la versión nueva, v1 (`partes`) o v2 (`expresiones`) | 400 contenido inválido, 404 `basada_en_id`, 409 nombre repetido |
+| `GET /mowa-mes/speech/{id}/como-v2` | Borrador v2 de una v1, sin guardar (M2) | 400 si ya es v2, 404 |
 | `PUT /mowa-mes/speech/{id}` | La versión | 400, 404, 409 usada, original o nombre repetido |
-| `POST /mowa-mes/speech/previsualizacion` | `{whatsapp, largo_advertencia, largo_maximo, problemas, segmentos}`; sin `whatsapp` usa el configurado | 400 WhatsApp fuera de RF-02 |
+| `POST /mowa-mes/speech/previsualizacion` | `{whatsapp, largo_advertencia, largo_maximo, problemas, segmentos}`; acepta `partes` o `expresiones`; sin `whatsapp` usa el configurado | 400 WhatsApp fuera de RF-02 o contenido inválido |
 
 **Diferencia con el plan:** los feriados se exponen como `/calendario/feriados` (lectura del año) más `/calendario/excepciones` (escritura), porque la tabla guarda excepciones y no feriados.
 

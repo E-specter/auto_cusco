@@ -265,7 +265,14 @@ def test_previsualizacion_con_whatsapp_y_problemas(cliente) -> None:
 
     assert cuerpo["whatsapp"] == "900000123"
     assert cuerpo["problemas"] == [
-        {"segmento": "preventiva", "campo": "parte_2", "detalle": "El texto no puede contener '[@'"}
+        {
+            "segmento": "preventiva",
+            "campo": "parte_2",
+            "detalle": "El texto no puede contener '[@'",
+            "codigo": None,  # los problemas de una v1 no vienen del motor
+            "catalogo": None,
+            "ubicacion": None,
+        }
     ]
     assert all(not s["falta_whatsapp"] for s in cuerpo["segmentos"])
     assert invalido.status_code == 400

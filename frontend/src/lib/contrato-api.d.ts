@@ -508,7 +508,8 @@ export interface paths {
         put?: never;
         /**
          * Crear Speech
-         * @description Guarda una version nueva. 404 si `basada_en_id` no existe.
+         * @description Guarda una version nueva, v1 (`partes`) o v2 (`expresiones`). 404 si `basada_en_id` no
+         *     existe.
          */
         post: operations["crear_speech_mowa_mes_speech_post"];
         delete?: never;
@@ -529,6 +530,11 @@ export interface paths {
         /**
          * Previsualizar Speech
          * @description Largo maximo de cada segmento, con titular de 8 y fecha de 10 (RF-MM-19).
+         *
+         *     Con `expresiones` (v2) devuelve por segmento el largo maximo (la cota de la expresion), el
+         *     nivel (`codigo`: 150 o 160 si lo cruza) y el ejemplo evaluado; sin maximo calculable,
+         *     `largo_maximo` es nulo y `sin_maximo` dice por que. El control de los 160 caracteres de la
+         *     campana es por fila, sobre el mensaje real.
          *
          *     Un segmento que usa [whatsapp] sin numero se marca con `falta_whatsapp` y sin
          *     ejemplo: nunca se muestra un enlace roto.
@@ -551,9 +557,33 @@ export interface paths {
         get: operations["obtener_speech_mowa_mes_speech__speech_id__get"];
         /**
          * Actualizar Speech
-         * @description Reemplaza una version que nadie uso. Si ya se uso o es la original, 409.
+         * @description Reemplaza una version que nadie uso, en su mismo formato. Si ya se uso o es la original,
+         *     409; si el contenido es del otro formato, 400.
          */
         put: operations["actualizar_speech_mowa_mes_speech__speech_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/speech/{speech_id}/como-v2": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Convertir A V2
+         * @description El borrador v2 de una v1: la misma estructura expresada con el motor, que da los mismos
+         *     mensajes y largos (con el titular y la fecha obligatorios). No guarda nada: se edita y se
+         *     guarda con `POST /speech` y `basada_en_id`, como una version nueva con huella propia. La v1
+         *     queda intacta. Una version que ya es v2 responde 400.
+         */
+        get: operations["convertir_a_v2_mowa_mes_speech__speech_id__como_v2_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -942,6 +972,20 @@ export interface components {
              * @default VENCIDA
              */
             hoja: string;
+        };
+        /**
+         * BorradorV2Respuesta
+         * @description Una v1 convertida a v2, sin guardar: se edita y se guarda como version nueva.
+         */
+        BorradorV2Respuesta: {
+            /** Basada En Id */
+            basada_en_id: number;
+            /** Nombre Sugerido */
+            nombre_sugerido: string;
+            /** Expresiones */
+            expresiones: components["schemas"]["ExpresionSegmentoRespuesta"][];
+            /** Problemas */
+            problemas: components["schemas"]["ProblemaSpeechRespuesta"][];
         };
         /** CampanaRespuesta */
         CampanaRespuesta: {
@@ -1584,6 +1628,16 @@ export interface components {
             problemas: components["schemas"]["ProblemaTextoRespuesta"][];
         };
         /**
+         * DetalleErrorSpeech
+         * @description Un 400 de speech: el motivo y los problemas, cada uno con su ubicacion.
+         */
+        DetalleErrorSpeech: {
+            /** Detail */
+            detail: string;
+            /** Problemas */
+            problemas: components["schemas"]["ProblemaSpeechRespuesta"][];
+        };
+        /**
          * DetalleErrorTexto
          * @description El motivo y el `codigo` del catalogo (`CodigoTexto`) que la interfaz traduce.
          */
@@ -1725,6 +1779,35 @@ export interface components {
             /** Nodos */
             nodos: (components["schemas"]["NodoTextoGuardadoRespuesta"] | components["schemas"]["NodoVariableGuardadoRespuesta"])[];
         };
+        /**
+         * ExpresionSegmentoEntrada
+         * @description El contenido de un segmento de una v2: su expresion completa (el modelo del motor).
+         */
+        ExpresionSegmentoEntrada: {
+            segmento: components["schemas"]["Segmento"];
+            expresion: components["schemas"]["ExpresionEntrada"];
+        };
+        /**
+         * ExpresionSegmentoRespuesta
+         * @description El segmento de una v2. `usa_titular` y `usa_vencimiento` dicen si un producto sin ese dato
+         *     se excluye en este segmento (RF-MM-13): solo si la expresion usa la variable.
+         */
+        ExpresionSegmentoRespuesta: {
+            segmento: components["schemas"]["Segmento"];
+            /** Etiqueta */
+            etiqueta: string;
+            /** Dias Desde */
+            dias_desde: number | null;
+            /** Dias Hasta */
+            dias_hasta: number;
+            expresion: components["schemas"]["ExpresionGuardadaRespuesta"];
+            /** Usa Titular */
+            usa_titular: boolean;
+            /** Usa Vencimiento */
+            usa_vencimiento: boolean;
+            /** Usa Whatsapp */
+            usa_whatsapp: boolean;
+        };
         /** FeriadosRespuesta */
         FeriadosRespuesta: {
             /** Anio */
@@ -1815,6 +1898,15 @@ export interface components {
             /** Opciones */
             opciones: string[];
         };
+        /**
+         * FormatoSpeech
+         * @description Como se guarda el contenido de una version del speech.
+         *
+         *     `v1` es la estructura fija de siempre (dos partes por segmento, RF-MM-14), incluido el Speech
+         *     original. `v2` es una expresion del motor de texto enriquecido por segmento (RF-42 a RF-48).
+         * @enum {string}
+         */
+        FormatoSpeech: "v1" | "v2";
         /** FuncionEntrada */
         FuncionEntrada: {
             /** Nombre */
@@ -1926,7 +2018,11 @@ export interface components {
             /** Incidencias */
             incidencias: components["schemas"]["IncidenciaRespuesta"][];
         };
-        /** LargoSegmentoRespuesta */
+        /**
+         * LargoSegmentoRespuesta
+         * @description `largo_maximo` es nulo cuando la expresion de una v2 no tiene maximo calculable: `sin_maximo`
+         *     dice por que (una variable cuyo largo depende del dato, o una funcion que no lo acota).
+         */
         LargoSegmentoRespuesta: {
             segmento: components["schemas"]["Segmento"];
             /** Etiqueta */
@@ -1936,7 +2032,8 @@ export interface components {
             /** Falta Whatsapp */
             falta_whatsapp: boolean;
             /** Largo Maximo */
-            largo_maximo: number;
+            largo_maximo: number | null;
+            sin_maximo: components["schemas"]["SinCotaRespuesta"] | null;
             codigo: components["schemas"]["CodigoMowaMes"] | null;
             /** Ejemplo */
             ejemplo: string | null;
@@ -2450,8 +2547,16 @@ export interface components {
         };
         /** PrevisualizacionEntrada */
         PrevisualizacionEntrada: {
-            /** Partes */
-            partes: components["schemas"]["PartesEntrada"][];
+            /**
+             * Partes
+             * @description Las `partes` de una v1 o las `expresiones` de una v2: una de las dos
+             */
+            partes?: components["schemas"]["PartesEntrada"][] | null;
+            /**
+             * Expresiones
+             * @description Las `partes` de una v1 o las `expresiones` de una v2: una de las dos
+             */
+            expresiones?: components["schemas"]["ExpresionSegmentoEntrada"][] | null;
             /**
              * Whatsapp
              * @description Sin numero, se usa el WhatsApp de contacto configurado
@@ -2482,13 +2587,29 @@ export interface components {
             /** Detalle */
             detalle: string;
         };
-        /** ProblemaSpeechRespuesta */
+        /**
+         * ProblemaSpeechRespuesta
+         * @description `codigo` y `ubicacion` (nodo, funcion y parametro) vienen en los problemas de una v2.
+         *
+         *     `catalogo` dice en cual catalogo i18n se traduce `codigo`: `texto` (`textoEnriquecido.codigo.*`,
+         *     el del motor) o `mowa_mes` (`mowaMes.codigo.*`). Los dos catalogos comparten nombres
+         *     (`telefono_invalido`) con textos distintos, asi que el codigo solo no basta. Es nulo cuando
+         *     `codigo` lo es.
+         */
         ProblemaSpeechRespuesta: {
             segmento: components["schemas"]["Segmento"] | null;
-            /** Campo */
-            campo: string;
+            /**
+             * Campo
+             * @enum {string}
+             */
+            campo: "nombre" | "segmentos" | "formato" | "parte_1" | "parte_2" | "expresion";
             /** Detalle */
             detalle: string;
+            /** Codigo */
+            codigo: string | null;
+            /** Catalogo */
+            catalogo: ("texto" | "mowa_mes") | null;
+            ubicacion: components["schemas"]["UbicacionRespuesta"] | null;
         };
         /**
          * ProblemaTextoRespuesta
@@ -2715,6 +2836,7 @@ export interface components {
             id: number;
             /** Nombre */
             nombre: string;
+            formato: components["schemas"]["FormatoSpeech"];
             /** Huella */
             huella: string;
         };
@@ -2722,8 +2844,16 @@ export interface components {
         SpeechEdicionEntrada: {
             /** Nombre */
             nombre: string;
-            /** Partes */
-            partes: components["schemas"]["PartesEntrada"][];
+            /**
+             * Partes
+             * @description Las `partes` de una v1 o las `expresiones` de una v2: una de las dos
+             */
+            partes?: components["schemas"]["PartesEntrada"][] | null;
+            /**
+             * Expresiones
+             * @description Las `partes` de una v1 o las `expresiones` de una v2: una de las dos
+             */
+            expresiones?: components["schemas"]["ExpresionSegmentoEntrada"][] | null;
         };
         /** SpeechNuevoEntrada */
         SpeechNuevoEntrada: {
@@ -2734,8 +2864,16 @@ export interface components {
             nombre?: string | null;
             /** Basada En Id */
             basada_en_id?: number | null;
-            /** Partes */
-            partes: components["schemas"]["PartesEntrada"][];
+            /**
+             * Partes
+             * @description Las `partes` de una v1 o las `expresiones` de una v2: una de las dos
+             */
+            partes?: components["schemas"]["PartesEntrada"][] | null;
+            /**
+             * Expresiones
+             * @description Las `partes` de una v1 o las `expresiones` de una v2: una de las dos
+             */
+            expresiones?: components["schemas"]["ExpresionSegmentoEntrada"][] | null;
         };
         /** SpeechRegistradoRespuesta */
         SpeechRegistradoRespuesta: {
@@ -2954,12 +3092,16 @@ export interface components {
             /** Motivo Fallo */
             motivo_fallo: string | null;
         };
-        /** VersionSpeechRespuesta */
+        /**
+         * VersionSpeechRespuesta
+         * @description `partes` si es v1 y `expresiones` si es v2; la otra lista viene vacia.
+         */
         VersionSpeechRespuesta: {
             /** Id */
             id: number;
             /** Nombre */
             nombre: string;
+            formato: components["schemas"]["FormatoSpeech"];
             /** Original */
             original: boolean;
             /** Basada En Id */
@@ -2975,6 +3117,8 @@ export interface components {
             creado_en: string;
             /** Partes */
             partes: components["schemas"]["PartesRespuesta"][];
+            /** Expresiones */
+            expresiones: components["schemas"]["ExpresionSegmentoRespuesta"][];
         };
         /** PrevisualizacionRespuesta */
         app__api__archivos_carga__PrevisualizacionRespuesta: {
@@ -4302,13 +4446,13 @@ export interface operations {
                     "application/json": components["schemas"]["VersionSpeechRespuesta"];
                 };
             };
-            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            /** @description La peticion no vale: `detail` es el motivo y `problemas` dice donde */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleError"];
+                    "application/json": components["schemas"]["DetalleErrorSpeech"];
                 };
             };
             /** @description No existe lo pedido */
@@ -4362,13 +4506,13 @@ export interface operations {
                     "application/json": components["schemas"]["app__api__mowa_mes__PrevisualizacionRespuesta"];
                 };
             };
-            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            /** @description La peticion no vale: `detail` es el motivo y `problemas` dice donde */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleError"];
+                    "application/json": components["schemas"]["DetalleErrorSpeech"];
                 };
             };
             /** @description Validation Error */
@@ -4446,13 +4590,13 @@ export interface operations {
                     "application/json": components["schemas"]["VersionSpeechRespuesta"];
                 };
             };
-            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            /** @description La peticion no vale: `detail` es el motivo y `problemas` dice donde */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleError"];
+                    "application/json": components["schemas"]["DetalleErrorSpeech"];
                 };
             };
             /** @description No existe lo pedido */
@@ -4466,6 +4610,55 @@ export interface operations {
             };
             /** @description La operacion choca con el estado actual */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    convertir_a_v2_mowa_mes_speech__speech_id__como_v2_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speech_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BorradorV2Respuesta"];
+                };
+            };
+            /** @description La peticion no vale: `detail` es el motivo y `problemas` dice donde */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorSpeech"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

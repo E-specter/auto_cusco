@@ -12,11 +12,10 @@ from typing import Any
 from app.core.entities.contexto_texto import ORIGEN_CARTERA, ContextoTexto, VariableContexto
 from app.core.entities.mowa_mes import LARGO_ADVERTENCIA, LARGO_MAXIMO, RANGOS_SEGMENTO
 from app.core.entities.segmentacion import RangoDias
-from app.core.entities.texto_enriquecido import TipoValor
 from app.core.services.plataformas.mowa_mes import speech
 
 NOMBRE = "mowa_mes.speech"
-VARIABLE_DIAS = "dias_atraso_ajustados"
+VARIABLE_DIAS = speech.VARIABLE_DIAS
 
 # Datos sinteticos: nunca de un producto real. El telefono es del rango 900000xxx.
 WHATSAPP_DE_EJEMPLO = "900000123"
@@ -49,7 +48,7 @@ def _registro_de_producto(producto: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def contexto_speech() -> ContextoTexto:
-    tipos = {**speech.VARIABLES_DEL_MENSAJE, VARIABLE_DIAS: TipoValor.NUMERO}
+    tipos = speech.VARIABLES_V2
     return ContextoTexto(
         nombre=NOMBRE,
         clave_nombre=f"textoEnriquecido.contexto.{NOMBRE}",

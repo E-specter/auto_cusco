@@ -73,7 +73,8 @@ const usaWhatsapp = (parte: { parte_1: string; parte_2: string }) =>
   `${parte.parte_1}${parte.parte_2}`.includes('[whatsapp]');
 
 /** The missing and repeated segments in one sentence, or null when all six arrive once. */
-function problemaDeSegmentos(partes: PartesEntrada[]): string | null {
+function problemaDeSegmentos(recibidas: PartesEntrada[] | null | undefined): string | null {
+  const partes = recibidas ?? [];
   const faltan = SEGMENTOS.filter(({ segmento }) => !partes.some((p) => p.segmento === segmento)).map((s) => s.segmento);
   const repetidos = SEGMENTOS.filter(({ segmento }) => partes.filter((p) => p.segmento === segmento).length > 1).map(
     (s) => s.segmento,
@@ -84,7 +85,8 @@ function problemaDeSegmentos(partes: PartesEntrada[]): string | null {
   return frases.length ? frases.join('. ') : null;
 }
 
-function partesCompletas(partes: PartesEntrada[]): PartesSpeech[] {
+function partesCompletas(recibidas: PartesEntrada[] | null | undefined): PartesSpeech[] {
+  const partes = recibidas ?? [];
   return SEGMENTOS.map(({ segmento, etiqueta, desde, hasta }) => {
     const parte = partes.find((p) => p.segmento === segmento) ?? { segmento, parte_1: '', parte_2: '' };
     return {
@@ -111,12 +113,14 @@ export function speechOriginal(): VersionSpeech {
   return {
     id: 1,
     nombre: 'Speech original',
+    formato: 'v1',
     original: true,
     basada_en_id: null,
     usada: false,
     editable: false,
     creado_en: '2026-09-13T08:00:00-05:00',
     partes: partesCompletas(partesOriginales()),
+    expresiones: [],
   };
 }
 
@@ -124,12 +128,14 @@ export function versionSpeech(parcial: Partial<VersionSpeech> = {}): VersionSpee
   return {
     id: 2,
     nombre: 'Speech 2',
+    formato: 'v1',
     original: false,
     basada_en_id: 1,
     usada: false,
     editable: true,
     creado_en: '2026-09-13T09:00:00-05:00',
     partes: partesCompletas(partesOriginales()),
+    expresiones: [],
     ...parcial,
   };
 }
@@ -154,15 +160,25 @@ export function previsualizacionSintetica(
   // Like the backend: missing or repeated segments are ONE problem that lists
   // them all, and those segments are left out of `segmentos`.
   const detalleSegmentos = problemaDeSegmentos(entrada.partes);
-  if (detalleSegmentos) problemas.push({ segmento: null, campo: 'segmentos', detalle: detalleSegmentos });
+  if (detalleSegmentos) {
+    problemas.push({ segmento: null, campo: 'segmentos', detalle: detalleSegmentos, codigo: null, catalogo: null, ubicacion: null });
+  }
 
   SEGMENTOS.forEach(({ segmento, etiqueta }) => {
-    const recibidas = entrada.partes.filter((p) => p.segmento === segmento);
+    const recibidas = (entrada.partes ?? []).filter((p) => p.segmento === segmento);
     if (recibidas.length !== 1) return;
     const [parte] = recibidas;
     (['parte_1', 'parte_2'] as const).forEach((campo) => {
       if (parte[campo].includes('[@')) {
-        problemas.push({ segmento, campo, detalle: 'La parte no puede contener [@' });
+        problemas.push({
+          segmento,
+          campo,
+          detalle: 'La parte no puede contener [@',
+          // No code, so no catalogue: the real backend answers `catalogo: null` for a v1 problem.
+          codigo: null,
+          catalogo: null,
+          ubicacion: null,
+        });
       }
     });
     const usa = usaWhatsapp(parte);
@@ -178,6 +194,7 @@ export function previsualizacionSintetica(
       usa_whatsapp: usa,
       falta_whatsapp: falta,
       largo_maximo: largo,
+      sin_maximo: null,
       codigo: largo > 160 ? 'mensaje_excede_160' : largo > 150 ? 'mensaje_excede_150' : null,
       // The backend's worst case: an 8-character holder and the date as a pattern.
       ejemplo: falta
@@ -465,7 +482,12 @@ export function previsualizacionCampanaSintetica(
     descripcion_sugerida: descripcionSugerida,
     fecha_generacion: '2026-09-16',
     fecha_envio: '2026-09-17',
-    speech: { id: speechId, nombre: speechId === 1 ? 'Speech original' : `Speech ${speechId}`, huella: 'a'.repeat(64) },
+    speech: {
+      id: speechId,
+      nombre: speechId === 1 ? 'Speech original' : `Speech ${speechId}`,
+      formato: 'v1',
+      huella: 'a'.repeat(64),
+    },
     whatsapp: entrada.whatsapp?.trim() || '900000999',
     supervisores: (
       entrada.supervisores ?? [
@@ -831,7 +853,7 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       const entrada = cuerpo as SpeechNuevoEntrada;
       const segmentosMal = problemaDeSegmentos(entrada.partes);
       if (segmentosMal) return json(route, 400, { detail: segmentosMal });
-      if (entrada.partes.some((p) => `${p.parte_1}${p.parte_2}`.includes('[@'))) {
+      if ((entrada.partes ?? []).some((p) => `${p.parte_1}${p.parte_2}`.includes('[@'))) {
         return json(route, 400, { detail: 'Una parte no puede contener [@' });
       }
       if (entrada.basada_en_id != null && !estado.versiones.some((v) => v.id === entrada.basada_en_id)) {
@@ -879,7 +901,7 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       const entrada = cuerpo as SpeechEdicionEntrada;
       const segmentosMal = problemaDeSegmentos(entrada.partes);
       if (segmentosMal) return json(route, 400, { detail: segmentosMal });
-      if (entrada.partes.some((p) => `${p.parte_1}${p.parte_2}`.includes('[@'))) {
+      if ((entrada.partes ?? []).some((p) => `${p.parte_1}${p.parte_2}`.includes('[@'))) {
         return json(route, 400, { detail: 'Una parte no puede contener [@' });
       }
       if (estado.versiones.some((v) => v.id !== id && v.nombre.toLowerCase() === entrada.nombre.trim().toLowerCase())) {

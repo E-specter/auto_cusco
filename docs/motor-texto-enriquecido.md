@@ -326,7 +326,7 @@ Estado: hecha y probada sin base (2026-09-30). El speech de MOWA MES se evalúa 
 - **Largo máximo = `Compilada.cota`.** Coincide con la aritmética de antes (8 + 10 + texto + 26 por cada `[whatsapp]`) en el Speech original y en 12 versiones sintéticas; `9 a 30` da 156. El `ejemplo` sigue por el camino de antes, con marcadores (D8).
 - **Un solo dueño del prefijo de WhatsApp.** `PREFIJO_WHATSAPP` vive en `entities/texto_enriquecido.py`; `enlaces.py` lo importa y `entities/mowa_mes.py` lo reexporta con el mismo nombre. Una prueba fija `len(PREFIJO_WHATSAPP) + LARGO_NUMERO_WHATSAPP == 26` y que la cota de `enlace_whatsapp` sea 26.
 - **Las exclusiones siguen en `campana.py`** (`_vacio` antes del mensaje, en el orden `falta_titular`, `falta_vencimiento`, `falta_whatsapp`). Titular y vencimiento no se marcan como obligatorios todavía: eso es de M2.
-- **`plantilla_mensaje` y `contexto_fila` quedan en el código** hasta cerrar M2, solo como referencia de la prueba de oro; ninguna ruta de producción las llama.
+- **`plantilla_mensaje` y `contexto_fila` se borraron en B6** (sección 23); la prueba de oro sigue contra las constantes congeladas.
 - **Diferencias, ambas fuera del camino real** (las dos con su prueba): un titular en blanco que llegara directo a `mensaje_de` da vacío (D10) y no los espacios que dejaba `titular[:8]`, pero `campana.py` lo excluye antes con `falta_titular`; y un número de WhatsApp inválido en el constructor ya no da un enlace con basura: el motor lo informa (`telefono_invalido`) y `mensaje` lanza `MensajeNoGenerable` (con el segmento y los códigos), para que no salga un SMS sin enlace en silencio. La configuración y la campaña lo validan antes, así que no se alcanza; si esas validaciones cambian, pasa a ser un 500.
 - **Costo.** El motor cuesta unos 3,7 µs por mensaje contra 2,8 µs del camino de antes en el microbench de 46 000 filas (`scripts/medir_mensajes_mowa_mes.py`, sin base). Parte de la diferencia es la validación RF-02 del teléfono que `enlace_whatsapp` repite por fila (el camino de antes la hacía una vez al configurar). El umbral de 10 % se juzga sobre `medir_campana_mowa_mes.py` (con base, lo corre `architec`), donde este costo es una fracción pequeña del total.
 - **El oro sobrevive a M2.** Compara siempre contra constantes congeladas en HEAD 3e567d7 con el código viejo (`tests/oro_mowa_mes_congelados.py`: los 6 mensajes literales del Speech original y un SHA-256 de la matriz completa de 4 992 casos, serializada de forma determinista), y contra el camino viejo en vivo solo mientras exista. En B6, al borrar `plantilla_mensaje` y `contexto_fila`, se borran solo las pruebas marcadas "en vivo".
@@ -498,3 +498,37 @@ Estado: hecho y probado sin base (2026-10-03); las pruebas de PostgreSQL (`@pyte
 - **Un problema de forma tapa los de contenido:** el lector estricto se detiene antes de compilar; el editor ve primero los de forma y, al corregirlos, los de contenido.
 - **Una definición guardada puede quedar inválida** si cambia el catálogo de la cartera: se rechaza al generar, como una plantilla inválida (`400`), sin marcar la versión.
 - **Nombres del contrato:** `VersionDefinicionRespuesta` y `DefinicionRespuesta` llevan sufijo para no chocar con `VersionRespuesta` de `/cargas`.
+
+## 23. MOWA MES M2: el speech v2 (B6)
+
+Estado: hecho y probado sin base (2026-10-04); las pruebas de PostgreSQL (`tests/test_mowa_mes_speech_v2_postgres.py`) están escritas y **no corridas**, y la migración `f2c8a4d7b915` la verifica architec con ida y vuelta. RF-MM-13 y la sección 6 de `requerimientos-mowa-mes.md`.
+
+### Dos formatos que conviven
+
+- Una versión de speech es **v1** (dos partes por segmento, como siempre) o **v2** (una expresión del motor por segmento). El formato se fija al crearla y **no cambia al editarla**: `PUT` con el otro formato es `400`. La misma regla de siempre: editable hasta que una campaña la usa (`usada_en`), inmutable después.
+- `mowa_mes_speech_version` gana `formato` (`v1` por defecto, así que todo lo que existía queda v1) y `expresiones` (JSONB: lista de `{segmento, expresion}`; nula en las v1, y `partes` queda `[]` en las v2). Dos CHECK: `formato IN ('v1','v2')` y contenido según formato. El `downgrade` se niega si ya hay v2.
+- **Las huellas de las v1 no cambian** (`huella_speech`, sin tocar): el Speech original sigue en `297c227c…` y la versión 92 de la base en `20990813…`. La v2 tiene la suya (`huella_expresiones`): SHA-256 sobre la forma canónica de las expresiones (`expresion_a_dict`, segmentos en el orden de `RANGOS_SEGMENTO`) con el formato `v2` por delante, así que no puede coincidir con la de una v1. `huella_de(datos)` elige según el formato. La campaña la vuelve a comprobar dentro de su transacción, así que el `409 huella_cambiada` funciona igual con una v2.
+
+### De v1 a v2 (C-5)
+
+`GET /mowa-mes/speech/{id}/como-v2` devuelve el **borrador** (no guarda nada): `expresion_de` por segmento, con `titular` y `fecha_vencimiento_cuota` **obligatorios**. Se guarda con `POST /mowa-mes/speech` (`expresiones`, `basada_en_id`): versión nueva con `basada_en_id` y huella propia; la v1 queda intacta. Condición de architec, con prueba sobre toda la matriz del oro (Speech original y 12 versiones sintéticas): el v2 convertido da los **mismos mensajes, largos, exclusiones y orden** que la v1 a través de `evaluar_producto`.
+
+### Exclusiones en la v2 (decisión del usuario)
+
+`falta_titular` y `falta_vencimiento` excluyen **solo si la expresión compilada de ese segmento usa la variable** (nodos de variable, también dentro de argumentos de función; nunca buscando texto: `services/texto_enriquecido/uso.py`). El orden no cambia (`telefono_invalido`, `falta_documento`, `sin_speech`, `falta_titular`, `falta_vencimiento`, `mensaje_excede_160`). Un segmento que no usa el titular genera su mensaje sin hueco aunque el titular venga vacío. «Vacío» es `campana._vacio`. En una v1 las dos exclusiones siguen siendo siempre.
+
+### Previsualización (C-6)
+
+`POST /mowa-mes/speech/previsualizacion` acepta `partes` (v1) **o** `expresiones` (v2), exactamente una. Por segmento devuelve `largo_maximo` (la cota de la expresión), `codigo` (`mensaje_excede_150`/`_160` si la cruza) y `ejemplo`. Sin cota calculable, `largo_maximo` es `null` y `sin_maximo` dice por qué (variable cuyo largo depende del dato, o función que no acota). `mensaje_excede_160` sigue excluyendo por fila sobre el mensaje real.
+
+### Contrato
+
+`VersionSpeechRespuesta` gana `formato` y `expresiones` (cada una con `usa_titular`, `usa_vencimiento`, `usa_whatsapp`); los pedidos de crear, editar y previsualizar aceptan `partes` o `expresiones` (XOR, `400` si vienen las dos o ninguna). `ProblemaSpeechRespuesta` gana `codigo` y `ubicacion`; el `400` es `DetalleErrorSpeech {detail, problemas}`. `SpeechCampanaRespuesta` gana `formato`. `contratos/openapi.json` y `frontend/src/lib/contrato-api.d.ts` regenerados; los mocks y pruebas del frontend que arman estas respuestas a mano (`e2e/api-falsa-mowa-mes.ts`, `e2e/mowa-mes-campana.spec.ts`, `tests/nucleo/mowa-mes*.test.ts`) fallan `tsc` hasta que F4 los adapte.
+
+### Limpieza de M1
+
+Se borraron `plantilla_mensaje`, `contexto_fila`, `CAMPOS_CONTEXTO` y las pruebas `test_en_vivo_*` de la prueba de oro. Siguen las constantes congeladas (`oro_mowa_mes_congelados.py`).
+
+### Pruebas
+
+`tests/test_mowa_mes_speech_v2.py` (núcleo: huellas, conversión sobre la matriz del oro, exclusiones en los dos sentidos, previsualización, `usa_*`), `tests/test_api_mowa_mes_speech_v2.py` (API, incluido el `409` con un v2 que cambia entre previsualizar y crear) y `tests/test_mowa_mes_speech_v2_postgres.py` (escrita, no corrida). Mutación a mano sobre las huellas, el uso de variables, las exclusiones, la conversión, la previsualización, el servicio y la API: 72 mutantes, 68 muertos y 4 vivos. Dos son equivalentes (el borrador `como-v2` nunca trae problemas: ninguna v1 válida convierte a una v2 que el motor rechace) y dos solo los cubre la prueba de PostgreSQL sin correr (el filtro de formato al editar y la huella que comprueba la campaña dentro de su transacción).

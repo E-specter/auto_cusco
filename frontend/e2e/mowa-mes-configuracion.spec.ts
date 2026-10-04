@@ -8,7 +8,13 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 
-import { apiMowaMes, montarApiMowaMes, versionSpeech, type ApiFalsaMowaMes } from './api-falsa-mowa-mes';
+import {
+  apiMowaMes,
+  montarApiMowaMes,
+  previsualizacionSintetica,
+  versionSpeech,
+  type ApiFalsaMowaMes,
+} from './api-falsa-mowa-mes';
 
 const RUTA = '/mowa-mes/configuracion';
 const ANIO = new Date().getFullYear();
@@ -391,6 +397,51 @@ test.describe('anchos (T-MM-F5, hallazgos 1 y 2)', () => {
     await sinDesbordeHorizontal(filaSupervisor.locator('select'));
     const celdaDocumento = filaSupervisor.locator('td').filter({ hasText: '00000001' });
     await sinDesbordeHorizontal(celdaDocumento);
+  });
+});
+
+test.describe('un segmento sin largo máximo (speech v2, B6)', () => {
+  test('la fila muestra «—», no afirma un nivel y la pantalla no se rompe', async ({ page }) => {
+    const errores: string[] = [];
+    page.on('pageerror', (error) => errores.push(error.message));
+    const api = apiMowaMes();
+    await montarApiMowaMes(page, api);
+    // The fake answers a v1 preview, where the maximum always exists: this one answers, for 9 a 30, as a
+    // preview with no maximum would (registered after the module's mock, so it runs first).
+    await page.route('**/api/mowa-mes/speech/previsualizacion', async (route) => {
+      const real = previsualizacionSintetica(
+        JSON.parse(route.request().postData() ?? '{}'),
+        api.configuracion.whatsapp_contacto,
+      );
+      const segmentos = real.segmentos.map((s) =>
+        s.segmento === '9_a_30'
+          ? {
+              ...s,
+              largo_maximo: null,
+              codigo: null,
+              sin_maximo: {
+                codigo: 'sin_cota',
+                detalle: 'El mensaje no tiene una cota',
+                ubicacion: { nodo: 1, funcion: null, parametro: null },
+              },
+            }
+          : s,
+      );
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...real, segmentos }) });
+    });
+    await page.goto(RUTA);
+    await expect(page.getByRole('heading', { name: 'Configuración de MOWA MES' })).toBeVisible();
+    // The other rows still read as before: the page painted past the segment without a maximum.
+    await expect(page.locator('[data-speech-filas] tr[data-segmento="preventiva"] [data-largo]')).not.toHaveText('—');
+
+    const fila = page.locator('[data-speech-filas] tr[data-segmento="9_a_30"]');
+    await expect(fila.locator('[data-largo]')).toHaveText('—');
+    // No level is claimed for it: neither "Cabe" nor the 150 or 160 warnings.
+    await expect(fila.locator('[data-nivel-tags]').getByText(/^(Cabe|Más de 150|Más de 160)$/)).toHaveCount(0);
+    // Nor any other level tag: the only tag left is the one that says it uses the WhatsApp.
+    await expect(fila.locator('[data-nivel-tags] .tag').filter({ hasNotText: 'Usa WhatsApp' })).toHaveCount(0);
+    await expect(fila).toHaveAttribute('data-nivel-largo', '');
+    expect(errores).toEqual([]);
   });
 });
 

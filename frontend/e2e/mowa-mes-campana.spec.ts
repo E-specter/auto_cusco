@@ -301,7 +301,7 @@ test.describe('P4: speech cambiado', () => {
   }) => {
     const api = apiMowaMes();
     const previa = previsualizacionCampanaSintetica(entradaMinima(), {
-      speech: { id: 1, nombre: 'Speech original', huella: 'b'.repeat(64) },
+      speech: { id: 1, nombre: 'Speech original', formato: 'v1', huella: 'b'.repeat(64) },
       // Excedido a propósito: el diálogo del límite ya no depende de esta
       // previsualización, solo del `codigo` que devuelva el 409.
       limite: { mes: '2026-09', limite: 2_500_000, cargados_mes: 2_490_000, esta_campana: 982, total: 2_490_982, disponible: 9018, excedido: true },
@@ -334,7 +334,7 @@ test.describe('P4: speech cambiado', () => {
   }) => {
     const api = apiMowaMes();
     const previa = previsualizacionCampanaSintetica(entradaMinima(), {
-      speech: { id: 1, nombre: 'Speech original', huella: 'c'.repeat(64) },
+      speech: { id: 1, nombre: 'Speech original', formato: 'v1', huella: 'c'.repeat(64) },
       // The huella check runs before the limit check server-side, so a 409 on
       // the very first (unconfirmed) attempt can happen with the limit intact.
       // The client no longer needs to know that order: `codigo` alone decides.
@@ -360,7 +360,7 @@ test.describe('P4: speech cambiado', () => {
   test('un 409 sin código conocido se trata como huella: bloquea Crear y pide previsualizar', async ({ page }) => {
     const api = apiMowaMes();
     const previa = previsualizacionCampanaSintetica(entradaMinima(), {
-      speech: { id: 1, nombre: 'Speech original', huella: 'd'.repeat(64) },
+      speech: { id: 1, nombre: 'Speech original', formato: 'v1', huella: 'd'.repeat(64) },
       limite: { mes: '2026-09', limite: 2_500_000, cargados_mes: 2_490_000, esta_campana: 982, total: 2_490_982, disponible: 9018, excedido: true },
     });
     api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previa }];
