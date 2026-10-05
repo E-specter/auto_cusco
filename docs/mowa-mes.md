@@ -87,6 +87,8 @@ Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6
 | `tests/test_speech_original.py` | Contrato: semilla de la migración ↔ tabla de RF-MM-18 |
 | `tests/test_mowa_mes_speech_oro.py` | Oro de M1: mensaje byte a byte en el Speech original y 12 versiones sintéticas contra constantes congeladas en HEAD 3e567d7 (6 mensajes literales y un SHA-256 de 4 992 casos) y, mientras exista, contra el camino de antes en vivo; `previsualizar` entero, bordes de 150 y 160, orden de exclusiones con constructor espía, huellas fijadas y un solo dueño del prefijo de WhatsApp |
 | `tests/test_api_mowa_mes_configuracion.py` | API con `TestClient` y repositorios en memoria |
+| `tests/test_api_mowa_mes_conciliacion_v2.py` | API con repositorios en memoria: una campana con speech v2 (una por `como-v2` desde el Speech original y otra que no usa el titular) hasta el reporte de enviados y la conciliacion; un producto sin titular (RF-MM-13), estados distintos de «enviado» (E-1), mensajes con tildes y espacios en los extremos |
+| `tests/test_mowa_mes_conciliacion_v2_postgres.py` | Los mismos dos escenarios contra PostgreSQL (B8, escritos y no corridos en su entrega): el reporte se arma desde `mowa_mes_fila_cargada`, se importa por HTTP y se compara con las tablas por SQL crudo |
 | `tests/test_mowa_mes_configuracion_postgres.py` | Integración y HTTP de punta a punta contra PostgreSQL (fechas 2099, prefijo propio, estado único restituido) |
 
 ## 9. Campaña (B4, RF-MM-01 a RF-MM-13)
