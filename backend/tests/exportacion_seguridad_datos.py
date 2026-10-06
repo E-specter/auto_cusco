@@ -167,12 +167,21 @@ TABLA_PELIGROSA = Tabla(
 )
 
 
-def largo_xlsx_sin_core(contenido: bytes) -> int:
-    """Largo del .xlsx sin el `docProps/core.xml` COMPRIMIDO, que trae la fecha y hora.
+def largo_sin_comprimir_sin_core(contenido: bytes) -> int:
+    """Suma del largo SIN comprimir (`ZipInfo.file_size`) de todas las partes menos `core.xml`.
 
-    Comprimido, el `core.xml` mide entre 233 y 236 bytes segun la hora, asi que el largo bruto
-    cambia de una corrida a otra. Lo que no depende de la hora, y de lo que depende la division
-    por bytes de MOWA MES, es todo lo demas.
+    No depende de la compresion: el largo comprimido cambia con la implementacion de zlib (el
+    clasico de CPython 3.13 y el zlib-ng de CPython 3.14 en Windows dan 5110 y 5118 bytes para las
+    MISMAS partes con el mismo contenido) y el `core.xml` ademas lleva la fecha y la hora.
+
+    Alcanza para la division por bytes de MOWA MES (`division.py`) porque esa division no usa un
+    largo congelado: escribe cada tramo y mide su tamano REAL, comprimido, en cada corrida. Lo que
+    estas pruebas deben garantizar es que el exportador escribe las mismas partes con el mismo
+    contenido que en HEAD, de modo que cada fila pesa lo mismo antes de comprimir. Eso lo fijan la
+    huella (el contenido de todas las partes) y este largo (que ademas avisa si se agrega o se quita
+    una parte); el largo comprimido no se congela a proposito.
     """
     with zipfile.ZipFile(io.BytesIO(contenido)) as libro:
-        return len(contenido) - libro.getinfo("docProps/core.xml").compress_size
+        return sum(
+            info.file_size for info in libro.infolist() if info.filename != "docProps/core.xml"
+        )

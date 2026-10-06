@@ -5,19 +5,23 @@ Se calcularon con los exportadores TAL COMO ESTABAN, antes de tocar el codigo (w
 comportamiento de hoy, no una funcion consigo misma.
 
 - XLSX: `huella_xlsx` (todas las partes del zip, sin las marcas de tiempo de `core.xml`, que
-  cambian en cada escritura) y `largo_xlsx_sin_core` (el largo menos el `core.xml` COMPRIMIDO, que
-  mide entre 233 y 236 bytes segun la hora): de ese largo depende la division por bytes de MOWA
-  MES. El largo bruto no se congela: cambia de una corrida a otra.
+  cambian en cada escritura) y `largo_sin_comprimir_sin_core` (la suma del largo SIN comprimir de
+  todas las partes menos `core.xml`). El largo comprimido no se congela: depende de la
+  implementacion de zlib (el clasico y el zlib-ng de CPython 3.14 en Windows difieren en unos
+  bytes con las mismas partes) y la division por bytes de MOWA MES mide el tamano real en cada
+  corrida. En B10 el largo pasa de comprimido (5110 y 4878) a sin comprimir (18331 y 17333): los
+  exportadores no cambiaron (la huella sigue siendo la de HEAD 3e567d7) y el nuevo largo da lo
+  mismo en CPython 3.13.14 (zlib) y 3.14.7 (zlib-ng).
 - CSV y JSON: SHA-256 de los bytes, que son deterministas.
 """
 
 XLSX_GENERICO_SIN_IGUAL = (
     "85f57bf0fa3646bc5139d43f4b9460558a090058c071f37dadadccbd3608d625",
-    5110,
+    18331,
 )
 XLSX_MOWA_SIN_IGUAL = (
     "1192098ad4a4d86b17ece3ce2ae71cc45bff9ed60d497aa3a5addf9db841e07f",
-    4878,
+    17333,
 )
 
 # CSV con las opciones por defecto, y con `;` y `utf-8-sig`.

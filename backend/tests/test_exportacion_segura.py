@@ -32,7 +32,7 @@ from tests.exportacion_seguridad_datos import (
     TABLA_SIN_IGUAL,
     huella_bytes,
     huella_xlsx,
-    largo_xlsx_sin_core,
+    largo_sin_comprimir_sin_core,
 )
 
 SIN_PROTECCION = OpcionesArchivo(proteger_formulas=False)
@@ -181,7 +181,7 @@ def test_el_xlsx_lleva_igual_el_texto_con_saltos_de_linea_dentro_de_la_celda() -
 def test_el_xlsx_sin_igual_es_identico_al_de_head_en_todas_sus_partes() -> None:
     contenido = _xlsx(TABLA_SIN_IGUAL)
 
-    assert (huella_xlsx(contenido), largo_xlsx_sin_core(contenido)) == (
+    assert (huella_xlsx(contenido), largo_sin_comprimir_sin_core(contenido)) == (
         congelados.XLSX_GENERICO_SIN_IGUAL
     )
 
@@ -198,8 +198,8 @@ def _fijar_la_hora_de_openpyxl(monkeypatch, momento: datetime) -> None:
 
 
 def test_la_huella_y_el_largo_congelados_no_dependen_de_la_hora_de_escritura(monkeypatch) -> None:
-    # El core.xml lleva la fecha y comprimido mide entre 233 y 236 bytes segun la hora: el largo
-    # bruto es intermitente. Con tres horas distintas, huella y largo sin core.xml no se mueven.
+    # El core.xml lleva la fecha y la hora. Con tres momentos distintos (tambien de dia y de ano),
+    # la huella y el largo sin comprimir de las demas partes no se mueven.
     momentos = [datetime(2020, 1, 1, 0, 0, 0), datetime(2031, 12, 31, 23, 59, 59)]
     momentos.append(datetime(2026, 9, 30, 10, 46, 31))
     escritos = []
@@ -213,9 +213,9 @@ def test_la_huella_y_el_largo_congelados_no_dependen_de_la_hora_de_escritura(mon
             (
                 core,
                 huella_xlsx(generico),
-                largo_xlsx_sin_core(generico),
+                largo_sin_comprimir_sin_core(generico),
                 huella_xlsx(mowa),
-                largo_xlsx_sin_core(mowa),
+                largo_sin_comprimir_sin_core(mowa),
             )
         )
 
@@ -223,6 +223,32 @@ def test_la_huella_y_el_largo_congelados_no_dependen_de_la_hora_de_escritura(mon
     assert "2020-01-01T00:00:00Z" in escritos[0][0] and "2031-12-31T23:59:59Z" in escritos[1][0]
     assert len({e[1:] for e in escritos}) == 1  # y no cambia nada de lo congelado
     assert escritos[0][1:] == (*congelados.XLSX_GENERICO_SIN_IGUAL, *congelados.XLSX_MOWA_SIN_IGUAL)
+
+
+def _partes_de(contenido: bytes) -> dict[str, bytes]:
+    with zipfile.ZipFile(io.BytesIO(contenido)) as libro:
+        return {nombre: libro.read(nombre) for nombre in libro.namelist()}
+
+
+def test_dos_dias_distintos_solo_cambian_el_core_xml(monkeypatch) -> None:
+    # La fecha de escritura va solo en docProps/core.xml: de un dia a otro (misma hora) las demas
+    # partes salen byte a byte iguales, y la huella y el largo sin comprimir no se mueven.
+    dias = [datetime(2026, 10, 4, 10, 46, 31), datetime(2026, 10, 5, 10, 46, 31)]
+    escritos = []
+    for dia in dias:
+        _fijar_la_hora_de_openpyxl(monkeypatch, dia)
+        escritos.append((_xlsx(TABLA_SIN_IGUAL), escribir_archivo_carga(FILAS_MOWA_SIN_IGUAL)))
+
+    for del_primero, del_segundo in zip(*escritos, strict=True):  # el generico y el de MOWA MES
+        uno, dos = _partes_de(del_primero), _partes_de(del_segundo)
+        assert uno.keys() == dos.keys()
+        assert {nombre for nombre in uno if uno[nombre] != dos[nombre]} == {"docProps/core.xml"}
+        assert "2026-10-04T10:46:31Z" in uno["docProps/core.xml"].decode("utf-8")
+        assert "2026-10-05T10:46:31Z" in dos["docProps/core.xml"].decode("utf-8")
+        assert huella_xlsx(del_primero) == huella_xlsx(del_segundo)
+        assert largo_sin_comprimir_sin_core(del_primero) == largo_sin_comprimir_sin_core(
+            del_segundo
+        )
 
 
 def test_la_proteccion_del_xlsx_no_depende_de_la_opcion() -> None:
@@ -462,7 +488,7 @@ def test_el_archivo_de_mowa_mes_sin_igual_es_identico_al_de_head_y_mide_lo_mismo
 
     assert (
         huella_xlsx(contenido),
-        largo_xlsx_sin_core(contenido),
+        largo_sin_comprimir_sin_core(contenido),
     ) == congelados.XLSX_MOWA_SIN_IGUAL
 
 
