@@ -589,7 +589,12 @@ describe('campoDeError', () => {
 describe('nivelDeFila (un segmento sin máximo no tiene nivel)', () => {
   const sinMaximo = {
     largo_maximo: null,
-    sin_maximo: { codigo: 'sin_cota', detalle: 'sin máximo', ubicacion: { nodo: 1, funcion: null, parametro: null } },
+    // A real code of the engine, with the sentence it gives for it: the length of a variable depends on each product's data.
+    sin_maximo: {
+      codigo: 'sin_cota_variable',
+      detalle: "El largo de la variable 'monto' depende del dato de cada producto",
+      ubicacion: { nodo: 1, funcion: null, parametro: null },
+    },
   } as const;
 
   it('con largo máximo es el nivel de siempre', () => {

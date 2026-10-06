@@ -194,7 +194,7 @@ def _resolver_definicion(
         raise ErrorConCodigo(
             400,
             "Se pide una definicion en linea o una definicion guardada, no las dos ni ninguna",
-            CodigoTexto.DEFINICION_INVALIDA.value,
+            CodigoTexto.DEFINICION_INVALIDA,
         )
     if peticion.definicion is not None:
         return _definicion(peticion.definicion), None
@@ -202,16 +202,16 @@ def _resolver_definicion(
     try:
         cargada = definiciones.cargar(guardada.id, guardada.version)  # type: ignore[union-attr]
     except DefinicionNoEncontrada as exc:
-        raise ErrorConCodigo(404, str(exc), CodigoTexto.DEFINICION_NO_ENCONTRADA.value) from exc
+        raise ErrorConCodigo(404, str(exc), CodigoTexto.DEFINICION_NO_ENCONTRADA) from exc
     except VersionNoEncontrada as exc:
-        raise ErrorConCodigo(404, str(exc), CodigoTexto.VERSION_NO_ENCONTRADA.value) from exc
+        raise ErrorConCodigo(404, str(exc), CodigoTexto.VERSION_NO_ENCONTRADA) from exc
     return cargada.definicion, cargada
 
 
 def _error(exc: Exception) -> ErrorConCodigo:
     """Los errores de siempre, sin codigo: el `detail` es el mismo que antes."""
     if isinstance(exc, SinVersionVigente):
-        return ErrorConCodigo(404, str(exc), CodigoTexto.SIN_VERSION_VIGENTE.value)
+        return ErrorConCodigo(404, str(exc), CodigoTexto.SIN_VERSION_VIGENTE)
     return ErrorConCodigo(400, str(exc), None)
 
 

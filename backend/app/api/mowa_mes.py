@@ -57,7 +57,7 @@ from app.core.entities.mowa_mes import (
     VersionSpeech,
 )
 from app.core.entities.mowa_mes_costo import VARIABLES_PLANTILLA, TarifaInvalida
-from app.core.entities.texto_enriquecido import ExpresionInvalida, MotivoSinCota
+from app.core.entities.texto_enriquecido import CodigoTexto, ExpresionInvalida, MotivoSinCota
 from app.core.services.plataformas.mowa_mes import costos
 from app.core.services.plataformas.mowa_mes.configuracion import (
     BorradorV2,
@@ -375,16 +375,17 @@ class VersionSpeechRespuesta(ModeloRespuesta):
 class ProblemaSpeechRespuesta(ModeloRespuesta):
     """`codigo` y `ubicacion` (nodo, funcion y parametro) vienen en los problemas de una v2.
 
-    `catalogo` dice en cual catalogo i18n se traduce `codigo`: `texto` (`textoEnriquecido.codigo.*`,
-    el del motor) o `mowa_mes` (`mowaMes.codigo.*`). Los dos catalogos comparten nombres
-    (`telefono_invalido`) con textos distintos, asi que el codigo solo no basta. Es nulo cuando
-    `codigo` lo es.
+    `codigo` es de uno de los dos catalogos (`CodigoTexto` o `CodigoMowaMes`; un nombre que no
+    esta en ninguno no compila en el cliente) y `catalogo` dice en cual i18n se traduce: `texto`
+    (`textoEnriquecido.codigo.*`, el del motor) o `mowa_mes` (`mowaMes.codigo.*`). Los dos
+    catalogos comparten nombres (`telefono_invalido`) con textos distintos, asi que el codigo solo
+    no basta. Es nulo cuando `codigo` lo es.
     """
 
     segmento: Segmento | None
     campo: CampoProblemaSpeech
     detalle: str
-    codigo: str | None
+    codigo: CodigoTexto | CodigoMowaMes | None
     catalogo: Literal["texto", "mowa_mes"] | None
     ubicacion: UbicacionRespuesta | None
 
@@ -480,11 +481,12 @@ def _problema(p: ProblemaSpeech) -> ProblemaSpeechRespuesta:
         ubicacion = UbicacionRespuesta(
             nodo=motor.nodo, funcion=motor.funcion, parametro=motor.parametro
         )
-    codigo, catalogo = None, None
+    codigo: CodigoTexto | CodigoMowaMes | None = None
+    catalogo: Literal["texto", "mowa_mes"] | None = None
     if motor is not None:
-        codigo, catalogo = motor.codigo.value, "texto"
+        codigo, catalogo = motor.codigo, "texto"
     elif p.codigo_mowa_mes is not None:
-        codigo, catalogo = p.codigo_mowa_mes.value, "mowa_mes"
+        codigo, catalogo = p.codigo_mowa_mes, "mowa_mes"
     return ProblemaSpeechRespuesta(
         segmento=p.segmento,
         campo=p.campo,
@@ -505,7 +507,7 @@ def _sin_maximo(motivo: MotivoSinCota | None) -> SinCotaRespuesta | None:
     if motivo is None:
         return None
     return SinCotaRespuesta(
-        codigo=motivo.codigo.value,
+        codigo=motivo.codigo,
         detalle=motivo.detalle,
         ubicacion=UbicacionRespuesta(nodo=motivo.nodo, funcion=motivo.funcion, parametro=None),
     )

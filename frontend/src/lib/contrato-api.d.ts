@@ -1180,6 +1180,18 @@ export interface components {
          */
         CodigoMowaMes: "telefono_invalido" | "falta_documento" | "sin_speech" | "falta_titular" | "falta_vencimiento" | "mensaje_excede_160" | "mensaje_excede_150" | "documento_no_estandar" | "limite_mensual_excedido" | "id_sin_correspondencia" | "falta_whatsapp" | "sin_supervisores" | "sin_productos_cargables";
         /**
+         * CodigoTexto
+         * @description Catalogo de codigos que el frontend traducira como `textoEnriquecido.codigo.<codigo>`.
+         *
+         *     Un codigo por linea, con la forma `NOMBRE = "codigo"`: la prueba espejo del
+         *     frontend lee esta clase. Los primeros se detectan al compilar (una expresion
+         *     invalida no procesa ninguna fila); los siguientes, al evaluar una fila concreta; al final,
+         *     los que solo informa la API del motor (B4a): lo que no se puede leer, el contexto o el
+         *     producto que no existen, y por que una expresion no tiene largo maximo.
+         * @enum {string}
+         */
+        CodigoTexto: "expresion_invalida" | "definicion_invalida" | "sintaxis_invalida" | "referencia_vacia" | "variable_desconocida" | "funcion_desconocida" | "parametro_invalido" | "tipo_incompatible" | "limite_excedido" | "no_se_puede_escribir_como_texto" | "sin_segmento" | "variable_obligatoria_vacia" | "argumento_vacio" | "division_por_cero" | "no_es_numero" | "no_es_fecha" | "telefono_invalido" | "resultado_fuera_de_rango" | "valor_no_convertible" | "sin_cota_variable" | "sin_cota_funcion" | "contexto_desconocido" | "producto_no_encontrado" | "sin_version_vigente" | "definicion_no_encontrada" | "version_no_encontrada" | "nombre_repetido" | "seleccion_no_encontrada";
+        /**
          * ColumnaEntrada
          * @description Una columna de la definicion: la forma que guardara B4b. El contenido es solo expresion;
          *     `formato_fecha` va con marcas legibles (`dd/mm/aaaa`) y el backend las traduce.
@@ -1607,13 +1619,13 @@ export interface components {
          * @description Un error que, ademas del motivo, puede traer el `codigo` que la interfaz traduce.
          *
          *     `codigo` es nulo en los errores que todavia no tienen uno (una seleccion mal armada, una
-         *     plantilla invalida); siempre viaja, para que el cliente no tenga que adivinar si falta.
+         *     plantilla invalida); siempre viaja, para que el cliente no tenga que adivinar si falta. Cuando
+         *     viaja es de `CodigoTexto`.
          */
         DetalleErrorConCodigo: {
             /** Detail */
             detail: string;
-            /** Codigo */
-            codigo: string | null;
+            codigo: components["schemas"]["CodigoTexto"] | null;
         };
         /**
          * DetalleErrorDefinicion
@@ -1622,8 +1634,7 @@ export interface components {
         DetalleErrorDefinicion: {
             /** Detail */
             detail: string;
-            /** Codigo */
-            codigo: string;
+            codigo: components["schemas"]["CodigoTexto"];
             /** Problemas */
             problemas: components["schemas"]["ProblemaTextoRespuesta"][];
         };
@@ -1644,8 +1655,7 @@ export interface components {
         DetalleErrorTexto: {
             /** Detail */
             detail: string;
-            /** Codigo */
-            codigo: string;
+            codigo: components["schemas"]["CodigoTexto"];
         };
         /** DiaNoLaborableRespuesta */
         DiaNoLaborableRespuesta: {
@@ -1756,8 +1766,7 @@ export interface components {
         };
         /** ExclusionFilaRespuesta */
         ExclusionFilaRespuesta: {
-            /** Codigo */
-            codigo: string;
+            codigo: components["schemas"]["CodigoTexto"];
             /** Detalle */
             detalle: string;
         };
@@ -2591,10 +2600,11 @@ export interface components {
          * ProblemaSpeechRespuesta
          * @description `codigo` y `ubicacion` (nodo, funcion y parametro) vienen en los problemas de una v2.
          *
-         *     `catalogo` dice en cual catalogo i18n se traduce `codigo`: `texto` (`textoEnriquecido.codigo.*`,
-         *     el del motor) o `mowa_mes` (`mowaMes.codigo.*`). Los dos catalogos comparten nombres
-         *     (`telefono_invalido`) con textos distintos, asi que el codigo solo no basta. Es nulo cuando
-         *     `codigo` lo es.
+         *     `codigo` es de uno de los dos catalogos (`CodigoTexto` o `CodigoMowaMes`; un nombre que no
+         *     esta en ninguno no compila en el cliente) y `catalogo` dice en cual i18n se traduce: `texto`
+         *     (`textoEnriquecido.codigo.*`, el del motor) o `mowa_mes` (`mowaMes.codigo.*`). Los dos
+         *     catalogos comparten nombres (`telefono_invalido`) con textos distintos, asi que el codigo solo
+         *     no basta. Es nulo cuando `codigo` lo es.
          */
         ProblemaSpeechRespuesta: {
             segmento: components["schemas"]["Segmento"] | null;
@@ -2606,7 +2616,7 @@ export interface components {
             /** Detalle */
             detalle: string;
             /** Codigo */
-            codigo: string | null;
+            codigo: components["schemas"]["CodigoTexto"] | components["schemas"]["CodigoMowaMes"] | null;
             /** Catalogo */
             catalogo: ("texto" | "mowa_mes") | null;
             ubicacion: components["schemas"]["UbicacionRespuesta"] | null;
@@ -2618,8 +2628,7 @@ export interface components {
          *     no es de una columna (`definicion`, `nombre`, `campos`, `segmentacion`).
          */
         ProblemaTextoRespuesta: {
-            /** Codigo */
-            codigo: string;
+            codigo: components["schemas"]["CodigoTexto"];
             /** Detalle */
             detalle: string;
             ubicacion: components["schemas"]["UbicacionRespuesta"] | null;
@@ -2824,8 +2833,7 @@ export interface components {
         };
         /** SinCotaRespuesta */
         SinCotaRespuesta: {
-            /** Codigo */
-            codigo: string;
+            codigo: components["schemas"]["CodigoTexto"];
             /** Detalle */
             detalle: string;
             ubicacion: components["schemas"]["UbicacionRespuesta"];

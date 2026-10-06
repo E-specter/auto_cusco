@@ -420,8 +420,8 @@ test.describe('un segmento sin largo máximo (speech v2, B6)', () => {
               largo_maximo: null,
               codigo: null,
               sin_maximo: {
-                codigo: 'sin_cota',
-                detalle: 'El mensaje no tiene una cota',
+                codigo: 'sin_cota_variable',
+                detalle: "El largo de la variable 'monto' depende del dato de cada producto",
                 ubicacion: { nodo: 1, funcion: null, parametro: null },
               },
             }

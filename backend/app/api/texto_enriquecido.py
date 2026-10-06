@@ -92,7 +92,7 @@ def obtener_servicio_texto(
 class DetalleErrorTexto(DetalleError):
     """El motivo y el `codigo` del catalogo (`CodigoTexto`) que la interfaz traduce."""
 
-    codigo: str
+    codigo: CodigoTexto
 
 
 RESPUESTAS_404: dict[int | str, dict[str, Any]] = {
@@ -281,7 +281,7 @@ class ProblemaTextoRespuesta(ModeloRespuesta):
     ubican el problema dentro de una definicion; `campo` nombra el campo de la definicion cuando
     no es de una columna (`definicion`, `nombre`, `campos`, `segmentacion`)."""
 
-    codigo: str
+    codigo: CodigoTexto
     detalle: str
     ubicacion: UbicacionRespuesta | None
     nombre: str | None
@@ -291,7 +291,7 @@ class ProblemaTextoRespuesta(ModeloRespuesta):
 
 
 class SinCotaRespuesta(ModeloRespuesta):
-    codigo: str
+    codigo: CodigoTexto
     detalle: str
     ubicacion: UbicacionRespuesta
 
@@ -436,7 +436,7 @@ class ColumnaRespuesta(ModeloRespuesta):
 
 
 class ExclusionFilaRespuesta(ModeloRespuesta):
-    codigo: str
+    codigo: CodigoTexto
     detalle: str
 
 
@@ -484,7 +484,7 @@ def problema_respuesta(
     problema: Problema, de_definicion: ProblemaDeDefinicion | None = None
 ) -> ProblemaTextoRespuesta:
     return ProblemaTextoRespuesta(
-        codigo=problema.codigo.value,
+        codigo=problema.codigo,
         detalle=problema.detalle,
         ubicacion=_ubicacion(problema.nodo, problema.funcion, problema.parametro),
         nombre=problema.nombre,
@@ -498,7 +498,7 @@ def _sin_cota(motivo: MotivoSinCota | None) -> SinCotaRespuesta | None:
     if motivo is None:
         return None
     return SinCotaRespuesta(
-        codigo=motivo.codigo.value,
+        codigo=motivo.codigo,
         detalle=motivo.detalle,
         ubicacion=UbicacionRespuesta(nodo=motivo.nodo, funcion=motivo.funcion, parametro=None),
     )

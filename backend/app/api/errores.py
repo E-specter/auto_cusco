@@ -12,6 +12,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from app.api.respuestas import ModeloRespuesta
+from app.core.entities.texto_enriquecido import CodigoTexto
 
 
 class DetalleError(ModeloRespuesta):
@@ -32,10 +33,11 @@ class DetalleErrorConCodigo(DetalleError):
     """Un error que, ademas del motivo, puede traer el `codigo` que la interfaz traduce.
 
     `codigo` es nulo en los errores que todavia no tienen uno (una seleccion mal armada, una
-    plantilla invalida); siempre viaja, para que el cliente no tenga que adivinar si falta.
+    plantilla invalida); siempre viaja, para que el cliente no tenga que adivinar si falta. Cuando
+    viaja es de `CodigoTexto`.
     """
 
-    codigo: str | None
+    codigo: CodigoTexto | None
 
 
 class ErrorConCodigo(Exception):
@@ -44,7 +46,7 @@ class ErrorConCodigo(Exception):
     `HTTPException` solo sabe enviar `{"detail": ...}`.
     """
 
-    def __init__(self, estado: int, detalle: str, codigo: str | None) -> None:
+    def __init__(self, estado: int, detalle: str, codigo: CodigoTexto | None) -> None:
         super().__init__(detalle)
         self.estado = estado
         self.detalle = detalle
@@ -53,8 +55,9 @@ class ErrorConCodigo(Exception):
 
 def manejar_error_con_codigo(_: Request, error: Exception) -> JSONResponse:
     assert isinstance(error, ErrorConCodigo)
+    codigo = None if error.codigo is None else error.codigo.value
     return JSONResponse(
-        status_code=error.estado, content={"detail": error.detalle, "codigo": error.codigo}
+        status_code=error.estado, content={"detail": error.detalle, "codigo": codigo}
     )
 
 
