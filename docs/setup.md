@@ -92,6 +92,8 @@ Las variables de base de datos (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_
 
 El backend usa **[uv](https://docs.astral.sh/uv/)** para gestionar el entorno virtual y las dependencias — no `pip`/`venv` directos. Requiere PostgreSQL instalado (paso 6) para que el health-check reporte la base de datos como disponible, pero el servidor arranca igual sin ella.
 
+**Versión de Python: 3.13**, fijada en `backend/.python-version`. `uv` la respeta en cada copia del repositorio y en la integración continua; si no está instalada, la descarga. Sin el archivo, `uv` elegía la versión más alta instalada, y con Python 3.14 (que trae otra zlib) los archivos `.xlsx` comprimen unos bytes distinto: el contenido es idéntico, pero cerca del límite de 2 MB de MOWA MES una campaña podría dividirse en otra cantidad de archivos según el entorno. Si tu `.venv` se creó con otra versión, recréalo con `uv sync`. Pasar a otra versión es una decisión aparte, con su verificación completa.
+
 ```powershell
 cd backend
 

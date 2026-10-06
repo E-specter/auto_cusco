@@ -9,7 +9,7 @@ uv add --dev <paquete>  # agrega una dependencia de desarrollo
 uv run <comando>    # ejecuta un comando dentro del entorno (sin activar el venv manualmente)
 ```
 
-No edites `uv.lock` a mano; se regenera con `uv sync` / `uv add` / `uv lock`. Commitea `uv.lock` junto con `pyproject.toml`.
+La versión de Python es **3.13**, fijada en `backend/.python-version` (ver `docs/setup.md`, sección 5): toda verificación corre con ella. No edites `uv.lock` a mano; se regenera con `uv sync` / `uv add` / `uv lock`. Commitea `uv.lock` junto con `pyproject.toml`.
 
 ## Comandos habituales
 
