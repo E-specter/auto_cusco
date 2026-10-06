@@ -31,17 +31,17 @@ import {
 
 const CATALOGO: Catalogo = {
   variables: [
-    { nombre: 'titular', tipo: 'texto', origen: 'cartera' },
-    { nombre: 'fecha_vencimiento_cuota', tipo: 'fecha', origen: 'cartera' },
-    { nombre: 'saldo_capital_pendiente', tipo: 'numero', origen: 'cartera' },
+    { nombre: 'titular', tipo: 'texto' },
+    { nombre: 'fecha_vencimiento_cuota', tipo: 'fecha' },
+    { nombre: 'saldo_capital_pendiente', tipo: 'numero' },
   ],
   funciones: [
-    { nombre: 'primeros', familia: 'texto', recibe: ['texto'], devuelve: 'texto' },
-    { nombre: 'mayusculas', familia: 'texto', recibe: ['texto'], devuelve: 'texto' },
-    { nombre: 'sumar_dias', familia: 'fecha', recibe: ['fecha'], devuelve: 'fecha' },
-    { nombre: 'formato_fecha', familia: 'fecha', recibe: ['fecha'], devuelve: 'texto' },
-    { nombre: 'redondear', familia: 'numero', recibe: ['numero'], devuelve: 'numero' },
-    { nombre: 'si_vacio', familia: 'nulos', recibe: ['texto', 'numero', 'fecha'], devuelve: 'entrada' },
+    { nombre: 'primeros', recibe: ['texto'], devuelve: 'texto' },
+    { nombre: 'mayusculas', recibe: ['texto'], devuelve: 'texto' },
+    { nombre: 'sumar_dias', recibe: ['fecha'], devuelve: 'fecha' },
+    { nombre: 'formato_fecha', recibe: ['fecha'], devuelve: 'texto' },
+    { nombre: 'redondear', recibe: ['numero'], devuelve: 'numero' },
+    { nombre: 'si_vacio', recibe: ['texto', 'numero', 'fecha'], devuelve: 'entrada' },
   ],
 };
 

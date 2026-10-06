@@ -172,3 +172,21 @@ test.describe('selecciones guardadas y compartidas', () => {
     await expect(page.getByLabel('Selección guardada')).toHaveValue('1');
   });
 });
+
+test.describe('nombres de los campos', () => {
+  test('la tabla de productos y los filtros muestran la etiqueta del campo, no su nombre técnico', async ({ page }) => {
+    const api = apiVacia();
+    api.versiones = [version()];
+    await montarApi(page, api);
+
+    await page.goto('/cartera');
+    await expect(page.locator('[data-disponibles]')).toHaveText('3,200');
+
+    await expect(page.getByRole('columnheader', { name: 'Saldo de capital pendiente' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'saldo capital pendiente', exact: true })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Agregar filtro' }).click();
+    const campo = page.locator('[data-filtros] > .fila').first().getByLabel('Campo');
+    await expect(campo.locator('option[value="dias_atraso"]')).toHaveText('Días de atraso');
+  });
+});

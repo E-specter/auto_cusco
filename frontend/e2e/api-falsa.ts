@@ -70,7 +70,18 @@ export interface ApiFalsa {
   revision: Revision;
   /** Answers `POST /selecciones` in order; the last one repeats. */
   respuestasCrearSeleccion: Array<{ estado: number; cuerpo: unknown }>;
+  /**
+   * Extra routes a feature's own fake contributes (the rich-text engine,
+   * saved column definitions), asked in order before the 404.
+   */
+  manejadores?: Manejador[];
 }
+
+/**
+ * A feature fake's routes: answers the request and returns `true`, or returns
+ * `false` to let the next handler try (interface rules §9.3).
+ */
+export type Manejador = (route: Route, ruta: string, metodo: string, url: URL) => Promise<boolean>;
 
 /** A synthetic catalogue: the operational fields plus one text field. */
 export function camposSinteticos(): Campos {
@@ -302,6 +313,10 @@ export async function montarApi(page: Page, estado: ApiFalsa): Promise<void> {
       }));
       const elegida = estado.versiones.find((v) => v.id === id);
       return elegida ? json(route, 200, elegida) : json(route, 404, { detail: 'no existe' });
+    }
+
+    for (const manejar of estado.manejadores ?? []) {
+      if (await manejar(route, ruta, metodo, url)) return;
     }
 
     return json(route, 404, { detail: `sin ruta falsa para ${metodo} ${ruta}` });

@@ -251,6 +251,7 @@ La versión, el nombre de la versión y el guardado conservan su forma actual. L
 | API falsa de catálogo, validación y previsualización | `e2e/api-falsa-texto-enriquecido.ts` | `designer` |
 | Fila expandida de tabla y marca de vacío | `src/styles/ui.css` (`.table__detalle`, `.marca-vacio`) | `designer` |
 | Textos `textoEnriquecido.*` | `src/i18n/*.json` | `designer`, con la prueba espejo del backend sobre todas sus claves |
+| Etiquetas de los campos de la cartera (`campo.<nombre>`) | `src/lib/campos.ts`, `src/i18n/*.json` | `designer`, con su prueba contra el catálogo de campos del backend (`tests/nucleo/i18n-campos.test.ts`). Las usan `/cartera`, el selector de variables y el constructor. Una variable con `clave_nombre` usa esa clave; un campo de la cartera, `campo.<nombre>` |
 | Cliente de `/definiciones-columnas` y su API falsa | `src/lib/api-definiciones.ts`, `e2e/api-falsa-definiciones.ts` | `dev_frontend_motor_texto_enriquecido` |
 | Pantalla del constructor de columnas, su vista previa y sus textos `columnas.*` | `src/pages/columnas.astro`, `src/styles/columnas.css` | `dev_frontend_motor_texto_enriquecido` |
 | Integración en el speech de MOWA MES (M2) y sus textos `mowaMes.speech.v2.*` | `src/pages/mowa-mes/configuracion.astro` | `dev_frontend_motor_texto_enriquecido` |

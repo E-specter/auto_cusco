@@ -36,7 +36,6 @@ import {
   borradorDe,
   consultaDe,
   funcionAdmiteCampo,
-  humanizarCampo,
   leerCantidad,
   operadoresPara,
   partesIncompletas,
@@ -52,6 +51,7 @@ import {
   type SeleccionBorrador,
   type TipoCampo,
 } from '../lib/seleccion';
+import { etiquetaCampo } from '../lib/campos';
 
 export const EVENTO_SELECCION = 'seleccioncambiada';
 
@@ -134,7 +134,7 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
   };
 
   const nombresDeCampos = (): string[] =>
-    Object.keys(s.campos).sort((a, b) => humanizarCampo(a).localeCompare(humanizarCampo(b)));
+    Object.keys(s.campos).sort((a, b) => etiquetaCampo(a).localeCompare(etiquetaCampo(b)));
 
   const sucio = (): boolean => JSON.stringify(s.borrador) !== s.base;
 
@@ -429,7 +429,7 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
 
     const campo = crearSelect(
       t('selector.filtro.campo'),
-      [['', t('selector.filtro.campo.elige')], ...nombresDeCampos().map((n): [string, string] => [n, humanizarCampo(n)])],
+      [['', t('selector.filtro.campo.elige')], ...nombresDeCampos().map((n): [string, string] => [n, etiquetaCampo(n)])],
       filtro.campo,
       'fila__campo',
     );
@@ -529,7 +529,7 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
     const campo = q<HTMLSelectElement>('[data-orden-campo]');
     if (!campo) return;
     campo.replaceChildren(
-      ...[['', t('selector.orden.ninguno')] as [string, string], ...nombresDeCampos().map((n): [string, string] => [n, humanizarCampo(n)])].map(
+      ...[['', t('selector.orden.ninguno')] as [string, string], ...nombresDeCampos().map((n): [string, string] => [n, etiquetaCampo(n)])].map(
         ([value, texto]) => {
           const opcion = document.createElement('option');
           opcion.value = value;
@@ -595,7 +595,7 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
       t('selector.indicador.campo'),
       [
         ['', indicador.funcion === 'conteo' ? t('selector.indicador.sinCampo') : t('selector.filtro.campo.elige')],
-        ...admitidos.map((n): [string, string] => [n, humanizarCampo(n)]),
+        ...admitidos.map((n): [string, string] => [n, etiquetaCampo(n)]),
       ],
       indicador.campo ?? '',
       'fila__campoIndicador',

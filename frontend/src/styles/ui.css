@@ -537,6 +537,61 @@
   text-align: end;
 }
 
+/* ---- Expanded row ----------------------------------------------------------
+   A row that opens its editor right below it (interface rules §5.3, §9.6):
+   a <tr class="table__detalle"> after its row, with one <td colspan> holding
+   the form. The row's own button carries aria-expanded and aria-controls;
+   its chevron (.table__abrir svg) turns when open. The detail row sits on
+   the surface tone so it reads as part of the row above, not a new record. */
+
+.table__detalle > td {
+  padding: var(--space-4);
+  border-block-end: var(--color-border-hairline) solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+.table tbody tr.table__detalle:hover {
+  background-color: transparent;
+}
+
+/* The row being edited keeps the same tone as its detail, so the pair reads
+   as one block while it is open. */
+.table tbody tr:has(+ tr.table__detalle:not([hidden])) {
+  background-color: var(--color-surface);
+}
+
+.table__abrir svg {
+  transition: transform var(--duration-micro) var(--ease-default);
+}
+
+.table__abrir[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+/* A stacked table (.table--apilable) turns every cell into a block; the
+   detail row's single cell must keep the full width and its own padding. */
+@media (max-width: 63.99rem) {
+  .table--apilable .table__detalle > td {
+    padding: var(--space-3) 0 var(--space-4);
+    border: 0;
+  }
+}
+
+/* ---- Empty value mark --------------------------------------------------------
+   Where a preview shows a value that came out empty (a variable with no data
+   in the sample record). It is a mark, not a character: fixed width, a dotted
+   baseline, nothing to select or copy. Give it role="img" and an accessible
+   name ("vacío") where it appears. */
+
+.marca-vacio {
+  display: inline-block;
+  inline-size: 2ch;
+  block-size: 1em;
+  vertical-align: text-bottom;
+  border-block-end: 2px dotted var(--color-text-muted);
+  user-select: none;
+}
+
 /* ---- Pager -----------------------------------------------------------------
    The foot of a paged table: previous, the range in mono, next. */
 

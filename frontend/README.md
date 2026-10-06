@@ -45,6 +45,7 @@ src/
 ├── scripts/      selector-seleccion.ts — comportamiento del selector; la página lo monta
 ├── styles/       tokens.css · base.css · ui.css · console.css · selector.css · cartera.css
 ├── lib/          api.ts (cliente) · seleccion.ts · descargas.ts · i18n.ts · format.ts
+│                 campos.ts (etiquetas de campos) · expresion.ts · variantes.ts · api-texto-enriquecido.ts (motor de texto)
 └── i18n/         es.json · en.json
 ```
 

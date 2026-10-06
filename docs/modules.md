@@ -113,6 +113,8 @@ El esqueleto real de este enfoque ya existe en `backend/app/` (`core/{entities,p
 | `src/lib/api.ts` | Cliente tipado de la API, con los tipos generados del contrato. Distingue `ApiError` (el servidor respondió que no) de `NetworkError` (no se pudo contactar). Exporta `request` y `requestRespuesta` para los clientes de cada módulo (`api-<modulo>.ts`) |
 | `src/lib/seleccion.ts` | Sintaxis de la selección (`campo:operador:valor`, `-campo`, `nombre:funcion:campo`) sobre borradores estructurados: lo incompleto no llega a la API |
 | `src/lib/descargas.ts` | Descarga binaria compartida: cuerpo, nombre desde `Content-Disposition` y resumen desde cabeceras `X-*` |
+| `src/lib/campos.ts` | Etiquetas visibles de los campos de la cartera (`campo.<nombre>`), compartidas por `/cartera`, el editor de texto y el constructor de columnas. Una prueba las compara con el catálogo de campos del backend |
+| `src/lib/expresion.ts`, `src/lib/variantes.ts`, `src/lib/api-texto-enriquecido.ts` | Frontend del motor de texto enriquecido: estado puro del editor de piezas, variantes por segmento y cliente de catálogo, validación y previsualización (catálogo en caché por contexto). Reglas en `docs/motor-texto-enriquecido-interfaz.md` |
 | `src/lib/i18n.ts` | i18n vanilla es/en por atributos `data-i18n`; ambos diccionarios viajan en el bundle |
 | `src/lib/format.ts` | Fechas, números, tamaños y montos; incluye la sugerencia de fecha de corte desde el nombre del archivo (`DD.MM.YYYY`) |
 | `src/styles/` | `tokens.css` (única fuente de verdad visual), `base.css`, `ui.css` (vocabulario compartido), `console.css`, `selector.css` y `cartera.css` |

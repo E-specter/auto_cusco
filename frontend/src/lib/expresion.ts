@@ -12,19 +12,26 @@
  * Everything here is pure: no DOM, no fetch. The component calls these and
  * renders the result; the tests call them directly.
  *
- * PROVISIONAL: the node, catalogue and problem shapes follow the design until
- * B4a fixes the contract. Then they become aliases of the generated types and
- * the functions below stay as they are.
+ * The shapes below are the minimum the editor reads, not copies of the
+ * contract: the generated response types (`ExpresionGuardadaRespuesta`,
+ * `VariableRespuesta`, `FuncionRespuesta`, `ProblemaTextoRespuesta`) are
+ * assignable to them, and what the editor builds is assignable to the request
+ * models. `tests/tipos/contrato-expresion.ts` pins both directions, so the
+ * contract and these shapes cannot drift apart without `npm run tipos` failing.
  */
 
-// ---- Contract shapes (provisional until B4a) -------------------------------------
+import type { components } from './contrato-api';
+
+// ---- Contract shapes ------------------------------------------------------------------
 //
 // Shapes that travel to the backend are `type` aliases, never `interface`s:
 // the generated request models accept extra keys (an index signature), and
 // TypeScript lets an object type alias be assigned to one but not an
 // interface. An `interface` here would stop `aExpresion(...)` from being sent.
 
-export type TipoValor = 'texto' | 'numero' | 'fecha' | 'booleano';
+type Esquemas = components['schemas'];
+
+export type TipoValor = Esquemas['VariableRespuesta']['tipo'];
 
 /** A function argument: a literal, or a reference to another variable. */
 export type Argumento = string | number | { variable: string };
@@ -42,25 +49,25 @@ export type Expresion = {
   nodos: Nodo[];
 };
 
-export interface VariableCatalogo {
-  nombre: string;
-  tipo: TipoValor;
-  /** `cartera` or the context that contributes it (`mowa_mes.speech`). */
-  origen: string;
-}
+/** What type checking needs from a catalogue variable (`VariableRespuesta`). */
+export type VariableCatalogo = Pick<Esquemas['VariableRespuesta'], 'nombre' | 'tipo'>;
 
-export interface FuncionCatalogo {
-  nombre: string;
-  familia: string;
-  /** Types the function accepts as input. */
-  recibe: TipoValor[];
-  /** Output type; `entrada` means "the same type it received" (`si_vacio`). */
-  devuelve: TipoValor | 'entrada';
-}
+/**
+ * What type checking needs from a catalogue function (`FuncionRespuesta`).
+ * `devuelve: 'entrada'` means "the same type it received" (`si_vacio`).
+ */
+export type FuncionCatalogo = Pick<Esquemas['FuncionRespuesta'], 'nombre' | 'recibe' | 'devuelve'>;
 
-export interface Catalogo {
+export type Catalogo<F extends FuncionCatalogo = FuncionCatalogo> = {
   variables: VariableCatalogo[];
-  funciones: FuncionCatalogo[];
+  funciones: F[];
+};
+
+/** The editor's view of `GET /texto-enriquecido/catalogo`. */
+export function catalogoDe(
+  respuesta: Esquemas['CatalogoRespuesta'],
+): Catalogo<Esquemas['FuncionRespuesta']> {
+  return { variables: respuesta.contexto.variables, funciones: respuesta.funciones };
 }
 
 /**
@@ -312,7 +319,10 @@ export function tipoEnPosicion(
 }
 
 /** Functions that accept `tipo`, the only ones `+ Agregar función` offers. */
-export function funcionesCompatibles(catalogo: Catalogo, tipo: TipoValor | null): FuncionCatalogo[] {
+export function funcionesCompatibles<F extends FuncionCatalogo>(
+  catalogo: Catalogo<F>,
+  tipo: TipoValor | null,
+): F[] {
   if (tipo === null) return [];
   return catalogo.funciones.filter((f) => f.recibe.includes(tipo));
 }

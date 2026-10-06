@@ -152,7 +152,8 @@ import '../styles/cartera.css';
     formatNumber,
     formatParticipacion,
   } from '../lib/format';
-  import { humanizarCampo, leerIndicador, tipoDe, type TipoCampo } from '../lib/seleccion';
+  import { leerIndicador, tipoDe, type TipoCampo } from '../lib/seleccion';
+  import { etiquetaCampo } from '../lib/campos';
   import {
     EVENTO_SELECCION,
     montarSelector,
@@ -405,9 +406,9 @@ import '../styles/cartera.css';
     const sel = estado.seleccion;
     if (!sel) return;
     const select = $<HTMLSelectElement>('[data-segmento]');
-    const nombres = Object.keys(sel.campos).sort((a, b) => humanizarCampo(a).localeCompare(humanizarCampo(b)));
+    const nombres = Object.keys(sel.campos).sort((a, b) => etiquetaCampo(a).localeCompare(etiquetaCampo(b)));
     select.replaceChildren(
-      ...[['', t('cartera.segmentos.ninguno')], ...nombres.map((n) => [n, humanizarCampo(n)])].map(
+      ...[['', t('cartera.segmentos.ninguno')], ...nombres.map((n) => [n, etiquetaCampo(n)])].map(
         ([value, texto]) => {
           const opcion = document.createElement('option');
           opcion.value = value;
@@ -430,7 +431,7 @@ import '../styles/cartera.css';
 
     const tipo = tipoDe(estado.seleccion.campos, universo.campo);
     const seleccion = resumen?.seleccion?.segmentacion ?? null;
-    const clave = (valor: unknown) => (valor === null || valor === undefined || valor === '' ? ' ' : String(valor));
+    const clave = (valor: unknown) => (valor === null || valor === undefined || valor === '' ? '\u0000' : String(valor));
     const deSeleccion = new Map((seleccion?.grupos ?? []).map((grupo) => [clave(grupo.valor), grupo]));
 
     const tabla = document.createElement('table');
@@ -470,7 +471,7 @@ import '../styles/cartera.css';
       const fila = document.createElement('tr');
       const enSeleccion = deSeleccion.get(clave(grupo.valor));
       const etiqueta =
-        clave(grupo.valor) === ' ' ? t('cartera.segmentos.sinValor') : formatValor(grupo.valor, tipo === 'numero' ? null : tipo);
+        clave(grupo.valor) === '\u0000' ? t('cartera.segmentos.sinValor') : formatValor(grupo.valor, tipo === 'numero' ? null : tipo);
       const th = celda('th', etiqueta);
       th.scope = 'row';
       fila.append(
@@ -520,7 +521,7 @@ import '../styles/cartera.css';
     if (!sel) return;
     const lista = $<HTMLElement>('[data-columnas-lista]');
     const leyenda = lista.querySelector('legend')!;
-    const nombres = Object.keys(sel.campos).sort((a, b) => humanizarCampo(a).localeCompare(humanizarCampo(b)));
+    const nombres = Object.keys(sel.campos).sort((a, b) => etiquetaCampo(a).localeCompare(etiquetaCampo(b)));
     lista.replaceChildren(
       leyenda,
       ...nombres.map((nombre) => {
@@ -541,7 +542,7 @@ import '../styles/cartera.css';
           guardarColumnas();
           pintarProductos();
         });
-        etiqueta.append(casilla, document.createTextNode(humanizarCampo(nombre)));
+        etiqueta.append(casilla, document.createTextNode(etiquetaCampo(nombre)));
         return etiqueta;
       }),
     );
@@ -614,7 +615,7 @@ import '../styles/cartera.css';
     const head = document.createElement('thead');
     const filaHead = document.createElement('tr');
     columnas.forEach((nombre) => {
-      const th = celda('th', humanizarCampo(nombre), tipoDe(sel.campos, nombre) === 'numero' ? 'num' : '');
+      const th = celda('th', etiquetaCampo(nombre), tipoDe(sel.campos, nombre) === 'numero' ? 'num' : '');
       th.scope = 'col';
       filaHead.append(th);
     });
