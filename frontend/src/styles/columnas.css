@@ -1,0 +1,307 @@
+/* Column builder (/columnas). Built at runtime by the page script, so global, like mowa-mes.css. */
+
+.cl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-4) var(--space-7);
+  max-inline-size: 80rem;
+  margin-inline: auto;
+}
+
+.cl__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cl__title {
+  font-size: var(--text-lg);
+  font-weight: 800;
+  line-height: var(--leading-heading);
+  letter-spacing: var(--tracking-heading);
+  text-wrap: balance;
+}
+
+.cl__intro {
+  max-inline-size: 70ch;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.cl__contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.cl-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Only the definition's fields are held to a readable measure; the table, the open row and the
+   preview use the whole panel. */
+.cl-definicion > * {
+  max-inline-size: 42rem;
+}
+
+.cl-grupo {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 48rem) {
+  .cl-grupo {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.cl-linea {
+  font-family: var(--font-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.cl-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.cl-check input {
+  margin-block-start: 0.2em;
+}
+
+.cl-aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cl-aviso__texto {
+  flex: 1 1 18rem;
+}
+
+.cl-aviso__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cl-problemas {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cl-problemas li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cl-problemas__donde {
+  font-family: var(--font-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.cl-tabla .input {
+  inline-size: 100%;
+  min-inline-size: 8rem;
+}
+
+.cl-tabla td {
+  vertical-align: top;
+}
+
+.cl-celda-resumen {
+  font-family: var(--font-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.cl-celda-resumen--vacio {
+  color: var(--color-text-muted);
+}
+
+.cl-acciones {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+}
+
+.cl-pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cl-pie__estado {
+  font-family: var(--font-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.cl-pie__hint {
+  flex-basis: 100%;
+  font-family: var(--font-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* ---- Segmentation ---------------------------------------------------------------------- */
+
+.cl-segmentacion {
+  border: var(--color-border-hairline) solid var(--color-border);
+  padding: var(--space-3) var(--space-4);
+}
+
+.cl-segmentacion > summary {
+  cursor: pointer;
+  font-family: var(--font-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.cl-segmentacion__cuerpo,
+.cl-segmentacion__cuerpo > [data-segmentacion-detalle] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cl-segmentacion__cuerpo {
+  margin-block-start: var(--space-3);
+}
+
+/* The criterion's options are long: one control per line, never cut. */
+.cl-segmentacion .cl-grupo {
+  grid-template-columns: 1fr;
+}
+
+.cl-segmentacion [hidden] {
+  display: none;
+}
+
+.cl-rangos-tabla {
+  inline-size: auto;
+  min-inline-size: 20rem;
+}
+
+.cl-rangos {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-family: var(--font-secondary);
+  font-size: var(--text-sm);
+}
+
+.cl-rangos li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cl-valor-nuevo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
+
+.cl-politica {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* ---- Open row ----------------------------------------------------------------------------- */
+
+.cl-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cl-detalle__bloque {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cl-formato {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (min-width: 48rem) {
+  .cl-formato {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.cl-formato__ejemplo {
+  font-family: var(--font-secondary);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* ---- Preview -------------------------------------------------------------------------------- */
+
+.cl-previa td,
+.cl-previa th {
+  vertical-align: top;
+  font-family: var(--font-secondary);
+  font-size: var(--text-sm);
+}
+
+.cl-previa__excluida {
+  color: var(--color-text-muted);
+}
+
+.cl-previa__problema {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-danger-text);
+}
+
+/* The page sets the sample of the open row's editor (§9.2), so the editor's own control is not
+   shown. The variants component has no option for it; this rule is what hides it there. */
+.cl-detalle [data-control-muestra] {
+  display: none;
+}
+
+/* The sample picker of the preview is as wide as its two options, never the whole panel, and on a
+   phone its options wrap inside the screen instead of being cut at the edge. */
+.cl-politica .segmented {
+  align-self: flex-start;
+  max-inline-size: 100%;
+}
+
+.cl-politica .segmented__item {
+  min-inline-size: 0;
+  white-space: normal;
+  text-align: center;
+}

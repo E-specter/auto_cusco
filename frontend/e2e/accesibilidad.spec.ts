@@ -19,6 +19,8 @@ import {
   previsualizacionCampanaSintetica,
   SIN_TARIFA_GUARDADA,
 } from './api-falsa-mowa-mes';
+import { apiDefiniciones, definicionFalsa, manejadorDefiniciones } from './api-falsa-definiciones';
+import { apiTextoEnriquecidoVacia, manejarTextoEnriquecido } from './api-falsa-texto-enriquecido';
 
 const REGLAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
@@ -337,6 +339,91 @@ test('cartera: selección que no aplica, con partes marcadas', async ({ page }) 
   await page.goto('/cartera');
   await page.getByLabel('Selección guardada').selectOption({ index: 1 });
   await expect(page.getByRole('heading', { name: 'La selección tiene partes que no aplican.' })).toBeVisible();
+  await sinViolaciones(page);
+});
+
+// The column builder, in the states where problems hide: an open row with its editor, the
+// variants selector, a dialog, the problems summary and an old version opened to look at.
+async function abrirColumnas(page: Page, versiones = 1) {
+  const definiciones = apiDefiniciones();
+  definiciones.definiciones.push(definicionFalsa({ id: 1, nombre: 'SMS preventivo', versiones }));
+  const base = apiVacia();
+  base.manejadores = [manejarTextoEnriquecido(apiTextoEnriquecidoVacia()), manejadorDefiniciones(definiciones)];
+  await montarApi(page, base);
+  await page.goto('/columnas');
+  await page.getByLabel('Definición guardada').selectOption('1');
+  await expect(page.getByLabel('Nombre de la columna 1')).toBeVisible();
+  return definiciones;
+}
+
+for (const tema of ['light', 'dark'] as const) {
+  test.describe(`columnas de carga, tema ${tema === 'light' ? 'claro' : 'oscuro'}`, () => {
+    test.beforeEach(async ({ page }) => {
+      await page.addInitScript((elegido) => {
+        localStorage.setItem('app:appearance', JSON.stringify({ theme: elegido, language: 'es' }));
+      }, tema);
+    });
+
+    test('la lista de columnas con su vista previa', async ({ page }) => {
+      await abrirColumnas(page);
+      await expect(page.locator('.cl-previa')).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('una fila abierta con el editor de texto', async ({ page }) => {
+      await abrirColumnas(page);
+      await page.getByRole('button', { name: 'Editar mensaje' }).click();
+      await expect(page.locator('#columna-editor')).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('una columna de variable directa y el formato de una fecha', async ({ page }) => {
+      await abrirColumnas(page);
+      await page.getByLabel('Tipo de telefono').selectOption('fecha');
+      await page.getByRole('button', { name: 'Editar telefono' }).click();
+      await expect(page.locator('#columna-editor-directa')).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('la segmentación y las variantes por segmento', async ({ page }) => {
+      await abrirColumnas(page);
+      await page.getByText('Segmentación', { exact: true }).click();
+      await page.getByLabel('Segmentar las columnas').check();
+      await page.getByRole('button', { name: 'Editar mensaje' }).click();
+      await page.getByLabel('Variar por segmento').check();
+      await expect(page.locator('#columna-editor [data-segmento-botones] button').first()).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('el diálogo de confirmación al quitar una columna con contenido', async ({ page }) => {
+      await abrirColumnas(page);
+      await page.getByRole('button', { name: 'Quitar telefono' }).click();
+      await expect(page.getByRole('dialog', { name: 'Quitar la columna' })).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('el resumen de problemas tras un guardado rechazado', async ({ page }) => {
+      await abrirColumnas(page);
+      await page.getByRole('button', { name: 'Agregar columna' }).click();
+      await page.getByRole('button', { name: 'Guardar' }).click();
+      await expect(page.getByRole('alert').filter({ hasText: 'impide guardar' })).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('una versión antigua en solo lectura, con el aviso', async ({ page }) => {
+      await abrirColumnas(page, 3);
+      await page.getByLabel('Versión', { exact: true }).selectOption('2');
+      await expect(page.getByText('Estás viendo la versión 2. La vigente es la 3.')).toBeVisible();
+      await sinViolaciones(page);
+    });
+  });
+}
+
+test('columnas de carga a 360 px: la fila abierta y las tablas se alcanzan con teclado', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  await abrirColumnas(page);
+  await page.getByRole('button', { name: 'Editar mensaje' }).click();
+  await expect(page.locator('#columna-editor')).toBeVisible();
   await sinViolaciones(page);
 });
 

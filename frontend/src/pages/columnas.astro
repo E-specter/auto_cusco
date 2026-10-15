@@ -1,0 +1,2055 @@
+---
+/**
+ * Column builder (T-MTE-F3, docs/motor-texto-enriquecido-interfaz.md §5 and §9). What every load
+ * file carries and how each column is filled: a saved definition, its versions and its columns.
+ *
+ * The header, the saved definitions with their versions (an old one opens read-only; «Usar como
+ * base» is the explicit step that edits it), the segmentation, the list of columns and, under each
+ * row that is open, the shared editor of its content (direct variable or composed text, optionally
+ * varying by segment) and its format; then a live preview of the whole definition. Every save
+ * creates a new version: none is modified.
+ *
+ * The page validates nothing. The backend answers a save with located problems; the screen shows
+ * them where they belong and keeps what was typed.
+ */
+import Shell from '../layouts/Shell.astro';
+import EditorTexto from '../components/EditorTexto.astro';
+import Icon from '../components/Icon.astro';
+import SelectorSeleccion from '../components/SelectorSeleccion.astro';
+import VariantesSegmento from '../components/VariantesSegmento.astro';
+import '../styles/columnas.css';
+---
+
+<Shell
+  title="Columnas de carga — auto_cusco"
+  description="Define qué columnas lleva cada archivo de carga y cómo se llena cada una, con definiciones guardadas y versionadas."
+>
+  <div class="cl">
+    <header class="cl__head">
+      <h1 class="cl__title" data-i18n="columnas.title">Columnas de carga</h1>
+      <p class="cl__intro" data-i18n="columnas.intro">
+        Define qué columnas lleva cada archivo de carga y cómo se llena cada una. Cada guardado crea una versión nueva; las anteriores no cambian.
+      </p>
+    </header>
+
+    <section class="standIn" data-offline hidden aria-labelledby="cl-offline-title">
+      <h2 class="standIn__title" id="cl-offline-title" data-i18n="console.offline.title">Sin conexión con la API</h2>
+      <p class="standIn__body" data-i18n="console.offline.body">
+        No se pudo contactar con el backend. Comprueba que esté en marcha y vuelve a intentarlo.
+      </p>
+      <button type="button" class="btn btn--primary" data-reintentar>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span class="btn__label" data-i18n="console.offline.retry">Reintentar</span>
+      </button>
+    </section>
+
+    <div class="cl__contenido" data-contenido hidden>
+      <div class="empty" data-vacio hidden>
+        <p class="empty__title" data-i18n="columnas.vacio.title">Todavía no hay definiciones guardadas</p>
+        <p data-i18n="columnas.vacio.cuerpo">Arma la primera: escribe un nombre, agrega las columnas y guárdala.</p>
+      </div>
+
+      <section class="panel" aria-labelledby="cl-definicion-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="cl-definicion-title" data-i18n="columnas.definicion.title">Definición</h2>
+          <button type="button" class="btn btn--sm" data-nueva>
+            <Icon name="plus" size={16} />
+            <span data-i18n="columnas.definicion.nueva">Nueva definición</span>
+          </button>
+        </div>
+        <div class="panel__body cl-form cl-definicion">
+          <div class="cl-grupo">
+            <div class="field">
+              <label class="field__label" for="cl-definiciones" data-i18n="columnas.definicion.elegir">Definición guardada</label>
+              <select class="input" id="cl-definiciones" data-definiciones></select>
+            </div>
+            <div class="field" data-campo-version hidden>
+              <label class="field__label" for="cl-version" data-i18n="columnas.version.elegir">Versión</label>
+              <select class="input" id="cl-version" data-version></select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="cl-nombre" data-i18n="columnas.definicion.nombre">Nombre</label>
+            <input
+              class="input"
+              id="cl-nombre"
+              data-nombre
+              type="text"
+              maxlength="120"
+              autocomplete="off"
+              aria-describedby="cl-nombre-hint cl-nombre-error"
+            />
+            <p class="field__hint" id="cl-nombre-hint" data-nombre-hint></p>
+            <p class="field__error" id="cl-nombre-error" data-nombre-error></p>
+          </div>
+
+          <p class="cl-linea" data-version-linea></p>
+
+          <div class="notice notice--info cl-aviso" data-lectura hidden>
+            <Icon name="info" size={20} />
+            <span class="cl-aviso__texto" data-lectura-texto></span>
+            <span class="cl-aviso__acciones">
+              <button type="button" class="btn btn--primary btn--sm" data-ir-vigente data-i18n="columnas.lectura.irVigente">
+                Ir a la vigente
+              </button>
+              <button type="button" class="btn btn--sm" data-usar-base data-i18n="columnas.lectura.usarBase">
+                Usar como base
+              </button>
+            </span>
+          </div>
+
+          <p class="notice notice--warning" data-base hidden>
+            <Icon name="triangle-alert" size={20} />
+            <span data-base-texto></span>
+          </p>
+
+          <div class="field">
+            <label class="cl-check" for="cl-proteger">
+              <input type="checkbox" id="cl-proteger" data-proteger aria-describedby="cl-proteger-hint" />
+              <span data-i18n="columnas.proteger">Proteger fórmulas en CSV</span>
+            </label>
+            <p class="field__hint" id="cl-proteger-hint" data-i18n="columnas.proteger.hint">
+              Agrega un apóstrofo a los textos que empiezan con =, +, - o @, salvo los que son solo un número, como -1,234.56 o +51987654321. Desmárcala solo si la plataforma de destino no lo acepta.
+            </p>
+          </div>
+
+          <details class="cl-segmentacion" data-segmentacion>
+            <summary data-i18n="columnas.segmentacion.title">Segmentación</summary>
+            <div class="cl-segmentacion__cuerpo">
+              <div class="field">
+                <label class="cl-check" for="cl-segmentar">
+                  <input type="checkbox" id="cl-segmentar" data-segmentar aria-describedby="cl-segmentar-hint" />
+                  <span data-i18n="columnas.segmentacion.activar">Segmentar las columnas</span>
+                </label>
+                <p class="field__hint" id="cl-segmentar-hint" data-i18n="columnas.segmentacion.hint">
+                  Permite que cada columna lleve un contenido distinto según el segmento del producto.
+                </p>
+              </div>
+
+              <div data-segmentacion-detalle hidden>
+                <div class="cl-grupo">
+                  <div class="field">
+                    <label class="field__label" for="cl-criterio" data-i18n="columnas.segmentacion.criterio">Criterio</label>
+                    <select class="input" id="cl-criterio" data-criterio>
+                      <option value="calculado" data-i18n="columnas.segmentacion.calculado">
+                        Segmento financiero calculado por días de atraso
+                      </option>
+                      <option value="campo" data-i18n="columnas.segmentacion.campo">Valor de un campo de la cartera</option>
+                    </select>
+                  </div>
+                  <div class="field" data-campo-criterio hidden>
+                    <label class="field__label" for="cl-campo" data-i18n="columnas.segmentacion.campoElegir">Campo</label>
+                    <select class="input" id="cl-campo" data-campo></select>
+                  </div>
+                </div>
+
+                <div data-tabla-rangos>
+                  <p class="field__label" data-i18n="columnas.segmentacion.tabla">Rangos de días</p>
+                  <div class="table-scroll">
+                    <table class="table cl-rangos-tabla">
+                      <thead>
+                        <tr>
+                          <th scope="col" data-i18n="columnas.segmentacion.col.etiqueta">Segmento</th>
+                          <th scope="col" class="num" data-i18n="columnas.segmentacion.col.desde">Desde (días)</th>
+                          <th scope="col" class="num" data-i18n="columnas.segmentacion.col.hasta">Hasta (días)</th>
+                        </tr>
+                      </thead>
+                      <tbody data-rangos></tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div data-valores hidden>
+                  <p class="field__label" data-i18n="columnas.segmentacion.valores">Valores del campo</p>
+                  <ul class="cl-rangos" data-valores-lista></ul>
+                  <div class="cl-valor-nuevo">
+                    <input
+                      class="input"
+                      type="text"
+                      data-valor-nuevo
+                      autocomplete="off"
+                      data-i18n-attr="aria-label:columnas.segmentacion.valorNuevo"
+                      aria-label="Valor nuevo"
+                    />
+                    <button type="button" class="btn btn--sm" data-valor-agregar data-i18n="columnas.segmentacion.valorAgregar">
+                      Agregar valor
+                    </button>
+                  </div>
+                </div>
+
+                <fieldset class="cl-politica">
+                  <legend class="field__label" data-i18n="columnas.segmentacion.politica">Producto sin segmento</legend>
+                  <label class="cl-check">
+                    <input type="radio" name="cl-politica" value="excluir" data-politica />
+                    <span data-i18n="columnas.segmentacion.politica.excluir">Excluir el producto e informar el motivo</span>
+                  </label>
+                  <label class="cl-check">
+                    <input type="radio" name="cl-politica" value="usar_por_defecto" data-politica />
+                    <span data-i18n="columnas.segmentacion.politica.usar_por_defecto">Usar el contenido por defecto</span>
+                  </label>
+                </fieldset>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="cl-columnas-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="cl-columnas-title" data-i18n="columnas.columnas.title">Columnas</h2>
+        </div>
+        <div class="panel__body cl-form">
+          <div class="notice notice--danger" data-resumen hidden>
+            <Icon name="circle-alert" size={20} />
+            <div>
+              <strong data-resumen-titulo></strong>
+              <ul class="cl-problemas" data-resumen-lista></ul>
+            </div>
+          </div>
+
+          <p class="field__hint" data-sin-columnas hidden data-i18n="columnas.sinColumnas">
+            Esta definición no tiene columnas. Agrega la primera.
+          </p>
+
+          <div class="table-scroll" data-tabla-contenedor>
+            <table class="table cl-tabla table--apilable table--apilable-ancha">
+              <thead>
+                <tr>
+                  <th scope="col" class="num" data-i18n="columnas.col.orden">N.º</th>
+                  <th scope="col" data-i18n="columnas.col.nombre">Nombre</th>
+                  <th scope="col" data-i18n="columnas.col.tipo">Tipo</th>
+                  <th scope="col" data-i18n="columnas.col.contenido">Contenido</th>
+                  <th scope="col" data-i18n="columnas.col.formato">Formato</th>
+                  <th scope="col" data-i18n="columnas.col.defecto">Por defecto</th>
+                  <th scope="col" data-i18n="columnas.col.acciones">Acciones</th>
+                </tr>
+              </thead>
+              <tbody data-filas></tbody>
+            </table>
+          </div>
+
+          <div>
+            <button type="button" class="btn btn--sm" data-agregar-columna>
+              <Icon name="plus" size={16} />
+              <span data-i18n="columnas.agregar">Agregar columna</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="cl-previa-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="cl-previa-title" data-i18n="columnas.previa.title">Vista previa</h2>
+          <p class="cl-pie__estado" data-previa-estado role="status"></p>
+        </div>
+        <div class="panel__body cl-form">
+          <div class="cl-politica">
+            <p class="field__label" id="cl-muestra-etiqueta" data-i18n="columnas.previa.muestra">Muestra</p>
+            <div class="segmented" role="group" aria-labelledby="cl-muestra-etiqueta">
+              <button type="button" class="segmented__item" data-muestra="ejemplos" aria-pressed="true" data-i18n="columnas.previa.ejemplos">
+                Ejemplos por segmento
+              </button>
+              <button type="button" class="segmented__item" data-muestra="real" aria-pressed="false" data-i18n="columnas.previa.real">
+                Cartera real
+              </button>
+            </div>
+          </div>
+
+          <div data-previa-seleccion hidden>
+            <SelectorSeleccion modo="compacto" id="seleccion" />
+          </div>
+
+          <p class="field__hint" data-previa-aviso hidden></p>
+          <div class="table-scroll" data-previa-contenedor hidden>
+            <table class="table cl-previa">
+              <thead data-previa-cabecera></thead>
+              <tbody data-previa-filas></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <div class="cl-pie">
+        <button type="button" class="btn btn--primary" data-guardar>
+          <span class="btn__spinner" aria-hidden="true"></span>
+          <span class="btn__label" data-i18n="columnas.guardar">Guardar</span>
+        </button>
+        <button type="button" class="btn" data-descartar data-i18n="columnas.descartar">Descartar cambios</button>
+        <p class="cl-pie__estado" data-estado role="status"></p>
+        <p class="cl-pie__hint" data-guardar-hint></p>
+      </div>
+    </div>
+  </div>
+
+  <template data-icono-arriba><Icon name="arrow-up" size={16} /></template>
+  <template data-icono-abajo><Icon name="arrow-down" size={16} /></template>
+  <template data-icono-duplicar><Icon name="copy" size={16} /></template>
+  <template data-icono-quitar><Icon name="trash-2" size={16} /></template>
+  <template data-icono-abrir><Icon name="chevron-down" size={16} /></template>
+
+  <!-- The editor of the open row is cloned from here: one instance at a time, so the ids hold. -->
+  <template data-plantilla-editor>
+    <EditorTexto id="columna-editor" etiqueta="Contenido" claveEtiqueta="columnas.detalle.contenido" />
+  </template>
+  <template data-plantilla-variantes>
+    <VariantesSegmento id="columna-editor" etiqueta="Contenido" claveEtiqueta="columnas.detalle.contenido" />
+  </template>
+
+  <!-- ---- Confirmation (unsaved changes, removing a column with content) ---------- -->
+  <dialog class="dialog" data-dialog="confirmar" aria-labelledby="cl-confirmar-title">
+    <div class="dialog__head">
+      <h2 id="cl-confirmar-title" data-confirmar-titulo></h2>
+    </div>
+    <div class="dialog__body">
+      <p data-confirmar-cuerpo></p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn" data-confirmar-no></button>
+      <button type="button" class="btn btn--primary" data-confirmar-si></button>
+    </div>
+  </dialog>
+
+  <dialog class="dialog" data-dialog="error" aria-labelledby="cl-error-title">
+    <div class="dialog__head">
+      <h2 id="cl-error-title" data-i18n="common.error">Algo salió mal</h2>
+    </div>
+    <div class="dialog__body">
+      <p class="notice notice--danger">
+        <Icon name="circle-alert" size={20} />
+        <span data-error-body></span>
+      </p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn btn--primary" data-close data-i18n="common.close">Cerrar</button>
+    </div>
+  </dialog>
+</Shell>
+
+<script>
+  import { ApiError, NetworkError } from '../lib/api';
+  import {
+    guardarBorrador,
+    listarDefiniciones,
+    obtenerDefinicion,
+    problemasDeError,
+    type DefinicionGuardadaRespuesta,
+    type ProblemaDefinicion,
+    type ResumenDefinicion,
+  } from '../lib/api-definiciones';
+  import {
+    obtenerCatalogo,
+    previsualizarTexto,
+    type MuestraTexto,
+    type PrevisualizacionTexto,
+  } from '../lib/api-texto-enriquecido';
+  import { etiquetaVariable } from '../lib/campos';
+  import {
+    agregarColumna,
+    aDefinicion,
+    cambiarTipo,
+    definicionNueva,
+    desdeDefinicion,
+    duplicarColumna,
+    fijarExpresion,
+    fijarFormatoFecha,
+    fijarFormatoFinanciero,
+    fijarProteccion,
+    fijarValorPorDefecto,
+    fijarVariantes,
+    guardadaDesdeRespuesta,
+    hayCambios,
+    modoContenido,
+    moverColumna,
+    nombresRepetidos,
+    quitarColumna,
+    renombrarColumna,
+    renombrarDefinicion,
+    versionAlGuardar,
+    type Borrador,
+    type DefinicionGuardada,
+    type Expresion,
+    type TipoSalida,
+  } from '../lib/constructor-columnas';
+  import {
+    agruparProblemas,
+    destinoDeProblema,
+    ejemploFinanciero,
+    resumenDeContenido,
+  } from '../lib/constructor-pantalla';
+  import {
+    activarSegmentacion,
+    columnasConVariantes,
+    desactivarSegmentacion,
+    fijarCriterioCalculado,
+    fijarCriterioCampo,
+    fijarPolitica,
+    quitarTodasLasVariantes,
+    segmentosDe,
+    valoresEnUso,
+    type ContextoSegmentos,
+  } from '../lib/constructor-segmentacion';
+  import {
+    aviso,
+    descartar,
+    esEditable,
+    hayContenido,
+    modoInicial,
+    puedeGuardar,
+    usarComoBase,
+    type ModoVista,
+  } from '../lib/constructor-version';
+  import { openWhenFree } from '../lib/dialogs';
+  import { aVariableDirecta } from '../lib/editor-texto';
+  import { applyTranslations, t } from '../lib/i18n';
+  import { EVENTO_EXPRESION, mensajeProblema, montarEditor, type ControladorEditor, type EstadoEditor } from '../scripts/editor-texto';
+  import { crearSelectorPatronFecha } from '../scripts/selector-patron-fecha';
+  import { EVENTO_SELECCION, montarSelector, type EstadoSeleccion } from '../scripts/selector-seleccion';
+  import { EVENTO_VARIANTES, montarVariantes, type ControladorVariantes, type EstadoVariantes } from '../scripts/variantes-segmento';
+
+  const $ = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
+  const CONTEXTO = 'cartera';
+  const TIPOS: readonly TipoSalida[] = ['texto', 'numero', 'fecha', 'financiero'];
+  const ESPERA_PREVIA = 500;
+
+  type Contenido =
+    | { tipo: 'editor'; ctl: ControladorEditor }
+    | { tipo: 'variantes'; ctl: ControladorVariantes };
+
+  const estado = {
+    lista: [] as ResumenDefinicion[],
+    /** What is on screen as saved; `null` is a definition not yet saved. */
+    respuesta: null as DefinicionGuardadaRespuesta | null,
+    guardada: null as DefinicionGuardada | null,
+    borrador: definicionNueva() as Borrador,
+    modo: 'nueva' as ModoVista,
+    problemas: [] as ProblemaDefinicion[],
+    /** Set after a 409 `nombre_repetido`, which names no column. */
+    nombreRepetido: false,
+    guardando: false,
+    foco: null as string | null,
+    mensaje: '',
+    /** Field values the analyst typed for the by-field criterion, before a variant uses them. */
+    valoresExtra: [] as string[],
+    /** The column whose row is open, and what is mounted in it. */
+    abierta: null as string | null,
+    contenido: null as Contenido | null,
+    detalle: null as HTMLTableRowElement | null,
+    variar: false,
+    /** What the open editor last said: gates saving and feeds the summary. */
+    editorPendiente: false,
+    editorValido: true,
+    editorProblemas: [] as Array<{ segmento: string | null; mensaje: string; indice: number }>,
+    muestra: 'ejemplos' as 'ejemplos' | 'real',
+    /** True while `ultimaPrevia` answers the draft as it is now (not one an edit has outdated). */
+    previaVigente: false,
+    seleccion: null as EstadoSeleccion | null,
+    selectorMontado: false,
+  };
+
+  const el = {
+    offline: $<HTMLElement>('[data-offline]'),
+    contenido: $<HTMLElement>('[data-contenido]'),
+    vacio: $<HTMLElement>('[data-vacio]'),
+    definiciones: $<HTMLSelectElement>('[data-definiciones]'),
+    campoVersion: $<HTMLElement>('[data-campo-version]'),
+    version: $<HTMLSelectElement>('[data-version]'),
+    nombre: $<HTMLInputElement>('[data-nombre]'),
+    nombreHint: $<HTMLElement>('[data-nombre-hint]'),
+    nombreError: $<HTMLElement>('[data-nombre-error]'),
+    versionLinea: $<HTMLElement>('[data-version-linea]'),
+    lectura: $<HTMLElement>('[data-lectura]'),
+    lecturaTexto: $<HTMLElement>('[data-lectura-texto]'),
+    base: $<HTMLElement>('[data-base]'),
+    baseTexto: $<HTMLElement>('[data-base-texto]'),
+    proteger: $<HTMLInputElement>('[data-proteger]'),
+    segmentacion: $<HTMLDetailsElement>('[data-segmentacion]'),
+    segmentar: $<HTMLInputElement>('[data-segmentar]'),
+    segmentacionDetalle: $<HTMLElement>('[data-segmentacion-detalle]'),
+    criterio: $<HTMLSelectElement>('[data-criterio]'),
+    campoCriterio: $<HTMLElement>('[data-campo-criterio]'),
+    campo: $<HTMLSelectElement>('[data-campo]'),
+    tablaRangos: $<HTMLElement>('[data-tabla-rangos]'),
+    rangos: $<HTMLElement>('[data-rangos]'),
+    valores: $<HTMLElement>('[data-valores]'),
+    valoresLista: $<HTMLElement>('[data-valores-lista]'),
+    valorNuevo: $<HTMLInputElement>('[data-valor-nuevo]'),
+    valorAgregar: $<HTMLButtonElement>('[data-valor-agregar]'),
+    resumen: $<HTMLElement>('[data-resumen]'),
+    resumenTitulo: $<HTMLElement>('[data-resumen-titulo]'),
+    resumenLista: $<HTMLElement>('[data-resumen-lista]'),
+    sinColumnas: $<HTMLElement>('[data-sin-columnas]'),
+    tabla: $<HTMLElement>('[data-tabla-contenedor]'),
+    filas: $<HTMLElement>('[data-filas]'),
+    agregar: $<HTMLButtonElement>('[data-agregar-columna]'),
+    guardar: $<HTMLButtonElement>('[data-guardar]'),
+    descartar: $<HTMLButtonElement>('[data-descartar]'),
+    estado: $<HTMLElement>('[data-estado]'),
+    guardarHint: $<HTMLElement>('[data-guardar-hint]'),
+    previaEstado: $<HTMLElement>('[data-previa-estado]'),
+    previaSeleccion: $<HTMLElement>('[data-previa-seleccion]'),
+    previaAviso: $<HTMLElement>('[data-previa-aviso]'),
+    previaContenedor: $<HTMLElement>('[data-previa-contenedor]'),
+    previaCabecera: $<HTMLElement>('[data-previa-cabecera]'),
+    previaFilas: $<HTMLElement>('[data-previa-filas]'),
+  };
+
+  const dialogos = {
+    confirmar: $<HTMLDialogElement>('[data-dialog="confirmar"]'),
+    error: $<HTMLDialogElement>('[data-dialog="error"]'),
+  };
+
+  document.querySelectorAll<HTMLElement>('[data-close]').forEach((boton) => {
+    boton.addEventListener('click', () => boton.closest('dialog')?.close());
+  });
+
+  // ---- Helpers ------------------------------------------------------------------------------
+
+  function mensajeDeError(error: unknown): string {
+    if (error instanceof NetworkError) return t('console.upload.error.network');
+    if (error instanceof ApiError && error.detail) return error.detail;
+    return t('common.errorBody');
+  }
+
+  function mostrarError(error: unknown): void {
+    $<HTMLElement>('[data-error-body]').textContent = mensajeDeError(error);
+    void openWhenFree(dialogos.error);
+  }
+
+  /** The dialog answers a yes/no; Escape and the backdrop are "no". */
+  function confirmar(opciones: { titulo: string; cuerpo: string; si: string; no: string }): Promise<boolean> {
+    return new Promise((resolver) => {
+      $<HTMLElement>('[data-confirmar-titulo]').textContent = opciones.titulo;
+      $<HTMLElement>('[data-confirmar-cuerpo]').textContent = opciones.cuerpo;
+      const si = $<HTMLButtonElement>('[data-confirmar-si]');
+      const no = $<HTMLButtonElement>('[data-confirmar-no]');
+      si.textContent = opciones.si;
+      no.textContent = opciones.no;
+      let respuesta = false;
+      const alSi = () => {
+        respuesta = true;
+        dialogos.confirmar.close();
+      };
+      const alNo = () => dialogos.confirmar.close();
+      si.addEventListener('click', alSi, { once: true });
+      no.addEventListener('click', alNo, { once: true });
+      dialogos.confirmar.addEventListener(
+        'close',
+        () => {
+          si.removeEventListener('click', alSi);
+          no.removeEventListener('click', alNo);
+          resolver(respuesta);
+        },
+        { once: true },
+      );
+      void openWhenFree(dialogos.confirmar);
+    });
+  }
+
+  const hayCambiosSinGuardar = (): boolean =>
+    estado.modo === 'nueva'
+      ? hayContenido(estado.borrador)
+      : estado.modo === 'lectura'
+        ? false
+        : estado.guardada !== null && hayCambios(estado.guardada, estado.borrador);
+
+  /** Ask before leaving what has changed; `true` means go ahead. */
+  async function puedoSoltar(): Promise<boolean> {
+    if (!hayCambiosSinGuardar()) return true;
+    return confirmar({
+      titulo: t('columnas.cambios.titulo'),
+      cuerpo: t('columnas.cambios.cuerpo'),
+      si: t('columnas.cambios.seguir'),
+      no: t('columnas.cambios.volver'),
+    });
+  }
+
+  let catalogo: Awaited<ReturnType<typeof obtenerCatalogo>> | null = null;
+
+  const etiquetaDe = (nombre: string): string => {
+    const variable = catalogo?.contexto.variables.find((v) => v.nombre === nombre);
+    return etiquetaVariable({ nombre, clave_nombre: variable?.clave_nombre ?? null });
+  };
+
+  const nombreVisible = (indice: number): string => {
+    const nombre = estado.borrador.columnas[indice]?.nombre.trim();
+    return nombre || t('columnas.sinNombre', { numero: indice + 1 });
+  };
+
+  const contextoSegmentos = (): ContextoSegmentos => ({
+    tabla: catalogo?.contexto.segmentos ?? [],
+    variable_dias: catalogo?.contexto.variable_dias ?? 'dias_atraso',
+  });
+
+  const segmentosActuales = () =>
+    segmentosDe(estado.borrador.segmentacion, [...valoresEnUso(estado.borrador), ...estado.valoresExtra]);
+
+  // ---- The open row ---------------------------------------------------------------------------
+
+  /** Unmount what the open row holds. The markup goes with the row. */
+  function soltarContenido(): void {
+    estado.contenido?.ctl.destruir();
+    estado.contenido = null;
+    estado.editorPendiente = false;
+    estado.editorValido = true;
+    estado.editorProblemas = [];
+  }
+
+  function cerrarFila(): void {
+    soltarContenido();
+    estado.detalle?.remove();
+    estado.detalle = null;
+    estado.abierta = null;
+    estado.variar = false;
+  }
+
+  const columnaAbierta = () => estado.borrador.columnas.find((c) => c.id === estado.abierta) ?? null;
+  const modoDeLaColumna = (id: string): 'variable' | 'texto' => {
+    const columna = estado.borrador.columnas.find((c) => c.id === id);
+    return columna && modoContenido(columna.expresion) === 'variable' ? 'variable' : 'texto';
+  };
+
+  function recogerProblemas(problemas: ReadonlyArray<{ codigo: string; detalle: string; segmento?: string | null }>) {
+    const porSegmento = new Map<string, number>();
+    estado.editorProblemas = problemas.map((p) => {
+      const clave = p.segmento ?? '';
+      const indice = porSegmento.get(clave) ?? 0;
+      porSegmento.set(clave, indice + 1);
+      return { segmento: p.segmento ?? null, mensaje: mensajeProblema(p), indice };
+    });
+  }
+
+  function alCambiarEditor(detalle: EstadoEditor): void {
+    estado.editorPendiente = detalle.pendiente;
+    estado.editorValido = detalle.valida;
+    recogerProblemas(detalle.problemas);
+    if (detalle.origen === 'usuario' && estado.abierta) {
+      estado.borrador = fijarExpresion(estado.borrador, estado.abierta, detalle.expresion);
+      actualizarFila(estado.abierta);
+      programarPrevia();
+    }
+    pintarEstado();
+    pintarResumen();
+  }
+
+  function alCambiarVariantes(detalle: EstadoVariantes): void {
+    estado.editorPendiente = detalle.pendiente;
+    estado.editorValido = detalle.valida;
+    recogerProblemas(detalle.problemas);
+    if (detalle.origen === 'usuario' && estado.abierta) {
+      estado.borrador = fijarExpresion(estado.borrador, estado.abierta, detalle.porDefecto);
+      estado.borrador = fijarVariantes(estado.borrador, estado.abierta, detalle.variantes);
+      actualizarFila(estado.abierta);
+      programarPrevia();
+    }
+    pintarEstado();
+    pintarResumen();
+  }
+
+  /** Mount the editor (or the variants) of the open column into its detail row. */
+  async function montarContenido(): Promise<void> {
+    const columna = columnaAbierta();
+    const detalle = estado.detalle;
+    if (!columna || !detalle) return;
+    soltarContenido();
+
+    const host = detalle.querySelector<HTMLElement>('[data-host]')!;
+    host.replaceChildren();
+    const plantilla = $<HTMLTemplateElement>(
+      estado.variar ? '[data-plantilla-variantes]' : '[data-plantilla-editor]',
+    );
+    host.append(plantilla.content.cloneNode(true));
+    // The content of a <template> is not touched by the language pass.
+    applyTranslations(host);
+    const raiz = host.querySelector<HTMLElement>('#columna-editor')!;
+    const soloVariable = modoDeLaColumna(columna.id) === 'variable';
+    const soloLectura = !esEditable(estado.modo);
+    const id = columna.id;
+
+    if (estado.variar) {
+      raiz.addEventListener(EVENTO_VARIANTES, (evento) => alCambiarVariantes((evento as CustomEvent<EstadoVariantes>).detail));
+      const ctl = await montarVariantes(raiz, {
+        contexto: CONTEXTO,
+        segmentos: segmentosActuales(),
+        porDefecto: columna.expresion,
+        variantes: columna.variantes,
+        conPorDefecto: true,
+        resumen: 'ninguno',
+        soloLectura,
+        soloVariable,
+      });
+      if (estado.abierta !== id) {
+        ctl.destruir();
+        return;
+      }
+      estado.contenido = { tipo: 'variantes', ctl };
+      // The page sets the sample (the variants component has no option to hide its editor's own
+      // control; `columnas.css` hides it), so there is one control and not two that do not talk.
+      aplicarMuestraAlEditor();
+    } else {
+      raiz.addEventListener(EVENTO_EXPRESION, (evento) => alCambiarEditor((evento as CustomEvent<EstadoEditor>).detail));
+      const ctl = await montarEditor(raiz, {
+        contexto: CONTEXTO,
+        expresion: columna.expresion,
+        controlMuestra: false,
+        muestra: muestraDelEditor(),
+        resumen: 'ninguno',
+        soloLectura,
+        soloVariable,
+      });
+      if (estado.abierta !== id) {
+        ctl.destruir();
+        return;
+      }
+      estado.contenido = { tipo: 'editor', ctl };
+    }
+  }
+
+  /** The sample the open editor previews with: the first product of the selection, or the example. */
+  function muestraDelEditor(): MuestraTexto {
+    const seleccion = estado.seleccion;
+    if (estado.muestra === 'real' && seleccion?.fechaCorte && seleccion.aplicable) {
+      return {
+        tipo: 'primeros_de_seleccion',
+        fecha_corte: seleccion.fechaCorte,
+        filtros: seleccion.consulta.filtros,
+        orden: seleccion.consulta.orden,
+        cantidad: 1,
+      };
+    }
+    return { tipo: 'ejemplo', cantidad: 1 };
+  }
+
+  function aplicarMuestraAlEditor(): void {
+    const contenido = estado.contenido;
+    if (!contenido) return;
+    const muestra = muestraDelEditor();
+    if (contenido.tipo === 'variantes') contenido.ctl.editor.fijarMuestra(muestra);
+    else contenido.ctl.fijarMuestra(muestra);
+  }
+
+  function pintarFormato(): void {
+    const columna = columnaAbierta();
+    const bloque = estado.detalle?.querySelector<HTMLElement>('[data-formato]');
+    if (!columna || !bloque) return;
+    bloque.replaceChildren();
+    const editable = esEditable(estado.modo);
+
+    if (columna.tipo === 'fecha' && catalogo) {
+      const selector = crearSelectorPatronFecha({
+        id: 'cl-patron-fecha',
+        etiqueta: t('columnas.formato.fechaEtiqueta'),
+        opciones: catalogo.patrones_fecha.map((p) => ({ valor: p.patron, ejemplo: p.ejemplo })),
+        cerradas: false,
+        marcas: catalogo.marcas_fecha,
+        valor: columna.formato_fecha ?? '',
+        onCambio: (valor) => {
+          estado.borrador = fijarFormatoFecha(estado.borrador, columna.id, valor === '' ? null : valor);
+          actualizarFila(columna.id);
+          programarPrevia();
+          pintarEstado();
+        },
+      });
+      selector.querySelectorAll<HTMLInputElement | HTMLSelectElement>('select, input').forEach((c) => {
+        c.disabled = !editable;
+      });
+      bloque.append(selector);
+      return;
+    }
+
+    if (columna.tipo === 'financiero') {
+      const ejemplo = document.createElement('p');
+      ejemplo.className = 'cl-formato__ejemplo';
+      ejemplo.setAttribute('aria-live', 'polite');
+      const pintarEjemplo = () => {
+        const actual = columnaAbierta();
+        if (actual) ejemplo.textContent = t('columnas.formato.ejemplo', { ejemplo: ejemploFinanciero(actual.formato_financiero) });
+      };
+      const campo = (
+        etiqueta: string,
+        valor: string,
+        opciones: { maxLength?: number; numero?: boolean },
+        alCambiar: (valor: string) => void,
+      ) => {
+        const grupo = document.createElement('div');
+        grupo.className = 'field';
+        const id = `cl-financiero-${etiqueta}`;
+        const label = document.createElement('label');
+        label.className = 'field__label';
+        label.htmlFor = id;
+        label.textContent = etiqueta;
+        const input = document.createElement('input');
+        input.className = 'input';
+        input.id = id;
+        input.value = valor;
+        input.readOnly = !editable;
+        input.autocomplete = 'off';
+        if (opciones.numero) {
+          input.type = 'number';
+          input.min = '0';
+          input.max = '6';
+        } else {
+          input.type = 'text';
+          input.maxLength = opciones.maxLength ?? 1;
+        }
+        input.addEventListener('input', () => {
+          alCambiar(input.value);
+          pintarEjemplo();
+          actualizarFila(columna.id);
+          programarPrevia();
+          pintarEstado();
+        });
+        grupo.append(label, input);
+        return grupo;
+      };
+      const f = columna.formato_financiero;
+      bloque.append(
+        campo(t('columnas.formato.miles'), f.separador_miles, { maxLength: 1 }, (v) => {
+          estado.borrador = fijarFormatoFinanciero(estado.borrador, columna.id, { separador_miles: v });
+        }),
+        campo(t('columnas.formato.decimal'), f.separador_decimal, { maxLength: 1 }, (v) => {
+          if (v !== '') estado.borrador = fijarFormatoFinanciero(estado.borrador, columna.id, { separador_decimal: v });
+        }),
+        campo(t('columnas.formato.decimales'), String(f.decimales), { numero: true }, (v) => {
+          const n = Number(v);
+          if (v !== '' && Number.isInteger(n) && n >= 0 && n <= 6) {
+            estado.borrador = fijarFormatoFinanciero(estado.borrador, columna.id, { decimales: n });
+          }
+        }),
+        ejemplo,
+      );
+      pintarEjemplo();
+      return;
+    }
+
+    const nada = document.createElement('p');
+    nada.className = 'field__hint';
+    nada.textContent = t('columnas.formato.sin');
+    bloque.append(nada);
+  }
+
+  /** Whether switching to a direct variable would drop text from the column or from a variant. */
+  function perderiaTexto(columna: Borrador['columnas'][number]): boolean {
+    const cambia = (e: Expresion) => JSON.stringify(aVariableDirecta(e)) !== JSON.stringify(e) && e.nodos.length > 0;
+    return cambia(columna.expresion) || columna.variantes.some((v) => cambia(v.expresion));
+  }
+
+  function construirDetalle(columna: Borrador['columnas'][number]): HTMLTableRowElement {
+    const fila = document.createElement('tr');
+    fila.className = 'table__detalle';
+    fila.id = `cl-detalle-${columna.id}`;
+    fila.dataset.detalle = columna.id;
+    const celda = document.createElement('td');
+    celda.colSpan = 7;
+    const cuerpo = document.createElement('div');
+    cuerpo.className = 'cl-detalle';
+    const editable = esEditable(estado.modo);
+
+    // What the column carries.
+    const modo = document.createElement('fieldset');
+    modo.className = 'cl-politica';
+    const leyenda = document.createElement('legend');
+    leyenda.className = 'field__label';
+    leyenda.textContent = t('columnas.detalle.modo');
+    modo.append(leyenda);
+    (['variable', 'texto'] as const).forEach((valor) => {
+      const etiqueta = document.createElement('label');
+      etiqueta.className = 'cl-check';
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = `cl-modo-${columna.id}`;
+      radio.value = valor;
+      radio.disabled = !editable;
+      radio.checked = modoDeLaColumna(columna.id) === valor;
+      radio.dataset.modo = valor;
+      radio.addEventListener('change', () => void cambiarModo(valor));
+      const texto = document.createElement('span');
+      texto.textContent = t(`columnas.modo.${valor}`);
+      etiqueta.append(radio, texto);
+      modo.append(etiqueta);
+    });
+
+    const host = document.createElement('div');
+    host.dataset.host = '';
+
+    // Varying by segment.
+    const variar = document.createElement('div');
+    variar.className = 'field';
+    const etiquetaVariar = document.createElement('label');
+    etiquetaVariar.className = 'cl-check';
+    const casilla = document.createElement('input');
+    casilla.type = 'checkbox';
+    casilla.dataset.variar = '';
+    casilla.checked = estado.variar;
+    casilla.disabled = !editable || estado.borrador.segmentacion === null;
+    casilla.addEventListener('change', () => void cambiarVariar(casilla.checked));
+    const textoVariar = document.createElement('span');
+    textoVariar.textContent = t('columnas.variar');
+    etiquetaVariar.append(casilla, textoVariar);
+    const hint = document.createElement('p');
+    hint.className = 'field__hint';
+    hint.dataset.variarHint = '';
+    hint.textContent = t(
+      estado.borrador.segmentacion === null ? 'columnas.variar.sinSegmentacion' : 'columnas.variar.hint',
+    );
+    variar.append(etiquetaVariar, hint);
+
+    // Format.
+    const formato = document.createElement('div');
+    formato.className = 'cl-detalle__bloque';
+    const tituloFormato = document.createElement('p');
+    tituloFormato.className = 'field__label';
+    tituloFormato.textContent = t('columnas.detalle.formato');
+    const campoFormato = document.createElement('div');
+    campoFormato.className = 'cl-formato';
+    campoFormato.dataset.formato = '';
+    formato.append(tituloFormato, campoFormato);
+
+    cuerpo.append(modo, host, variar, formato);
+    celda.append(cuerpo);
+    fila.append(celda);
+    return fila;
+  }
+
+  async function abrirFila(id: string): Promise<void> {
+    if (estado.abierta === id) {
+      cerrarFila();
+      pintarColumnas();
+      return;
+    }
+    cerrarFila();
+    const columna = estado.borrador.columnas.find((c) => c.id === id);
+    if (!columna) return;
+    estado.abierta = id;
+    estado.variar = columna.variantes.length > 0 && estado.borrador.segmentacion !== null;
+    estado.detalle = construirDetalle(columna);
+    pintarColumnas();
+    pintarFormato();
+    await montarContenido();
+  }
+
+  async function cambiarModo(modo: 'variable' | 'texto'): Promise<void> {
+    const columna = columnaAbierta();
+    if (!columna) return;
+    if (modo === 'variable') {
+      if (perderiaTexto(columna)) {
+        const si = await confirmar({
+          titulo: t('columnas.modo.perder.titulo'),
+          cuerpo: t('columnas.modo.perder.cuerpo'),
+          si: t('columnas.modo.perder.confirmar'),
+          no: t('common.cancel'),
+        });
+        if (!si) {
+          // Put the radio back where it was.
+          estado.detalle
+            ?.querySelectorAll<HTMLInputElement>('[data-modo]')
+            .forEach((r) => (r.checked = r.value === modoDeLaColumna(columna.id)));
+          return;
+        }
+      }
+      estado.borrador = fijarExpresion(estado.borrador, columna.id, aVariableDirecta(columna.expresion));
+      estado.borrador = fijarVariantes(
+        estado.borrador,
+        columna.id,
+        columna.variantes.map((v) => ({ ...v, expresion: aVariableDirecta(v.expresion) })),
+      );
+    }
+    // `texto` keeps what it has: a direct variable is already valid composed text.
+    actualizarFila(columna.id);
+    programarPrevia();
+    pintarEstado();
+    await montarContenido();
+    estado.detalle?.querySelectorAll<HTMLInputElement>('[data-modo]').forEach((r) => (r.checked = r.value === modo));
+  }
+
+  async function cambiarVariar(activar: boolean): Promise<void> {
+    const columna = columnaAbierta();
+    if (!columna) return;
+    if (!activar && columna.variantes.length > 0) {
+      const si = await confirmar({
+        titulo: t('columnas.variar.quitar.titulo'),
+        cuerpo: t('columnas.variar.quitar.cuerpo'),
+        si: t('columnas.variar.quitar.confirmar'),
+        no: t('common.cancel'),
+      });
+      if (!si) {
+        const casilla = estado.detalle?.querySelector<HTMLInputElement>('[data-variar]');
+        if (casilla) casilla.checked = true;
+        return;
+      }
+      estado.borrador = fijarVariantes(estado.borrador, columna.id, []);
+    }
+    estado.variar = activar;
+    actualizarFila(columna.id);
+    programarPrevia();
+    pintarEstado();
+    await montarContenido();
+  }
+
+  // ---- Loading a definition -----------------------------------------------------------------
+
+  function poner(respuesta: DefinicionGuardadaRespuesta | null): void {
+    cerrarFila();
+    estado.respuesta = respuesta;
+    estado.guardada = respuesta ? guardadaDesdeRespuesta(respuesta) : null;
+    estado.borrador = estado.guardada ? desdeDefinicion(estado.guardada) : definicionNueva();
+    estado.modo = modoInicial(respuesta);
+    estado.problemas = [];
+    estado.nombreRepetido = false;
+    estado.mensaje = '';
+    estado.valoresExtra = [];
+  }
+
+  async function recargarLista(): Promise<void> {
+    estado.lista = await listarDefiniciones();
+  }
+
+  async function abrir(id: number, version?: number): Promise<void> {
+    try {
+      poner(await obtenerDefinicion(id, version));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        await recargarLista().catch(() => undefined);
+        poner(null);
+        estado.mensaje = t('columnas.error.noExiste');
+      } else {
+        mostrarError(error);
+        return;
+      }
+    }
+    pintar();
+  }
+
+  // ---- Painting ------------------------------------------------------------------------------
+
+  function pintarCabecera(): void {
+    el.vacio.hidden = estado.lista.length > 0;
+
+    el.definiciones.replaceChildren();
+    const nueva = document.createElement('option');
+    nueva.value = '';
+    nueva.textContent = t('columnas.definicion.ninguna');
+    el.definiciones.append(nueva);
+    for (const d of estado.lista) {
+      const opcion = document.createElement('option');
+      opcion.value = String(d.id);
+      opcion.textContent = d.nombre;
+      el.definiciones.append(opcion);
+    }
+    el.definiciones.value = estado.respuesta ? String(estado.respuesta.id) : '';
+
+    const guardada = estado.respuesta !== null;
+    el.campoVersion.hidden = !guardada;
+    el.version.replaceChildren();
+    for (const v of [...(estado.respuesta?.versiones ?? [])].reverse()) {
+      const opcion = document.createElement('option');
+      opcion.value = String(v.numero);
+      opcion.textContent = t(
+        v.numero === estado.respuesta?.version_vigente ? 'columnas.version.opcionVigente' : 'columnas.version.opcion',
+        { numero: v.numero },
+      );
+      el.version.append(opcion);
+    }
+    if (estado.respuesta) el.version.value = String(estado.respuesta.version.numero);
+
+    if (document.activeElement !== el.nombre) el.nombre.value = estado.borrador.nombre;
+    const reglas = versionAlGuardar(estado.respuesta);
+    el.nombre.readOnly = !reglas.nombreEditable;
+    el.nombreHint.textContent = t(
+      reglas.nombreEditable ? 'columnas.definicion.nombre.nuevo' : 'columnas.definicion.nombre.hint',
+    );
+    const problemaNombre = estado.nombreRepetido
+      ? t('columnas.error.nombreRepetido')
+      : (agruparProblemas(estado.problemas, estado.borrador).definicion.find((p) => p.campo === 'nombre')?.detalle ?? '');
+    el.nombreError.textContent = problemaNombre;
+    if (problemaNombre) el.nombre.setAttribute('aria-invalid', 'true');
+    else el.nombre.removeAttribute('aria-invalid');
+
+    el.versionLinea.textContent = estado.respuesta
+      ? t(estado.respuesta.version.usada ? 'columnas.version.lineaUsada' : 'columnas.version.linea', {
+          numero: estado.respuesta.version.numero,
+        })
+      : t('columnas.version.sinGuardar');
+
+    const avisoVista = aviso(estado.modo, estado.respuesta);
+    el.lectura.hidden = avisoVista.tipo !== 'lectura';
+    el.base.hidden = avisoVista.tipo !== 'base';
+    if (avisoVista.tipo === 'lectura') {
+      el.lecturaTexto.textContent = t('columnas.lectura.titulo', {
+        vista: avisoVista.vista,
+        vigente: avisoVista.vigente,
+      });
+    }
+    if (avisoVista.tipo === 'base') {
+      el.baseTexto.textContent = t('columnas.base.aviso', {
+        base: avisoVista.base,
+        nueva: avisoVista.nueva,
+        vigente: avisoVista.vigente,
+      });
+    }
+
+    el.proteger.checked = estado.borrador.proteger_formulas;
+    el.proteger.disabled = !esEditable(estado.modo);
+    pintarSegmentacion();
+  }
+
+  function pintarSegmentacion(): void {
+    const seg = estado.borrador.segmentacion;
+    const editable = esEditable(estado.modo);
+    el.segmentar.checked = seg !== null;
+    el.segmentar.disabled = !editable;
+    el.segmentacionDetalle.hidden = seg === null;
+    // Closed by default unless the definition already varies (§5.1).
+    if (seg !== null && columnasConVariantes(estado.borrador) > 0 && !el.segmentacion.dataset.tocada) {
+      el.segmentacion.open = true;
+    }
+    if (seg === null) return;
+
+    const porCampo = seg.criterio.tipo === 'campo';
+    el.criterio.value = seg.criterio.tipo;
+    el.criterio.disabled = !editable;
+    el.campoCriterio.hidden = !porCampo;
+    el.tablaRangos.hidden = porCampo;
+    el.valores.hidden = !porCampo;
+
+    el.campo.replaceChildren();
+    const variables = catalogo?.contexto.variables ?? [];
+    for (const variable of variables) {
+      const opcion = document.createElement('option');
+      opcion.value = variable.nombre;
+      opcion.textContent = etiquetaDe(variable.nombre);
+      el.campo.append(opcion);
+    }
+    if (seg.criterio.tipo === 'campo') el.campo.value = seg.criterio.campo;
+    el.campo.disabled = !editable;
+
+    el.rangos.replaceChildren();
+    if (seg.criterio.tipo === 'calculado') {
+      for (const rango of seg.criterio.tabla) {
+        const fila = document.createElement('tr');
+        const etiqueta = document.createElement('th');
+        etiqueta.scope = 'row';
+        etiqueta.textContent = rango.etiqueta;
+        const desde = document.createElement('td');
+        desde.className = 'num mono';
+        desde.textContent = rango.desde === null ? '—' : String(rango.desde);
+        const hasta = document.createElement('td');
+        hasta.className = 'num mono';
+        hasta.textContent = rango.hasta === null ? '—' : String(rango.hasta);
+        fila.append(etiqueta, desde, hasta);
+        el.rangos.append(fila);
+      }
+    }
+
+    el.valoresLista.replaceChildren();
+    if (porCampo) {
+      const enUso = new Set(valoresEnUso(estado.borrador));
+      const valores = [...new Set([...valoresEnUso(estado.borrador), ...estado.valoresExtra])];
+      for (const valor of valores) {
+        const item = document.createElement('li');
+        const texto = document.createElement('span');
+        texto.textContent = valor;
+        item.append(texto);
+        if (enUso.has(valor)) {
+          const marca = document.createElement('span');
+          marca.className = 'tag tag--neutral';
+          marca.textContent = t('columnas.segmentacion.valorEnUso');
+          item.append(marca);
+        } else {
+          const quitar = document.createElement('button');
+          quitar.type = 'button';
+          quitar.className = 'btn btn--sm';
+          quitar.textContent = t('columnas.segmentacion.valorQuitar', { valor });
+          quitar.disabled = !editable;
+          quitar.addEventListener('click', () => {
+            estado.valoresExtra = estado.valoresExtra.filter((v) => v !== valor);
+            cambioDeSegmentos();
+          });
+          item.append(quitar);
+        }
+        el.valoresLista.append(item);
+      }
+    }
+    el.valorNuevo.disabled = !editable;
+    el.valorAgregar.disabled = !editable;
+    document.querySelectorAll<HTMLInputElement>('[data-politica]').forEach((radio) => {
+      radio.checked = radio.value === seg.politica;
+      radio.disabled = !editable;
+    });
+  }
+
+  /** The open row's "vary by segment" box and its hint follow whether the definition segments. */
+  function pintarVariar(): void {
+    const detalle = estado.detalle;
+    if (!detalle) return;
+    const sin = estado.borrador.segmentacion === null;
+    const casilla = detalle.querySelector<HTMLInputElement>('[data-variar]');
+    const hint = detalle.querySelector<HTMLElement>('[data-variar-hint]');
+    if (casilla) {
+      casilla.disabled = !esEditable(estado.modo) || sin;
+      casilla.checked = estado.variar && !sin;
+    }
+    if (hint) hint.textContent = t(sin ? 'columnas.variar.sinSegmentacion' : 'columnas.variar.hint');
+  }
+
+  /** The segments changed: the open row's selector follows, and the preview recalculates. */
+  function cambioDeSegmentos(): void {
+    pintarSegmentacion();
+    const contenido = estado.contenido;
+    if (estado.abierta && contenido?.tipo === 'variantes') {
+      if (!estado.variar || estado.borrador.segmentacion === null) {
+        // The row no longer varies (its variants were dropped or the segmentation went off): mount
+        // the plain editor. Telling the old selector first would send the stale variants back.
+        estado.variar = false;
+        void montarContenido();
+      } else {
+        contenido.ctl.fijarSegmentos(segmentosActuales());
+      }
+    }
+    pintarVariar();
+    actualizarTodasLasFilas();
+    programarPrevia();
+    pintarEstado();
+  }
+
+  function celdaDe(fila: HTMLTableRowElement, etiqueta: string, clase = '', tipo = ''): HTMLTableCellElement {
+    const celda = document.createElement('td');
+    celda.dataset.etiqueta = etiqueta;
+    if (clase) celda.className = clase;
+    if (tipo) celda.dataset.celda = tipo;
+    fila.append(celda);
+    return celda;
+  }
+
+  function boton(plantilla: string, etiqueta: string, alPulsar: () => void, deshabilitado: boolean, clase = ''): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `btn btn--sm btn--icon${clase ? ` ${clase}` : ''}`;
+    b.setAttribute('aria-label', etiqueta);
+    b.title = etiqueta;
+    b.disabled = deshabilitado;
+    const icono = document.querySelector<HTMLTemplateElement>(`[${plantilla}]`);
+    if (icono) b.append(icono.content.cloneNode(true));
+    b.addEventListener('click', alPulsar);
+    return b;
+  }
+
+  function resumenDeFormato(columna: Borrador['columnas'][number]): string {
+    if (columna.tipo === 'fecha') {
+      return columna.formato_fecha
+        ? t('columnas.formato.fecha', { patron: columna.formato_fecha })
+        : t('columnas.formato.fechaSin');
+    }
+    if (columna.tipo === 'financiero') {
+      return t('columnas.formato.importe', { ejemplo: ejemploFinanciero(columna.formato_financiero) });
+    }
+    return t('columnas.formato.ninguno');
+  }
+
+  const MAXIMO_RESUMEN = 60;
+
+  /**
+   * What the backend's preview says this column gives for the example record, when the preview is
+   * up to date: the screen evaluates nothing itself. `null` when there is none to read.
+   */
+  function resultadoDeEjemplo(id: string): string | null {
+    if (!estado.previaVigente || !ultimaPrevia || ultimaPrevia.problemas.length > 0) return null;
+    const indice = estado.borrador.columnas.findIndex((c) => c.id === id);
+    const fila = ultimaPrevia.filas.find((f) => f.excluida === null);
+    const texto = fila?.columnas[indice]?.texto;
+    return texto === undefined || texto === '' ? null : texto.replace(/\s+/g, ' ');
+  }
+
+  function textoDeContenido(columna: Borrador['columnas'][number]): { texto: string; vacio: boolean } {
+    const resumen = resumenDeContenido(columna.expresion, etiquetaDe, MAXIMO_RESUMEN);
+    let texto: string;
+    if (resumen.modo === 'vacio') texto = t('columnas.contenido.vacio');
+    else if (resumen.modo === 'variable') {
+      texto = resumen.funciones
+        ? t('columnas.contenido.variableConFunciones', { variable: resumen.variable, n: resumen.funciones })
+        : t('columnas.contenido.variable', { variable: resumen.variable });
+    } else {
+      const resultado = resultadoDeEjemplo(columna.id);
+      const fuente = resultado ?? resumen.fragmento;
+      const recortado = resultado !== null ? resultado.length > MAXIMO_RESUMEN : resumen.recortado;
+      texto = t(recortado ? 'columnas.contenido.textoRecortado' : 'columnas.contenido.texto', {
+        fragmento: fuente.length > MAXIMO_RESUMEN ? fuente.slice(0, MAXIMO_RESUMEN) : fuente,
+      });
+    }
+    if (columna.variantes.length) {
+      texto += ` · ${t(columna.variantes.length === 1 ? 'columnas.variantes.uno' : 'columnas.variantes.otras', { n: columna.variantes.length })}`;
+    }
+    return { texto, vacio: resumen.modo === 'vacio' };
+  }
+
+  function refrescarResumenes(): void {
+    for (const columna of estado.borrador.columnas) actualizarFila(columna.id);
+  }
+
+  const actualizarTodasLasFilas = refrescarResumenes;
+
+  /** Refresh the summary cells of one row without rebuilding the table (and the open editor). */
+  function actualizarFila(id: string): void {
+    const columna = estado.borrador.columnas.find((c) => c.id === id);
+    const fila = el.filas.querySelector<HTMLTableRowElement>(`tr[data-columna="${id}"]`);
+    if (!columna || !fila) return;
+    const contenido = textoDeContenido(columna);
+    const celdaContenido = fila.querySelector<HTMLElement>('[data-celda="contenido"]');
+    if (celdaContenido) {
+      if (celdaContenido.firstChild) celdaContenido.firstChild.textContent = contenido.texto;
+      celdaContenido.classList.toggle('cl-celda-resumen--vacio', contenido.vacio);
+    }
+    const celdaFormato = fila.querySelector<HTMLElement>('[data-celda="formato"]');
+    if (celdaFormato) celdaFormato.textContent = resumenDeFormato(columna);
+  }
+
+  /**
+   * The "another column has this name" marks, in place: rebuilding the rows on every key would take
+   * the focus away from the field being typed in.
+   */
+  function marcarNombresRepetidos(): void {
+    const repetidos = nombresRepetidos(estado.borrador);
+    const grupos = agruparProblemas(estado.problemas, estado.borrador);
+    for (const columna of estado.borrador.columnas) {
+      const input = el.filas.querySelector<HTMLInputElement>(`input[data-columna="${columna.id}"][data-campo="nombre"]`);
+      const mensaje = el.filas.querySelector<HTMLElement>(`#cl-nombre-${columna.id}`);
+      if (!input || !mensaje) continue;
+      const delBackend =
+        (grupos.porColumna.get(columna.id) ?? []).find((p) => p.campo === 'nombre')?.detalle ?? '';
+      const texto = repetidos.has(columna.id) ? t('columnas.repetido') : delBackend;
+      mensaje.textContent = texto;
+      if (texto) {
+        input.setAttribute('aria-invalid', 'true');
+        input.setAttribute('aria-describedby', mensaje.id);
+      } else {
+        input.removeAttribute('aria-invalid');
+        input.removeAttribute('aria-describedby');
+      }
+    }
+  }
+
+  function pintarColumnas(): void {
+    const editable = esEditable(estado.modo);
+    const columnas = estado.borrador.columnas;
+    const repetidos = nombresRepetidos(estado.borrador);
+    const grupos = agruparProblemas(estado.problemas, estado.borrador);
+
+    // The open row's detail keeps its mounted editor: take it out and put it back.
+    estado.detalle?.remove();
+    if (estado.abierta && !columnas.some((c) => c.id === estado.abierta)) cerrarFila();
+
+    el.sinColumnas.hidden = columnas.length > 0;
+    el.tabla.hidden = columnas.length === 0;
+    el.filas.replaceChildren();
+
+    columnas.forEach((columna, indice) => {
+      const fila = document.createElement('tr');
+      fila.dataset.columna = columna.id;
+      const propios = grupos.porColumna.get(columna.id) ?? [];
+      const detalleDe = (campo: string) =>
+        propios.find((p) => destinoDeProblema(p, estado.borrador).tipo === 'columna' && (p.campo ?? 'expresion') === campo)?.detalle ?? '';
+
+      celdaDe(fila, t('columnas.col.orden'), 'num mono').textContent = String(indice + 1);
+
+      const celdaNombre = celdaDe(fila, t('columnas.col.nombre'));
+      const nombre = document.createElement('input');
+      nombre.className = 'input';
+      nombre.type = 'text';
+      nombre.value = columna.nombre;
+      nombre.maxLength = 120;
+      nombre.autocomplete = 'off';
+      nombre.dataset.columna = columna.id;
+      nombre.dataset.campo = 'nombre';
+      nombre.readOnly = !editable;
+      nombre.setAttribute('aria-label', t('columnas.col.nombreDe', { numero: indice + 1 }));
+      const error = repetidos.has(columna.id) ? t('columnas.repetido') : detalleDe('nombre');
+      const mensaje = document.createElement('p');
+      mensaje.className = 'field__error';
+      mensaje.id = `cl-nombre-${columna.id}`;
+      mensaje.textContent = error;
+      if (error) {
+        nombre.setAttribute('aria-invalid', 'true');
+        nombre.setAttribute('aria-describedby', mensaje.id);
+      }
+      nombre.addEventListener('input', () => {
+        estado.borrador = renombrarColumna(estado.borrador, columna.id, nombre.value);
+        estado.foco = null;
+        marcarNombresRepetidos();
+        programarPrevia();
+        pintarEstado();
+      });
+      celdaNombre.append(nombre, mensaje);
+
+      const celdaTipo = celdaDe(fila, t('columnas.col.tipo'));
+      const tipo = document.createElement('select');
+      tipo.className = 'input';
+      tipo.dataset.columna = columna.id;
+      tipo.dataset.campo = 'tipo';
+      tipo.disabled = !editable;
+      tipo.setAttribute('aria-label', t('columnas.col.tipoDe', { nombre: nombreVisible(indice) }));
+      for (const valor of TIPOS) {
+        const opcion = document.createElement('option');
+        opcion.value = valor;
+        opcion.textContent = t(`columnas.tipo.${valor}`);
+        tipo.append(opcion);
+      }
+      tipo.value = columna.tipo;
+      tipo.addEventListener('change', () => {
+        estado.borrador = cambiarTipo(estado.borrador, columna.id, tipo.value as TipoSalida);
+        actualizarFila(columna.id);
+        if (estado.abierta === columna.id) pintarFormato();
+        programarPrevia();
+        pintarEstado();
+      });
+      celdaTipo.append(tipo);
+
+      const contenido = textoDeContenido(columna);
+      const celdaContenido = celdaDe(
+        fila,
+        t('columnas.col.contenido'),
+        `cl-celda-resumen${contenido.vacio ? ' cl-celda-resumen--vacio' : ''}`,
+        'contenido',
+      );
+      const textoContenido = document.createElement('span');
+      textoContenido.textContent = contenido.texto;
+      celdaContenido.append(textoContenido);
+      const errorContenido = detalleDe('expresion');
+      if (errorContenido) {
+        const p = document.createElement('p');
+        p.className = 'field__error';
+        p.textContent = errorContenido;
+        celdaContenido.append(p);
+      }
+
+      celdaDe(fila, t('columnas.col.formato'), 'cl-celda-resumen', 'formato').textContent = resumenDeFormato(columna);
+
+      const celdaDefecto = celdaDe(fila, t('columnas.col.defecto'));
+      const defecto = document.createElement('input');
+      defecto.className = 'input';
+      defecto.type = 'text';
+      defecto.value = columna.valor_por_defecto ?? '';
+      defecto.autocomplete = 'off';
+      defecto.dataset.columna = columna.id;
+      defecto.dataset.campo = 'valor_por_defecto';
+      defecto.readOnly = !editable;
+      defecto.setAttribute('aria-label', t('columnas.col.defectoDe', { nombre: nombreVisible(indice) }));
+      defecto.addEventListener('input', () => {
+        estado.borrador = fijarValorPorDefecto(estado.borrador, columna.id, defecto.value);
+        programarPrevia();
+        pintarEstado();
+      });
+      celdaDefecto.append(defecto);
+
+      const celdaAcciones = celdaDe(fila, t('columnas.col.acciones'));
+      const acciones = document.createElement('div');
+      acciones.className = 'cl-acciones';
+      const nombreFila = nombreVisible(indice);
+      const abierta = estado.abierta === columna.id;
+      const abrir = boton(
+        'data-icono-abrir',
+        t(abierta ? 'columnas.cerrar' : 'columnas.editar', { nombre: nombreFila }),
+        () => void abrirFila(columna.id),
+        false,
+        'table__abrir',
+      );
+      abrir.setAttribute('aria-expanded', abierta ? 'true' : 'false');
+      abrir.setAttribute('aria-controls', `cl-detalle-${columna.id}`);
+      abrir.dataset.accion = `${columna.id}:abrir`;
+      const mover = (paso: -1 | 1) => () => {
+        estado.borrador = moverColumna(estado.borrador, columna.id, paso);
+        estado.foco = `${columna.id}:${paso === -1 ? 'subir' : 'bajar'}`;
+        programarPrevia();
+        pintar();
+      };
+      const subir = boton('data-icono-arriba', t('columnas.subir', { nombre: nombreFila }), mover(-1), !editable || indice === 0);
+      subir.dataset.accion = `${columna.id}:subir`;
+      const bajar = boton(
+        'data-icono-abajo',
+        t('columnas.bajar', { nombre: nombreFila }),
+        mover(1),
+        !editable || indice === columnas.length - 1,
+      );
+      bajar.dataset.accion = `${columna.id}:bajar`;
+      const duplicar = boton(
+        'data-icono-duplicar',
+        t('columnas.duplicar', { nombre: nombreFila }),
+        () => {
+          const resultado = duplicarColumna(estado.borrador, columna.id, t('columnas.copia'));
+          estado.borrador = resultado.borrador;
+          estado.foco = resultado.id ? `${resultado.id}:nombre` : null;
+          programarPrevia();
+          pintar();
+        },
+        !editable,
+      );
+      const quitar = boton(
+        'data-icono-quitar',
+        t('columnas.quitar', { nombre: nombreFila }),
+        async () => {
+          const conContenido = !(contenido.vacio && !columna.valor_por_defecto && columna.variantes.length === 0);
+          if (conContenido && columna.nombre.trim()) {
+            const si = await confirmar({
+              titulo: t('columnas.quitar.titulo'),
+              cuerpo: t('columnas.quitar.cuerpo', { nombre: columna.nombre.trim() }),
+              si: t('columnas.quitar.confirmar'),
+              no: t('common.cancel'),
+            });
+            if (!si) return;
+          }
+          if (estado.abierta === columna.id) cerrarFila();
+          const resultado = quitarColumna(estado.borrador, columna.id);
+          estado.borrador = resultado.borrador;
+          estado.foco = resultado.foco ? `${resultado.foco}:nombre` : 'agregar';
+          programarPrevia();
+          pintar();
+        },
+        !editable,
+      );
+      acciones.append(abrir, subir, bajar, duplicar, quitar);
+      celdaAcciones.append(acciones);
+
+      el.filas.append(fila);
+      if (estado.abierta === columna.id && estado.detalle) el.filas.append(estado.detalle);
+    });
+
+    el.agregar.disabled = !editable;
+  }
+
+  function pintarResumen(): void {
+    const grupos = agruparProblemas(estado.problemas, estado.borrador);
+    const delEditor = estado.abierta && !estado.editorValido && !estado.editorPendiente ? estado.editorProblemas : [];
+    const total = grupos.total + (estado.nombreRepetido ? 1 : 0) + delEditor.length;
+    el.resumen.hidden = total === 0;
+    el.resumenLista.replaceChildren();
+    if (total === 0) {
+      el.resumen.removeAttribute('role');
+      return;
+    }
+    el.resumenTitulo.textContent =
+      total === 1 ? t('columnas.problemas.resumen.uno') : t('columnas.problemas.resumen.otros', { n: total });
+
+    const agregarItem = (donde: string, detalle: string, ir: () => void) => {
+      const item = document.createElement('li');
+      const etiqueta = document.createElement('span');
+      etiqueta.className = 'cl-problemas__donde';
+      etiqueta.textContent = donde;
+      const texto = document.createElement('span');
+      texto.textContent = detalle;
+      const enlace = document.createElement('button');
+      enlace.type = 'button';
+      enlace.className = 'btn btn--sm';
+      enlace.textContent = t('columnas.problemas.ir');
+      enlace.addEventListener('click', ir);
+      item.append(etiqueta, texto, enlace);
+      el.resumenLista.append(item);
+    };
+
+    if (estado.nombreRepetido) {
+      agregarItem(t('columnas.problemas.enDefinicion'), t('columnas.error.nombreRepetido'), () => el.nombre.focus());
+    }
+    for (const problema of grupos.definicion) {
+      agregarItem(t('columnas.problemas.enDefinicion'), problema.detalle, () => el.nombre.focus());
+    }
+    estado.borrador.columnas.forEach((columna, indice) => {
+      for (const problema of grupos.porColumna.get(columna.id) ?? []) {
+        agregarItem(
+          t('columnas.problemas.enColumna', { numero: indice + 1, nombre: nombreVisible(indice) }),
+          problema.detalle,
+          () => void irAlProblema(columna.id, problema),
+        );
+      }
+    });
+    const abierta = estado.abierta ? estado.borrador.columnas.findIndex((c) => c.id === estado.abierta) : -1;
+    for (const problema of delEditor) {
+      agregarItem(
+        t('columnas.problemas.enColumna', { numero: abierta + 1, nombre: nombreVisible(abierta) }),
+        problema.mensaje,
+        () => irAlProblemaDelEditor(problema.segmento, problema.indice),
+      );
+    }
+  }
+
+  function irAlProblemaDelEditor(segmento: string | null, indice: number): void {
+    const contenido = estado.contenido;
+    if (!contenido) return;
+    if (contenido.tipo === 'variantes') contenido.ctl.irAProblema(segmento, indice);
+    else contenido.ctl.irAProblema(indice);
+  }
+
+  /** From the save's summary: the field of the column, or its open row for its content. */
+  async function irAlProblema(id: string, problema: ProblemaDefinicion): Promise<void> {
+    const campo = problema.campo ?? 'expresion';
+    if (campo === 'nombre' || campo === 'valor_por_defecto') {
+      document.querySelector<HTMLElement>(`[data-columna="${id}"][data-campo="${campo}"]`)?.focus();
+      return;
+    }
+    if (estado.abierta !== id) await abrirFila(id);
+    if (campo === 'expresion') {
+      // The editor validates the segment again once mounted; the first problem of it is the one.
+      irAlProblemaDelEditor(problema.segmento, 0);
+    }
+  }
+
+  function pintarEstado(): void {
+    const reglas = versionAlGuardar(estado.respuesta);
+    const cambios = estado.modo === 'nueva' ? hayContenido(estado.borrador) : hayCambiosSinGuardar();
+    const sePuedeGuardar = puedeGuardar(estado.modo, cambios, estado.guardando);
+    el.guardar.disabled = !sePuedeGuardar;
+    el.guardar.dataset.loading = estado.guardando ? 'true' : 'false';
+    el.descartar.disabled = estado.guardando || estado.modo === 'lectura' || (!cambios && estado.modo !== 'base');
+    el.estado.textContent = estado.guardando ? t('columnas.guardando') : estado.mensaje;
+    el.guardarHint.textContent =
+      estado.modo === 'lectura'
+        ? ''
+        : estado.modo === 'base'
+          ? t('columnas.guardar.hintBase', { nueva: reglas.nueva })
+          : estado.respuesta === null
+            ? t('columnas.guardar.hintNueva')
+            : t('columnas.guardar.hint', { nueva: reglas.nueva, actual: estado.respuesta.version_vigente });
+  }
+
+  function pintar(): void {
+    pintarCabecera();
+    pintarColumnas();
+    pintarResumen();
+    pintarEstado();
+    if (estado.foco === 'agregar') el.agregar.focus();
+    else if (estado.foco) {
+      const [id, que] = estado.foco.split(':');
+      const objetivo =
+        que === 'nombre'
+          ? document.querySelector<HTMLElement>(`[data-columna="${id}"][data-campo="nombre"]`)
+          : document.querySelector<HTMLElement>(`[data-accion="${id}:${que}"]:not(:disabled)`) ??
+            document.querySelector<HTMLElement>(`[data-accion="${id}:${que === 'subir' ? 'bajar' : 'subir'}"]:not(:disabled)`);
+      objetivo?.focus();
+    }
+    estado.foco = null;
+  }
+
+  // ---- Preview of the whole definition -----------------------------------------------------------
+
+  let temporizadorPrevia = 0;
+  let controlPrevia: AbortController | null = null;
+  let ultimaPrevia: PrevisualizacionTexto | null = null;
+
+  function programarPrevia(espera = ESPERA_PREVIA): void {
+    estado.previaVigente = false;
+    window.clearTimeout(temporizadorPrevia);
+    temporizadorPrevia = window.setTimeout(() => void calcularPrevia(), espera);
+  }
+
+  function muestraDePrevia(): MuestraTexto | null {
+    if (estado.muestra === 'real') {
+      const seleccion = estado.seleccion;
+      if (!seleccion?.fechaCorte || !seleccion.aplicable) return null;
+      return {
+        tipo: 'primeros_de_seleccion',
+        fecha_corte: seleccion.fechaCorte,
+        filtros: seleccion.consulta.filtros,
+        orden: seleccion.consulta.orden,
+        cantidad: 5,
+      };
+    }
+    // With a segmentation there is one example per segment; without it they would all be alike.
+    return estado.borrador.segmentacion ? { tipo: 'ejemplos_por_segmento', cantidad: 5 } : { tipo: 'ejemplo', cantidad: 1 };
+  }
+
+  function pintarPrevia(): void {
+    el.previaFilas.replaceChildren();
+    el.previaCabecera.replaceChildren();
+    el.previaAviso.hidden = true;
+    const mostrarAviso = (texto: string) => {
+      el.previaAviso.hidden = false;
+      el.previaAviso.textContent = texto;
+    };
+    const sinContenido = estado.borrador.columnas.every(
+      (c) => c.nombre.trim() === '' && c.expresion.nodos.length === 0,
+    );
+    el.previaContenedor.hidden = true;
+    if (sinContenido) return mostrarAviso(t('columnas.previa.vacia'));
+    if (estado.muestra === 'real' && !muestraDePrevia()) return mostrarAviso(t('columnas.previa.fechaFalta'));
+    if (!ultimaPrevia) return;
+    if (ultimaPrevia.problemas.length > 0) return mostrarAviso(t('columnas.previa.problemas'));
+    if (ultimaPrevia.filas.length === 0) return mostrarAviso(t('columnas.previa.sinProductos'));
+
+    el.previaContenedor.hidden = false;
+    const cabecera = document.createElement('tr');
+    const porSegmento = ultimaPrevia.filas.some((f) => f.segmento !== null);
+    const primera = t(porSegmento ? 'columnas.previa.segmento' : 'columnas.previa.fila');
+    for (const texto of [primera, ...estado.borrador.columnas.map((c, i) => c.nombre.trim() || nombreVisible(i))]) {
+      const th = document.createElement('th');
+      th.scope = 'col';
+      th.textContent = texto;
+      cabecera.append(th);
+    }
+    el.previaCabecera.append(cabecera);
+
+    for (const filaPrevia of ultimaPrevia.filas) {
+      const tr = document.createElement('tr');
+      const etiqueta = document.createElement('th');
+      etiqueta.scope = 'row';
+      etiqueta.textContent = filaPrevia.etiqueta ?? String(filaPrevia.numero);
+      tr.append(etiqueta);
+      if (filaPrevia.excluida) {
+        const td = document.createElement('td');
+        td.colSpan = Math.max(1, estado.borrador.columnas.length);
+        td.className = 'cl-previa__excluida';
+        td.textContent = t('columnas.previa.excluida', { motivo: filaPrevia.excluida.detalle });
+        tr.append(td);
+      } else {
+        for (const columna of filaPrevia.columnas) {
+          const td = document.createElement('td');
+          const todosVacios = columna.nodos.length > 0 && columna.nodos.every((n) => n.vacio);
+          if (columna.problemas.length > 0) {
+            const marca = document.createElement('span');
+            marca.className = 'cl-previa__problema';
+            marca.setAttribute('role', 'img');
+            marca.setAttribute(
+              'aria-label',
+              t('columnas.previa.celdaConProblema', { valor: columna.texto, detalle: columna.problemas[0].detalle }),
+            );
+            marca.textContent = columna.texto || '⚠';
+            td.append(marca);
+          } else if (columna.texto === '' || todosVacios) {
+            const marca = document.createElement('span');
+            marca.className = 'marca-vacio';
+            marca.setAttribute('role', 'img');
+            marca.setAttribute('aria-label', t('columnas.previa.vacio'));
+            td.append(marca);
+          } else {
+            td.textContent = columna.texto;
+          }
+          tr.append(td);
+        }
+      }
+      el.previaFilas.append(tr);
+    }
+    if (ultimaPrevia.disponibles !== null) {
+      mostrarAviso(
+        t('columnas.previa.disponibles', { n: ultimaPrevia.filas.length, total: ultimaPrevia.disponibles }),
+      );
+    }
+  }
+
+  async function calcularPrevia(): Promise<void> {
+    controlPrevia?.abort();
+    const muestra = muestraDePrevia();
+    const sinContenido = estado.borrador.columnas.every(
+      (c) => c.nombre.trim() === '' && c.expresion.nodos.length === 0,
+    );
+    if (!muestra || sinContenido) {
+      ultimaPrevia = null;
+      el.previaEstado.textContent = '';
+      pintarPrevia();
+      return;
+    }
+    const control = new AbortController();
+    controlPrevia = control;
+    el.previaEstado.textContent = t('columnas.previa.calculando');
+    el.previaContenedor.style.opacity = '0.6';
+    try {
+      ultimaPrevia = await previsualizarTexto(
+        { contexto: CONTEXTO, definicion: aDefinicion(estado.borrador), muestra },
+        control.signal,
+      );
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      ultimaPrevia = null;
+      el.previaEstado.textContent = '';
+      el.previaContenedor.style.opacity = '';
+      if (error instanceof ApiError && (error.status === 400 || error.status === 404)) {
+        el.previaAviso.hidden = false;
+        el.previaAviso.textContent = error.detail;
+        el.previaContenedor.hidden = true;
+        return;
+      }
+      el.previaAviso.hidden = false;
+      el.previaAviso.textContent = mensajeDeError(error);
+      return;
+    }
+    el.previaEstado.textContent = '';
+    el.previaContenedor.style.opacity = '';
+    estado.previaVigente = true;
+    pintarPrevia();
+    refrescarResumenes();
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('[data-muestra]').forEach((opcion) => {
+    opcion.addEventListener('click', async () => {
+      if (estado.muestra === opcion.dataset.muestra) return;
+      document.querySelectorAll<HTMLButtonElement>('[data-muestra]').forEach((b) => {
+        b.setAttribute('aria-pressed', String(b === opcion));
+      });
+      estado.muestra = opcion.dataset.muestra as 'ejemplos' | 'real';
+      el.previaSeleccion.hidden = estado.muestra !== 'real';
+      if (estado.muestra === 'real' && !estado.selectorMontado) {
+        const raiz = $<HTMLElement>('[data-selector]');
+        // Subscribed before mounting so no `seleccioncambiada` is missed.
+        raiz.addEventListener(EVENTO_SELECCION, (evento) => {
+          estado.seleccion = (evento as CustomEvent<EstadoSeleccion>).detail;
+          aplicarMuestraAlEditor();
+          programarPrevia();
+        });
+        estado.selectorMontado = true;
+        try {
+          await montarSelector(raiz);
+        } catch (error) {
+          estado.selectorMontado = false;
+          mostrarError(error);
+          return;
+        }
+      }
+      aplicarMuestraAlEditor();
+      programarPrevia(0);
+    });
+  });
+
+  // ---- Actions -------------------------------------------------------------------------------
+
+  el.nombre.addEventListener('input', () => {
+    estado.borrador = renombrarDefinicion(estado.borrador, el.nombre.value);
+    estado.nombreRepetido = false;
+    pintarEstado();
+  });
+
+  el.proteger.addEventListener('change', () => {
+    estado.borrador = fijarProteccion(estado.borrador, el.proteger.checked);
+    pintarEstado();
+  });
+
+  el.segmentacion.addEventListener('toggle', () => {
+    el.segmentacion.dataset.tocada = 'true';
+  });
+
+  /** Changing the criterion orphans the variants: ask, then remove them. */
+  async function conVariantesSoltadas(accion: () => void): Promise<boolean> {
+    if (columnasConVariantes(estado.borrador) > 0) {
+      const si = await confirmar({
+        titulo: t('columnas.segmentacion.cambiar.titulo'),
+        cuerpo: t('columnas.segmentacion.cambiar.cuerpo'),
+        si: t('columnas.segmentacion.cambiar.confirmar'),
+        no: t('common.cancel'),
+      });
+      if (!si) return false;
+      estado.borrador = quitarTodasLasVariantes(estado.borrador);
+      if (estado.variar) estado.variar = false;
+    }
+    accion();
+    return true;
+  }
+
+  el.segmentar.addEventListener('change', async () => {
+    if (el.segmentar.checked) {
+      estado.borrador = activarSegmentacion(estado.borrador, contextoSegmentos());
+      pintarColumnas();
+      cambioDeSegmentos();
+      return;
+    }
+    const hecho = await conVariantesSoltadas(() => {
+      estado.borrador = desactivarSegmentacion(estado.borrador);
+    });
+    if (!hecho) el.segmentar.checked = true;
+    estado.valoresExtra = [];
+    pintarColumnas();
+    cambioDeSegmentos();
+  });
+
+  el.criterio.addEventListener('change', async () => {
+    const valor = el.criterio.value as 'calculado' | 'campo';
+    const hecho = await conVariantesSoltadas(() => {
+      estado.borrador =
+        valor === 'campo'
+          ? fijarCriterioCampo(estado.borrador, el.campo.value || (catalogo?.contexto.variables[0]?.nombre ?? ''))
+          : fijarCriterioCalculado(estado.borrador, contextoSegmentos());
+      estado.valoresExtra = [];
+    });
+    if (!hecho) pintarSegmentacion();
+    cambioDeSegmentos();
+  });
+
+  el.campo.addEventListener('change', async () => {
+    const hecho = await conVariantesSoltadas(() => {
+      estado.borrador = fijarCriterioCampo(estado.borrador, el.campo.value);
+      estado.valoresExtra = [];
+    });
+    if (!hecho) pintarSegmentacion();
+    cambioDeSegmentos();
+  });
+
+  document.querySelectorAll<HTMLInputElement>('[data-politica]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      estado.borrador = fijarPolitica(estado.borrador, radio.value as 'excluir' | 'usar_por_defecto');
+      programarPrevia();
+      pintarEstado();
+    });
+  });
+
+  el.valorAgregar.addEventListener('click', () => {
+    const valor = el.valorNuevo.value.trim();
+    if (valor === '') return;
+    if (!estado.valoresExtra.includes(valor) && !valoresEnUso(estado.borrador).includes(valor)) {
+      estado.valoresExtra = [...estado.valoresExtra, valor];
+    }
+    el.valorNuevo.value = '';
+    cambioDeSegmentos();
+  });
+
+  el.agregar.addEventListener('click', () => {
+    const resultado = agregarColumna(estado.borrador);
+    estado.borrador = resultado.borrador;
+    estado.foco = `${resultado.id}:nombre`;
+    programarPrevia();
+    pintar();
+  });
+
+  $<HTMLButtonElement>('[data-nueva]').addEventListener('click', async () => {
+    if (!(await puedoSoltar())) return;
+    poner(null);
+    pintar();
+    programarPrevia(0);
+    el.nombre.focus();
+  });
+
+  el.definiciones.addEventListener('change', async () => {
+    const elegida = el.definiciones.value;
+    if (!(await puedoSoltar())) {
+      pintarCabecera();
+      return;
+    }
+    if (elegida === '') {
+      poner(null);
+      pintar();
+    } else {
+      await abrir(Number(elegida));
+    }
+    programarPrevia(0);
+  });
+
+  el.version.addEventListener('change', async () => {
+    if (!estado.respuesta) return;
+    const numero = Number(el.version.value);
+    if (!(await puedoSoltar())) {
+      pintarCabecera();
+      return;
+    }
+    await abrir(estado.respuesta.id, numero === estado.respuesta.version_vigente ? undefined : numero);
+    programarPrevia(0);
+  });
+
+  $<HTMLButtonElement>('[data-ir-vigente]').addEventListener('click', async () => {
+    if (!estado.respuesta) return;
+    await abrir(estado.respuesta.id);
+    programarPrevia(0);
+  });
+
+  $<HTMLButtonElement>('[data-usar-base]').addEventListener('click', () => {
+    estado.modo = usarComoBase(estado.modo);
+    if (estado.contenido) estado.contenido.ctl.fijarSoloLectura(false);
+    pintar();
+    if (estado.abierta) pintarFormato();
+  });
+
+  el.descartar.addEventListener('click', () => {
+    estado.modo = descartar(estado.modo);
+    const abierta = estado.abierta;
+    cerrarFila();
+    estado.borrador = estado.guardada ? desdeDefinicion(estado.guardada) : definicionNueva();
+    estado.problemas = [];
+    estado.nombreRepetido = false;
+    estado.mensaje = '';
+    estado.valoresExtra = [];
+    pintar();
+    programarPrevia(0);
+    if (abierta) void abrirFila(abierta);
+  });
+
+  async function guardar(): Promise<void> {
+    const cambios = estado.modo === 'nueva' ? hayContenido(estado.borrador) : hayCambiosSinGuardar();
+    if (!puedeGuardar(estado.modo, cambios, estado.guardando)) return;
+    // The open editor decides first: a text it still has problems with is not sent (§4).
+    if (estado.contenido && (estado.editorPendiente || !estado.editorValido)) {
+      estado.mensaje = estado.editorPendiente ? t('columnas.previa.calculando') : '';
+      pintarEstado();
+      pintarResumen();
+      if (!estado.editorValido && !estado.editorPendiente) {
+        el.resumen.setAttribute('role', 'alert');
+        el.resumen.querySelector<HTMLButtonElement>('button')?.focus();
+      }
+      return;
+    }
+    estado.guardando = true;
+    estado.problemas = [];
+    estado.nombreRepetido = false;
+    estado.mensaje = '';
+    pintarEstado();
+    try {
+      const respuesta = await guardarBorrador(estado.borrador, estado.respuesta?.id ?? null);
+      estado.guardando = false;
+      await recargarLista().catch(() => undefined);
+      poner(respuesta);
+      estado.mensaje = t('columnas.guardada', { numero: respuesta.version.numero });
+      pintar();
+    } catch (error) {
+      estado.guardando = false;
+      if (error instanceof ApiError && error.status === 400) {
+        estado.problemas = problemasDeError(error);
+        if (estado.problemas.length === 0) mostrarError(error);
+      } else if (error instanceof ApiError && error.status === 409 && error.codigo === 'nombre_repetido') {
+        estado.nombreRepetido = true;
+      } else if (error instanceof ApiError && error.status === 404) {
+        await recargarLista().catch(() => undefined);
+        poner(null);
+        estado.mensaje = t('columnas.error.noExiste');
+      } else {
+        mostrarError(error);
+      }
+      pintar();
+      if (estado.problemas.length || estado.nombreRepetido) {
+        // The summary becomes the alert and the focus goes to the first problem (§4).
+        el.resumen.setAttribute('role', 'alert');
+        el.resumen.querySelector<HTMLButtonElement>('button')?.focus();
+      }
+    }
+  }
+
+  el.guardar.addEventListener('click', () => void guardar());
+
+  // ---- Start ---------------------------------------------------------------------------------
+
+  function sinConexion(si: boolean): void {
+    el.offline.hidden = !si;
+    el.contenido.hidden = si;
+  }
+
+  async function arrancar(): Promise<void> {
+    try {
+      [estado.lista, catalogo] = await Promise.all([listarDefiniciones(), obtenerCatalogo(CONTEXTO)]);
+    } catch (error) {
+      if (error instanceof NetworkError) {
+        sinConexion(true);
+        return;
+      }
+      mostrarError(error);
+      return;
+    }
+    sinConexion(false);
+    poner(null);
+    pintar();
+    pintarPrevia();
+  }
+
+  document.querySelector<HTMLButtonElement>('[data-reintentar]')?.addEventListener('click', () => void arrancar());
+  document.addEventListener('languagechange', () => {
+    if (!el.contenido.hidden) {
+      pintar();
+      pintarPrevia();
+    }
+  });
+
+  window.addEventListener('beforeunload', (evento) => {
+    if (hayCambiosSinGuardar()) evento.preventDefault();
+  });
+
+  void arrancar();
+</script>

@@ -48,6 +48,8 @@
 | /docs/agents/coordinador_motor_texto_enriquecido/plan.md | Doc | Plan de ejecución del motor de texto enriquecido (T-MTE-C1): contraste del diseño con el código, ajustes D1 a D12, cortes y orden | coordinador_motor_texto_enriquecido | 2026-09-29 |
 | /docs/agents/dev_backend_motor_texto_enriquecido/profile.md | Doc | Perfil del desarrollador backend del motor de texto enriquecido | architec; dev_backend_motor_texto_enriquecido | 2026-09-29 |
 | /docs/agents/dev_frontend_motor_texto_enriquecido/profile.md | Doc | Perfil del desarrollador frontend del motor de texto enriquecido (bajo las reglas de designer) | architec; dev_frontend_motor_texto_enriquecido | 2026-09-29 |
+| /docs/agents/dev_frontend_motor_texto_enriquecido/plan-f3-f4.md | Doc | Plan de F3 (constructor de columnas) y F4 (speech v2 en MOWA MES): pantallas, estados, escenarios de Playwright, pruebas y preguntas de contrato | dev_frontend_motor_texto_enriquecido | 2026-10-01 |
+| /docs/agents/dev_frontend_motor_texto_enriquecido/dudas-designer.md | Doc | Dudas de F3 y F4 para `designer` (frontera de variantes, montaje de componentes, navegación, claves i18n) | dev_frontend_motor_texto_enriquecido | 2026-10-01 |
 | /docs/requerimientos-mowa-mes.md | Doc | Requerimientos del conector SMS MOWA MES (RF-MM-01 a RF-MM-22), decisiones y evidencia de los ejemplos | architec (requisitos) | 2026-09-13 |
 
 ## Pendientes de incorporar formalmente a la skill
