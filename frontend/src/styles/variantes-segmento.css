@@ -1,0 +1,105 @@
+/*
+ * Per-segment variants (docs/motor-texto-enriquecido-interfaz.md §5.4): the
+ * segments as buttons on the left and the chosen one's editor on the right;
+ * below 48rem the list moves on top as a select.
+ */
+
+.variantes {
+  display: grid;
+  grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.variantes__selectCampo {
+  display: none;
+}
+
+.variantes__botones {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: var(--color-border-hairline) solid var(--color-border);
+}
+
+.variantes__boton {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+  inline-size: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-block-end: var(--color-border-hairline) solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.variantes__botones li:last-child .variantes__boton {
+  border-block-end: 0;
+}
+.variantes__boton:hover {
+  background-color: var(--color-surface-sunken);
+}
+/* The chosen segment keeps its tags' own colours: an inverted row would turn
+   a washed tag (con problema) into light text on a light fill. */
+.variantes__boton[aria-pressed='true'] {
+  background-color: var(--color-accent-wash);
+  box-shadow: inset 0 0 0 var(--color-border-hairline) var(--color-text);
+}
+.variantes__nombre {
+  font-weight: 600;
+}
+.variantes__marcas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.variantes__contenido {
+  display: grid;
+  gap: var(--space-4);
+  min-inline-size: 0;
+}
+
+.variantes__cabeza {
+  display: grid;
+  gap: var(--space-3);
+}
+.variantes__estado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.variantes__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+.variantes__copiarFila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.variantes__copiarFila .input {
+  flex: 1 1 12rem;
+  inline-size: auto;
+}
+
+@media (max-width: 48rem) {
+  .variantes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .variantes__selectCampo {
+    display: grid;
+  }
+  .variantes__botones {
+    display: none;
+  }
+}

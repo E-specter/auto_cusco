@@ -16,7 +16,8 @@
     "contrato": "node herramientas/contrato/generar.mjs",
     "contrato:comprobar": "node herramientas/contrato/generar.mjs --comprobar",
     "tipos": "astro sync && tsc --noEmit -p tsconfig.json",
-    "verificar": "npm run contrato:comprobar && astro check && npm run tipos && npm run build && npm run test && npm run test:e2e"
+    "verificar": "npm run contrato:comprobar && astro check && npm run tipos && npm run build:produccion && npm run test && npm run test:e2e",
+    "build:produccion": "astro build && node herramientas/comprobar-build-produccion.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

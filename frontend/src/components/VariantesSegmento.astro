@@ -1,0 +1,56 @@
+---
+/**
+ * Per-segment variants of a text column (docs/motor-texto-enriquecido-interfaz.md
+ * §5.4 and §9.1): the segments on one side, one `EditorTexto` on the other
+ * that shows the chosen segment's content. Behaviour lives in
+ * `scripts/variantes-segmento.ts`; the page subscribes to
+ * `variantescambiadas` on the root and then calls `montarVariantes`.
+ *
+ * `etiqueta` is the column's name («Speech»); the editor is labelled with it
+ * and the segment («Speech de 9 a 30»).
+ */
+import EditorTexto from './EditorTexto.astro';
+import Icon from './Icon.astro';
+import '../styles/variantes-segmento.css';
+
+interface Props {
+  id: string;
+  etiqueta: string;
+  claveEtiqueta?: string;
+}
+
+const { id, etiqueta, claveEtiqueta } = Astro.props;
+---
+
+<div class="variantes" id={id} data-variantes data-etiqueta={etiqueta} data-clave-etiqueta={claveEtiqueta}>
+  <div class="variantes__lista">
+    <div class="field variantes__selectCampo">
+      <label class="field__label" for={`${id}-segmento`} data-i18n="variantes.segmento">Segmento</label>
+      <select class="input" id={`${id}-segmento`} data-segmento-select></select>
+    </div>
+    <ul class="variantes__botones" aria-label="Segmentos" data-i18n-attr="aria-label:variantes.segmentos" data-segmento-botones></ul>
+  </div>
+
+  <div class="variantes__contenido">
+    <div class="variantes__cabeza">
+      <p class="variantes__estado" data-estado></p>
+      <div class="variantes__acciones">
+        <div class="field variantes__copiar">
+          <label class="field__label" for={`${id}-copiar`} data-i18n="variantes.copiar.desde">Copiar de otro segmento</label>
+          <div class="variantes__copiarFila">
+            <select class="input" id={`${id}-copiar`} data-copiar-select></select>
+            <button type="button" class="btn btn--sm" data-copiar>
+              <Icon name="copy" size={16} />
+              <span data-i18n="variantes.copiar.boton">Copiar</span>
+            </button>
+          </div>
+        </div>
+        <button type="button" class="btn btn--sm btn--quiet" data-usar-defecto hidden data-i18n="variantes.usarDefecto">
+          Usar el contenido por defecto
+        </button>
+      </div>
+    </div>
+    <p class="visually-hidden" aria-live="polite" data-anuncio></p>
+    <EditorTexto id={`${id}-editor`} etiqueta={etiqueta} />
+  </div>
+</div>

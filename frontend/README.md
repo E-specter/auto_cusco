@@ -42,15 +42,19 @@ src/
 ├── pages/        index.astro (bienvenida) · cargas.astro (consola) · cartera.astro (selección)
 ├── layouts/      Shell.astro — cabecera adhesiva, pulso de la API, idioma y tema
 ├── components/   Icon.astro · Navegacion.astro · SelectorSeleccion.astro (fecha + selección, reutilizable)
-├── scripts/      selector-seleccion.ts — comportamiento del selector; la página lo monta
-├── styles/       tokens.css · base.css · ui.css · console.css · selector.css · cartera.css
+│                 EditorTexto.astro · VariantesSegmento.astro (motor de texto, reutilizables)
+├── scripts/      selector-seleccion.ts · editor-texto.ts · variantes-segmento.ts — comportamiento; la página monta
+│                 selector-variable.ts · selector-patron-fecha.ts — selectores que el editor y el constructor arman en ejecución
+├── styles/       tokens.css · base.css · ui.css · console.css · selector.css · cartera.css · editor-texto.css · variantes-segmento.css
 ├── lib/          api.ts (cliente) · seleccion.ts · descargas.ts · i18n.ts · format.ts
-│                 campos.ts (etiquetas de campos) · expresion.ts · variantes.ts · api-texto-enriquecido.ts (motor de texto)
+│                 campos.ts (etiquetas de campos) · expresion.ts · editor-texto.ts · variantes.ts · api-texto-enriquecido.ts (motor de texto)
+├── pruebas/      páginas solo para Playwright (/pruebas/editor-texto); no existen en el build que se despliega
 └── i18n/         es.json · en.json
 ```
 
 - **Agregar un módulo o una ruta al menú** es editar `NAVEGACION` en `src/lib/navegacion.ts`: su sección, su prefijo y sus enlaces, con clave i18n y texto de respaldo en español. Las claves van en los dos diccionarios; `tests/nucleo/navegacion.test.ts` falla si falta una traducción o si una ruta apunta a una página que no existe.
 - **Reusar el selector de selección.** Renderiza `<SelectorSeleccion modo="compacto" />` (o `completo`), escucha `seleccioncambiada` en su raíz y **después** llama a `montarSelector(raiz)`. El evento trae fecha de corte, la consulta en la sintaxis de la API, si es aplicable y la selección guardada cargada.
+- **Reusar el editor de texto.** Mismo patrón: `<EditorTexto id="…" etiqueta="…" />`, escucha `expresioncambiada` y después `montarEditor(raiz, { contexto, expresion })`; para una columna que varía por segmento, `<VariantesSegmento />` con `variantescambiadas` y `montarVariantes`. El contrato completo está en `docs/motor-texto-enriquecido-interfaz.md`, sección 9.2. Guardar solo con `comprobarAntesDeGuardar()`.
 
 - **`tokens.css` es la única fuente de verdad visual.** Deriva de `docs/design_ui/brand_guide.json`. Ninguna regla de componente escribe un hex ni un px a mano: todo sale de un token.
 - **`console.css` es global, no con ámbito de Astro**, a propósito: la consola construye la regla de fechas, las filas de versión, las cifras y la tabla de incidencias desde el script en tiempo de ejecución, y los estilos con ámbito no alcanzan al DOM que crea el script. Si agregas estilos para algo que dibuja el script, van ahí.

@@ -49,17 +49,27 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
   webServer: {
-    command: propio ? `npm run preview -- --port ${puerto}` : 'npm run preview',
+    // The tests run against their own build: the site plus the test-only
+    // routes (src/pruebas/, injected by astro.config.mjs), written to
+    // dist-pruebas/ so the deployable dist/ never carries them. Building here
+    // also means a run can never be served a stale build.
+    command: `npm run build && ${propio ? `npm run preview -- --port ${puerto}` : 'npm run preview'}`,
     url: origen,
-    timeout: 120 * 1000,
-    // A run with its own port never adopts a server it did not start.
-    reuseExistingServer: !process.env.CI && !propio,
-    // Since Astro 7.2, `astro preview` detaches into the background when it
-    // detects an AI coding agent. Playwright then sees its process exit at once,
-    // reports the server as dead, and leaves an orphan on the port. Playwright
-    // has to own the server's lifecycle, so the preview stays in the foreground
-    // for whoever runs the tests (docs: Building Astro sites with AI tools >
-    // Background mode).
-    env: { ASTRO_PREVIEW_BACKGROUND: '0' },
+    timeout: 180 * 1000,
+    // Never adopt a server this run did not start: a preview someone left
+    // running serves dist/, without the test routes, and every test of a
+    // shared component would fail for a reason that has nothing to do with it.
+    // A busy port fails loudly instead.
+    reuseExistingServer: false,
+    env: {
+      AUTO_CUSCO_RUTAS_PRUEBA: '1',
+      // Since Astro 7.2, `astro preview` detaches into the background when it
+      // detects an AI coding agent. Playwright then sees its process exit at
+      // once, reports the server as dead, and leaves an orphan on the port.
+      // Playwright has to own the server's lifecycle, so the preview stays in
+      // the foreground (docs: Building Astro sites with AI tools > Background
+      // mode).
+      ASTRO_PREVIEW_BACKGROUND: '0',
+    },
   },
 });

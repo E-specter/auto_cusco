@@ -170,7 +170,7 @@ Una `.table` con `.table--apilable-ancha`, porque las filas llevan editores, y u
 Una sola fila expandida a la vez, debajo de la fila, con el patrón de divulgación: el botón Editar con `aria-expanded`.
 
 - **Contenido,** dos opciones de radio:
-  - **Variable directa:** un `select` de variables con su tipo. Hint: «Conserva el valor original, sin pasarlo por texto» (RF-49). Si se le agregan funciones y la columna sigue siendo una sola variable, conserva el tipo del resultado final: una fecha con días sumados sigue siendo fecha en el XLSX (precisión D11 del diseño). El resumen de la fila lo dice así: «Variable: Vencimiento · sumar 3 días (fecha)».
+  - **Variable directa:** un `select` de variables con su tipo. Hint: «Conserva el valor original, sin pasarlo por texto» (RF-49). Si se le agregan funciones y la columna sigue siendo una sola variable, conserva el tipo del resultado final: una fecha con días sumados sigue siendo fecha en el XLSX (precisión D11 del diseño). El resumen de la fila lo dice así: «Variable: Vencimiento · sumar 3 días (fecha)». Es el mismo `EditorTexto` montado con `soloVariable: true` (9.2): el `select` reemplaza la línea de piezas y el panel de funciones de la sección 2.3 queda siempre abierto, sin «Quitar variable». No hay una cadena de funciones aparte.
   - **Texto compuesto:** el editor de la sección 2.
 - **Formato,** según el tipo:
   - fecha: el mismo selector de patrón de la sección 2.3;
@@ -242,11 +242,12 @@ La versión, el nombre de la versión y el guardado conservan su forma actual. L
 
 | Pieza | Dónde | Quién |
 |---|---|---|
-| Estado puro del editor (árbol, inserción, cursor, problemas) | `src/lib/expresion.ts` | `designer` |
+| Estado puro del editor (árbol, inserción, cursor, problemas) y sus ayudas (búsqueda, largo, argumentos) | `src/lib/expresion.ts`, `src/lib/editor-texto.ts` | `designer` |
 | Estado puro de las variantes por segmento | `src/lib/variantes.ts` | `designer` |
 | Componente del editor y su comportamiento | `src/components/EditorTexto.astro`, `src/scripts/editor-texto.ts`, `src/styles/editor-texto.css` | `designer` |
 | Selector de variantes por segmento | `src/components/VariantesSegmento.astro`, `src/scripts/variantes-segmento.ts` | `designer` |
 | Selector de variable y selector de patrón de fecha | `src/scripts/selector-variable.ts`, `src/scripts/selector-patron-fecha.ts` | `designer` |
+| Página de prueba de los componentes compartidos, solo en el build de Playwright | `src/pruebas/editor-texto.astro`, `e2e/editor-texto.spec.ts` | `designer` |
 | Cliente de catálogo, validación y previsualización | `src/lib/api-texto-enriquecido.ts` | `designer` |
 | API falsa de catálogo, validación y previsualización | `e2e/api-falsa-texto-enriquecido.ts` | `designer` |
 | Fila expandida de tabla y marca de vacío | `src/styles/ui.css` (`.table__detalle`, `.marca-vacio`) | `designer` |
@@ -284,13 +285,21 @@ const editor = await montarEditor(raiz, {
   expresion,                         // inicial; null es una expresión vacía
   controlMuestra: true,              // false: la página fija la muestra (constructor)
   resumen: 'propio',                 // 'ninguno': la pantalla muestra el resumen (9.4)
+  soloLectura: false,                // true: una versión antigua abierta para mirar (5.1)
+  soloVariable: false,               // true: columna de variable directa (5.3)
 });
 
 editor.fijarExpresion(otra);         // reemplaza, cierra paneles y vuelve a validar
-editor.fijarMuestra({ tipo: 'ejemplo', segmento: '9 a 30' });
+editor.fijarMuestra({ tipo: 'producto_real', fecha_corte, pagare, cantidad: 1 }); // MuestraEntrada del contrato
 editor.irAProblema(indice);          // abre la pieza y enfoca el campo
 editor.expresion();                  // el árbol actual, para guardar
+editor.estado();                     // lo mismo que lleva el último evento
+editor.comprobarAntesDeGuardar();    // false si no se puede guardar; con resumen propio, lo vuelve alerta y lleva el foco al primero
+editor.fijarSoloLectura(false);      // «Usar como base» habilita la edición
+editor.destruir();                   // antes de sacarlo de la página
 ```
+
+- **Desmontar:** `destruir()` quita los listeners que el componente puso en `document`, cancela la validación y la previsualización pendientes o en curso y deja de emitir. El marcado queda; lo saca la página. Una pantalla que monta y desmonta, como las filas del constructor, llama `destruir()` antes de quitar el nodo.
 
 - **El componente llama al backend.** Pide validación y previsualización con espera de 500 ms y cancela el pedido anterior. La página no los llama para el editor.
 - **El catálogo** se pide una vez por contexto y por página: varias instancias comparten la misma respuesta.
@@ -311,7 +320,15 @@ editor.expresion();                  // el árbol actual, para guardar
 
   Guardar solo se permite con `valida && !pendiente`.
 
-`VariantesSegmento` sigue el mismo patrón: `montarVariantes(raiz, { contexto, segmentos, variantes, conPorDefecto })`, con `fijarVariantes`, `fijarNiveles` e `irAProblema(segmento, indice)`. Emite `variantescambiadas` con `{ variantes, seleccionado, origen, pendiente, valida, problemas }`, donde `problemas` lleva el segmento de cada uno.
+`VariantesSegmento` sigue el mismo patrón: `montarVariantes(raiz, { contexto, segmentos, porDefecto, variantes, conPorDefecto, resumen, soloLectura, soloVariable })`, con `fijarVariantes({ porDefecto, variantes })`, `fijarNiveles`, `seleccionar(segmento)`, `irAProblema(segmento, indice)`, `fijarSoloLectura`, `fijarSegmentos(segmentos)`, `estado()` y `destruir()`, que destruye también su editor. `fijarSegmentos` es para cuando cambian el criterio o la tabla de rangos: conserva el segmento elegido si sigue existiendo y, si no, elige el primero; las variantes de segmentos que ya no están se conservan y las decide la pantalla (`variantesHuerfanas`); su `editor` es el controlador del `EditorTexto` de adentro, para `comprobarAntesDeGuardar` y `fijarMuestra`. `porDefecto` es la expresión propia de la columna, y `null` como segmento es «Por defecto». Emite `variantescambiadas` con `{ porDefecto, variantes, seleccionado, origen, pendiente, valida, problemas }`, donde `problemas` lleva el segmento de cada uno; el `expresioncambiada` del editor de adentro no sale de él. Al montar valida el contenido de cada segmento que no está en pantalla, para que todos muestren su estado.
+
+Las dos piezas se prueban solas en `/pruebas/editor-texto`, una página que existe solo en el build de Playwright (`docs/testing.md`, sección 4).
+
+**Uso en el constructor** (confirmaciones a `dev_frontend_motor_texto_enriquecido`, 2026-10-14):
+
+- **Filas armadas en ejecución:** `<VariantesSegmento id="columna-editor">` dentro de un `<template>` de la página, clonado a la `.table__detalle` al expandir la fila, es el patrón esperado; no hace falta un `crearEditorTexto()`. Tres condiciones: una sola instancia a la vez (los `id` internos se fijan al compilar con el `id` de la raíz); `applyTranslations(fila)` sobre el clon antes de montar, porque el contenido de un `<template>` no recibe la pasada de idioma y sus textos estáticos están en español; y `destruir()` antes de cerrar la fila o reemplazarla.
+- **Criterio «Valor de un campo»:** la lista de valores la mantiene la pantalla y la pasa con `fijarSegmentos`. `VariantesSegmento` no tiene «Agregar valor».
+- **«Ir al problema» en una fila no montada:** expandir, montar y llamar `irAProblema(segmento, indice)`. Si el editor todavía no validó ese segmento, espera a su primera validación terminada y entonces enfoca. `indice` cuenta los problemas de ese segmento en el orden en que llegan en `variantescambiadas`.
 
 ### 9.3 Clientes y APIs falsas (D-2)
 

@@ -114,10 +114,12 @@ El esqueleto real de este enfoque ya existe en `backend/app/` (`core/{entities,p
 | `src/lib/seleccion.ts` | Sintaxis de la selección (`campo:operador:valor`, `-campo`, `nombre:funcion:campo`) sobre borradores estructurados: lo incompleto no llega a la API |
 | `src/lib/descargas.ts` | Descarga binaria compartida: cuerpo, nombre desde `Content-Disposition` y resumen desde cabeceras `X-*` |
 | `src/lib/campos.ts` | Etiquetas visibles de los campos de la cartera (`campo.<nombre>`), compartidas por `/cartera`, el editor de texto y el constructor de columnas. Una prueba las compara con el catálogo de campos del backend |
-| `src/lib/expresion.ts`, `src/lib/variantes.ts`, `src/lib/api-texto-enriquecido.ts` | Frontend del motor de texto enriquecido: estado puro del editor de piezas, variantes por segmento y cliente de catálogo, validación y previsualización (catálogo en caché por contexto). Reglas en `docs/motor-texto-enriquecido-interfaz.md` |
+| `src/lib/expresion.ts`, `src/lib/editor-texto.ts`, `src/lib/variantes.ts`, `src/lib/api-texto-enriquecido.ts` | Frontend del motor de texto enriquecido: estado puro del editor de piezas, sus ayudas (búsqueda, nivel de largo, argumentos, problemas anclados a su pieza), variantes por segmento y cliente de catálogo, validación y previsualización (catálogo en caché por contexto). Reglas en `docs/motor-texto-enriquecido-interfaz.md` |
+| `src/components/EditorTexto.astro` + `src/scripts/editor-texto.ts`, `src/components/VariantesSegmento.astro` + `src/scripts/variantes-segmento.ts` | El editor de texto compuesto (piezas en línea, panel de funciones, vista previa, errores en su lugar) y el selector de variantes por segmento con un solo editor adentro. **Reutilizables**: la página escucha `expresioncambiada` o `variantescambiadas` y después monta. Usan `src/scripts/selector-variable.ts` y `selector-patron-fecha.ts`, que el constructor de columnas también reutiliza |
+| `src/pruebas/` | Páginas solo para Playwright, para probar un componente compartido antes de que lo use una pantalla. Existen solo con `AUTO_CUSCO_RUTAS_PRUEBA=1` (build en `dist-pruebas/`); `npm run build:produccion` falla si alguna llega a `dist/` |
 | `src/lib/i18n.ts` | i18n vanilla es/en por atributos `data-i18n`; ambos diccionarios viajan en el bundle |
 | `src/lib/format.ts` | Fechas, números, tamaños y montos; incluye la sugerencia de fecha de corte desde el nombre del archivo (`DD.MM.YYYY`) |
-| `src/styles/` | `tokens.css` (única fuente de verdad visual), `base.css`, `ui.css` (vocabulario compartido), `console.css`, `selector.css` y `cartera.css` |
+| `src/styles/` | `tokens.css` (única fuente de verdad visual), `base.css`, `ui.css` (vocabulario compartido), `console.css`, `selector.css`, `cartera.css`, `editor-texto.css` y `variantes-segmento.css` |
 | `src/components/Icon.astro` | Inserta iconos lucide en línea en tiempo de compilación, sin fuente de iconos ni peticiones extra |
 
 ### Decisiones de esta fase

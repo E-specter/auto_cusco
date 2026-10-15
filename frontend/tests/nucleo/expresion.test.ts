@@ -10,6 +10,7 @@ import {
   aExpresion,
   agregarFuncion,
   cambiarArgumento,
+  fijarArgumentos,
   desdeExpresion,
   editarTramo,
   funcionesCompatibles,
@@ -190,6 +191,13 @@ describe('cadena de funciones', () => {
 
     expect((piezas[1] as PiezaVariable).funciones[0].args).toEqual([12]);
     expect((piezas[3] as PiezaVariable).funciones[0].args).toEqual([{ variable: 'fecha_envio' }]);
+  });
+
+  it('reemplaza la lista de argumentos de una sola función', () => {
+    const piezas = fijarArgumentos(desdeExpresion(SPEECH), 3, 0, ['dd-mm-aa']);
+
+    expect((piezas[3] as PiezaVariable).funciones[0].args).toEqual(['dd-mm-aa']);
+    expect(fijarArgumentos(piezas, 0, 0, [1])).toBe(piezas);
   });
 
   it('editar un tramo no altera las variables', () => {

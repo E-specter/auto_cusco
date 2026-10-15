@@ -1,0 +1,139 @@
+---
+/**
+ * Test-only page: mounts EditorTexto or VariantesSegmento on its own so the
+ * e2e suite can exercise them before any screen uses them. It is injected by
+ * astro.config.mjs only when AUTO_CUSCO_RUTAS_PRUEBA=1 (Playwright's build,
+ * written to dist-pruebas/); the deployable build never has it, and
+ * `herramientas/comprobar-build-produccion.mjs` fails if it ever does.
+ *
+ * The components know nothing about this page. The query string sets up a
+ * case, always with synthetic data:
+ *   ?componente=editor|variantes  which one to mount (editor by default)
+ *   &contexto=mowa_mes.speech      catalogue context
+ *   &expresion=<json>              initial expression (or porDefecto)
+ *   &variantes=<json>              initial variants
+ *   &defecto=1                     variants: show «Por defecto»
+ *   &muestra=0                     editor: the page sets the sample
+ *   &resumen=ninguno               no summary of its own
+ *   &soloLectura=1                 read-only
+ *   &soloVariable=1                a direct-variable column (§5.3)
+ *
+ * The mounted controller is left on `window.controladorPrueba`, so a test can
+ * call what a screen would (destruir, fijarSegmentos, fijarSoloLectura).
+ */
+import Shell from '../layouts/Shell.astro';
+import EditorTexto from '../components/EditorTexto.astro';
+import VariantesSegmento from '../components/VariantesSegmento.astro';
+---
+
+<Shell title="Prueba del editor de texto — auto_cusco" noindex>
+  <div class="prueba" data-ruta-prueba>
+    <h1>Prueba del editor de texto</h1>
+
+    <section class="prueba__caso" data-caso="editor" hidden>
+      <EditorTexto id="editor-prueba" etiqueta="Texto del mensaje" />
+    </section>
+
+    <section class="prueba__caso" data-caso="variantes" hidden>
+      <VariantesSegmento id="variantes-prueba" etiqueta="Speech" />
+    </section>
+
+    <div class="prueba__acciones">
+      <button type="button" class="btn btn--primary" data-guardar>Guardar</button>
+      <output class="mono" data-guardado></output>
+    </div>
+
+    <details class="prueba__evento">
+      <summary>Último evento</summary>
+      <pre class="mono" data-ultimo-evento></pre>
+    </details>
+  </div>
+</Shell>
+
+<style>
+  .prueba {
+    display: grid;
+    gap: var(--space-5);
+    padding: var(--space-5) var(--shell-gutter);
+  }
+  .prueba h1 {
+    margin: 0;
+    font-size: var(--text-xl);
+  }
+  .prueba__acciones {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .prueba__evento pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: var(--text-xs);
+  }
+</style>
+
+<script>
+  import { obtenerCatalogo } from '../lib/api-texto-enriquecido';
+  import { EVENTO_EXPRESION, montarEditor } from '../scripts/editor-texto';
+  import { EVENTO_VARIANTES, montarVariantes } from '../scripts/variantes-segmento';
+
+  const parametros = new URLSearchParams(location.search);
+  const expuesta = window as unknown as { controladorPrueba?: unknown };
+  const componente = parametros.get('componente') ?? 'editor';
+  const contexto = parametros.get('contexto') ?? 'mowa_mes.speech';
+  const leer = (nombre: string) => {
+    const valor = parametros.get(nombre);
+    return valor ? JSON.parse(valor) : null;
+  };
+
+  const ultimo = document.querySelector<HTMLElement>('[data-ultimo-evento]')!;
+  const guardado = document.querySelector<HTMLOutputElement>('[data-guardado]')!;
+  const anotar = (evento: Event) => {
+    const detalle = (evento as CustomEvent).detail;
+    ultimo.textContent = JSON.stringify(detalle);
+    document.body.dataset.eventos = String(Number(document.body.dataset.eventos ?? 0) + 1);
+  };
+
+  const caso = document.querySelector<HTMLElement>(`[data-caso="${componente}"]`)!;
+  caso.hidden = false;
+
+  async function arrancar(): Promise<void> {
+    if (componente === 'variantes') {
+      const raiz = document.getElementById('variantes-prueba')!;
+      raiz.addEventListener(EVENTO_VARIANTES, anotar);
+      const catalogo = await obtenerCatalogo(contexto);
+      const variantes = await montarVariantes(raiz, {
+        contexto,
+        segmentos: catalogo.contexto.segmentos,
+        porDefecto: leer('expresion'),
+        variantes: leer('variantes') ?? [],
+        conPorDefecto: parametros.get('defecto') === '1',
+        resumen: parametros.get('resumen') === 'ninguno' ? 'ninguno' : 'propio',
+        soloLectura: parametros.get('soloLectura') === '1',
+        soloVariable: parametros.get('soloVariable') === '1',
+      });
+      expuesta.controladorPrueba = variantes;
+      document.querySelector('[data-guardar]')!.addEventListener('click', () => {
+        guardado.value = variantes.editor.comprobarAntesDeGuardar() && variantes.estado().valida ? 'guardado' : 'no guardado';
+      });
+    } else {
+      const raiz = document.getElementById('editor-prueba')!;
+      raiz.addEventListener(EVENTO_EXPRESION, anotar);
+      const editor = await montarEditor(raiz, {
+        contexto,
+        expresion: leer('expresion'),
+        controlMuestra: parametros.get('muestra') !== '0',
+        resumen: parametros.get('resumen') === 'ninguno' ? 'ninguno' : 'propio',
+        soloLectura: parametros.get('soloLectura') === '1',
+        soloVariable: parametros.get('soloVariable') === '1',
+      });
+      expuesta.controladorPrueba = editor;
+      document.querySelector('[data-guardar]')!.addEventListener('click', () => {
+        guardado.value = editor.comprobarAntesDeGuardar() ? 'guardado' : 'no guardado';
+      });
+    }
+    document.body.dataset.montado = 'true';
+  }
+
+  void arrancar();
+</script>

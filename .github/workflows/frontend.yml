@@ -35,7 +35,9 @@ jobs:
       # tsc sobre todo el proyecto: atrapa errores de asignacion en tipos
       # anidados que astro check no informa (ver tests/tipos/).
       - run: npm run tipos
-      - run: npm run build
+      # El build que se despliega, comprobado: dist/ no lleva las rutas de
+      # prueba (src/pruebas/), que solo existen en el build de Playwright.
+      - run: npm run build:produccion
       # Incluye el contrato con los codigos de incidencia del backend, que lee
       # el codigo Python del propio repositorio.
       - run: npm run test
@@ -54,8 +56,8 @@ jobs:
       # El runner no trae navegador; Playwright instala Chromium y sus
       # dependencias del sistema.
       - run: npx playwright install --with-deps chromium
-      - run: npm run build
-      # Playwright levanta `npm run preview` por su cuenta (webServer) y cada
+      # Playwright arma su propio build con las rutas de prueba (en
+      # dist-pruebas/) y levanta `npm run preview` sobre el (webServer). Cada
       # prueba intercepta la API, asi que no hacen falta backend ni PostgreSQL.
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4

@@ -1,0 +1,133 @@
+---
+/**
+ * Markup for the rich-text editor (docs/motor-texto-enriquecido-interfaz.md
+ * §2 to §4, mount contract §9.2). Behaviour lives in `scripts/editor-texto.ts`:
+ * the page renders this, subscribes to `expresioncambiada` on the root and
+ * then calls `montarEditor`.
+ *
+ * Every id inside carries the root's `id`, so a page may hold several. With
+ * `soloVariable` the line of pieces gives way to a select of variables
+ * (a direct-variable column, §5.3); the panel of functions is the same.
+ * `etiqueta` is the field's visible name («Texto del mensaje», «Speech»);
+ * `claveEtiqueta` makes it follow the language switch.
+ */
+import Icon from './Icon.astro';
+import '../styles/editor-texto.css';
+
+interface Props {
+  id: string;
+  etiqueta: string;
+  claveEtiqueta?: string;
+}
+
+const { id, etiqueta, claveEtiqueta } = Astro.props;
+---
+
+<div class="editor-texto" id={id} data-editor-texto>
+  <template data-icono="triangle-alert"><Icon name="triangle-alert" size={16} /></template>
+  <template data-icono="arrow-up"><Icon name="arrow-up" size={16} /></template>
+  <template data-icono="arrow-down"><Icon name="arrow-down" size={16} /></template>
+  <template data-icono="x"><Icon name="x" size={16} /></template>
+
+  <p class="field__label editor-texto__etiqueta" id={`${id}-etiqueta`} data-i18n={claveEtiqueta}>{etiqueta}</p>
+
+  <div class="notice notice--danger editor-texto__resumen" id={`${id}-resumen`} data-resumen tabindex="-1" hidden>
+    <Icon name="triangle-alert" size={20} />
+    <div>
+      <p class="editor-texto__resumenTitulo" data-resumen-titulo></p>
+      <ul class="editor-texto__resumenLista" data-resumen-lista></ul>
+    </div>
+  </div>
+
+  <div class="field editor-texto__directa" data-directa hidden>
+    <select
+      class="input"
+      id={`${id}-directa`}
+      aria-labelledby={`${id}-etiqueta`}
+      aria-describedby={`${id}-directa-hint`}
+      data-directa-select
+    ></select>
+    <p class="field__hint" id={`${id}-directa-hint`} data-i18n="editorTexto.directa.hint">
+      Conserva el valor original, sin pasarlo por texto.
+    </p>
+  </div>
+
+  <div
+    class="input editor-texto__linea"
+    id={`${id}-linea`}
+    role="group"
+    aria-labelledby={`${id}-etiqueta`}
+    data-linea
+  >
+    <span class="skeleton editor-texto__esqueleto" aria-hidden="true"></span>
+  </div>
+  <p class="field__error editor-texto__errorTramo" id={`${id}-error-tramo`} data-error-tramo></p>
+
+  <div class="editor-texto__barra" data-barra>
+    <button
+      type="button"
+      class="btn btn--sm"
+      id={`${id}-agregar`}
+      aria-expanded="false"
+      aria-controls={`${id}-variables`}
+      data-agregar-variable
+      disabled
+    >
+      <Icon name="plus" size={16} />
+      <span data-i18n="editorTexto.variable.agregar">Variable</span>
+    </button>
+  </div>
+
+  <div id={`${id}-variables`} data-selector-hueco></div>
+  <div id={`${id}-panel`} data-panel-hueco></div>
+
+  <section class="editor-texto__vista" aria-labelledby={`${id}-vista-titulo`}>
+    <div class="editor-texto__vistaCabeza">
+      <h3 class="editor-texto__vistaTitulo" id={`${id}-vista-titulo`} data-i18n="editorTexto.vista.titulo">
+        Vista previa
+      </h3>
+      <div class="editor-texto__muestra" data-control-muestra hidden>
+        <div class="segmented" role="group" aria-labelledby={`${id}-vista-titulo`}>
+          <button type="button" class="segmented__item" aria-pressed="true" data-muestra="ejemplo" data-i18n="editorTexto.muestra.ejemplo">
+            Registro de ejemplo
+          </button>
+          <button type="button" class="segmented__item" aria-pressed="false" data-muestra="producto_real" data-i18n="editorTexto.muestra.real">
+            Producto real
+          </button>
+        </div>
+        <div class="editor-texto__producto" data-producto hidden>
+          <div class="field">
+            <label class="field__label" for={`${id}-fecha`} data-i18n="editorTexto.muestra.fecha">Fecha de corte</label>
+            <input class="input" type="date" id={`${id}-fecha`} data-muestra-fecha />
+          </div>
+          <div class="field">
+            <label class="field__label" for={`${id}-pagare`} data-i18n="editorTexto.muestra.pagare">Pagaré</label>
+            <input
+              class="input mono"
+              type="text"
+              id={`${id}-pagare`}
+              autocomplete="off"
+              aria-describedby={`${id}-pagare-error`}
+              data-muestra-pagare
+            />
+            <p class="field__error" id={`${id}-pagare-error`} data-muestra-error></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="mono editor-texto__resultado" data-resultado></p>
+
+    <p class="editor-texto__largo">
+      <span class="mono" data-largo-texto></span>
+      <span class="tag" data-largo-nivel hidden></span>
+    </p>
+    <p class="visually-hidden" aria-live="polite" data-largo-anuncio></p>
+
+    <div class="notice notice--warning" data-sin-conexion hidden>
+      <Icon name="triangle-alert" size={20} />
+      <p data-i18n="editorTexto.sinConexion">No se pudo comprobar el texto. Se vuelve a intentar al editarlo.</p>
+    </div>
+    <ul class="editor-texto__datos" data-problemas-fila hidden></ul>
+  </section>
+</div>

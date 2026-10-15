@@ -83,9 +83,11 @@ Equivale a, en orden:
 | Contrato | `npm run contrato:comprobar` | Siempre. Falla si los tipos del frontend no coinciden con `contratos/openapi.json`. En una copia nueva (clon o worktree) necesita antes `npm ci` en `frontend/herramientas/contrato` ([setup.md](setup.md), sección 2.1) |
 | Tipos | `npx astro check` | Siempre |
 | Tipos de todo el proyecto | `npm run tipos` (`tsc --noEmit -p tsconfig.json`) | Siempre. `astro check` no informa un error de asignación cuando el tipo que falla está anidado, por ejemplo una `interface` dentro de un modelo de entrada del contrato con firma de índice; `tsc` sí. Las asignaciones entre el editor y el contrato están explícitas en `tests/tipos/`, para que esa regresión tenga dónde fallar |
-| Build | `npm run build` | Siempre |
+| Build de producción | `npm run build:produccion` | Siempre. Construye `dist/` y falla si lleva alguna ruta de prueba (`herramientas/comprobar-build-produccion.mjs`) |
 | Núcleo y DOM | `npm run test` | Siempre |
 | Extremo a extremo | `npm run test:e2e` | Siempre. Playwright construye y levanta `preview` por su cuenta |
+
+**Rutas de prueba.** Un componente compartido que todavía no usa ninguna pantalla se prueba en una página propia de `src/pruebas/` (por ejemplo `/pruebas/editor-texto`), sin entrada en la navegación y con `noindex`. `astro.config.mjs` la inyecta solo con `AUTO_CUSCO_RUTAS_PRUEBA=1`, que fija únicamente `playwright.config.ts`, y ese build va a `dist-pruebas/`; el `dist/` que se despliega nunca la tiene. El componente no sabe que esa página existe.
 
 **Cuando varias sesiones verifican a la vez,** dale a la corrida su propio puerto: en el puerto por defecto una reutiliza el `preview` de otra —con otra compilación— y aparecen fallos que no tienen nada que ver con el cambio.
 

@@ -290,6 +290,19 @@ export function cambiarArgumento(
   }));
 }
 
+/** Replace a function's whole argument list (the component builds it with `conArgumento`). */
+export function fijarArgumentos(
+  piezas: Pieza[],
+  indiceVariable: number,
+  indiceFuncion: number,
+  args: Argumento[],
+): Pieza[] {
+  return conVariable(piezas, indiceVariable, (v) => ({
+    ...v,
+    funciones: v.funciones.map((f, i) => (i === indiceFuncion ? { ...f, args: [...args] } : f)),
+  }));
+}
+
 export function marcarObligatoria(piezas: Pieza[], indiceVariable: number, obligatoria: boolean): Pieza[] {
   return conVariable(piezas, indiceVariable, (v) => ({ ...v, obligatoria }));
 }

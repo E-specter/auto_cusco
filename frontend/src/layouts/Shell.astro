@@ -15,9 +15,11 @@ interface Props {
   /** The welcome screen is the one surface locked to 100dvh with no scroll. */
   lockViewport?: boolean;
   description?: string;
+  /** Keeps a page out of search indexes (the test-only routes). */
+  noindex?: boolean;
 }
 
-const { title, lockViewport = false, description } = Astro.props;
+const { title, lockViewport = false, description, noindex = false } = Astro.props;
 const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/';
 ---
 
@@ -27,6 +29,7 @@ const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/';
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
     {description && <meta name="description" content={description} />}
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
 
