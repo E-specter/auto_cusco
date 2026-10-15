@@ -1014,5 +1014,15 @@
   "columnas.previa.disponibles": "Sample of {n} products out of {total} in the selection.",
   "columnas.previa.sinProductos": "The selection has no products for this cut-off date.",
   "columnas.previa.fechaFalta": "Choose the cut-off date to see real products.",
-  "columnas.previa.problemas": "The definition has problems; the preview shows once they are fixed."
+  "columnas.previa.problemas": "The definition has problems; the preview shows once they are fixed.",
+  "mowaMes.speech.v2.nivelConLargo": "{nivel} · {n} characters",
+  "mowaMes.speech.v2.convertir.boton": "Convert to v2",
+  "mowaMes.speech.v2.convertir.hint": "This version stores each segment as two fixed parts (v1). Convert it to build each message with variables and functions: you get a draft with the same messages that is not saved until you confirm it.",
+  "mowaMes.speech.v2.convertir.bloqueo": "Save or discard the changes to the parts before converting.",
+  "mowaMes.speech.v2.borrador": "Draft from “{base}”, not saved. Review each segment and save it as a new version when you confirm it.",
+  "mowaMes.speech.v2.avisoSegmento": "With a real product as the sample, the segment comes from its days of delay at the cut-off date, not from the days adjusted to the send date.",
+  "mowaMes.speech.v2.error.sinContenido": "These segments have no message: {segmentos}. Write one in each before saving.",
+  "mowaMes.speech.v2.error.pendiente": "The text is still being checked. Wait a moment and save again.",
+  "mowaMes.speech.v2.error.editor": "Some segments have problems. Fix them before saving.",
+  "mowaMes.speech.v2.problema": "{segmento}: {mensaje}"
 }

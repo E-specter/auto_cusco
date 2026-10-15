@@ -21,6 +21,7 @@ import {
 } from './api-falsa-mowa-mes';
 import { apiDefiniciones, definicionFalsa, manejadorDefiniciones } from './api-falsa-definiciones';
 import { apiTextoEnriquecidoVacia, manejarTextoEnriquecido } from './api-falsa-texto-enriquecido';
+import { apiSpeechV2, montarApiSpeechV2, versionV2Sintetica } from './api-falsa-speech-v2';
 
 const REGLAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
@@ -424,6 +425,89 @@ test('columnas de carga a 360 px: la fila abierta y las tablas se alcanzan con t
   await abrirColumnas(page);
   await page.getByRole('button', { name: 'Editar mensaje' }).click();
   await expect(page.locator('#columna-editor')).toBeVisible();
+  await sinViolaciones(page);
+});
+
+// The v2 speech of the MOWA MES configuration: the segment editor, the unsaved draft a v1 becomes,
+// the backend's problems per segment and a segment with no maximum length.
+async function abrirSpeechV2(
+  page: Page,
+  ajustar?: (api: ReturnType<typeof apiMowaMes>, v2: ReturnType<typeof apiSpeechV2>) => void,
+) {
+  const api = apiMowaMes();
+  const v2 = apiSpeechV2();
+  ajustar?.(api, v2);
+  await montarApiMowaMes(page, api);
+  await montarApiSpeechV2(page, api, v2, apiTextoEnriquecidoVacia());
+  await page.goto('/mowa-mes/configuracion');
+  await expect(page.locator('[data-speech-filas] tr[data-segmento="9_a_30"] [data-largo]')).not.toHaveText('—');
+  return { api, v2 };
+}
+
+for (const tema of ['light', 'dark'] as const) {
+  test.describe(`speech v2 de MOWA MES, tema ${tema === 'light' ? 'claro' : 'oscuro'}`, () => {
+    test.beforeEach(async ({ page }) => {
+      await page.addInitScript((elegido) => {
+        localStorage.setItem('app:appearance', JSON.stringify({ theme: elegido, language: 'es' }));
+      }, tema);
+    });
+
+    test('una versión v2 guardada, con el editor por segmento y sus niveles', async ({ page }) => {
+      await abrirSpeechV2(page, (api) => api.versiones.push(versionV2Sintetica(api.versiones[0])));
+      await page.locator('#mm-version').selectOption({ label: 'Speech v2' });
+      await expect(page.locator('#mm-speech-v2 [data-segmento-botones] button').nth(2)).toContainText('156');
+      await sinViolaciones(page);
+    });
+
+    test('el borrador que sale de convertir una v1, sin guardar', async ({ page }) => {
+      await abrirSpeechV2(page);
+      await page.getByRole('button', { name: 'Convertir a v2' }).click();
+      await expect(page.getByText(/Borrador a partir de/)).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('un segmento sin máximo calculable, con su motivo', async ({ page }) => {
+      await abrirSpeechV2(page, (api) => {
+        const v = versionV2Sintetica(api.versiones[0]);
+        v.expresiones.find((e) => e.segmento === '1_a_8')!.expresion = {
+          nodos: [{ tipo: 'variable', nombre: 'titular', funciones: [], obligatoria: true }],
+        };
+        api.versiones.push(v);
+      });
+      await page.locator('#mm-version').selectOption({ label: 'Speech v2' });
+      await expect(page.locator('#mm-speech-v2 [data-segmento-botones] button').nth(1)).toContainText('máximo');
+      await sinViolaciones(page);
+    });
+
+    test('los problemas del backend por segmento tras un guardado rechazado', async ({ page }) => {
+      const { v2 } = await abrirSpeechV2(page);
+      v2.respuestasCrear = [
+        {
+          estado: 400,
+          cuerpo: {
+            detail: 'No se guarda',
+            problemas: [
+              { segmento: '9_a_30', campo: 'expresion', detalle: 'x', codigo: 'telefono_invalido', catalogo: 'mowa_mes', ubicacion: null },
+            ],
+          },
+        },
+      ];
+      await page.getByRole('button', { name: 'Convertir a v2' }).click();
+      await expect(page.locator('#mm-speech-v2')).toBeVisible();
+      await expect(async () => {
+        await page.locator('[data-speech-guardar]').click();
+        await expect(page.locator('[data-speech-problemas-lista] li').first()).toBeVisible({ timeout: 1500 });
+      }).toPass();
+      await sinViolaciones(page);
+    });
+  });
+}
+
+test('speech v2 a 360 px: el editor por segmento se alcanza con teclado', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await abrirSpeechV2(page);
+  await page.getByRole('button', { name: 'Convertir a v2' }).click();
+  await expect(page.locator('#mm-speech-v2')).toBeVisible();
   await sinViolaciones(page);
 });
 

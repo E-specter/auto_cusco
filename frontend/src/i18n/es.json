@@ -1014,5 +1014,15 @@
   "columnas.previa.disponibles": "Muestra de {n} productos de {total} en la selección.",
   "columnas.previa.sinProductos": "La selección no tiene productos con esta fecha de corte.",
   "columnas.previa.fechaFalta": "Elige la fecha de corte para ver productos reales.",
-  "columnas.previa.problemas": "La definición tiene problemas; la vista previa se muestra cuando se corrigen."
+  "columnas.previa.problemas": "La definición tiene problemas; la vista previa se muestra cuando se corrigen.",
+  "mowaMes.speech.v2.nivelConLargo": "{nivel} · {n} caracteres",
+  "mowaMes.speech.v2.convertir.boton": "Convertir a v2",
+  "mowaMes.speech.v2.convertir.hint": "Esta versión guarda cada segmento en dos partes fijas (v1). Conviértela para armar cada mensaje con variables y funciones: obtienes un borrador con los mismos mensajes que no se guarda hasta que lo confirmes.",
+  "mowaMes.speech.v2.convertir.bloqueo": "Guarda o descarta los cambios de las partes antes de convertir.",
+  "mowaMes.speech.v2.borrador": "Borrador a partir de «{base}», sin guardar. Revisa cada segmento y guárdalo como versión nueva cuando lo confirmes.",
+  "mowaMes.speech.v2.avisoSegmento": "Con un producto real de muestra, el segmento sale de sus días de atraso a la fecha de corte, no de los ajustados a la fecha de envío.",
+  "mowaMes.speech.v2.error.sinContenido": "Estos segmentos no tienen mensaje: {segmentos}. Escribe uno en cada uno antes de guardar.",
+  "mowaMes.speech.v2.error.pendiente": "Todavía se está revisando el texto. Espera un momento y vuelve a guardar.",
+  "mowaMes.speech.v2.error.editor": "Hay segmentos con problemas. Corrígelos antes de guardar.",
+  "mowaMes.speech.v2.problema": "{segmento}: {mensaje}"
 }

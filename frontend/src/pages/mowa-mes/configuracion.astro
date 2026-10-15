@@ -10,7 +10,9 @@
  */
 import Shell from '../../layouts/Shell.astro';
 import Icon from '../../components/Icon.astro';
+import VariantesSegmento from '../../components/VariantesSegmento.astro';
 import '../../styles/mowa-mes.css';
+import '../../styles/mowa-mes-speech-v2.css';
 ---
 
 <Shell
@@ -257,13 +259,13 @@ import '../../styles/mowa-mes.css';
             </div>
           </div>
 
-          <p class="field__hint" data-i18n="mowaMes.speech.estructura">
+          <p class="field__hint" data-speech-v1 data-i18n="mowaMes.speech.estructura">
             Mensaje = titular (8 caracteres) + parte 1 + fecha de vencimiento (dd/mm/aaaa) + parte 2. Escribe [whatsapp] donde vaya el enlace. Los espacios de los extremos cuentan.
           </p>
 
-          <p class="mm-speech__resumen" role="status" data-speech-resumen></p>
+          <p class="mm-speech__resumen" role="status" data-speech-v1 data-speech-resumen></p>
 
-          <div class="table-scroll">
+          <div class="table-scroll" data-speech-v1>
             <table class="table mm-speech__tabla table--apilable table--apilable-ancha">
               <thead>
                 <tr>
@@ -278,7 +280,34 @@ import '../../styles/mowa-mes.css';
             </table>
           </div>
 
-          <p class="mono muted mm-speech__calculo" data-speech-calculo></p>
+          <p class="mono muted mm-speech__calculo" data-speech-v1 data-speech-calculo></p>
+
+          <!-- v2: the segment-by-segment editor, and the way a v1 becomes one. v1 above is untouched. -->
+          <div class="mm-speech-v2" data-v2-convertir hidden>
+            <p class="field__hint" id="mm-v2-convertir-hint" data-i18n="mowaMes.speech.v2.convertir.hint">
+              Esta versión guarda cada segmento en dos partes fijas (v1). Conviértela para armar cada mensaje con variables y funciones: obtienes un borrador con los mismos mensajes que no se guarda hasta que lo confirmes.
+            </p>
+            <div class="mm-speech-v2__acciones">
+              <button type="button" class="btn" data-v2-convertir-boton aria-describedby="mm-v2-convertir-hint">
+                <span class="btn__spinner" aria-hidden="true"></span>
+                <span class="btn__label" data-i18n="mowaMes.speech.v2.convertir.boton">Convertir a v2</span>
+              </button>
+              <p class="field__hint" data-v2-convertir-bloqueo hidden data-i18n="mowaMes.speech.v2.convertir.bloqueo">
+                Guarda o descarta los cambios de las partes antes de convertir.
+              </p>
+            </div>
+          </div>
+
+          <div class="mm-speech-v2" data-v2-editor-bloque hidden>
+            <p class="notice notice--info" data-v2-borrador hidden>
+              <Icon name="info" size={20} />
+              <span data-v2-borrador-texto></span>
+            </p>
+            <VariantesSegmento id="mm-speech-v2" etiqueta="Speech por segmento" claveEtiqueta="mowaMes.speech.title" />
+            <p class="field__hint" data-i18n="mowaMes.speech.v2.avisoSegmento">
+              Con un producto real de muestra, el segmento sale de sus días de atraso a la fecha de corte, no de los ajustados a la fecha de envío.
+            </p>
+          </div>
 
           <div class="mm-form__foot mm-speech__foot">
             <div class="field mm-speech__nombre">
@@ -430,6 +459,7 @@ import '../../styles/mowa-mes.css';
     type ConfiguracionSupervision,
     type DiaNoLaborable,
     type Feriados,
+    type LargoSegmento,
     type PartesEntrada,
     type PrevisualizacionSpeech,
     type TipoExcepcion,
@@ -438,7 +468,26 @@ import '../../styles/mowa-mes.css';
   import { openWhenFree } from '../../lib/dialogs';
   import { notaVariablesDesconocidas, pintarBotonesDeVariables } from '../../lib/mowa-mes-plantilla';
   import { formatBytes, formatDate, formatDateTime, formatNumber, parseApiDate } from '../../lib/format';
+  import { obtenerComoV2, problemasDeErrorSpeech } from '../../lib/api-speech-v2';
   import { applyTranslations, locale, t } from '../../lib/i18n';
+  import {
+    entradaDeExpresiones,
+    esV2,
+    hayCambiosV2,
+    mensajeDeProblema,
+    nivelesDeV2,
+    segmentosDeVersion,
+    segmentosSinContenido,
+    variantesDeVersion,
+    type ProblemaSpeech,
+  } from '../../lib/mowa-mes-speech-v2';
+  import type { Segmento as SegmentoDeVariantes, Variante } from '../../lib/variantes';
+  import {
+    EVENTO_VARIANTES,
+    montarVariantes,
+    type ControladorVariantes,
+    type EstadoVariantes,
+  } from '../../scripts/variantes-segmento';
   import {
     accionDia,
     borradorDeSupervision,
@@ -480,6 +529,21 @@ import '../../styles/mowa-mes.css';
     versionId: null as number | null,
     borrador: [] as PartesEntrada[],
     previsualizacion: null as PrevisualizacionSpeech | null,
+    /**
+     * The v2 speech on screen: a saved v2 version being edited, or the draft a v1 became (`borrador`,
+     * not saved until the analyst confirms). `null` is the v1 screen, untouched.
+     */
+    v2: null as {
+      borrador: boolean;
+      baseId: number;
+      nombreSugerido: string;
+      variantes: Variante[];
+      segmentos: SegmentoDeVariantes[];
+      problemas: ProblemaSpeech[];
+    } | null,
+    /** What the editor last said about the open content: gates saving. */
+    v2Editor: { pendiente: false, valida: true },
+    largosV2: [] as LargoSegmento[],
     anio: new Date().getFullYear(),
     feriados: null as Feriados | null,
     siguienteDia: null as string | null,
@@ -1126,6 +1190,19 @@ import '../../styles/mowa-mes.css';
     const version = versionActual();
     estado.borrador = version ? borradorDesdeVersion(version) : [];
     estado.previsualizacion = null;
+    // A saved v2 opens in the v2 editor; a v1 (or none) in the table of parts, exactly as before.
+    estado.v2 =
+      version && esV2(version)
+        ? {
+            borrador: false,
+            baseId: version.id,
+            nombreSugerido: '',
+            variantes: variantesDeVersion(version),
+            segmentos: segmentosDeVersion(version),
+            problemas: [],
+          }
+        : null;
+    fuenteV2 = '';
     inputNombre.value = version && modoGuardado(version) === 'editar' ? version.nombre : '';
     $<HTMLElement>('[data-speech-error]').textContent = '';
     pintarVersiones();
@@ -1135,6 +1212,11 @@ import '../../styles/mowa-mes.css';
 
   function pintarSpeech(): void {
     const version = versionActual();
+    mostrarRama();
+    if (estado.v2 && version) {
+      pintarSpeechV2(version);
+      return;
+    }
     const filas = $<HTMLElement>('[data-speech-filas]');
     filas.replaceChildren();
 
@@ -1197,6 +1279,7 @@ import '../../styles/mowa-mes.css';
           estado.borrador[indice] = { ...estado.borrador[indice], [campo]: area.value };
           $<HTMLElement>('[data-speech-error]').textContent = '';
           pintarEstadoSpeech();
+          pintarConvertir();
           programarPrevisualizacion(ESPERA_PREVISUALIZACION);
         });
         celda.append(area);
@@ -1232,6 +1315,7 @@ import '../../styles/mowa-mes.css';
 
     pintarPrevisualizacion();
     pintarEstadoSpeech();
+    pintarConvertir();
   }
 
   function pintarEstadoSpeech(): void {
@@ -1247,8 +1331,11 @@ import '../../styles/mowa-mes.css';
       return;
     }
 
-    const cambios = hayCambiosSpeech(version, estado.borrador);
-    const modo = modoGuardado(version);
+    const cambios = estado.v2
+      ? estado.v2.borrador || hayCambiosV2(version, estado.v2.variantes)
+      : hayCambiosSpeech(version, estado.borrador);
+    // A draft of a v1 is always saved as a new version: nothing of it exists yet.
+    const modo = estado.v2?.borrador ? 'nueva' : modoGuardado(version);
     const renombrada = modo === 'editar' && inputNombre.value.trim() !== version.nombre;
     texto.textContent = t(modo === 'editar' ? 'mowaMes.speech.guardar.editar' : 'mowaMes.speech.guardar.nueva');
     guardar.disabled = guardar.dataset.loading === 'true' || !(cambios || renombrada);
@@ -1345,6 +1432,7 @@ import '../../styles/mowa-mes.css';
 
   async function previsualizar(): Promise<void> {
     if (!versionActual()) return;
+    if (estado.v2) return previsualizarV2();
     controlPrevisualizacion?.abort();
     const control = new AbortController();
     controlPrevisualizacion = control;
@@ -1363,9 +1451,219 @@ import '../../styles/mowa-mes.css';
     }
   }
 
+  // ---- Speech v2 ---------------------------------------------------------------
+
+  const v2El = {
+    convertir: $<HTMLElement>('[data-v2-convertir]'),
+    boton: $<HTMLButtonElement>('[data-v2-convertir-boton]'),
+    bloqueo: $<HTMLElement>('[data-v2-convertir-bloqueo]'),
+    bloque: $<HTMLElement>('[data-v2-editor-bloque]'),
+    borrador: $<HTMLElement>('[data-v2-borrador]'),
+    borradorTexto: $<HTMLElement>('[data-v2-borrador-texto]'),
+    raiz: $<HTMLElement>('#mm-speech-v2'),
+  };
+  let ctlV2: ControladorVariantes | null = null;
+  let montandoV2: Promise<void> | null = null;
+  /** Which content the editor was last given, so a repaint does not re-feed (and re-validate) it. */
+  let fuenteV2 = '';
+  /** After converting: put the focus in the editor once it has validated every segment. */
+  let enfocarV2 = false;
+  let temporizadorFocoV2 = 0;
+
+  /** v1 is hidden only while a v2 is on screen; its markup and code are the same either way. */
+  function mostrarRama(): void {
+    const enV2 = estado.v2 !== null;
+    document.querySelectorAll<HTMLElement>('[data-speech-v1]').forEach((nodo) => {
+      nodo.hidden = enV2;
+    });
+    v2El.bloque.hidden = !enV2;
+    const version = versionActual();
+    v2El.convertir.hidden = enV2 || !version || esV2(version);
+  }
+
+  function pintarConvertir(): void {
+    const version = versionActual();
+    if (!version || esV2(version) || estado.v2) return;
+    const pendientes = hayCambiosSpeech(version, estado.borrador);
+    v2El.boton.disabled = pendientes;
+    v2El.bloqueo.hidden = !pendientes;
+  }
+
+  async function asegurarEditorV2(): Promise<ControladorVariantes | null> {
+    if (ctlV2) return ctlV2;
+    if (!estado.v2) return null;
+    if (!montandoV2) {
+      v2El.raiz.addEventListener(EVENTO_VARIANTES, (evento) => {
+        const detalle = (evento as CustomEvent<EstadoVariantes>).detail;
+        estado.v2Editor = { pendiente: detalle.pendiente, valida: detalle.valida };
+        if (enfocarV2) {
+          // The list of segments is repainted after every validation: focus waits until no more
+          // events arrive, so it lands on a button that stays.
+          window.clearTimeout(temporizadorFocoV2);
+          temporizadorFocoV2 = window.setTimeout(() => {
+            if (!enfocarV2 || estado.v2Editor.pendiente) return;
+            enfocarV2 = false;
+            const visibles = [
+              ...v2El.raiz.querySelectorAll<HTMLElement>('[data-segmento-botones] button, [data-segmento-select]'),
+            ].filter((n) => n.offsetParent !== null);
+            visibles[0]?.focus();
+          }, 250);
+        }
+        if (detalle.origen === 'usuario' && estado.v2) {
+          estado.v2.variantes = detalle.variantes.map((v) => ({ ...v }));
+          programarPrevisualizacion(ESPERA_PREVISUALIZACION);
+        }
+        pintarEstadoSpeech();
+      });
+      const segmentos = estado.v2.segmentos;
+      montandoV2 = montarVariantes(v2El.raiz, {
+        contexto: 'mowa_mes.speech',
+        segmentos,
+        porDefecto: null,
+        variantes: estado.v2.variantes,
+        // No default content: every segment carries its own message (RF-MM-14).
+        conPorDefecto: false,
+        resumen: 'ninguno',
+      }).then((ctl) => {
+        ctlV2 = ctl;
+        fuenteV2 = 'montado';
+      });
+    }
+    await montandoV2;
+    return ctlV2;
+  }
+
+  function nombreDelSegmento(clave: string | null): string {
+    if (clave === null) return '';
+    return estado.v2?.segmentos.find((s) => s.clave === clave)?.etiqueta ?? clave;
+  }
+
+  function mostrarProblemasV2(problemas: ProblemaSpeech[]): void {
+    const caja = $<HTMLElement>('[data-speech-problemas]');
+    const lista = $<HTMLElement>('[data-speech-problemas-lista]');
+    caja.hidden = problemas.length === 0;
+    lista.replaceChildren();
+    for (const problema of problemas) {
+      const item = document.createElement('li');
+      const donde = nombreDelSegmento(problema.segmento);
+      const texto = mensajeDeProblema(problema);
+      item.textContent = donde ? t('mowaMes.speech.v2.problema', { segmento: donde, mensaje: texto }) : texto;
+      lista.append(item);
+    }
+  }
+
+  function pintarSpeechV2(version: VersionSpeech): void {
+    const v2 = estado.v2!;
+    const meta = [t('mowaMes.speech.creada', { fecha: formatDateTime(version.creado_en) })];
+    const base = estado.versiones.find((v) => v.id === version.basada_en_id);
+    if (base) meta.push(t('mowaMes.speech.basadaEn', { nombre: base.nombre }));
+    $<HTMLElement>('[data-speech-meta]').textContent = meta.join('  ·  ');
+
+    // The same rule as v1 (RF-MM-17): the original and a used version never change.
+    const inmutable = !v2.borrador && modoGuardado(version) === 'nueva';
+    $<HTMLElement>('[data-speech-inmutable]').hidden = !inmutable;
+    $<HTMLElement>('[data-speech-inmutable-texto]').textContent = version.original
+      ? t('mowaMes.speech.inmutable.original')
+      : t('mowaMes.speech.inmutable.usada');
+    inputNombre.placeholder =
+      v2.borrador && v2.nombreSugerido
+        ? v2.nombreSugerido
+        : modoGuardado(version) === 'nueva'
+          ? t('mowaMes.speech.nombre.automatico')
+          : '';
+
+    v2El.borrador.hidden = !v2.borrador;
+    if (v2.borrador) {
+      v2El.borradorTexto.textContent = t('mowaMes.speech.v2.borrador', { base: version.nombre });
+    }
+    $<HTMLElement>('[data-speech-falta-whatsapp]').hidden = true;
+    mostrarProblemasV2(v2.problemas);
+
+    void asegurarEditorV2().then((ctl) => {
+      if (!ctl || !estado.v2) return;
+      const fuente = `${versionActual()?.id ?? ''}:${estado.v2.borrador ? 'borrador' : 'guardada'}`;
+      if (fuenteV2 !== fuente) {
+        fuenteV2 = fuente;
+        ctl.fijarSegmentos(estado.v2.segmentos);
+        ctl.fijarVariantes({ porDefecto: null, variantes: estado.v2.variantes });
+      }
+    });
+    pintarEstadoSpeech();
+  }
+
+  async function previsualizarV2(): Promise<void> {
+    const v2 = estado.v2;
+    if (!v2) return;
+    const expresiones = entradaDeExpresiones(v2.variantes);
+    const ctl = await asegurarEditorV2();
+    if (expresiones.length === 0) {
+      estado.largosV2 = [];
+      ctl?.fijarNiveles({});
+      return;
+    }
+    controlPrevisualizacion?.abort();
+    const control = new AbortController();
+    controlPrevisualizacion = control;
+    formSpeech.dataset.calculando = 'true';
+    try {
+      const vista = await previsualizarSpeech({ expresiones }, control.signal);
+      if (estado.v2 !== v2) return;
+      estado.largosV2 = vista.segmentos;
+      ctl?.fijarNiveles(nivelesDeV2(vista.segmentos));
+      $<HTMLElement>('[data-speech-falta-whatsapp]').hidden = !vista.segmentos.some((s) => s.falta_whatsapp);
+      mostrarProblemasV2(vista.problemas);
+    } catch (caido) {
+      if (caido instanceof DOMException && caido.name === 'AbortError') return;
+      if (caido instanceof ApiError && caido.status === 400) {
+        const problemas = problemasDeErrorSpeech(caido);
+        if (problemas.length > 0) mostrarProblemasV2(problemas);
+        else $<HTMLElement>('[data-speech-error]').textContent = mensajeDeError(caido);
+        return;
+      }
+      $<HTMLElement>('[data-speech-error]').textContent = mensajeDeError(caido);
+    } finally {
+      if (controlPrevisualizacion === control) delete formSpeech.dataset.calculando;
+    }
+  }
+
+  v2El.boton.addEventListener('click', async () => {
+    const version = versionActual();
+    if (!version || esV2(version) || hayCambiosSpeech(version, estado.borrador)) return;
+    ocupado(v2El.boton, true);
+    try {
+      const borrador = await obtenerComoV2(version.id);
+      // Nothing is saved: this is a draft until «Guardar como versión nueva».
+      estado.v2 = {
+        borrador: true,
+        baseId: borrador.basada_en_id,
+        nombreSugerido: borrador.nombre_sugerido,
+        variantes: variantesDeVersion(borrador),
+        segmentos: segmentosDeVersion(borrador),
+        problemas: borrador.problemas,
+      };
+      fuenteV2 = '';
+      inputNombre.value = '';
+      $<HTMLElement>('[data-speech-error]').textContent = '';
+      pintarSpeech();
+      programarPrevisualizacion(0);
+      // The button that was pressed is now hidden: focus goes to the editor, where the work is. It
+      // waits for the editor to finish validating, because the list of segments is repainted then
+      // and a focus placed earlier would be dropped with the button it was on.
+      enfocarV2 = true;
+      void asegurarEditorV2();
+    } catch (caido) {
+      $<HTMLElement>('[data-speech-error]').textContent = mensajeDeError(caido);
+    } finally {
+      ocupado(v2El.boton, false);
+    }
+  });
+
   selectVersion.addEventListener('change', () => {
     const version = versionActual();
-    if (version && hayCambiosSpeech(version, estado.borrador)) {
+    const pendientes = estado.v2
+      ? estado.v2.borrador || (version !== null && hayCambiosV2(version, estado.v2.variantes))
+      : version !== null && hayCambiosSpeech(version, estado.borrador);
+    if (version && pendientes) {
       // Switching versions would silently drop typed parts; ask by staying put
       // and telling what to do instead.
       selectVersion.value = String(estado.versionId);
@@ -1403,11 +1701,36 @@ import '../../styles/mowa-mes.css';
       return;
     }
 
+    // v2: a segment with nothing, or an editor that still has problems, is not sent (§4).
+    if (estado.v2) {
+      const vacios = segmentosSinContenido(estado.v2.variantes, estado.v2.segmentos);
+      if (vacios.length > 0) {
+        error.textContent = t('mowaMes.speech.v2.error.sinContenido', {
+          segmentos: vacios.map((v) => v.etiqueta).join(', '),
+        });
+        ctlV2?.seleccionar(vacios[0].clave);
+        return;
+      }
+      if (estado.v2Editor.pendiente || !estado.v2Editor.valida) {
+        error.textContent = t(
+          estado.v2Editor.pendiente ? 'mowaMes.speech.v2.error.pendiente' : 'mowaMes.speech.v2.error.editor',
+        );
+        return;
+      }
+    }
+
     const guardar = $<HTMLButtonElement>('[data-speech-guardar]');
     ocupado(guardar, true);
     try {
-      const guardada =
-        modo === 'editar'
+      const guardada = estado.v2
+        ? modo === 'editar'
+          ? await editarSpeech(version.id, { nombre, expresiones: entradaDeExpresiones(estado.v2.variantes) })
+          : await crearSpeech({
+              nombre: nombre || null,
+              basada_en_id: estado.v2.borrador ? estado.v2.baseId : version.id,
+              expresiones: entradaDeExpresiones(estado.v2.variantes),
+            })
+        : modo === 'editar'
           ? await editarSpeech(version.id, { nombre, partes: estado.borrador })
           : await crearSpeech({ nombre: nombre || null, basada_en_id: version.id, partes: estado.borrador });
       estado.versiones = await listarSpeech();
@@ -1427,6 +1750,15 @@ import '../../styles/mowa-mes.css';
         pintarVersiones();
         estado.borrador = borrador;
         pintarSpeech();
+      } else if (caido instanceof ApiError && caido.status === 400 && estado.v2) {
+        // The backend's located problems: each says its segment and the catalogue its code is from.
+        const problemas = problemasDeErrorSpeech(caido);
+        if (problemas.length > 0) {
+          mostrarProblemasV2(problemas);
+          error.textContent = caido.detail;
+        } else {
+          error.textContent = mensajeDeError(caido);
+        }
       } else if (caido instanceof ApiError && caido.status === 409) {
         error.textContent = t('mowaMes.speech.error.nombreRepetido');
         inputNombre.setAttribute('aria-invalid', 'true');
