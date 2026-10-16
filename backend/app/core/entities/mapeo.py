@@ -123,8 +123,13 @@ class ErrorGeneracion:
 
 @dataclass(frozen=True)
 class FilaExcluida:
-    """Un producto que no sale en la carga: no cae en ningun segmento y la definicion excluye."""
+    """Un producto que no sale en la carga: no cae en ningun segmento y la definicion excluye.
+
+    `fila` es la posicion del producto en la seleccion (desde 1) y `pagare`, el del producto, para
+    que quien lee el motivo pueda ubicarlo (el pagare ya viaja en la cartera).
+    """
 
     fila: int
     codigo: str
     detalle: str
+    pagare: str | None = None

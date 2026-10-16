@@ -15,7 +15,7 @@ La generación queda disponible apenas termina la selección, sin pasos intermed
 
 | Método | Ruta | Para qué |
 |---|---|---|
-| `GET` | `/archivos-carga/formatos` | Formatos disponibles y qué opciones admite cada uno |
+| `GET` | `/archivos-carga/formatos` | Formatos disponibles y qué opciones admite cada uno, con su tipo, su valor por defecto y sus límites |
 | `POST` | `/archivos-carga/previsualizacion` | Primeras filas y errores, en JSON |
 | `POST` | `/archivos-carga` | El archivo completo, para descargar |
 
@@ -50,8 +50,8 @@ La definición viaja completa en cada llamada porque **todavía no se guarda en 
 
 ### Respuestas
 
-- **Previsualización:** `cabeceras`, una muestra de `filas`, `disponibles` (el total de la selección completa, no el de la muestra), `solicitados`, `generados`, `suficiente`, `completa` y la lista de `errores` con su fila y su campo.
-- **Generación:** el archivo, con `Content-Disposition` para el nombre y el resumen en cabeceras `X-Carga-Generados`, `X-Carga-Disponibles`, `X-Carga-Solicitados`, `X-Carga-Suficiente` y `X-Carga-Errores`. El detalle de los errores se consulta en la previsualización, porque el cuerpo ya es el archivo.
+- **Previsualización:** `cabeceras`, una muestra de `filas`, `disponibles` (el total de la selección completa, no el de la muestra), `solicitados` (lo pedido, no la muestra), `generados`, `suficiente`, `completa`, la lista de `errores` con su fila y su campo, y los productos excluidos: `excluidos` (la cantidad) y `exclusiones` (por fila: `fila`, `pagare`, `codigo` de `CodigoTexto` y `detalle`). Siempre presentes: sin segmentación o sin productos fuera de un segmento, `0` y lista vacía. Lo que se evalúa en la previsualización es la muestra, `min(solicitados, 20)`: `generados` y `excluidos` son de esa muestra y cierran con `generados + excluidos = min(disponibles, muestra)`; la descarga recorre todo lo pedido y cierra con `min(disponibles, solicitados)` (ver [motor-texto-enriquecido.md](motor-texto-enriquecido.md), §20).
+- **Generación:** el archivo, con `Content-Disposition` para el nombre y el resumen en cabeceras `X-Carga-Generados`, `X-Carga-Disponibles`, `X-Carga-Solicitados`, `X-Carga-Suficiente`, `X-Carga-Errores` y `X-Carga-Excluidos`. El detalle de los errores se consulta en la previsualización, porque el cuerpo ya es el archivo.
 
 `suficiente` en `false` significa que había menos productos que los pedidos (RF-08): el archivo se genera igual, con los que hay.
 

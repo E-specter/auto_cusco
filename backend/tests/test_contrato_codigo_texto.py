@@ -24,6 +24,7 @@ SIEMPRE_DE_TEXTO = (
     "ProblemaTextoRespuesta",
     "SinCotaRespuesta",
     "ExclusionFilaRespuesta",
+    "ExclusionCargaRespuesta",
     "DetalleErrorTexto",
     "DetalleErrorDefinicion",
 )

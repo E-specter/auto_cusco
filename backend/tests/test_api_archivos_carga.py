@@ -15,8 +15,10 @@ import openpyxl
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.archivos_carga import OpcionesEntrada
 from app.api.cartera import obtener_servicio_cartera
 from app.core.entities.cartera import PaginaCartera, SinVersionVigente
+from app.core.entities.exportacion import OPCIONES_POR_DEFECTO
 from app.main import app
 
 FECHA = "2026-09-10"
@@ -92,8 +94,107 @@ def test_listar_formatos_dice_que_opciones_admite_cada_uno(cliente) -> None:
 
     assert set(formatos) == {"xlsx", "csv", "json"}
     assert formatos["csv"]["extension"] == "csv"
-    assert "delimitador" in formatos["csv"]["opciones"]
-    assert "hoja" in formatos["xlsx"]["opciones"]
+    nombres = {f: [o["nombre"] for o in formatos[f]["opciones"]] for f in formatos}
+    assert nombres == {
+        "xlsx": ["con_cabeceras", "hoja"],
+        "csv": ["delimitador", "codificacion", "con_cabeceras"],
+        "json": ["codificacion", "sangria"],
+    }
+
+
+def _opciones_anunciadas(client) -> dict[str, dict]:
+    return {
+        opcion["nombre"]: opcion
+        for formato in client.get("/archivos-carga/formatos").json()
+        for opcion in formato["opciones"]
+    }
+
+
+def test_cada_opcion_anuncia_su_tipo_su_defecto_y_sus_limites(cliente) -> None:
+    client, _ = cliente
+
+    opciones = _opciones_anunciadas(client)
+
+    def sin_nombre(opcion):
+        return {k: v for k, v in opcion.items() if k != "nombre"}
+
+    assert sin_nombre(opciones["delimitador"]) == {
+        "tipo": "texto",
+        "defecto": ",",
+        "sugeridos": [",", ";", "\t", "|"],
+        "minimo": 1,
+        "maximo": 1,
+    }
+    assert sin_nombre(opciones["codificacion"]) == {
+        "tipo": "texto",
+        "defecto": "utf-8",
+        "sugeridos": ["utf-8", "utf-8-sig", "latin-1", "cp1252"],
+        "minimo": None,
+        "maximo": None,
+    }
+    assert sin_nombre(opciones["con_cabeceras"]) == {
+        "tipo": "booleano",
+        "defecto": True,
+        "sugeridos": None,
+        "minimo": None,
+        "maximo": None,
+    }
+    assert sin_nombre(opciones["hoja"]) == {
+        "tipo": "texto",
+        "defecto": "Carga",
+        "sugeridos": None,
+        "minimo": None,
+        "maximo": 31,
+    }
+    assert sin_nombre(opciones["sangria"]) == {
+        "tipo": "entero",
+        "defecto": None,  # sin sangria: el JSON sale en una sola linea
+        "sugeridos": None,
+        "minimo": 0,
+        "maximo": 8,
+    }
+
+
+def test_los_defectos_anunciados_son_los_de_opciones_archivo_y_los_que_usa_la_peticion(
+    cliente,
+) -> None:
+    client, _ = cliente
+    opciones = _opciones_anunciadas(client)
+
+    anunciados = {nombre: opcion["defecto"] for nombre, opcion in opciones.items()}
+    de_la_entidad = {nombre: getattr(OPCIONES_POR_DEFECTO, nombre) for nombre in opciones}
+    de_la_peticion = OpcionesEntrada().model_dump()
+
+    assert anunciados == de_la_entidad  # una sola fuente
+    assert anunciados == de_la_peticion  # y la peticion sin opciones se comporta igual
+
+
+def test_cada_valor_anunciado_como_sugerido_o_limite_lo_acepta_la_peticion(cliente) -> None:
+    client, _ = cliente
+    opciones = _opciones_anunciadas(client)
+
+    for delimitador in opciones["delimitador"]["sugeridos"]:
+        respuesta = client.post(
+            "/archivos-carga",
+            json=_peticion(formato="csv", opciones={"delimitador": delimitador}),
+        )
+        assert respuesta.status_code == 200, delimitador
+    for codificacion in opciones["codificacion"]["sugeridos"]:
+        respuesta = client.post(
+            "/archivos-carga",
+            json=_peticion(formato="csv", opciones={"codificacion": codificacion}),
+        )
+        assert respuesta.status_code == 200, codificacion
+    for sangria in (opciones["sangria"]["minimo"], opciones["sangria"]["maximo"]):
+        respuesta = client.post(
+            "/archivos-carga", json=_peticion(formato="json", opciones={"sangria": sangria})
+        )
+        assert respuesta.status_code == 200, sangria
+    fuera = client.post(
+        "/archivos-carga",
+        json=_peticion(formato="json", opciones={"sangria": opciones["sangria"]["maximo"] + 1}),
+    )
+    assert fuera.status_code == 422  # el limite anunciado es el que se exige
 
 
 def test_previsualizacion_devuelve_filas_y_el_total_de_la_seleccion(cliente) -> None:
@@ -269,3 +370,15 @@ def test_peticiones_invalidas_se_rechazan_antes_de_generar(cliente, peticion) ->
 
     assert respuesta.status_code == 422
     assert consulta.recibido == {}
+
+
+def test_sin_segmentacion_no_hay_excluidos_y_la_cabecera_y_la_lista_lo_dicen(cliente) -> None:
+    client, _ = cliente
+
+    previa = client.post("/archivos-carga/previsualizacion", json=_peticion()).json()
+    descarga = client.post("/archivos-carga", json=_peticion())
+
+    # Siempre presentes (el contrato no omite campos), en cero y vacia.
+    assert (previa["excluidos"], previa["exclusiones"]) == (0, [])
+    assert descarga.headers["x-carga-excluidos"] == "0"
+    assert previa["generados"] + previa["excluidos"] == min(previa["disponibles"], 2)

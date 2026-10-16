@@ -66,6 +66,14 @@ class OpcionesArchivo:
 
 OPCIONES_POR_DEFECTO = OpcionesArchivo()
 
+# Lo que la API de `/archivos-carga` anuncia de cada opcion, en un solo lugar para que la pantalla
+# no tenga que repetirlo. Ninguna lista es cerrada: el delimitador es cualquier caracter y la
+# codificacion, cualquiera que Python conozca; estos son los usuales.
+LARGO_DELIMITADOR = 1
+DELIMITADORES_SUGERIDOS = (",", ";", "\t", "|")
+CODIFICACIONES_SUGERIDAS = ("utf-8", "utf-8-sig", "latin-1", "cp1252")
+SANGRIA_MAXIMA = 8
+
 
 @dataclass(frozen=True)
 class Tabla:

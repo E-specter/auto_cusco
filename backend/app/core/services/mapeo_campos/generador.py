@@ -318,7 +318,13 @@ class GeneradorCargas:
             detalle = f"El producto no tiene valor en {criterio.campo!r}, que define su segmento"
         else:
             detalle = f"El valor {clave!r} de {criterio.campo!r} no tiene contenido por segmento"
-        return FilaExcluida(numero_fila, CodigoTexto.SIN_SEGMENTO.value, detalle)
+        pagare = producto.get("pagare")
+        return FilaExcluida(
+            numero_fila,
+            CodigoTexto.SIN_SEGMENTO.value,
+            detalle,
+            None if pagare is None else str(pagare),
+        )
 
     def detallar_fila(self, producto: Mapping[str, Any], numero_fila: int) -> FilaDetallada:
         """Lo mismo que `generar_fila`, con el segmento, el texto de cada nodo y la cota.

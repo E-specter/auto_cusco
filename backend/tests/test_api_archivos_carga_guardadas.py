@@ -4,14 +4,17 @@ Lo unico simulado es la consulta a la cartera y el repositorio de definiciones. 
 linea (RF-54) no cambia y la cubre `test_api_archivos_carga.py`.
 """
 
+import io
 from datetime import date
+from decimal import Decimal
 
+import openpyxl
 import pytest
 from fastapi.testclient import TestClient
 
 from app.api.cartera import obtener_servicio_cartera
 from app.api.definiciones_columnas import obtener_servicio_definiciones
-from app.core.entities.cartera import SinVersionVigente
+from app.core.entities.cartera import PaginaCartera, SinVersionVigente
 from app.core.services.contextos_texto import contexto_cartera
 from app.core.services.definiciones_columnas.servicio import DefinicionesColumnasService
 from app.main import app
@@ -287,3 +290,114 @@ def test_una_guardada_con_un_campo_que_ya_no_existe_es_400_sin_marcar_nada(clien
 
     assert respuesta.status_code == 400
     assert servicio.obtener(id_).version.usada is False
+
+
+# --- Los productos que no caen en ningun segmento se excluyen y se explican (B12, RF-50) ----------
+
+
+class CarteraConDias:
+    """Productos con `dias_atraso`: el segmento sale de ahi (la tabla por defecto llega a 120)."""
+
+    def __init__(self, dias: list) -> None:
+        self.dias = dias
+
+    def consultar(self, fecha_corte, filtros, orden, limite, desplazamiento):
+        filas = tuple(
+            {
+                "pagare": f"{i:018d}",
+                "telefono": f"9{i:08d}",
+                "saldo_capital_pendiente": Decimal("100"),
+                "fecha_vencimiento_cuota": date(2026, 9, 18),
+                "dias_atraso": dias,
+            }
+            for i, dias in enumerate(self.dias, start=1)
+        )
+        return PaginaCartera(
+            total=len(filas),
+            filas=filas[desplazamiento : desplazamiento + limite],
+            limite=limite,
+            desplazamiento=desplazamiento,
+        )
+
+
+@pytest.fixture
+def segmentada():
+    """Una definicion con segmentacion (excluir lo que no cae en un rango) y su cartera."""
+    servicio = DefinicionesColumnasService(RepositorioEnMemoria(), contexto_cartera())
+    cartera = CarteraConDias([5, 200, None, 40])  # el 2 y el 3 no caen en ningun segmento
+    app.dependency_overrides[obtener_servicio_cartera] = lambda: cartera
+    app.dependency_overrides[obtener_servicio_definiciones] = lambda: servicio
+    try:
+        id_ = servicio.crear({**_guardada(), "segmentacion": {}}).definicion.id
+        yield TestClient(app), cartera, id_
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_la_previsualizacion_lista_los_excluidos_con_fila_pagare_codigo_y_detalle(
+    segmentada,
+) -> None:
+    client, _, id_ = segmentada
+
+    cuerpo = client.post("/archivos-carga/previsualizacion", json=_pedido(id_, cantidad=4)).json()
+
+    assert (cuerpo["generados"], cuerpo["excluidos"]) == (2, 2)
+    assert [(e["fila"], e["pagare"], e["codigo"]) for e in cuerpo["exclusiones"]] == [
+        (2, f"{2:018d}", "sin_segmento"),
+        (3, f"{3:018d}", "sin_segmento"),
+    ]
+    assert "200" in cuerpo["exclusiones"][0]["detalle"]  # los dias que no caen en un rango
+    assert "no tiene dias" in cuerpo["exclusiones"][1]["detalle"]
+    # Sin datos personales nuevos: el producto se identifica por el pagare y nada mas.
+    assert set(cuerpo["exclusiones"][0]) == {"fila", "pagare", "codigo", "detalle"}
+
+
+def test_los_numeros_de_la_previsualizacion_cierran(segmentada) -> None:
+    client, _, id_ = segmentada
+
+    cuerpo = client.post("/archivos-carga/previsualizacion", json=_pedido(id_, cantidad=4)).json()
+
+    # Se evaluan min(disponibles, muestra) productos y cada uno sale o se excluye.
+    assert cuerpo["generados"] + cuerpo["excluidos"] == min(cuerpo["disponibles"], 4) == 4
+    assert len(cuerpo["filas"]) == cuerpo["generados"]
+    # `suficiente` habla de la seleccion, no de la tabla: hay 4 productos para los 4 pedidos y
+    # aun asi salen 2 filas.
+    assert (cuerpo["suficiente"], cuerpo["solicitados"], cuerpo["generados"]) == (True, 4, 2)
+
+
+def test_si_faltan_productos_y_ademas_hay_excluidos_los_numeros_siguen_cerrando(segmentada) -> None:
+    client, _, id_ = segmentada
+
+    cuerpo = client.post("/archivos-carga/previsualizacion", json=_pedido(id_, cantidad=10)).json()
+
+    assert (cuerpo["disponibles"], cuerpo["solicitados"], cuerpo["suficiente"]) == (4, 10, False)
+    assert cuerpo["generados"] + cuerpo["excluidos"] == min(4, 10)
+
+
+def test_la_descarga_resume_los_excluidos_en_la_cabecera(segmentada) -> None:
+    client, _, id_ = segmentada
+
+    respuesta = client.post("/archivos-carga", json=_pedido(id_, cantidad=4))
+
+    cabeceras = respuesta.headers
+    assert respuesta.status_code == 200
+    assert (cabeceras["x-carga-generados"], cabeceras["x-carga-excluidos"]) == ("2", "2")
+    assert int(cabeceras["x-carga-generados"]) + int(cabeceras["x-carga-excluidos"]) == min(
+        int(cabeceras["x-carga-disponibles"]), int(cabeceras["x-carga-solicitados"])
+    )
+    filas = list(openpyxl.load_workbook(io.BytesIO(respuesta.content)).active.iter_rows())
+    assert len(filas) == 1 + 2  # la cabecera y los 2 generados
+
+
+def test_la_muestra_de_la_previsualizacion_no_es_la_carga_entera(segmentada) -> None:
+    client, cartera, id_ = segmentada
+    cartera.dias = [None] * 25  # ninguno cae en un segmento
+
+    previa = client.post("/archivos-carga/previsualizacion", json=_pedido(id_, cantidad=100)).json()
+    descarga = client.post("/archivos-carga", json=_pedido(id_, cantidad=100))
+
+    # La previsualizacion evalua solo la muestra (20); la descarga, todos los disponibles.
+    assert (previa["disponibles"], previa["generados"], previa["excluidos"]) == (25, 0, 20)
+    assert len(previa["exclusiones"]) == 20
+    assert descarga.headers["x-carga-excluidos"] == "25"
+    assert descarga.headers["x-carga-generados"] == "0"

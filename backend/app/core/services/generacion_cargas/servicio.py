@@ -15,7 +15,7 @@ from datetime import date
 
 from app.core.entities.cartera import ConsultaInvalida, Filtro, Orden
 from app.core.entities.exportacion import Tabla
-from app.core.entities.mapeo import DefinicionCarga, ErrorGeneracion
+from app.core.entities.mapeo import DefinicionCarga, ErrorGeneracion, FilaExcluida
 from app.core.services.mapeo_campos.generador import GeneradorCargas
 from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA
 from app.core.services.seleccion_cartera.recorrido import SeleccionPaginada
@@ -29,16 +29,28 @@ CANTIDAD_POR_DEFECTO = 1_000
 
 @dataclass(frozen=True)
 class ResultadoGeneracion:
-    """La tabla generada y lo que el usuario necesita saber sobre ella."""
+    """La tabla generada y lo que el usuario necesita saber sobre ella.
+
+    Los numeros cierran asi: de los `solicitados` se evaluan `min(disponibles, solicitados)`
+    productos y cada uno o sale en la tabla o se excluye con su motivo (RF-50), es decir
+    `generados + excluidos == min(disponibles, solicitados)`. `suficiente` habla de la seleccion
+    (habia productos para lo pedido), no de la tabla: con exclusiones puede ser verdadero y haber
+    menos `generados` que `solicitados`.
+    """
 
     tabla: Tabla
     disponibles: int
     solicitados: int
     errores: tuple[ErrorGeneracion, ...]
+    exclusiones: tuple[FilaExcluida, ...] = ()
 
     @property
     def generados(self) -> int:
         return self.tabla.cantidad
+
+    @property
+    def excluidos(self) -> int:
+        return len(self.exclusiones)
 
     @property
     def suficiente(self) -> bool:
@@ -75,4 +87,5 @@ class GeneracionCargasService:
             disponibles=seleccion.disponibles,
             solicitados=cantidad,
             errores=carga.errores,
+            exclusiones=carga.exclusiones,
         )

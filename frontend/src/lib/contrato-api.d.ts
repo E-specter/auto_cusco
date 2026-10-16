@@ -1764,6 +1764,21 @@ export interface components {
             /** Creado En */
             creado_en: string | null;
         };
+        /**
+         * ExclusionCargaRespuesta
+         * @description Un producto de la muestra que no sale en la carga y por que (RF-50).
+         *
+         *     `fila` es su posicion en la seleccion (desde 1), no la de la tabla; `pagare` lo identifica.
+         */
+        ExclusionCargaRespuesta: {
+            /** Fila */
+            fila: number;
+            /** Pagare */
+            pagare: string | null;
+            codigo: components["schemas"]["CodigoTexto"];
+            /** Detalle */
+            detalle: string;
+        };
         /** ExclusionFilaRespuesta */
         ExclusionFilaRespuesta: {
             codigo: components["schemas"]["CodigoTexto"];
@@ -1905,7 +1920,7 @@ export interface components {
             /** Extension */
             extension: string;
             /** Opciones */
-            opciones: string[];
+            opciones: components["schemas"]["OpcionFormatoRespuesta"][];
         };
         /**
          * FormatoSpeech
@@ -2198,6 +2213,32 @@ export interface components {
             /** Obligatoria */
             obligatoria: boolean;
         };
+        /**
+         * OpcionFormatoRespuesta
+         * @description Una opcion del archivo con lo que la pantalla necesita para pintarla sin repetir reglas.
+         *
+         *     `defecto` es el de `OpcionesArchivo` (nulo en `sangria` significa una sola linea). `sugeridos`
+         *     son valores usuales de una lista ABIERTA (el exportador acepta otros); ninguna opcion tiene hoy
+         *     una lista cerrada. `minimo` y `maximo` acotan el valor de un `entero` y el largo de un
+         *     `texto`; nulos si no hay limite.
+         */
+        OpcionFormatoRespuesta: {
+            /** Nombre */
+            nombre: string;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "texto" | "booleano" | "entero";
+            /** Defecto */
+            defecto: boolean | number | string | null;
+            /** Sugeridos */
+            sugeridos: string[] | null;
+            /** Minimo */
+            minimo: number | null;
+            /** Maximo */
+            maximo: number | null;
+        };
         /** OpcionRespuesta */
         OpcionRespuesta: {
             /** Valor */
@@ -2205,7 +2246,11 @@ export interface components {
             /** Ejemplo */
             ejemplo: string | null;
         };
-        /** OpcionesEntrada */
+        /**
+         * OpcionesEntrada
+         * @description Los defectos y los limites salen de `OpcionesArchivo` y de las constantes de la entidad: es
+         *     lo mismo que anuncia `GET /formatos`.
+         */
         OpcionesEntrada: {
             /**
              * Delimitador
@@ -3128,7 +3173,12 @@ export interface components {
             /** Expresiones */
             expresiones: components["schemas"]["ExpresionSegmentoRespuesta"][];
         };
-        /** PrevisualizacionRespuesta */
+        /**
+         * PrevisualizacionRespuesta
+         * @description `generados + excluidos` son los productos evaluados de la muestra: `min(disponibles,
+         *     muestra)`, con `muestra = min(solicitados, 20)`. `suficiente` es de la seleccion completa
+         *     (habia productos para lo pedido) y no considera las exclusiones.
+         */
         app__api__archivos_carga__PrevisualizacionRespuesta: {
             /** Nombre Archivo */
             nombre_archivo: string;
@@ -3144,12 +3194,16 @@ export interface components {
             solicitados: number;
             /** Generados */
             generados: number;
+            /** Excluidos */
+            excluidos: number;
             /** Suficiente */
             suficiente: boolean;
             /** Completa */
             completa: boolean;
             /** Errores */
             errores: components["schemas"]["ErrorGeneracionRespuesta"][];
+            /** Exclusiones */
+            exclusiones: components["schemas"]["ExclusionCargaRespuesta"][];
         };
         /** PrevisualizacionRespuesta */
         app__api__mowa_mes__PrevisualizacionRespuesta: {
@@ -3794,6 +3848,8 @@ export interface operations {
                     "X-Carga-Suficiente"?: "0" | "1";
                     /** @description Campos que no se pudieron generar; el detalle esta en /previsualizacion */
                     "X-Carga-Errores"?: string;
+                    /** @description Productos que no salen en el archivo porque no caen en ningun segmento (RF-50); generados + excluidos = min(disponibles, solicitados). El detalle de los primeros esta en /previsualizacion */
+                    "X-Carga-Excluidos"?: string;
                     [name: string]: unknown;
                 };
                 content: {

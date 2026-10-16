@@ -1055,6 +1055,13 @@
                   "type": "string",
                   "pattern": "^[0-9]+$"
                 }
+              },
+              "X-Carga-Excluidos": {
+                "description": "Productos que no salen en el archivo porque no caen en ningun segmento (RF-50); generados + excluidos = min(disponibles, solicitados). El detalle de los primeros esta en /previsualizacion",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
               }
             },
             "content": {
@@ -5440,6 +5447,41 @@
         ],
         "title": "ExcepcionRespuesta"
       },
+      "ExclusionCargaRespuesta": {
+        "properties": {
+          "fila": {
+            "type": "integer",
+            "title": "Fila"
+          },
+          "pagare": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagare"
+          },
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoTexto"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fila",
+          "pagare",
+          "codigo",
+          "detalle"
+        ],
+        "title": "ExclusionCargaRespuesta",
+        "description": "Un producto de la muestra que no sale en la carga y por que (RF-50).\n\n`fila` es su posicion en la seleccion (desde 1), no la de la tabla; `pagare` lo identifica."
+      },
       "ExclusionFilaRespuesta": {
         "properties": {
           "codigo": {
@@ -5843,7 +5885,7 @@
           },
           "opciones": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/OpcionFormatoRespuesta"
             },
             "type": "array",
             "title": "Opciones"
@@ -6642,6 +6684,87 @@
         ],
         "title": "NodoVariableGuardadoRespuesta"
       },
+      "OpcionFormatoRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "texto",
+              "booleano",
+              "entero"
+            ],
+            "title": "Tipo"
+          },
+          "defecto": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Defecto"
+          },
+          "sugeridos": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sugeridos"
+          },
+          "minimo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimo"
+          },
+          "maximo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "tipo",
+          "defecto",
+          "sugeridos",
+          "minimo",
+          "maximo"
+        ],
+        "title": "OpcionFormatoRespuesta",
+        "description": "Una opcion del archivo con lo que la pantalla necesita para pintarla sin repetir reglas.\n\n`defecto` es el de `OpcionesArchivo` (nulo en `sangria` significa una sola linea). `sugeridos`\nson valores usuales de una lista ABIERTA (el exportador acepta otros); ninguna opcion tiene hoy\nuna lista cerrada. `minimo` y `maximo` acotan el valor de un `entero` y el largo de un\n`texto`; nulos si no hay limite."
+      },
       "OpcionRespuesta": {
         "properties": {
           "valor": {
@@ -6706,7 +6829,8 @@
           }
         },
         "type": "object",
-        "title": "OpcionesEntrada"
+        "title": "OpcionesEntrada",
+        "description": "Los defectos y los limites salen de `OpcionesArchivo` y de las constantes de la entidad: es\nlo mismo que anuncia `GET /formatos`."
       },
       "OrigenDia": {
         "type": "string",
@@ -9167,6 +9291,10 @@
             "type": "integer",
             "title": "Generados"
           },
+          "excluidos": {
+            "type": "integer",
+            "title": "Excluidos"
+          },
           "suficiente": {
             "type": "boolean",
             "title": "Suficiente"
@@ -9181,6 +9309,13 @@
             },
             "type": "array",
             "title": "Errores"
+          },
+          "exclusiones": {
+            "items": {
+              "$ref": "#/components/schemas/ExclusionCargaRespuesta"
+            },
+            "type": "array",
+            "title": "Exclusiones"
           }
         },
         "type": "object",
@@ -9191,11 +9326,14 @@
           "disponibles",
           "solicitados",
           "generados",
+          "excluidos",
           "suficiente",
           "completa",
-          "errores"
+          "errores",
+          "exclusiones"
         ],
-        "title": "PrevisualizacionRespuesta"
+        "title": "PrevisualizacionRespuesta",
+        "description": "`generados + excluidos` son los productos evaluados de la muestra: `min(disponibles,\nmuestra)`, con `muestra = min(solicitados, 20)`. `suficiente` es de la seleccion completa\n(habia productos para lo pedido) y no considera las exclusiones."
       },
       "app__api__mowa_mes__PrevisualizacionRespuesta": {
         "properties": {

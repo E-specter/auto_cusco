@@ -15,12 +15,13 @@ asi que el frontend la envia completa en cada llamada (ver docs/mapeo-campos.md)
 """
 
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, Field
 
 from app.adapters.output import exportadores
+from app.adapters.output.exportadores.exportador_xlsx import LARGO_MAXIMO_HOJA
 from app.api.cartera import obtener_servicio_cartera
 from app.api.consultas import parsear_filtro, parsear_orden, texto_si_es_monto
 from app.api.definiciones_columnas import obtener_servicio_definiciones
@@ -29,7 +30,12 @@ from app.api.respuestas import ModeloRespuesta
 from app.core.entities.cartera import ConsultaInvalida, SinVersionVigente
 from app.core.entities.definiciones_columnas import DefinicionNoEncontrada, VersionNoEncontrada
 from app.core.entities.exportacion import (
+    CODIFICACIONES_SUGERIDAS,
+    DELIMITADORES_SUGERIDOS,
     EXTENSIONES,
+    LARGO_DELIMITADOR,
+    OPCIONES_POR_DEFECTO,
+    SANGRIA_MAXIMA,
     TIPOS_MIME,
     ExportacionInvalida,
     FormatoArchivo,
@@ -67,6 +73,11 @@ CABECERAS_RESUMEN: dict[str, str] = {
     "X-Carga-Solicitados": "Cantidad de productos pedida",
     "X-Carga-Suficiente": "1 si habia al menos tantos productos como se pidieron, 0 si no",
     "X-Carga-Errores": "Campos que no se pudieron generar; el detalle esta en /previsualizacion",
+    "X-Carga-Excluidos": (
+        "Productos que no salen en el archivo porque no caen en ningun segmento (RF-50); "
+        "generados + excluidos = min(disponibles, solicitados). El detalle de los primeros "
+        "esta en /previsualizacion"
+    ),
 }
 
 
@@ -97,11 +108,18 @@ class DefinicionEntrada(BaseModel):
 
 
 class OpcionesEntrada(BaseModel):
-    delimitador: str = Field(default=",", min_length=1, max_length=1)
-    codificacion: str = "utf-8"
-    con_cabeceras: bool = True
-    hoja: str = "Carga"
-    sangria: int | None = Field(default=None, ge=0, le=8)
+    """Los defectos y los limites salen de `OpcionesArchivo` y de las constantes de la entidad: es
+    lo mismo que anuncia `GET /formatos`."""
+
+    delimitador: str = Field(
+        default=OPCIONES_POR_DEFECTO.delimitador,
+        min_length=LARGO_DELIMITADOR,
+        max_length=LARGO_DELIMITADOR,
+    )
+    codificacion: str = OPCIONES_POR_DEFECTO.codificacion
+    con_cabeceras: bool = OPCIONES_POR_DEFECTO.con_cabeceras
+    hoja: str = OPCIONES_POR_DEFECTO.hoja
+    sangria: int | None = Field(default=OPCIONES_POR_DEFECTO.sangria, ge=0, le=SANGRIA_MAXIMA)
 
 
 class DefinicionGuardadaEntrada(BaseModel):
@@ -134,22 +152,57 @@ class ErrorGeneracionRespuesta(ModeloRespuesta):
     detalle: str
 
 
+class ExclusionCargaRespuesta(ModeloRespuesta):
+    """Un producto de la muestra que no sale en la carga y por que (RF-50).
+
+    `fila` es su posicion en la seleccion (desde 1), no la de la tabla; `pagare` lo identifica.
+    """
+
+    fila: int
+    pagare: str | None
+    codigo: CodigoTexto
+    detalle: str
+
+
 class PrevisualizacionRespuesta(ModeloRespuesta):
+    """`generados + excluidos` son los productos evaluados de la muestra: `min(disponibles,
+    muestra)`, con `muestra = min(solicitados, 20)`. `suficiente` es de la seleccion completa
+    (habia productos para lo pedido) y no considera las exclusiones."""
+
     nombre_archivo: str
     cabeceras: list[str]
     filas: list[dict[str, Any]]
     disponibles: int
     solicitados: int
     generados: int
+    excluidos: int
     suficiente: bool
     completa: bool
     errores: list[ErrorGeneracionRespuesta]
+    exclusiones: list[ExclusionCargaRespuesta]
+
+
+class OpcionFormatoRespuesta(ModeloRespuesta):
+    """Una opcion del archivo con lo que la pantalla necesita para pintarla sin repetir reglas.
+
+    `defecto` es el de `OpcionesArchivo` (nulo en `sangria` significa una sola linea). `sugeridos`
+    son valores usuales de una lista ABIERTA (el exportador acepta otros); ninguna opcion tiene hoy
+    una lista cerrada. `minimo` y `maximo` acotan el valor de un `entero` y el largo de un
+    `texto`; nulos si no hay limite.
+    """
+
+    nombre: str
+    tipo: Literal["texto", "booleano", "entero"]
+    defecto: bool | int | str | None
+    sugeridos: list[str] | None
+    minimo: int | None
+    maximo: int | None
 
 
 class FormatoRespuesta(ModeloRespuesta):
     formato: str
     extension: str
-    opciones: list[str]
+    opciones: list[OpcionFormatoRespuesta]
 
 
 # Que opcion de OpcionesArchivo usa cada formato, para que la interfaz muestre
@@ -159,6 +212,28 @@ OPCIONES_POR_FORMATO: dict[FormatoArchivo, tuple[str, ...]] = {
     FormatoArchivo.CSV: ("delimitador", "codificacion", "con_cabeceras"),
     FormatoArchivo.JSON: ("codificacion", "sangria"),
 }
+
+
+def _opcion(nombre: str) -> OpcionFormatoRespuesta:
+    """La descripcion de una opcion; el defecto se lee de `OpcionesArchivo`."""
+    defecto = getattr(OPCIONES_POR_DEFECTO, nombre)
+    descripciones: dict[str, dict[str, Any]] = {
+        "delimitador": {
+            "tipo": "texto",
+            "sugeridos": list(DELIMITADORES_SUGERIDOS),
+            "minimo": LARGO_DELIMITADOR,
+            "maximo": LARGO_DELIMITADOR,
+        },
+        "codificacion": {"tipo": "texto", "sugeridos": list(CODIFICACIONES_SUGERIDAS)},
+        "con_cabeceras": {"tipo": "booleano"},
+        "hoja": {"tipo": "texto", "maximo": LARGO_MAXIMO_HOJA},
+        "sangria": {"tipo": "entero", "minimo": 0, "maximo": SANGRIA_MAXIMA},
+    }
+    return OpcionFormatoRespuesta(
+        nombre=nombre,
+        defecto=defecto,
+        **{"sugeridos": None, "minimo": None, "maximo": None, **descripciones[nombre]},
+    )
 
 
 def _definicion(entrada: DefinicionEntrada) -> DefinicionCarga:
@@ -244,7 +319,7 @@ def listar_formatos() -> list[FormatoRespuesta]:
         FormatoRespuesta(
             formato=formato.value,
             extension=EXTENSIONES[formato],
-            opciones=list(OPCIONES_POR_FORMATO[formato]),
+            opciones=[_opcion(nombre) for nombre in OPCIONES_POR_FORMATO[formato]],
         )
         for formato in exportadores.EXPORTADORES
     ]
@@ -278,11 +353,18 @@ def previsualizar(
         disponibles=resultado.disponibles,
         solicitados=peticion.cantidad,
         generados=resultado.generados,
+        excluidos=resultado.excluidos,
         suficiente=resultado.disponibles >= peticion.cantidad,
         completa=resultado.completa,
         errores=[
             ErrorGeneracionRespuesta(fila=error.fila, campo=error.campo, detalle=error.detalle)
             for error in resultado.errores
+        ],
+        exclusiones=[
+            ExclusionCargaRespuesta(
+                fila=e.fila, pagare=e.pagare, codigo=CodigoTexto(e.codigo), detalle=e.detalle
+            )
+            for e in resultado.exclusiones
         ],
     )
 
@@ -349,5 +431,6 @@ def generar_archivo(
             "X-Carga-Solicitados": str(resultado.solicitados),
             "X-Carga-Suficiente": "1" if resultado.suficiente else "0",
             "X-Carga-Errores": str(len(resultado.errores)),
+            "X-Carga-Excluidos": str(resultado.excluidos),
         },
     )
