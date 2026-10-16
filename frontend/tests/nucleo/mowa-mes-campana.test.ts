@@ -220,12 +220,28 @@ describe('lectura de la previsualización', () => {
 
   it('un código sin traducción cae en la frase del servidor', () => {
     setLanguageForTests('es');
+    // A code no dictionary knows (what a newer API could send): invented on purpose and passed through
+    // `unknown`, because the type rightly does not admit it. A real code would be translated and prove nothing.
+    const inventado = 'codigo_que_ningun_diccionario_conoce' as unknown as AvisoCampana['codigo'];
+
     const resumen = resumenProblemasCampana({
       errores: [],
-      advertencias: [aviso('mensaje_excede_150' as AvisoCampana['codigo'], 'advertencia', 'Frase del servidor')],
+      advertencias: [aviso(inventado, 'advertencia', 'Frase del servidor')],
     });
-    // mensaje_excede_150 sí tiene traducción; se prueba con un código inventado vía cast.
-    expect(resumen).not.toBe('');
+
+    // The server's own sentence, whole: not a translation, not the raw dictionary key and not the code.
+    expect(resumen).toBe('Frase del servidor');
+    expect(resumen).not.toContain('mowaMes.codigo');
+    expect(resumen).not.toContain(inventado);
+
+    // Next to a code that does translate, each one reads its own way: the fallback is per code.
+    const mezclado = resumenProblemasCampana({
+      errores: [aviso('sin_supervisores', 'error', 'detalle del servidor')],
+      advertencias: [aviso(inventado, 'advertencia', 'Frase del servidor')],
+    });
+    expect(mezclado).not.toContain('detalle del servidor');
+    expect(mezclado).toContain('supervisor');
+    expect(mezclado.endsWith('Frase del servidor')).toBe(true);
   });
 
   it('la etiqueta del archivo previsto numera desde 1 y formatea los números', () => {
