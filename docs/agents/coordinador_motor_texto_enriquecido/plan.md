@@ -463,3 +463,59 @@ Worktree `auto_cusco_mte_b6`, sobre `01e11c5`.
 - **B6 devuelto por architec (2026-10-04):** 5 de 104 pruebas de integración fallan; 3 son de MOWA MES y ya existían. Causa probable: `expresiones` es JSONB sin `none_as_null`, así que un `None` se guarda como `'null'::jsonb` y no como NULL. El CHECK nuevo rechaza entonces guardar una v1, y acepta una v2 sin expresiones. Habría roto el guardado del speech en la base de trabajo del usuario.
   - Arreglo: lo hace el dev en el mismo worktree, con una prueba de SQL crudo y una revisión de las demás pruebas `@postgres`.
   - **Lección para los briefs que tocan persistencia:** como los devs no pueden correr las pruebas con base (decisión del usuario), deben compilar con el dialecto de PostgreSQL las sentencias que escriben columnas nulas, JSON o con zona horaria, y revisar los literales. En B4b y B6 los fallos con base aparecieron recién en architec.
+
+## 20. F2 en dos cortes y ruta de prueba (2026-10-06)
+
+F2 no había arrancado; antes solo existía el estado del editor (`5ffeddf` y `e207c46`). Se entrega en dos cortes:
+- **F2a, sin interfaz:** cliente del motor con caché por contexto, la API falsa encadenable, `variantes.ts`, `expresion.ts` alineado con los tipos generados, las etiquetas `campo.<nombre>` con su prueba, y `.table__detalle` y `.marca-vacio`.
+- **F2b, los componentes:** `EditorTexto`, `VariantesSegmento` y los selectores, con Playwright y axe.
+
+**Ruta de prueba de F2b, aprobada por architec, con condiciones:**
+1. Se inyecta con `injectRoute` solo cuando una variable de entorno está activa.
+2. Una comprobación de que el build de producción no la contiene.
+3. Sin navegación, sin `nav.*` y con `noindex`.
+4. Playwright la activa en su configuración.
+5. Una línea en `testing.md` §4.
+6. El build con la ruta sale a otro directorio (por ejemplo, `dist-pruebas`), del que Playwright levanta el preview. `npm run build` produce `dist/` sin la ruta.
+7. Los componentes no saben que están en una ruta de prueba: nada de ramas de modo prueba.
+
+## 21. Estado de la cola (2026-10-15)
+
+- **F3** entregado a architec, sin verificar todavía: se quedó sin margen de uso. El worktree `auto_cusco_mte_f3` queda congelado.
+- **B11** revisado por el coordinador y por dev_frontend. Incluye el ajuste de designer a su API falsa del motor; sin él, `npm run tipos` falla.
+- **Esperan la aprobación del usuario** (designer): `designer-nav.patch` (navegación de `/columnas`), `designer-ui-lectura` (`.input:read-only` y `controlMuestra` en `montarVariantes`) y el ajuste de la API falsa de B11.
+- **Después:** un corte chico de dev_frontend (quitar la regla CSS provisoria y usar como muestra un producto del segmento elegido) y luego F4.
+- **Mejora posible, no pedida:** una muestra por `segmento` concreto en la previsualización. Hoy, si ninguno de los 5 productos de la selección cae en el segmento elegido, se usa el primero y se avisa.
+
+## 22. F5, pantalla «Generar carga», y B12 (2026-10-15)
+
+**Origen:** hallazgo de C2. Ninguna pantalla usaba `/archivos-carga`, así que una definición guardada no se podía usar para generar un archivo desde la interfaz. El usuario eligió hacer la pantalla dentro del motor (consultado por architec). Es la «Pantalla de generación» que `planning.md` tenía pendiente en la Fase 3.
+
+**B12 (backend, antes de F5):** `/archivos-carga` no expone las exclusiones de la segmentación (`CargaGenerada.exclusiones`, código `sin_segmento`, RF-50), que el generador ya calcula.
+- La previsualización tiene que traerlas: cantidad y, por fila, el código de `CodigoTexto` y el detalle.
+- La descarga, una cabecera de resumen `X-Carga-Excluidos`, declarada en el contrato y en CORS, igual que las demás.
+- Sin datos personales nuevos.
+
+**F5 (dev_frontend; experiencia de designer):**
+- Elegir una definición guardada y su versión (`api-definiciones.ts`).
+- Elegir la fecha de corte y la selección con `SelectorSeleccion`.
+- Elegir el formato (XLSX, CSV o JSON), con las opciones de `/archivos-carga/formatos`. `proteger_formulas` viene de la definición y no se edita aquí.
+- Previsualizar (`/archivos-carga/previsualizacion` con `definicion_guardada`).
+- Descargar con `descargas.ts` y leer las cabeceras `X-Carga-*`.
+- Mostrar el aviso de selección insuficiente (`suficiente`, RF-08), los errores por fila y las exclusiones por segmento (B12).
+- Solo frontend, sobre contratos que ya existen, más B12.
+- Antes de programar, dev_frontend escribe el plan de la pantalla y designer lo aprueba, como en F3.
+- La entrada de navegación es de designer.
+
+**Cierre:** C2 se cierra después de F5.
+- **Navegación de F5 (designer):** va en «Flujo diario», como tercer paso: «Cargas · Cartera · Generar carga». Designer la agrega con un parche sobre F5. **Duda de nombre que designer le lleva al usuario:** «Cargas» (las sábanas que entran) frente a «Generar carga» (el archivo que sale). Recomienda mantener los dos nombres y que la intro de la página lo aclare; la alternativa es renombrar «Cargas» a «Sábanas».
+- **Plan de F5 (dev_frontend, `plan-f5.md` en su worktree), pendiente de la aprobación de designer.**
+  - El contrato encaja sin cambios: los filtros y el orden del selector son la misma sintaxis que `/cartera`, la selección guardada se resuelve a filtros y la cantidad es un campo propio de la pantalla.
+  - G-1: los tipos de B12, antes de programar las exclusiones.
+  - G-2, sumado a B12: `/archivos-carga/formatos` da por opción el tipo, el valor por defecto y los valores permitidos. El frontend no fija listas propias.
+  - G-3 (¿se corta la generación al cancelar?) y G-4 (¿cuándo se marca `usada_en`?): preguntados al dev backend; si no hay cambio, van como límites conocidos.
+- **G-3 y G-4, respondidos por el dev backend con una prueba real (2026-10-16):**
+  - `POST /archivos-carga` no se corta al cerrarse la conexión: corre entero en un hilo.
+  - `usada_en` se marca después de generar y exportar bien, pero antes de enviar el cuerpo. Si el cliente cancela, la versión puede quedar marcada sin entrega. Nunca se marca si la generación falla ni en la previsualización.
+  - Los dos quedan como límites conocidos. Mitigación en F5: un aviso después de cancelar y no permitir otra descarga mientras haya una en curso.
+- **Designer aprobó el plan de F5:** ruta `/generar-carga`, al final de «Flujo diario». La navegación va en un parche de designer sobre F5.
