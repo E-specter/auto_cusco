@@ -41,8 +41,8 @@ const MOWA = NAVEGACION.flatMap((s) => s.entradas).find(
 )!.modulo;
 
 describe('estructura de la navegación', () => {
-  it('agrupa el flujo diario y los canales en secciones separadas', () => {
-    expect(NAVEGACION.map((s) => s.id)).toEqual(['flujo', 'canales']);
+  it('agrupa el flujo diario, los canales y la configuración en secciones separadas', () => {
+    expect(NAVEGACION.map((s) => s.id)).toEqual(['flujo', 'canales', 'configuracion']);
   });
 
   it('cada ruta apunta a una página que existe', () => {

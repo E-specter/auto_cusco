@@ -25,7 +25,7 @@ const { actual } = Astro.props;
 <nav class="nav" data-navegacion data-i18n-attr="aria-label:nav.label" aria-label="Secciones">
   {
     NAVEGACION.map((seccion, i) => (
-      <Fragment>
+      <div class="nav__grupo">
         {i > 0 && (
           <span class="nav__divisor" aria-hidden="true">
             |
@@ -85,7 +85,7 @@ const { actual } = Astro.props;
             </li>
           ))}
         </ul>
-      </Fragment>
+      </div>
     ))
   }
 </nav>
@@ -211,6 +211,15 @@ const { actual } = Astro.props;
     align-items: center;
     flex-wrap: wrap;
     gap: var(--space-1) var(--space-2);
+    min-inline-size: 0;
+  }
+
+  /* A divider travels with the section it opens: when the bar wraps, the
+     section moves to the next line with its divider in front, never leaving
+     a dangling «|» at the end of the line above. */
+  .nav__grupo {
+    display: flex;
+    align-items: center;
     min-inline-size: 0;
   }
 

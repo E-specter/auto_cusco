@@ -12,6 +12,8 @@
   "nav.mowaMes.seguimientoLargo": "MOWA MES: tracking",
   "nav.mowaMes.configuracion": "Settings",
   "nav.mowaMes.configuracionLargo": "MOWA MES: settings",
+  "nav.seccion.configuracion": "Configuration",
+  "nav.columnas": "Load columns",
   "appearance.theme": "Theme",
   "appearance.theme.light": "Light",
   "appearance.theme.dark": "Dark",

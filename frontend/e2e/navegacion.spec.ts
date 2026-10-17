@@ -65,9 +65,11 @@ test.describe('secciones', () => {
 
     await expect(nav.getByRole('list', { name: 'Flujo diario' })).toBeVisible();
     await expect(nav.getByRole('list', { name: 'Canales' })).toBeVisible();
-    await expect(nav.locator('.nav__divisor')).toHaveText('|');
+    await expect(nav.getByRole('list', { name: 'Configuración' })).toBeVisible();
+    await expect(nav.locator('.nav__divisor')).toHaveText(['|', '|']);
     await expect(nav.locator('.nav__punto').first()).toHaveText('·');
     await expect(nav.getByRole('link', { name: 'Cartera' })).toHaveAttribute('aria-current', 'page');
+    await expect(nav.getByRole('link', { name: 'Columnas de carga' })).toHaveAttribute('href', '/columnas');
   });
 });
 
