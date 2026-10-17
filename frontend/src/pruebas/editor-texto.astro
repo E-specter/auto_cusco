@@ -13,7 +13,7 @@
  *   &expresion=<json>              initial expression (or porDefecto)
  *   &variantes=<json>              initial variants
  *   &defecto=1                     variants: show «Por defecto»
- *   &muestra=0                     editor: the page sets the sample
+ *   &muestra=0                     the page sets the sample (no sample control)
  *   &resumen=ninguno               no summary of its own
  *   &soloLectura=1                 read-only
  *   &soloVariable=1                a direct-variable column (§5.3)
@@ -111,6 +111,7 @@ import VariantesSegmento from '../components/VariantesSegmento.astro';
         resumen: parametros.get('resumen') === 'ninguno' ? 'ninguno' : 'propio',
         soloLectura: parametros.get('soloLectura') === '1',
         soloVariable: parametros.get('soloVariable') === '1',
+        controlMuestra: parametros.get('muestra') !== '0',
       });
       expuesta.controladorPrueba = variantes;
       document.querySelector('[data-guardar]')!.addEventListener('click', () => {

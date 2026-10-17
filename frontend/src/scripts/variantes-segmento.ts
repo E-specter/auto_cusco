@@ -57,6 +57,11 @@ export interface OpcionesVariantes {
   soloLectura?: boolean;
   /** Passed to the editor: a direct-variable column that varies by segment (§5.3). */
   soloVariable?: boolean;
+  /**
+   * Passed to the editor. `false` hides its sample control: the screen sets
+   * the sample with `editor.fijarMuestra` (the column builder, §9.2 and §5.4).
+   */
+  controlMuestra?: boolean;
 }
 
 export interface ControladorVariantes {
@@ -200,28 +205,57 @@ export async function montarVariantes(raiz: HTMLElement, opciones: OpcionesVaria
     ];
   }
 
+  function pintarBoton(
+    boton: HTMLButtonElement,
+    { segmento, etiqueta, estado }: { segmento: string | null; etiqueta: string; estado: EstadoVariante },
+  ): void {
+    boton.setAttribute('aria-pressed', String(segmento === s.seleccionado));
+    boton.querySelector<HTMLElement>('.variantes__nombre')!.textContent = etiqueta;
+    boton.querySelector<HTMLElement>('.variantes__marcas')!.replaceChildren(...marcas(segmento, estado));
+  }
+
+  /**
+   * Validations arrive one after another and each repaints the states. The
+   * buttons are updated in place while the segments are the same, so a
+   * keyboard user who is on one never loses it; when the segments change
+   * (`fijarSegmentos`), the list is rebuilt and the focus goes back to the
+   * same segment by its key, if it still exists.
+   */
   function pintarLista(): void {
     const lista = entradas();
-    el.botones.replaceChildren(
-      ...lista.map(({ segmento, etiqueta, estado }) => {
-        const item = document.createElement('li');
-        const boton = document.createElement('button');
-        boton.type = 'button';
-        boton.className = 'variantes__boton';
-        boton.dataset.segmento = clave(segmento);
-        boton.setAttribute('aria-pressed', String(segmento === s.seleccionado));
-        const nombre = document.createElement('span');
-        nombre.className = 'variantes__nombre';
-        nombre.textContent = etiqueta;
-        const grupo = document.createElement('span');
-        grupo.className = 'variantes__marcas';
-        grupo.append(...marcas(segmento, estado));
-        boton.append(nombre, grupo);
-        boton.addEventListener('click', () => seleccionar(segmento));
-        item.append(boton);
-        return item;
-      }),
-    );
+    const actuales = [...el.botones.querySelectorAll<HTMLButtonElement>('.variantes__boton')];
+    const mismos =
+      actuales.length === lista.length && actuales.every((b, i) => b.dataset.segmento === clave(lista[i].segmento));
+    if (mismos) {
+      actuales.forEach((boton, i) => pintarBoton(boton, lista[i]));
+    } else {
+      const activo = document.activeElement;
+      const enfocado =
+        activo instanceof HTMLElement && el.botones.contains(activo)
+          ? activo.closest<HTMLElement>('.variantes__boton')?.dataset.segmento
+          : undefined;
+      el.botones.replaceChildren(
+        ...lista.map((entrada) => {
+          const item = document.createElement('li');
+          const boton = document.createElement('button');
+          boton.type = 'button';
+          boton.className = 'variantes__boton';
+          boton.dataset.segmento = clave(entrada.segmento);
+          const nombre = document.createElement('span');
+          nombre.className = 'variantes__nombre';
+          const grupo = document.createElement('span');
+          grupo.className = 'variantes__marcas';
+          boton.append(nombre, grupo);
+          boton.addEventListener('click', () => seleccionar(entrada.segmento));
+          pintarBoton(boton, entrada);
+          item.append(boton);
+          return item;
+        }),
+      );
+      if (enfocado !== undefined) {
+        el.botones.querySelector<HTMLElement>(`[data-segmento="${CSS.escape(enfocado)}"]`)?.focus();
+      }
+    }
 
     el.select.replaceChildren(
       ...lista.map(({ segmento, etiqueta, estado }) => {
@@ -359,6 +393,7 @@ export async function montarVariantes(raiz: HTMLElement, opciones: OpcionesVaria
     resumen: opciones.resumen ?? 'ninguno',
     soloLectura: s.soloLectura,
     soloVariable: opciones.soloVariable,
+    controlMuestra: opciones.controlMuestra,
   });
 
   function seleccionar(segmento: string | null): void {

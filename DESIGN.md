@@ -329,7 +329,9 @@ One pressed-state group for every either/or in the product: language, theme, sev
 ### Fields
 
 - **Style:** square (`radius 0`), 1px ink border, page background, mono text at `0.786rem`. Labels sit above in the uppercase mono label style; hints below in the same face at `0.618rem`.
-- **Hover:** border shifts to the green text step over 120ms.
+- **Hover:** border shifts to the green text step over 120ms, except on a disabled or read-only field.
+- **Disabled:** sunken surface, muted text, `not-allowed` cursor.
+- **Read-only** (`[readonly]`): the sunken surface of a disabled field, but the text stays ink and the field keeps its focus, so the value can still be read, selected and copied. An old version opened to look at (the column builder) and a date fixed by the row it came from (the MOWA MES calendar) use it.
 - **Invalid:** border goes to the red-orange text step, driven by `:user-invalid` or `aria-invalid="true"` — never by a class alone.
 - **Error message:** a fully bordered block (`1px solid currentColor`) on the red-orange wash, in mono 500. It self-hides when empty (`:empty { display: none }`), and the script pairs it with `aria-invalid`, `aria-describedby` and a focus move to the offending control.
 - **File picker:** a dashed-bordered row that behaves as a real dropzone (`data-dragging="true"` swaps to the accent border and wash). The native `<input type=file>` stays real and focusable but visually hidden, because its built-in button text follows the *browser's* locale, not the page's; a `<label>` is the visible, translated trigger. Once a file is named, the "or drop it here" invitation removes itself via `:has([data-file-name]:not([data-i18n]))`.

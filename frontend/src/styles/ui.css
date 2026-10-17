@@ -288,7 +288,7 @@
   transition: border-color var(--duration-micro) var(--ease-default);
 }
 
-.input:hover:not(:disabled) {
+.input:hover:not(:disabled, [readonly]) {
   border-color: var(--color-accent-text);
 }
 
@@ -296,6 +296,15 @@
   background-color: var(--color-surface-sunken);
   color: var(--color-text-muted);
   cursor: not-allowed;
+}
+
+/* Read-only is not disabled: the value is there to be read, selected and
+   copied, so it keeps the ink colour and the focus. Only the sunken fill says
+   it cannot be changed — the same fill a disabled select shows beside it,
+   without fading the text. */
+.input[readonly] {
+  background-color: var(--color-surface-sunken);
+  cursor: default;
 }
 
 .input:user-invalid,

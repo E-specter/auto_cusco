@@ -306,6 +306,11 @@ test.describe('calendario', () => {
     await fila.getByRole('button', { name: /Retirar el feriado/ }).click();
 
     const dialogo = page.getByRole('dialog', { name: 'Retirar «Día del Trabajo» este año' });
+    // The date is the holiday clicked: read-only, and it looks it (sunken, unlike the editable motive).
+    const fecha = dialogo.locator('input[type="date"]');
+    await expect(fecha).not.toBeEditable();
+    const fondo = (campo: typeof fecha) => campo.evaluate((e) => getComputedStyle(e).backgroundColor);
+    expect(await fondo(fecha)).not.toBe(await fondo(dialogo.getByLabel('Motivo')));
     await dialogo.getByLabel('Motivo').fill('Decreto sintético');
     await dialogo.getByRole('button', { name: 'Retirar feriado' }).click();
 

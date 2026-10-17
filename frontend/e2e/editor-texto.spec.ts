@@ -404,6 +404,17 @@ test.describe('variantes por segmento', () => {
     await expect(raiz.locator('[data-segmento-botones]').getByRole('button', { name: /^1 a 8/ })).toContainText('Usa el por defecto');
   });
 
+  test('con controlMuestra: false el editor de adentro no muestra su control y la página fija la muestra', async ({ page }) => {
+    const { motor } = await abrir(page, { componente: 'variantes', variantes, extra: '&muestra=0' });
+    await expect(variantesRaiz(page).getByRole('button', { name: 'Registro de ejemplo' })).toBeHidden();
+    await expect(variantesRaiz(page).locator('[data-resultado]')).not.toHaveClass(/pendiente/);
+
+    await llamarEditor(page, 'fijarMuestra', { tipo: 'producto_real', fecha_corte: '2026-10-05', pagare: '000000001', cantidad: 1 });
+    await expect
+      .poll(() => motor.pedidos.filter((p) => p.ruta === '/texto-enriquecido/previsualizacion').at(-1)?.cuerpo)
+      .toMatchObject({ muestra: { tipo: 'producto_real', pagare: '000000001' } });
+  });
+
   test('a 360 px la lista pasa a un select', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 740 });
     await abrir(page, { componente: 'variantes', variantes });
@@ -423,6 +434,18 @@ async function llamar(page: Page, metodo: string, ...args: unknown[]): Promise<v
       const controlador = (window as unknown as { controladorPrueba: Record<string, (...x: unknown[]) => void> })
         .controladorPrueba;
       controlador[m as string](...(a as unknown[]));
+    },
+    [metodo, args] as const,
+  );
+}
+
+/** The same, on the editor inside VariantesSegmento (`controlador.editor`). */
+async function llamarEditor(page: Page, metodo: string, ...args: unknown[]): Promise<void> {
+  await page.evaluate(
+    ([m, a]) => {
+      const controlador = (window as unknown as { controladorPrueba: { editor: Record<string, (...x: unknown[]) => void> } })
+        .controladorPrueba;
+      controlador.editor[m as string](...(a as unknown[]));
     },
     [metodo, args] as const,
   );
@@ -510,6 +533,44 @@ test.describe('variantes sin remontar', () => {
     await llamar(page, 'fijarSegmentos', dosSegmentos);
     await expect(lista(page).getByRole('button', { name: /^Preventiva/ })).toHaveAttribute('aria-pressed', 'true');
     await expect(raiz(page).getByRole('group', { name: 'Speech de Preventiva' })).toBeVisible();
+  });
+
+  test('el foco sigue en su segmento mientras llegan las validaciones de todos', async ({ page }) => {
+    const { motor } = await abrir(page, {
+      componente: 'variantes',
+      variantes: [
+        ...variantes,
+        { segmento: '9_a_30', expresion: { nodos: [{ tipo: 'texto', valor: 'Otro texto.' }] } },
+      ],
+    });
+    const boton = lista(page).getByRole('button', { name: /^1 a 8/ });
+    await expect(boton).toContainText('Propio');
+    await boton.focus();
+    await boton.evaluate((b) => b.setAttribute('data-mismo-nodo', ''));
+    const antes = validaciones(motor);
+
+    // New content for every segment: each one is validated again, and each answer repaints the list.
+    await llamar(page, 'fijarVariantes', {
+      porDefecto: null,
+      variantes: [
+        { segmento: '1_a_8', expresion: { nodos: [{ tipo: 'texto', valor: 'Cambiado.' }] } },
+        { segmento: '9_a_30', expresion: { nodos: [{ tipo: 'texto', valor: 'Cambiado también.' }] } },
+      ],
+    });
+    await expect.poll(() => validaciones(motor)).toBeGreaterThanOrEqual(antes + 2);
+    await expect(raiz(page).locator('[data-resultado]')).not.toHaveClass(/pendiente/);
+
+    await expect(lista(page).locator('[data-mismo-nodo]')).toBeFocused();
+    await expect(boton).toBeFocused();
+  });
+
+  test('si cambian los segmentos, el foco vuelve al mismo segmento', async ({ page }) => {
+    await abrir(page, { componente: 'variantes', variantes });
+    const boton = lista(page).getByRole('button', { name: /^1 a 8/ });
+    await boton.focus();
+    await llamar(page, 'fijarSegmentos', dosSegmentos);
+    await expect(lista(page).getByRole('button')).toHaveCount(2);
+    await expect(lista(page).getByRole('button', { name: /^1 a 8/ })).toBeFocused();
   });
 
   test('fijarSoloLectura(false) habilita la edición sin perder el segmento («Usar como base»)', async ({ page }) => {
