@@ -1,0 +1,234 @@
+---
+/**
+ * Generate a load file (T-MTE-F5, docs/generacion-cargas.md and plan-f5.md). The file that leaves for a
+ * platform: a selection (cut-off date, filters, order), a saved column definition with its version
+ * and a format, in one column that reads in the order of the walk.
+ *
+ * Not to be mixed up with "Cargas", which are the daily sheets that come in. The page validates
+ * nothing and evaluates nothing: the sample, the totals, the exclusions and the errors are the
+ * backend's; the screen only asks for them with the same body the download will carry.
+ */
+import Shell from '../layouts/Shell.astro';
+import Icon from '../components/Icon.astro';
+import SelectorSeleccion from '../components/SelectorSeleccion.astro';
+import '../styles/generar-carga.css';
+---
+
+<Shell
+  title="Generar carga — auto_cusco"
+  description="Genera el archivo de carga para una plataforma a partir de una selección, una definición de columnas y un formato."
+>
+  <div class="gc">
+    <header class="gc__head">
+      <h1 class="gc__title" data-i18n="generar.title">Generar carga</h1>
+      <p class="gc__intro" data-i18n="generar.intro">
+        «Cargas» es lo que entra, las sábanas diarias; «Generar carga» es el archivo que sale hacia una plataforma, armado con una selección y una definición de columnas.
+      </p>
+    </header>
+
+    <section class="standIn" data-offline hidden aria-labelledby="gc-offline-title">
+      <h2 class="standIn__title" id="gc-offline-title" data-i18n="console.offline.title">Sin conexión con la API</h2>
+      <p class="standIn__body" data-i18n="console.offline.body">
+        No se pudo contactar con el backend. Comprueba que esté en marcha y vuelve a intentarlo.
+      </p>
+      <button type="button" class="btn btn--primary" data-reintentar>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span class="btn__label" data-i18n="console.offline.retry">Reintentar</span>
+      </button>
+    </section>
+
+    <div class="gc__contenido" data-contenido hidden>
+      <SelectorSeleccion modo="compacto" id="seleccion" />
+
+      <section class="panel" aria-labelledby="gc-definicion-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="gc-definicion-title" data-i18n="generar.definicion.title">Definición de columnas</h2>
+          <a class="btn btn--sm" href="/columnas" data-editar>
+            <span data-i18n="generar.definicion.editar">Editar en Columnas de carga</span>
+          </a>
+        </div>
+        <div class="panel__body gc-form">
+          <div class="empty" data-vacio hidden>
+            <p class="empty__title" data-i18n="generar.vacio.title">Todavía no hay definiciones guardadas</p>
+            <p data-i18n="generar.vacio.cuerpo">Arma la primera en Columnas de carga para poder generar archivos.</p>
+            <a class="btn btn--primary" href="/columnas">
+              <span data-i18n="generar.vacio.enlace">Ir a Columnas de carga</span>
+            </a>
+          </div>
+
+          <div class="gc-grupo" data-definicion-campos>
+            <div class="field">
+              <label class="field__label" for="gc-definicion" data-i18n="generar.definicion.elegir">Definición guardada</label>
+              <select class="input" id="gc-definicion" data-definicion></select>
+            </div>
+            <div class="field" data-campo-version hidden>
+              <label class="field__label" for="gc-version" data-i18n="generar.definicion.version">Versión</label>
+              <select class="input" id="gc-version" data-version></select>
+            </div>
+          </div>
+
+          <p class="field__error" data-definicion-error role="alert"></p>
+
+          <dl class="gc-datos" data-definicion-resumen hidden>
+            <div class="gc-datos__item">
+              <dt data-i18n="generar.definicion.columnas">Columnas</dt>
+              <dd class="mono" data-resumen-columnas></dd>
+            </div>
+            <div class="gc-datos__item">
+              <dt data-i18n="generar.definicion.segmentacion">Segmentación</dt>
+              <dd data-resumen-segmentacion></dd>
+            </div>
+            <div class="gc-datos__item">
+              <dt data-i18n="generar.definicion.proteger">Proteger fórmulas en CSV</dt>
+              <dd data-resumen-proteger></dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="gc-archivo-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="gc-archivo-title" data-i18n="generar.archivo.title">Archivo</h2>
+        </div>
+        <div class="panel__body gc-form">
+          <div class="field">
+            <span class="field__label" id="gc-formato-etiqueta" data-i18n="generar.formato">Formato</span>
+            <div class="segmented" role="group" aria-labelledby="gc-formato-etiqueta" data-formatos></div>
+          </div>
+
+          <div class="field gc-cantidad">
+            <label class="field__label" for="gc-cantidad" data-i18n="generar.cantidad">Cantidad a generar</label>
+            <input
+              class="input mono"
+              id="gc-cantidad"
+              data-cantidad
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              aria-describedby="gc-cantidad-hint gc-cantidad-error"
+            />
+            <p class="field__hint" id="gc-cantidad-hint" data-cantidad-hint></p>
+            <p class="field__error" id="gc-cantidad-error" data-cantidad-error></p>
+          </div>
+
+          <fieldset class="gc-opciones" data-opciones-grupo hidden>
+            <legend class="gc-opciones__titulo" data-i18n="generar.opciones.title">Opciones del formato</legend>
+            <div class="gc-opciones__lista" data-opciones></div>
+          </fieldset>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="gc-previa-title" data-previa>
+        <div class="panel__head">
+          <h2 class="panel__title" id="gc-previa-title" data-i18n="generar.previa.title">Vista previa</h2>
+          <p class="gc-calculo" data-calculo aria-live="polite">
+            <span class="dot" aria-hidden="true"></span>
+            <span data-calculo-texto></span>
+          </p>
+        </div>
+        <div class="panel__body gc-form">
+          <p class="gc-pendiente" data-previa-pendiente></p>
+
+          <div class="notice notice--danger" data-previa-error hidden>
+            <Icon name="triangle-alert" size={20} />
+            <span class="gc-aviso__texto" data-previa-error-texto></span>
+            <button type="button" class="btn btn--sm" data-previa-reintentar data-i18n="generar.previa.reintentar">Reintentar</button>
+          </div>
+
+          <div data-previa-contenido hidden>
+            <dl class="gc-cifras">
+              <div class="gc-cifras__item">
+                <dd class="gc-cifras__cifra mono" data-cifra-disponibles></dd>
+                <dt class="gc-cifras__etiqueta" data-i18n="generar.cifras.disponibles">Cumplen la selección</dt>
+              </div>
+              <div class="gc-cifras__item">
+                <dd class="gc-cifras__cifra mono" data-cifra-solicitados></dd>
+                <dt class="gc-cifras__etiqueta" data-i18n="generar.cifras.solicitados">Se piden</dt>
+              </div>
+              <div class="gc-cifras__item">
+                <dd class="gc-cifras__cifra mono" data-cifra-muestra></dd>
+                <dt class="gc-cifras__etiqueta" data-i18n="generar.cifras.muestra">Filas de la muestra</dt>
+              </div>
+            </dl>
+
+            <div class="gc-avisos">
+              <p class="notice notice--info" data-aviso-suficiencia hidden>
+                <Icon name="info" size={20} />
+                <span data-aviso-suficiencia-texto></span>
+              </p>
+              <p class="notice notice--warning" data-aviso-exclusiones hidden>
+                <Icon name="triangle-alert" size={20} />
+                <span data-aviso-exclusiones-texto></span>
+              </p>
+              <p class="notice notice--danger" data-aviso-errores hidden>
+                <Icon name="triangle-alert" size={20} />
+                <span data-aviso-errores-texto></span>
+              </p>
+            </div>
+
+            <div class="table-scroll" data-tabla-contenedor>
+              <table class="table gc-tabla">
+                <caption class="visually-hidden" id="gc-tabla-caption" data-tabla-caption></caption>
+                <thead data-tabla-cabeza></thead>
+                <tbody data-tabla-cuerpo></tbody>
+              </table>
+            </div>
+
+            <div class="gc-problemas" data-problemas hidden>
+              <h3 class="gc-problemas__titulo" id="gc-problemas-title" data-i18n="generar.problemas.title">Problemas de la muestra</h3>
+              <table class="table table--apilable gc-tabla-problemas" aria-labelledby="gc-problemas-title">
+                <thead>
+                  <tr>
+                    <th scope="col" data-i18n="generar.problemas.donde">Dónde</th>
+                    <th scope="col" data-i18n="generar.problemas.que">Qué pasó</th>
+                  </tr>
+                </thead>
+                <tbody data-problemas-cuerpo></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel gc-generar" aria-label="Generar">
+        <div class="panel__body gc-form">
+          <p class="gc-linea" data-linea></p>
+          <div class="gc-acciones">
+            <button type="button" class="btn btn--primary" data-generar>
+              <span class="btn__spinner" aria-hidden="true"></span>
+              <Icon name="download" size={16} />
+              <span class="btn__label" data-generar-texto data-i18n="generar.generar">Generar y descargar</span>
+            </button>
+            <button type="button" class="btn" data-cancelar hidden data-i18n="generar.cancelar">Cancelar</button>
+          </div>
+
+          <div class="gc-resultado" data-resultado aria-live="polite">
+            <div class="notice notice--success" data-resultado-exito hidden tabindex="-1">
+              <Icon name="circle-check" size={20} />
+              <div class="gc-aviso__texto" data-resultado-exito-texto></div>
+            </div>
+            <div class="notice notice--info" data-resultado-cancelado hidden tabindex="-1">
+              <Icon name="info" size={20} />
+              <span class="gc-aviso__texto" data-resultado-cancelado-texto></span>
+            </div>
+            <div class="notice notice--danger" data-resultado-error hidden tabindex="-1">
+              <Icon name="triangle-alert" size={20} />
+              <div class="gc-aviso__texto">
+                <strong data-i18n="generar.error.titulo">No se pudo generar el archivo</strong>
+                <span data-resultado-error-texto></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <template data-icono-abrir><Icon name="chevron-down" size={16} /></template>
+  </div>
+</Shell>
+
+<script>
+  import { arrancar } from '../scripts/generar-carga';
+
+  void arrancar();
+</script>

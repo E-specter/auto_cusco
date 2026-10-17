@@ -142,4 +142,4 @@ Los exportadores no saben nada de cobranza: reciben cabeceras y filas. Los repor
 
 - **Guardar definiciones** de carga y editarlas desde la interfaz (RF-11, RF-32).
 - **Adaptadores por plataforma:** SMS y WhatsApp primero, luego Cisvox para VoIP. Lo que falta de ellos no es el motor ni el formato, sino **la estructura exacta de campos y cabeceras que exige cada proveedor**, que hay que levantar con el usuario o con su documentación antes de implementarlos (RF-10, RF-18).
-- **Pantalla de generación** en el frontend, sobre estos endpoints.
+- ~~**Pantalla de generación** en el frontend, sobre estos endpoints.~~ Hecha: `/generar-carga` (T-MTE-F5). Une la selección compacta, una definición guardada con su versión y un formato; pide la vista previa y la descarga con el mismo cuerpo. Cancelar solo libera la pantalla: el servidor termina igual y puede marcar la versión como usada (`plan-f5.md` §14).

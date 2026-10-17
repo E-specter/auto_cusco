@@ -19,6 +19,7 @@ import {
   previsualizacionCampanaSintetica,
   SIN_TARIFA_GUARDADA,
 } from './api-falsa-mowa-mes';
+import { apiArchivosCarga, crearCompuerta, manejadorArchivosCarga } from './api-falsa-archivos-carga';
 import { apiDefiniciones, definicionFalsa, manejadorDefiniciones } from './api-falsa-definiciones';
 import { apiTextoEnriquecidoVacia, manejarTextoEnriquecido } from './api-falsa-texto-enriquecido';
 import { apiSpeechV2, montarApiSpeechV2, versionV2Sintetica } from './api-falsa-speech-v2';
@@ -551,3 +552,108 @@ for (const tema of ['light', 'dark'] as const) {
     await page.mouse.up();
   });
 }
+
+// "Generar carga" (/generar-carga): the preview with its notices and problems, the options of a format,
+// the notices after a download, a cancel and a refusal, and the table that overflows on a phone.
+async function abrirGenerarCarga(
+  page: Page,
+  ajustar?: (cargas: ReturnType<typeof apiArchivosCarga>) => void,
+) {
+  const base = apiVacia();
+  base.versiones = [version({ fecha_corte: '2026-09-10', vigente: true })];
+  base.selecciones = [seleccionGuardada({ id: 1, nombre: 'Preventiva top 500', cantidad: 500 })];
+  const definiciones = apiDefiniciones();
+  definiciones.definiciones.push(definicionFalsa({ id: 7, nombre: 'SMS preventivo', versiones: 2 }));
+  const cargas = apiArchivosCarga();
+  ajustar?.(cargas);
+  base.manejadores = [manejadorDefiniciones(definiciones), manejadorArchivosCarga(cargas)];
+  await montarApi(page, base);
+  await page.goto('/generar-carga');
+  await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 500' });
+  await page.getByLabel('Definición guardada').selectOption({ label: 'SMS preventivo' });
+  await expect(page.locator('[data-previa-contenido]')).toBeVisible();
+  // The figures dim while the preview recalculates; axe measures contrast only once it is up to date.
+  await expect(page.locator('[data-previa]')).toHaveAttribute('data-calculando', 'false');
+  return cargas;
+}
+
+const conProblemas = (cargas: ReturnType<typeof apiArchivosCarga>) => {
+  cargas.disponibles = 300;
+  cargas.segmentadas = [7];
+  cargas.errores = [{ fila: 2, campo: 'mensaje', detalle: 'La variable titular está vacía' }];
+  cargas.exclusiones = Array.from({ length: 6 }, (_, i) => ({
+    fila: i + 1,
+    pagare: `90000${String(i).padStart(2, '0')}`,
+    codigo: 'sin_segmento' as const,
+    detalle: 'El producto no cae en ningún segmento',
+  }));
+};
+
+for (const tema of ['light', 'dark'] as const) {
+  test.describe(`generar carga, tema ${tema === 'light' ? 'claro' : 'oscuro'}`, () => {
+    test.beforeEach(async ({ page }) => {
+      await page.addInitScript((elegido) => {
+        localStorage.setItem('app:appearance', JSON.stringify({ theme: elegido, language: 'es' }));
+      }, tema);
+    });
+
+    test('con la vista previa lista', async ({ page }) => {
+      await abrirGenerarCarga(page);
+      await sinViolaciones(page);
+    });
+
+    test('con avisos, problemas y un grupo abierto', async ({ page }) => {
+      await abrirGenerarCarga(page, conProblemas);
+      await expect(page.locator('[data-aviso-suficiencia]')).toBeVisible();
+      await expect(page.locator('[data-aviso-exclusiones]')).toBeVisible();
+      await page.getByRole('button', { name: 'Ver los 6' }).click();
+      await expect(page.locator('.gc-problemas__lista li').first()).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('con las opciones de un formato y «Personalizado» abierto', async ({ page }) => {
+      await abrirGenerarCarga(page);
+      await page.locator('[data-formatos]').getByRole('button', { name: 'CSV', exact: true }).click();
+      await page.getByLabel('Delimitador', { exact: true }).selectOption({ label: 'Personalizado' });
+      await expect(page.locator('#gc-op-delimitador-propio')).toBeVisible();
+      // The figures dim while the preview recalculates (as in Cartera); contrast is read once it settles.
+      await expect(page.locator('[data-previa]')).toHaveAttribute('data-calculando', 'false');
+      await sinViolaciones(page);
+    });
+
+    test('con la cantidad inválida y el motivo junto al botón', async ({ page }) => {
+      await abrirGenerarCarga(page);
+      await page.getByLabel('Cantidad a generar').fill('0');
+      await expect(page.locator('[data-cantidad-error]')).not.toBeEmpty();
+      await sinViolaciones(page);
+    });
+
+    test('tras generar, tras cancelar y tras un rechazo', async ({ page }) => {
+      const cargas = await abrirGenerarCarga(page);
+      await Promise.all([page.waitForEvent('download'), page.locator('[data-generar]').click()]);
+      await expect(page.locator('[data-resultado-exito]')).toBeVisible();
+      await expect(page.locator('[data-previa]')).toHaveAttribute('data-calculando', 'false');
+      await sinViolaciones(page);
+
+      const { compuerta, liberar } = crearCompuerta();
+      cargas.compuerta = compuerta;
+      await page.locator('[data-generar]').click();
+      await page.locator('[data-cancelar]').click();
+      await expect(page.locator('[data-resultado-cancelado]')).toBeVisible();
+      await sinViolaciones(page);
+      liberar();
+
+      cargas.compuerta = null;
+      cargas.respuestas.generar = [{ estado: 404, cuerpo: { detail: 'No hay cartera', codigo: 'sin_version_vigente' } }];
+      await page.locator('[data-generar]').click();
+      await expect(page.locator('[data-resultado-error]')).toBeVisible();
+      await sinViolaciones(page);
+    });
+  });
+}
+
+test('generar carga a 360 px: la tabla de la muestra y la de problemas se alcanzan con teclado', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await abrirGenerarCarga(page, conProblemas);
+  await sinViolaciones(page);
+});
