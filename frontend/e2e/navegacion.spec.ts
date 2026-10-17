@@ -70,6 +70,10 @@ test.describe('secciones', () => {
     await expect(nav.locator('.nav__punto').first()).toHaveText('·');
     await expect(nav.getByRole('link', { name: 'Cartera' })).toHaveAttribute('aria-current', 'page');
     await expect(nav.getByRole('link', { name: 'Columnas de carga' })).toHaveAttribute('href', '/columnas');
+    await expect(nav.getByRole('list', { name: 'Flujo diario' }).getByRole('link', { name: 'Generar carga' })).toHaveAttribute(
+      'href',
+      '/generar-carga',
+    );
   });
 });
 

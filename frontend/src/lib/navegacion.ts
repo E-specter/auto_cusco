@@ -6,7 +6,7 @@
  * separated by a middle dot (`·`). An entry is either a plain link (a step of
  * the daily flow) or a module whose routes open in a dropdown.
  *
- *     Cargas · Cartera  |  MOWA MES ▾ · WhatsMKT ▾ · Cisvox ▾  |  Columnas de carga
+ *     Cargas · Cartera · Generar carga  |  MOWA MES ▾ · WhatsMKT ▾ · Cisvox ▾  |  Columnas de carga
  *
  * Every visible text carries its i18n key and a Spanish fallback, the same
  * contract as the rest of the markup (`data-i18n`).
@@ -51,6 +51,8 @@ export const NAVEGACION: SeccionNav[] = [
     entradas: [
       { tipo: 'enlace', enlace: { ruta: '/cargas', i18n: 'nav.cargas', texto: 'Cargas' } },
       { tipo: 'enlace', enlace: { ruta: '/cartera', i18n: 'nav.cartera', texto: 'Cartera' } },
+      // The file that goes out to a platform: the daily step after the selection.
+      { tipo: 'enlace', enlace: { ruta: '/generar-carga', i18n: 'nav.generarCarga', texto: 'Generar carga' } },
     ],
   },
   {
