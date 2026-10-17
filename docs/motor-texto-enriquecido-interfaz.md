@@ -349,6 +349,7 @@ Las dos piezas se prueban solas en `/pruebas/editor-texto`, una página que exis
 
 - **`crearSelectorVariable` y `crearSelectorPatronFecha`** son míos, en `src/scripts/`, porque el editor los construye en tiempo de ejecución.
 - **El constructor los reutiliza:** el selector de variable para la variable directa y el de patrón para el formato de fecha de la columna. No se arma una versión propia.
+- **Opciones con valores sugeridos** (las del archivo en «Generar carga»: delimitador, codificación) usan el mismo selector de patrón: los sugeridos del backend, «Personalizado» para otro valor, y una `etiqueta` opcional por opción para un valor que no se lee solo («tabulación»; un carácter en blanco nunca se muestra).
 
 ### 9.6 Fila expandida, vacíos y esqueletos (D-6, D-10, D-12)
 

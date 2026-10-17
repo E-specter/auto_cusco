@@ -4,6 +4,10 @@
  * 05/10/2026") and, when the options are not closed, "Personalizado", which
  * shows a text field and the readable date marks as buttons that insert at
  * the caret. The analyst never sees `strftime`.
+ *
+ * Any parameter with suggested values uses it the same way (the file options
+ * of «Generar carga»: delimiter, encoding). An option may carry a visible
+ * `etiqueta` for a value that does not read on its own, like a tab.
  */
 
 import { t } from '../lib/i18n';
@@ -11,12 +15,25 @@ import type { components } from '../lib/contrato-api';
 
 type Esquemas = components['schemas'];
 
+/** A known value; `etiqueta`, already translated, names it when the value alone does not read. */
+export type OpcionSelector = Esquemas['OpcionRespuesta'] & { etiqueta?: string | null };
+
+/**
+ * What an option shows: «punto y coma (;)», «tabulación» (a blank character
+ * is never shown), «dd/mm/aaaa — 05/10/2026».
+ */
+export function textoOpcion(opcion: OpcionSelector): string {
+  const visible = opcion.valor.trim() !== '';
+  const nombre = opcion.etiqueta ? (visible ? `${opcion.etiqueta} (${opcion.valor})` : opcion.etiqueta) : opcion.valor;
+  return opcion.ejemplo ? `${nombre} — ${opcion.ejemplo}` : nombre;
+}
+
 export interface OpcionesSelectorPatron {
   /** Id of the select; the custom field gets `${id}-propio`. */
   id: string;
   /** Visible label, already translated. */
   etiqueta: string;
-  opciones: readonly Esquemas['OpcionRespuesta'][];
+  opciones: readonly OpcionSelector[];
   /** Whether a value outside the options is allowed. */
   cerradas: boolean;
   /** Date marks to insert in a custom pattern; empty for other parameters. */
@@ -47,7 +64,7 @@ export function crearSelectorPatronFecha(opciones: OpcionesSelectorPatron): HTML
   for (const opcion of opciones.opciones) {
     const elemento = document.createElement('option');
     elemento.value = opcion.valor;
-    elemento.textContent = opcion.ejemplo ? `${opcion.valor} — ${opcion.ejemplo}` : opcion.valor;
+    elemento.textContent = textoOpcion(opcion);
     elemento.selected = opcion.valor === opciones.valor;
     select.append(elemento);
   }
