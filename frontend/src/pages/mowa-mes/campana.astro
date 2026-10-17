@@ -432,6 +432,7 @@ import '../../styles/mowa-mes.css';
     etiquetaArchivoPrevisto,
     mensajeLimiteExcedido,
     problemasCampana,
+    textoDeProblemaCampana,
     resumenProblemasCampana,
     type CampanaBorrador,
     type ProgramacionBorrador,
@@ -874,9 +875,7 @@ import '../../styles/mowa-mes.css';
 
   function pintarProblemasCliente(problemas: ReturnType<typeof problemasCampana>): void {
     const nodo = $<HTMLElement>('[data-problemas-cliente]');
-    nodo.textContent = problemas
-      .map((p) => t(`mowaMes.campana.problema.${p.tipo}`, 'indice' in p ? { n: p.indice + 1 } : {}))
-      .join(' ');
+    nodo.textContent = problemas.map(textoDeProblemaCampana).join(' ');
   }
 
   function pintarCifras(previa: PrevisualizacionCampana): void {

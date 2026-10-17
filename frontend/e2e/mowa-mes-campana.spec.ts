@@ -94,6 +94,39 @@ async function elegirSeleccionGuardada(page: Page): Promise<void> {
   await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 1000' });
 }
 
+test.describe('cantidad fuera de rango (límite de la campaña)', () => {
+  test('el aviso dice el máximo con el formato del sitio, en español y en inglés', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(
+      page,
+      api,
+      seleccionFalsa({ selecciones: [seleccionGuardada({ id: 1, nombre: 'Preventiva top 1000', cantidad: 150_000 })] }),
+    );
+    await elegirSeleccionGuardada(page);
+
+    await expect(page.locator('[data-problemas-cliente]')).toHaveText(
+      'La cantidad de la selección debe ser un entero entre 1 y 120,000.',
+    );
+
+    const en = apiMowaMes();
+    const paginaEn = await page.context().newPage();
+    await paginaEn.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    await montarApiMowaMes(paginaEn, en);
+    await montarSeleccion(
+      paginaEn,
+      seleccionFalsa({ selecciones: [seleccionGuardada({ id: 1, nombre: 'Preventiva top 1000', cantidad: 150_000 })] }),
+    );
+    await paginaEn.goto(RUTA);
+    await paginaEn.getByLabel('Saved selection').selectOption({ label: 'Preventiva top 1000' });
+    await expect(paginaEn.locator('[data-problemas-cliente]')).toHaveText(
+      "The selection's quantity must be a whole number between 1 and 120,000.",
+    );
+    await paginaEn.close();
+  });
+});
+
 test.describe('P9: base de la selección', () => {
   test('sin selección guardada con cantidad, no deja previsualizar', async ({ page }) => {
     const api = apiMowaMes();

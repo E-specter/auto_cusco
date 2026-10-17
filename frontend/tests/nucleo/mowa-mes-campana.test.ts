@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { AvisoCampana, ConsumoLimite, PrevisualizacionCampana } from '../../src/lib/api-mowa-mes';
 import {
   CANTIDAD_MAXIMA_CAMPANA,
+  CANTIDAD_MINIMA_CAMPANA,
   SALIDA_FIJA,
   TIPO_CARGA_FIJO,
   descripcionSigueSugerida,
@@ -19,8 +20,11 @@ import {
   mensajeLimiteExcedido,
   problemasCampana,
   resumenProblemasCampana,
+  textoDeProblemaCampana,
   type CampanaBorrador,
 } from '../../src/lib/mowa-mes-campana';
+import { formatNumber } from '../../src/lib/format';
+import { t } from '../../src/lib/i18n';
 import { setLanguageForTests } from './idioma';
 
 function borrador(parcial: Partial<CampanaBorrador> = {}): CampanaBorrador {
@@ -312,5 +316,54 @@ describe('previsualización completa (contrato)', () => {
       nombre_estimado: true,
     };
     expect(resumenProblemasCampana(previsualizacion)).not.toBe('');
+  });
+});
+
+describe('textoDeProblemaCampana (el rango de la cantidad sale de las constantes, formateado)', () => {
+  it('en español, con el formato de números del resto del sitio', () => {
+    setLanguageForTests('es');
+    expect(textoDeProblemaCampana({ tipo: 'cantidad_invalida' })).toBe(
+      'La cantidad de la selección debe ser un entero entre 1 y 120,000.',
+    );
+  });
+
+  it('en inglés, con el mismo formato', () => {
+    setLanguageForTests('en');
+    expect(textoDeProblemaCampana({ tipo: 'cantidad_invalida' })).toBe(
+      "The selection's quantity must be a whole number between 1 and 120,000.",
+    );
+    setLanguageForTests('es');
+  });
+
+  it.each(['es', 'en'] as const)('(%s) dice exactamente los límites que valida problemasCampana, formateados', (idioma) => {
+    setLanguageForTests(idioma);
+    const texto = textoDeProblemaCampana({ tipo: 'cantidad_invalida' });
+    expect(texto).toContain(formatNumber(CANTIDAD_MINIMA_CAMPANA));
+    expect(texto).toContain(formatNumber(CANTIDAD_MAXIMA_CAMPANA));
+    expect(texto).not.toMatch(/\d[\s\u00a0\u202f]\d/);
+    setLanguageForTests('es');
+  });
+
+  it('las constantes son las que valida problemasCampana: justo en cada borde', () => {
+    const conCantidad = (cantidad: number) => problemasCampana(borrador({ seleccion: { ...borrador().seleccion, cantidad } }));
+    expect(conCantidad(CANTIDAD_MINIMA_CAMPANA)).toEqual([]);
+    expect(conCantidad(CANTIDAD_MINIMA_CAMPANA - 1)).toEqual([{ tipo: 'cantidad_invalida' }]);
+    expect(conCantidad(CANTIDAD_MAXIMA_CAMPANA)).toEqual([]);
+    expect(conCantidad(CANTIDAD_MAXIMA_CAMPANA + 1)).toEqual([{ tipo: 'cantidad_invalida' }]);
+  });
+
+  it('el diccionario no lleva los números escritos: son placeholders {min} y {max}', () => {
+    for (const idioma of ['es', 'en'] as const) {
+      setLanguageForTests(idioma);
+      const marcado = t('mowaMes.campana.problema.cantidad_invalida', { min: 'MIN', max: 'MAX' });
+      expect(marcado, idioma).toMatch(/MIN.*MAX/);
+      expect(marcado.replace(/MIN|MAX/g, ''), idioma).not.toMatch(/\d/);
+    }
+    setLanguageForTests('es');
+  });
+
+  it('los demás problemas siguen llevando su número de fecha', () => {
+    setLanguageForTests('es');
+    expect(textoDeProblemaCampana({ tipo: 'fecha_envio_invalida', indice: 1 })).toContain('2');
   });
 });

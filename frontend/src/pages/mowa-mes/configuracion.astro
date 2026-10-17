@@ -505,6 +505,8 @@ import '../../styles/mowa-mes-speech-v2.css';
     RANGOS_CONFIGURACION,
     problemasConfiguracion,
     supervisionCambio,
+    textoDeProblemaSupervision,
+    textoDeRango,
     tarifaEditable,
     tarifaNormalizada,
     type CampoConfiguracion,
@@ -626,11 +628,6 @@ import '../../styles/mowa-mes-speech-v2.css';
     registros_por_archivo: inputRegistros,
     bytes_por_archivo: inputBytes,
   };
-  const ERROR_DE_CAMPO: Record<CampoConfiguracion, string> = {
-    limite_mensual: 'mowaMes.plataforma.limite.rango',
-    registros_por_archivo: 'mowaMes.plataforma.registros.rango',
-    bytes_por_archivo: 'mowaMes.plataforma.bytes.rango',
-  };
 
   function pintarPlataforma(): void {
     const config = estado.configuracion;
@@ -711,7 +708,7 @@ import '../../styles/mowa-mes-speech-v2.css';
     const limite = Number(inputLimite.value);
     $<HTMLElement>('[data-limite-hint]').textContent = Number.isInteger(limite) && limite > 0
       ? t('mowaMes.plataforma.limite.hint', { n: formatNumber(limite) })
-      : t('mowaMes.plataforma.limite.rango');
+      : textoDeRango('limite_mensual');
     $<HTMLElement>('[data-registros-hint]').textContent = t('mowaMes.plataforma.registros.hint', {
       max: formatNumber(RANGOS_CONFIGURACION.registros_por_archivo.maximo),
     });
@@ -756,7 +753,7 @@ import '../../styles/mowa-mes-speech-v2.css';
       bytes_por_archivo: inputBytes.value,
     });
     if (invalidos.length > 0) {
-      error.textContent = invalidos.map((campo) => t(ERROR_DE_CAMPO[campo])).join(' ');
+      error.textContent = invalidos.map((campo) => textoDeRango(campo)).join(' ');
       invalidos.forEach((campo) => controlesPlataforma[campo].setAttribute('aria-invalid', 'true'));
       controlesPlataforma[invalidos[0]].focus();
       return;
@@ -1123,11 +1120,6 @@ import '../../styles/mowa-mes-speech-v2.css';
     cambioSupervision({ repintarTodo: true });
   });
 
-  function textoProblema(problema: ProblemaSupervision): string {
-    const n = 'indice' in problema ? problema.indice + 1 : 0;
-    return t(`mowaMes.supervisores.problema.${problema.tipo}`, { n });
-  }
-
   formSupervisores.addEventListener('submit', async (evento) => {
     evento.preventDefault();
     const error = $<HTMLElement>('[data-supervisores-error]');
@@ -1137,7 +1129,7 @@ import '../../styles/mowa-mes-speech-v2.css';
     if (estado.problemas.length > 0) {
       pintarProcedencias();
       pintarSupervisores();
-      error.textContent = estado.problemas.map(textoProblema).join(' ');
+      error.textContent = estado.problemas.map(textoDeProblemaSupervision).join(' ');
       formSupervisores.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
       return;
     }

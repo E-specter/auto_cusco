@@ -18,6 +18,7 @@ import type {
   Segmento,
   VersionSpeech,
 } from './api-mowa-mes';
+import { formatNumber } from './format';
 import { t } from './i18n';
 
 /** Segment order of RF-MM-15, the order every speech table reads in. */
@@ -144,6 +145,22 @@ export const RANGOS_CONFIGURACION = {
 
 export type CampoConfiguracion = keyof typeof RANGOS_CONFIGURACION;
 
+const CLAVE_DEL_RANGO: Record<CampoConfiguracion, string> = {
+  limite_mensual: 'mowaMes.plataforma.limite.rango',
+  registros_por_archivo: 'mowaMes.plataforma.registros.rango',
+  bytes_por_archivo: 'mowaMes.plataforma.bytes.rango',
+};
+
+/**
+ * The sentence that says what range a field accepts, with its bounds read from
+ * `RANGOS_CONFIGURACION` — the table `problemasConfiguracion` validates against — and
+ * formatted like every other number on the screen, not written into the dictionary.
+ */
+export function textoDeRango(campo: CampoConfiguracion): string {
+  const { minimo, maximo } = RANGOS_CONFIGURACION[campo];
+  return t(CLAVE_DEL_RANGO[campo], { min: formatNumber(minimo), max: formatNumber(maximo) });
+}
+
 /** The fields whose typed value is not a whole number inside its range, in form order. */
 export function problemasConfiguracion(valores: Record<CampoConfiguracion, string>): CampoConfiguracion[] {
   return (Object.keys(RANGOS_CONFIGURACION) as CampoConfiguracion[]).filter((campo) => {
@@ -235,6 +252,12 @@ export type ProblemaSupervision =
   | { tipo: 'sin_procedencias' }
   | { tipo: 'procedencia_vacia' | 'procedencia_larga' | 'procedencia_repetida'; indice: number }
   | { tipo: 'numero_vacio' | 'procedencia_desconocida'; indice: number };
+
+/** The sentence for one problem; the origin's length bound is the constant the validation uses. */
+export function textoDeProblemaSupervision(problema: ProblemaSupervision): string {
+  const n = 'indice' in problema ? problema.indice + 1 : 0;
+  return t(`mowaMes.supervisores.problema.${problema.tipo}`, { n, max: formatNumber(LARGO_MAXIMO_PROCEDENCIA) });
+}
 
 /**
  * The shape problems the form can point at before asking the API. Whether a

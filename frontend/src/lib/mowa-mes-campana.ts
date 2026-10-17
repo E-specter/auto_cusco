@@ -29,6 +29,7 @@ export const SALIDA_FIJA = 'numero_largo' as const;
 
 /** Same cap as `/cartera` and the load-generation screens (`CANTIDAD_MAXIMA`). */
 export const CANTIDAD_MAXIMA_CAMPANA = 120_000;
+export const CANTIDAD_MINIMA_CAMPANA = 1;
 
 // ---- Draft shapes ----------------------------------------------------------------
 
@@ -113,6 +114,21 @@ export type ProblemaCampana =
   | { tipo: 'fecha_envio_invalida'; indice: number };
 
 /**
+ * The sentence for one of those problems. The bounds of the quantity are read from the
+ * same constants the validation compares against and formatted like any other number on the
+ * screen, instead of being written into the dictionary.
+ */
+export function textoDeProblemaCampana(problema: ProblemaCampana): string {
+  const parametros: Record<string, string | number> =
+    'indice' in problema
+      ? { n: problema.indice + 1 }
+      : problema.tipo === 'cantidad_invalida'
+        ? { min: formatNumber(CANTIDAD_MINIMA_CAMPANA), max: formatNumber(CANTIDAD_MAXIMA_CAMPANA) }
+        : {};
+  return t(`mowaMes.campana.problema.${problema.tipo}`, parametros);
+}
+
+/**
  * Shape problems the form can point at before asking the API — the same
  * checks `_validar_opciones` and `_fecha_envio` make in the backend
  * (docs/mowa-mes.md §9). `tipo_carga` and `salida` are not user inputs, so
@@ -122,7 +138,7 @@ export type ProblemaCampana =
 export function problemasCampana(borrador: CampanaBorrador): ProblemaCampana[] {
   const problemas: ProblemaCampana[] = [];
 
-  if (!Number.isInteger(borrador.seleccion.cantidad) || borrador.seleccion.cantidad < 1 || borrador.seleccion.cantidad > CANTIDAD_MAXIMA_CAMPANA) {
+  if (!Number.isInteger(borrador.seleccion.cantidad) || borrador.seleccion.cantidad < CANTIDAD_MINIMA_CAMPANA || borrador.seleccion.cantidad > CANTIDAD_MAXIMA_CAMPANA) {
     problemas.push({ tipo: 'cantidad_invalida' });
   }
 

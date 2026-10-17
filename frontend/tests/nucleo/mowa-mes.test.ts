@@ -25,7 +25,11 @@ import {
   problemasConfiguracion,
   problemasSupervision,
   rangoSegmento,
+  LARGO_MAXIMO_PROCEDENCIA,
+  RANGOS_CONFIGURACION,
   tarifaEditable,
+  textoDeProblemaSupervision,
+  textoDeRango,
   tarifaNormalizada,
   variablesDesconocidas,
   renombrarProcedencia,
@@ -33,6 +37,7 @@ import {
   supervisionCambio,
   traducirCodigo,
 } from '../../src/lib/mowa-mes';
+import { formatNumber } from '../../src/lib/format';
 import { t } from '../../src/lib/i18n';
 import { setLanguageForTests } from './idioma';
 
@@ -612,5 +617,89 @@ describe('nivelDeFila (un segmento sin máximo no tiene nivel)', () => {
     expect(nivelDeFila(largo({ ...sinMaximo, falta_whatsapp: true, usa_whatsapp: true, ejemplo: null }))).toBe(
       'falta_whatsapp',
     );
+  });
+});
+
+describe('textoDeRango (los límites salen de RANGOS_CONFIGURACION, formateados)', () => {
+  const CAMPOS = ['limite_mensual', 'registros_por_archivo', 'bytes_por_archivo'] as const;
+
+  it('en español, con el formato de números del resto del sitio', () => {
+    setLanguageForTests('es');
+    expect(textoDeRango('limite_mensual')).toBe('Escribe un número entero entre 1 y 1,000,000,000.');
+    expect(textoDeRango('registros_por_archivo')).toBe('Las filas por archivo van de 1 a 50,000.');
+    expect(textoDeRango('bytes_por_archivo')).toBe('El tamaño por archivo va de 100,000 a 2,000,000 bytes.');
+  });
+
+  it('en inglés, con el mismo formato', () => {
+    setLanguageForTests('en');
+    expect(textoDeRango('limite_mensual')).toBe('Enter a whole number between 1 and 1,000,000,000.');
+    expect(textoDeRango('registros_por_archivo')).toBe('Rows per file range from 1 to 50,000.');
+    expect(textoDeRango('bytes_por_archivo')).toBe('Size per file ranges from 100,000 to 2,000,000 bytes.');
+    setLanguageForTests('es');
+  });
+
+  it.each(['es', 'en'] as const)('(%s) cada texto dice exactamente los límites de la tabla que valida, formateados', (idioma) => {
+    setLanguageForTests(idioma);
+    for (const campo of CAMPOS) {
+      const { minimo, maximo } = RANGOS_CONFIGURACION[campo];
+      const texto = textoDeRango(campo);
+      expect(texto).toContain(formatNumber(minimo));
+      expect(texto).toContain(formatNumber(maximo));
+      // No grouping written by hand: a space or a non-breaking space between digits.
+      expect(texto).not.toMatch(/\d[\s\u00a0\u202f]\d/);
+    }
+    setLanguageForTests('es');
+  });
+
+  it('el diccionario no lleva los números escritos: son placeholders {min} y {max}', () => {
+    for (const idioma of ['es', 'en'] as const) {
+      setLanguageForTests(idioma);
+      for (const clave of ['limite', 'registros', 'bytes']) {
+        const marcado = t(`mowaMes.plataforma.${clave}.rango`, { min: 'MIN', max: 'MAX' });
+        expect(marcado, `${idioma} ${clave}`).toMatch(/MIN.*MAX/);
+        expect(marcado.replace(/MIN|MAX/g, ''), `${idioma} ${clave}`).not.toMatch(/\d/);
+      }
+    }
+    setLanguageForTests('es');
+  });
+});
+
+describe('textoDeProblemaSupervision (el largo de la procedencia sale de la constante que valida)', () => {
+  it('en español y en inglés, con el número de la procedencia y el máximo', () => {
+    setLanguageForTests('es');
+    expect(textoDeProblemaSupervision({ tipo: 'procedencia_larga', indice: 2 })).toBe('La procedencia 3 pasa de 60 caracteres.');
+    setLanguageForTests('en');
+    expect(textoDeProblemaSupervision({ tipo: 'procedencia_larga', indice: 2 })).toBe('Origin 3 is longer than 60 characters.');
+    setLanguageForTests('es');
+  });
+
+  it.each(['es', 'en'] as const)('(%s) el máximo que dice es exactamente LARGO_MAXIMO_PROCEDENCIA, formateado', (idioma) => {
+    setLanguageForTests(idioma);
+    expect(textoDeProblemaSupervision({ tipo: 'procedencia_larga', indice: 0 })).toContain(
+      formatNumber(LARGO_MAXIMO_PROCEDENCIA),
+    );
+    setLanguageForTests('es');
+  });
+
+  it('la constante es la que valida problemasSupervision: justo en el borde', () => {
+    const conLargo = (largo: number) =>
+      problemasSupervision({ procedencias: ['x'.repeat(largo)], supervisores: [{ numero: '900000101', procedencia: 'x'.repeat(largo) }] });
+    expect(conLargo(LARGO_MAXIMO_PROCEDENCIA).map((p) => p.tipo)).not.toContain('procedencia_larga');
+    expect(conLargo(LARGO_MAXIMO_PROCEDENCIA + 1).map((p) => p.tipo)).toContain('procedencia_larga');
+  });
+
+  it('el diccionario no lleva el número escrito: es el placeholder {max}', () => {
+    for (const idioma of ['es', 'en'] as const) {
+      setLanguageForTests(idioma);
+      const marcado = t('mowaMes.supervisores.problema.procedencia_larga', { n: 'N', max: 'MAX' });
+      expect(marcado, idioma).toContain('MAX');
+      expect(marcado.replace(/MAX|N/g, ''), idioma).not.toMatch(/\d/);
+    }
+    setLanguageForTests('es');
+  });
+
+  it('los demás problemas siguen diciendo su número de fila', () => {
+    setLanguageForTests('es');
+    expect(textoDeProblemaSupervision({ tipo: 'numero_vacio', indice: 2 })).toBe('El supervisor 3 no tiene número.');
   });
 });

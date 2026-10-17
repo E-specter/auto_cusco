@@ -202,7 +202,36 @@ test.describe('plataforma', () => {
     await page.getByLabel('Límite mensual de SMS').fill('0');
     await page.getByRole('button', { name: 'Guardar plataforma' }).click();
 
-    await expect(page.locator('[data-plataforma-error]')).toHaveText('Escribe un número entero entre 1 y 1 000 000 000.');
+    await expect(page.locator('[data-plataforma-error]')).toHaveText('Escribe un número entero entre 1 y 1,000,000,000.');
+    expect(pedidosA(api, 'PUT', '/mowa-mes/configuracion')).toEqual([]);
+  });
+
+  test('el aviso de rango del límite, mientras se escribe, también sale con el número formateado', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+
+    await page.getByLabel('Límite mensual de SMS').fill('0');
+
+    await expect(page.locator('[data-limite-hint]')).toHaveText('Escribe un número entero entre 1 y 1,000,000,000.');
+  });
+
+  test('en inglés, los tres errores de rango dicen los mismos límites, formateados', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    const api = apiMowaMes();
+    await montarApiMowaMes(page, api);
+    await page.goto(RUTA);
+    await expect(page.getByRole('heading', { name: 'MOWA MES settings' })).toBeVisible();
+
+    await page.getByLabel('Monthly SMS limit').fill('0');
+    await page.getByLabel('Rows per file').fill('50001');
+    await page.getByLabel('Maximum size per file (bytes)').fill('2000001');
+    await page.getByRole('button', { name: 'Save platform' }).click();
+
+    await expect(page.locator('[data-plataforma-error]')).toHaveText(
+      'Enter a whole number between 1 and 1,000,000,000. Rows per file range from 1 to 50,000. Size per file ranges from 100,000 to 2,000,000 bytes.',
+    );
     expect(pedidosA(api, 'PUT', '/mowa-mes/configuracion')).toEqual([]);
   });
 });
@@ -235,7 +264,7 @@ test.describe('límites por archivo (C1b, RF-MM-11)', () => {
     await page.getByRole('button', { name: 'Guardar plataforma' }).click();
 
     await expect(page.locator('[data-plataforma-error]')).toHaveText(
-      'Las filas por archivo van de 1 a 50 000. El tamaño por archivo va de 100 000 a 2 000 000 bytes.',
+      'Las filas por archivo van de 1 a 50,000. El tamaño por archivo va de 100,000 a 2,000,000 bytes.',
     );
     await expect(page.getByLabel('Filas por archivo')).toHaveAttribute('aria-invalid', 'true');
     await expect(page.getByLabel('Tamaño máximo por archivo (bytes)')).toHaveAttribute('aria-invalid', 'true');
@@ -286,6 +315,30 @@ test.describe('supervisores', () => {
     await expect(page.getByText('El supervisor 3 no tiene número.')).toBeVisible();
     await expect(page.getByLabel('Número del supervisor 3')).toHaveAttribute('aria-invalid', 'true');
     expect(pedidosA(api, 'PUT', '/supervisores')).toEqual([]);
+  });
+
+  test('una procedencia de más de 60 caracteres dice el máximo, en español y en inglés', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+
+    await page.getByRole('textbox', { name: 'Procedencia 1', exact: true }).fill('x'.repeat(61));
+    await page.getByRole('button', { name: 'Guardar supervisores' }).click();
+
+    await expect(page.getByText('La procedencia 1 pasa de 60 caracteres.')).toBeVisible();
+    expect(pedidosA(api, 'PUT', '/supervisores')).toEqual([]);
+
+    const en = apiMowaMes();
+    const paginaEn = await page.context().newPage();
+    await paginaEn.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    await montarApiMowaMes(paginaEn, en);
+    await paginaEn.goto(RUTA);
+    await expect(paginaEn.getByRole('heading', { name: 'MOWA MES settings' })).toBeVisible();
+    await paginaEn.getByRole('textbox', { name: 'Origin 1', exact: true }).fill('x'.repeat(61));
+    await paginaEn.getByRole('button', { name: 'Save supervisors' }).click();
+    await expect(paginaEn.getByText('Origin 1 is longer than 60 characters.')).toBeVisible();
+    await paginaEn.close();
   });
 
   test('sin supervisores guardados avisa que no se podrá crear ninguna campaña', async ({ page }) => {
