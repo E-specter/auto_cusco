@@ -9,7 +9,7 @@
 | Ruta | Tipo | Propósito | Agente/rol que la creó o mantiene | Última actualización |
 |---|---|---|---|---|
 | /docs/README.md | Doc | Índice de la documentación y estado del proyecto | architec (docs) | 2026-09-13 |
-| /docs/planning.md | Doc | Plan general, fases y avance | architec (arquitectura) | 2026-09-12 |
+| /docs/planning.md | Doc | Plan general, fases y avance | architec (arquitectura) | 2026-10-19 |
 | /docs/modules.md | Doc | Mapa de módulos, responsabilidades, RF y dependencias | architec (arquitectura), designer (ui, módulo 10) | 2026-09-12 |
 | /docs/requirements.md | Doc | Resumen de contexto de requerimientos y requerimientos no funcionales (RNF); enlaza a los RF | architec (requisitos) | 2026-09-13 |
 | /docs/atomics-requirements.md | Doc | Requerimientos funcionales numerados (RF), fuente de verdad funcional | usuario; architec (requisitos) | 2026-09-13 |
@@ -50,6 +50,8 @@
 | /docs/agents/dev_frontend_motor_texto_enriquecido/profile.md | Doc | Perfil del desarrollador frontend del motor de texto enriquecido (bajo las reglas de designer) | architec; dev_frontend_motor_texto_enriquecido | 2026-09-29 |
 | /docs/agents/dev_frontend_motor_texto_enriquecido/plan-f3-f4.md | Doc | Plan de F3 (constructor de columnas) y F4 (speech v2 en MOWA MES): pantallas, estados, escenarios de Playwright, pruebas y preguntas de contrato | dev_frontend_motor_texto_enriquecido | 2026-10-01 |
 | /docs/agents/dev_frontend_motor_texto_enriquecido/dudas-designer.md | Doc | Dudas de F3 y F4 para `designer` (frontera de variantes, montaje de componentes, navegación, claves i18n) | dev_frontend_motor_texto_enriquecido | 2026-10-01 |
+| /docs/agents/dev_frontend_motor_texto_enriquecido/plan-f5.md | Doc | Plan de F5, la pantalla «Generar carga» (`/generar-carga`): flujo, estados, contrato y pruebas, aprobado por `designer` | dev_frontend_motor_texto_enriquecido | 2026-10-16 |
+| /docs/agents/coordinador_motor_texto_enriquecido/revision-c2.md | Doc | Revisión integral del motor de texto enriquecido (T-MTE-C2): trazabilidad de RF-42 a RF-54, hallazgos, límites, lecciones y commits | coordinador_motor_texto_enriquecido | 2026-10-19 |
 | /docs/requerimientos-mowa-mes.md | Doc | Requerimientos del conector SMS MOWA MES (RF-MM-01 a RF-MM-22), decisiones y evidencia de los ejemplos | architec (requisitos) | 2026-09-13 |
 
 ## Pendientes de incorporar formalmente a la skill
