@@ -222,6 +222,9 @@ export interface ApiFalsaTextoEnriquecido {
   pedidos: Array<{ metodo: string; ruta: string; cuerpo: unknown }>;
 }
 
+/** Cut-off date of the synthetic products when the request does not name one. */
+const FECHA_CORTE_SINTETICA = '2026-10-05';
+
 export function previsualizacionSintetica(cuerpo: Peticion, catalogo: Catalogo, productos: ApiFalsaTextoEnriquecido['productos'] = {}): Previsualizacion | { estado: number; cuerpo: unknown } {
   const expresion = cuerpo.expresion ?? { nodos: [] };
   const ejemplo = catalogo.contexto.ejemplo;
@@ -231,10 +234,20 @@ export function previsualizacionSintetica(cuerpo: Peticion, catalogo: Catalogo, 
     umbral_advertencia: catalogo.contexto.umbral_advertencia,
     disponibles: null,
   };
-  const fila = (numero: number, registro: Record<string, unknown>, etiqueta: string | null, segmento: string | null) => ({
+  // `pagare` and `fecha_corte` say which product a row is, like the backend: only a real
+  // product or a selection has one; the example record answers null and null.
+  const fila = (
+    numero: number,
+    registro: Record<string, unknown>,
+    etiqueta: string | null,
+    segmento: string | null,
+    producto: { pagare: string; fecha_corte: string } | null = null,
+  ) => ({
     numero,
     etiqueta,
     segmento,
+    pagare: producto?.pagare ?? null,
+    fecha_corte: producto?.fecha_corte ?? null,
     excluida: null,
     columnas: [columna(expresion, registro)],
   });
@@ -244,10 +257,21 @@ export function previsualizacionSintetica(cuerpo: Peticion, catalogo: Catalogo, 
     if (!producto) {
       return { estado: 404, cuerpo: { detail: 'No hay un producto con ese pagaré', codigo: 'producto_no_encontrado' } };
     }
-    return { ...base, filas: [fila(1, producto, null, null)] };
+    const fecha = cuerpo.muestra.fecha_corte ?? FECHA_CORTE_SINTETICA;
+    return { ...base, filas: [fila(1, producto, null, null, { pagare: cuerpo.muestra.pagare!, fecha_corte: fecha })] };
   }
   if (cuerpo.muestra.tipo === 'ejemplo') return { ...base, filas: [fila(1, ejemplo, null, null)] };
-  // ejemplos_por_segmento, and primeros_de_seleccion answered with the example.
+  if (cuerpo.muestra.tipo === 'primeros_de_seleccion') {
+    // One synthetic product per segment, with the example's values and a pagaré of its own.
+    const fecha = cuerpo.muestra.fecha_corte ?? FECHA_CORTE_SINTETICA;
+    return {
+      ...base,
+      filas: catalogo.contexto.segmentos.map((s, i) =>
+        fila(i + 1, ejemplo, s.etiqueta, s.clave, { pagare: String(100 + i).padStart(18, '0'), fecha_corte: fecha }),
+      ),
+    };
+  }
+  // ejemplos_por_segmento: the example record, one row per segment, no product.
   return {
     ...base,
     filas: catalogo.contexto.segmentos.map((s, i) => fila(i + 1, ejemplo, s.etiqueta, s.clave)),

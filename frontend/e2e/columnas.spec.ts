@@ -35,10 +35,15 @@ function motorConDefiniciones(): ApiFalsaTextoEnriquecido {
     if (cuerpo.expresion) return previsualizacionSintetica(cuerpo, catalogo, motor.productos);
     const columnas = cuerpo.definicion?.columnas ?? [];
     const ejemplo = catalogo.contexto.ejemplo as Record<string, unknown>;
+    // Like the backend: a row names its product (`pagare`, `fecha_corte`) only when the sample is a real
+    // product or the first of a selection; the example record answers null and null.
+    const esProductoReal = cuerpo.muestra.tipo === 'producto_real' || cuerpo.muestra.tipo === 'primeros_de_seleccion';
     const fila = (numero: number, etiqueta: string | null, segmento: string | null) => ({
       numero,
       etiqueta,
       segmento,
+      pagare: esProductoReal ? (cuerpo.muestra.pagare ?? String(99 + numero).padStart(18, '0')) : null,
+      fecha_corte: esProductoReal ? (cuerpo.muestra.fecha_corte ?? '2026-10-05') : null,
       excluida: null,
       columnas: columnas.map((c) => {
         const propia = segmento ? c.variantes?.find((v) => v.segmento === segmento) : undefined;

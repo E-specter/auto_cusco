@@ -56,6 +56,14 @@ COLUMNA_DE_UNA_EXPRESION = "texto"
 # asociar la fila con su segmento.
 Representado = tuple[str, str]
 
+# El producto real que una fila representa: su pagare y la fecha de corte de la sabana de la que
+# sale. Solo lo tienen las muestras de producto real y de seleccion (B11).
+ProductoDeMuestra = tuple[str, date]
+
+
+# (lo que la fila representa, el registro que se evalua, el producto real de la muestra o None)
+_Registro = tuple[Representado | None, dict[str, Any], ProductoDeMuestra | None]
+
 
 class ProductoNoEncontrado(Exception):
     def __init__(self, fecha_corte: date, pagare: str) -> None:
@@ -157,6 +165,10 @@ class FilaPrevia:
     segmento: str | None  # la clave que representa la fila; si no, la que calcula la definicion
     excluida: FilaExcluida | None
     columnas: tuple[ColumnaPrevia, ...]
+    # El producto real que la fila representa, para que el editor lo fije como muestra: solo en
+    # las muestras de producto real y de seleccion (None en las de ejemplo).
+    pagare: str | None = None
+    fecha_corte: date | None = None
 
 
 @dataclass(frozen=True)
@@ -259,8 +271,8 @@ class PrevisualizacionTextoService:
         generador = GeneradorCargas(definicion_leida, ctx.tipos)
         registros, disponibles = self._registros(ctx, definicion_leida, muestra)
         filas = tuple(
-            self._fila(generador, numero, representado, registro)
-            for numero, (representado, registro) in enumerate(registros, 1)
+            self._fila(generador, numero, representado, registro, producto)
+            for numero, (representado, registro, producto) in enumerate(registros, 1)
         )
         return Previsualizacion((), filas, ctx.limite_largo, ctx.umbral_advertencia, disponibles)
 
@@ -270,9 +282,11 @@ class PrevisualizacionTextoService:
         numero: int,
         representado: Representado | None,
         registro: Mapping[str, Any],
+        producto: ProductoDeMuestra | None = None,
     ) -> FilaPrevia:
         detalle = generador.detallar_fila(registro, numero)
         etiqueta, clave = (None, None) if representado is None else representado
+        pagare, fecha_corte = (None, None) if producto is None else producto
         return FilaPrevia(
             numero=numero,
             etiqueta=etiqueta,
@@ -292,22 +306,30 @@ class PrevisualizacionTextoService:
                 )
                 for celda in detalle.celdas
             ),
+            pagare=pagare,
+            fecha_corte=fecha_corte,
         )
 
     # --- muestras ---
 
     def _registros(
         self, contexto: ContextoTexto, definicion: DefinicionCarga, muestra: Muestra
-    ) -> tuple[list[tuple[Representado | None, dict[str, Any]]], int | None]:
-        """Los registros de la muestra y, si es una seleccion, cuantos productos tiene."""
+    ) -> tuple[list[_Registro], int | None]:
+        """Los registros de la muestra y, si es una seleccion, cuantos productos tiene. Cada uno
+        lleva, ademas, el producto real que representa (None en las muestras de ejemplo)."""
         if isinstance(muestra, MuestraProductoReal):
-            return [(None, contexto.registro_de_producto(self._producto(muestra)))], None
+            producto = self._producto(muestra)
+            origen = _origen(producto, muestra.fecha_corte, muestra.pagare)
+            return [(None, contexto.registro_de_producto(producto), origen)], None
         if isinstance(muestra, MuestraPrimerosDeSeleccion):
             productos, disponibles = self._primeros(muestra)
-            return [(None, contexto.registro_de_producto(p)) for p in productos], disponibles
+            return [
+                (None, contexto.registro_de_producto(p), _origen(p, muestra.fecha_corte))
+                for p in productos
+            ], disponibles
         if isinstance(muestra, MuestraEjemplosPorSegmento):
-            return _ejemplos_por_segmento(contexto, definicion), None
-        return [(None, dict(contexto.ejemplo))], None
+            return [(r, reg, None) for r, reg in _ejemplos_por_segmento(contexto, definicion)], None
+        return [(None, dict(contexto.ejemplo), None)], None
 
     def _primeros(self, muestra: MuestraPrimerosDeSeleccion) -> tuple[list[Mapping[str, Any]], int]:
         """Los primeros productos de la seleccion, con el recorrido de la carga.
@@ -342,6 +364,14 @@ class PrevisualizacionTextoService:
         if not pagina.filas:
             raise ProductoNoEncontrado(muestra.fecha_corte, muestra.pagare)
         return pagina.filas[0]
+
+
+def _origen(
+    producto: Mapping[str, Any], fecha_corte: date, pagare: str | None = None
+) -> ProductoDeMuestra | None:
+    """El pagare y la fecha de corte del producto real; None si el producto no trae pagare."""
+    de_la_cartera = producto.get("pagare", pagare)
+    return None if de_la_cartera is None else (str(de_la_cartera), fecha_corte)
 
 
 def _dias_de_ejemplo(rango: RangoDias) -> int:

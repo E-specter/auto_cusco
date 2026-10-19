@@ -5747,6 +5747,29 @@
             ],
             "title": "Segmento"
           },
+          "pagare": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagare"
+          },
+          "fecha_corte": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Corte"
+          },
           "excluida": {
             "anyOf": [
               {
@@ -5770,10 +5793,13 @@
           "numero",
           "etiqueta",
           "segmento",
+          "pagare",
+          "fecha_corte",
           "excluida",
           "columnas"
         ],
-        "title": "FilaRespuesta"
+        "title": "FilaRespuesta",
+        "description": "`pagare` y `fecha_corte` identifican el producto real que la fila representa (el editor\nlo fija como muestra); son nulos en las muestras de ejemplo."
       },
       "FormatoArchivo": {
         "type": "string",

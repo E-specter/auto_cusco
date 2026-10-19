@@ -191,3 +191,5 @@ def test_los_primeros_de_una_seleccion_se_acotan_a_cinco_aunque_se_pidan_mas() -
     assert pedidas == [5]
     assert len(previa.filas) == 5
     assert previa.disponibles == 40
+    # un producto sin pagare no se ofrece como muestra: ni pagare ni fecha de corte
+    assert [(f.pagare, f.fecha_corte) for f in previa.filas] == [(None, None)] * 5

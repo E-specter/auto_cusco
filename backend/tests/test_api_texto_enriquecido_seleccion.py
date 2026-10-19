@@ -127,6 +127,31 @@ def test_los_primeros_n_de_la_seleccion_con_el_total_disponible(cliente) -> None
     assert cuerpo["problemas"] == []
 
 
+def test_cada_fila_trae_el_pagare_y_la_fecha_de_corte_del_producto_que_representa(
+    cliente,
+) -> None:
+    client, _ = cliente
+
+    cuerpo = _previsualizar(client, tipo="primeros_de_seleccion", fecha_corte=CORTE, cantidad=3)
+
+    # El editor fija como muestra un producto real de la fila elegida (por su pagare y su corte).
+    assert [(f["pagare"], f["fecha_corte"]) for f in cuerpo["filas"]] == [
+        (f"{i:018d}", CORTE) for i in (1, 2, 3)
+    ]
+
+
+def test_una_seleccion_guardada_tambien_trae_el_pagare_y_la_fecha_de_corte(cliente) -> None:
+    client, _ = cliente
+
+    cuerpo = _previsualizar(
+        client, tipo="primeros_de_seleccion", fecha_corte=CORTE, seleccion_id=7, cantidad=2
+    )
+
+    assert [(f["pagare"], f["fecha_corte"]) for f in cuerpo["filas"]] == [
+        (f"{i:018d}", CORTE) for i in (1, 2)
+    ]
+
+
 def test_por_defecto_son_cinco(cliente) -> None:
     client, cartera = cliente
 

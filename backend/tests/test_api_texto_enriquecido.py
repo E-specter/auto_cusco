@@ -435,6 +435,34 @@ def test_un_producto_real_se_busca_por_fecha_de_corte_y_pagare(cliente) -> None:
     assert cartera.recibido["limite"] == 1
 
 
+def test_un_producto_real_trae_su_pagare_y_su_fecha_de_corte(cliente) -> None:
+    client, _ = cliente
+
+    fila = _previsualizar(
+        client,
+        contexto="mowa_mes.speech",
+        muestra={"tipo": "producto_real", "fecha_corte": CORTE, "pagare": "000000000000000007"},
+        expresion=SPEECH,
+    )["filas"][0]
+
+    assert (fila["pagare"], fila["fecha_corte"]) == ("000000000000000007", CORTE)
+
+
+def test_las_muestras_de_ejemplo_traen_pagare_y_fecha_de_corte_en_null(cliente) -> None:
+    client, _ = cliente
+
+    por_defecto = _previsualizar(client, contexto="mowa_mes.speech", expresion=SPEECH)["filas"]
+    ejemplo = _previsualizar(
+        client, contexto="mowa_mes.speech", muestra={"tipo": "ejemplo"}, expresion=SPEECH
+    )["filas"]
+
+    # Siempre presentes (el contrato no omite campos), con null: no representan un producto real.
+    for fila in [*por_defecto, *ejemplo]:
+        assert "pagare" in fila and "fecha_corte" in fila
+        assert (fila["pagare"], fila["fecha_corte"]) == (None, None)
+    assert len(por_defecto) == 6 and len(ejemplo) == 1
+
+
 def test_un_producto_real_inexistente_es_404_con_su_codigo(cliente) -> None:
     client, cartera = cliente
     cartera.filas = ()

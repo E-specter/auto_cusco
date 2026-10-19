@@ -1857,7 +1857,11 @@ export interface components {
             /** Advertencias */
             advertencias: components["schemas"]["CodigoMowaMes"][];
         };
-        /** FilaRespuesta */
+        /**
+         * FilaRespuesta
+         * @description `pagare` y `fecha_corte` identifican el producto real que la fila representa (el editor
+         *     lo fija como muestra); son nulos en las muestras de ejemplo.
+         */
         FilaRespuesta: {
             /** Numero */
             numero: number;
@@ -1865,6 +1869,10 @@ export interface components {
             etiqueta: string | null;
             /** Segmento */
             segmento: string | null;
+            /** Pagare */
+            pagare: string | null;
+            /** Fecha Corte */
+            fecha_corte: string | null;
             excluida: components["schemas"]["ExclusionFilaRespuesta"] | null;
             /** Columnas */
             columnas: components["schemas"]["ColumnaRespuesta"][];

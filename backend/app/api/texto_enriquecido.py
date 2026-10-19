@@ -441,9 +441,14 @@ class ExclusionFilaRespuesta(ModeloRespuesta):
 
 
 class FilaRespuesta(ModeloRespuesta):
+    """`pagare` y `fecha_corte` identifican el producto real que la fila representa (el editor
+    lo fija como muestra); son nulos en las muestras de ejemplo."""
+
     numero: int
     etiqueta: str | None
     segmento: str | None
+    pagare: str | None
+    fecha_corte: date | None
     excluida: ExclusionFilaRespuesta | None
     columnas: list[ColumnaRespuesta]
 
@@ -613,6 +618,8 @@ def _fila(f: FilaPrevia) -> FilaRespuesta:
         numero=f.numero,
         etiqueta=f.etiqueta,
         segmento=f.segmento,
+        pagare=f.pagare,
+        fecha_corte=f.fecha_corte,
         excluida=(
             None
             if f.excluida is None
