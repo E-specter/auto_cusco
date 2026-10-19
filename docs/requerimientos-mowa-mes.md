@@ -174,7 +174,8 @@ Formato confirmado con el ejemplo de carga (sección 7).
   * El largo se mide sobre el `mensaje` ya normalizado a GSM-7 (RF-MM-27).
 * **RF-MM-27 — Mensaje en GSM-7:** Normalizar cada `mensaje` al alfabeto GSM-7 al generar la carga, para que un SMS nunca pase a UCS-2 y su límite de 160 caracteres (RF-MM-19) sea siempre el real (decisión del usuario, 2026-10-19).
   * Primero se quitan los signos diacríticos (`á`→`a`, `é`→`e`, `ñ`→`n`, `ü`→`u`), igual que la normalización de la conciliación (RF-MM-22) y que lo que MES hace al enviar.
-  * Después se borran los caracteres que siguen fuera del alfabeto GSM-7 (por ejemplo, un emoji, `«`, `»` o `—`).
+  * Después se transliteran los signos tipográficos que tienen un equivalente simple (decisión del usuario, 2026-10-19): comillas `“ ” « »` → `"`, `‘ ’` → `'`, `…` → `...`, `– —` → `-`, `° º` → `o` y `ª` → `a`. Por ejemplo, `N°` sale `No` y `don’t` sale `don't`.
+  * Por último se borran los caracteres que siguen fuera del alfabeto GSM-7 (por ejemplo, un emoji).
   * La versión de speech se guarda tal como se escribió; la normalización se aplica al generar, y la previsualización muestra el texto que saldrá.
   * Cambia el `mensaje` de las versiones con tildes, incluido el Speech original (`venció` sale `vencio`): es un cambio decidido, registrado en RF-54.
   * Supuesto S-MM-9: los caracteres de la tabla extendida de GSM-7 (`€`, `[`, `]`, `{`, `}`, `\`, `~`, `^`, `|`) se conservan y cuentan 2 en el largo, como en el estándar.
@@ -229,7 +230,7 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Dónde se define el nombre de los archivos | Plantilla por defecto en la configuración, editable al crear cada campaña (RF-MM-25) | Usuario (2026-09-28) |
 | Qué se pagina en la previsualización | Las 20 filas de muestra y las 100 exclusiones que ya devuelve, sin recalcular; la lista completa sigue en el seguimiento (RF-MM-26) | Usuario (2026-09-28) |
 | Falta de titular o de fecha en un speech v2 | Se excluye solo si la expresión del segmento usa esa variable, según la expresión compilada; el orden de exclusiones no cambia; una v2 convertida desde una v1 usa esas variables (y además las marca obligatorias) y excluye igual (RF-MM-13) | Usuario (2026-10-03), consultado por coordinador_modulo_mowa_mes |
-| Codificación del SMS (GSM-7 o UCS-2) | Se fuerza GSM-7 al generar: se quitan los diacríticos y se borran los caracteres sin equivalente; la versión se guarda como se escribió (RF-MM-27) | Usuario (2026-10-19), consultado por architec |
+| Codificación del SMS (GSM-7 o UCS-2) | Se fuerza GSM-7 al generar: se quitan los diacríticos, se transliteran los signos tipográficos con equivalente simple (comillas, puntos suspensivos, guiones, `°`, `º`, `ª`) y se borran los caracteres sin equivalente; la versión se guarda como se escribió (RF-MM-27) | Usuario (2026-10-19), consultado por architec; la transliteración, a pregunta de coordinador_modulo_mowa_mes |
 | Retiro del editor de dos partes (fase M3) | Ahora: las versiones nuevas son solo v2; las v1 siguen usándose en solo lectura y se convierten a v2 para personalizarlas (RF-MM-17) | Usuario (2026-10-19), consultado por architec |
 
 ## 7. Evidencia de los ejemplos
