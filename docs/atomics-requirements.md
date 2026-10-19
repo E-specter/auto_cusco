@@ -156,7 +156,8 @@ Capacidad transversal que amplía RF-12: la usan todas las cargas digitales y Vo
 * **RF-49 — Constructor de columnas:** Permitir definir N columnas de salida para una carga, cada una con nombre, orden, tipo de dato, formato, valor por defecto opcional y su contenido: una variable directa o un texto compuesto según RF-42.
   * Una columna de variable directa conserva el valor original (fecha o importe) sin pasarlo por texto, como en RF-12.
 * **RF-50 — Segmentación de las columnas:** Permitir que el contenido de una columna varíe según el segmento de cada producto, con un contenido por segmento y uno por defecto opcional.
-  * **Criterio por defecto: segmento financiero calculado** a partir de los días de atraso del producto, con una tabla de rangos y etiquetas configurable. No se usa por defecto el campo de segmento financiero de la sábana, porque llega mal cargado (decisión del usuario, 2026-09-29).
+  * **Criterio por defecto: segmento financiero calculado** a partir de los días de atraso del producto, ajustados a la fecha de envío según RF-55, con una tabla de rangos y etiquetas configurable. No se usa por defecto el campo de segmento financiero de la sábana, porque llega mal cargado (decisión del usuario, 2026-09-29).
+  * **Tabla de rangos por defecto:** la del speech de MOWA MES (RF-MM-15), que es la que está en uso: `Preventiva` (hasta 0 días), `1 a 8`, `9 a 30`, `31 a 60`, `61 a 90` y `91 a 120` (decisión del usuario, 2026-10-19). La partición del campo de la sábana (1–8, 9–15, 16–30, 31–60 y 61–90) no es la por defecto.
   * También se puede usar como criterio el valor de un campo de la cartera, incluido el segmento financiero de la sábana.
   * Si un producto no cae en ningún segmento, entonces se excluye con su motivo o se usa el contenido por defecto, según lo que declare la definición.
 * **RF-51 — Definiciones guardadas y versionadas:** Guardar las definiciones de columnas con un nombre, compartidas entre usuarios y módulos, y versionarlas: una versión usada en una carga no se modifica, un cambio crea una versión nueva.
@@ -172,9 +173,24 @@ Capacidad transversal que amplía RF-12: la usan todas las cargas digitales y Vo
   * **Excepciones, por seguridad (RF-53):** son las únicas dos, y solo afectan a los textos que empiezan con un carácter de fórmula; el resto del archivo no cambia.
     * XLSX: un texto que antes se escribía como fórmula viva (por ejemplo `=1+1`) ahora se escribe como texto, con el mismo contenido.
     * CSV: un texto que empieza con `=`, `+`, `-`, `@`, tabulación o retorno de carro, y que no es solo un número, ahora lleva un apóstrofo delante (por ejemplo `=SUMA(A1)` o `@usuario`), salvo que la definición desactive la protección.
+  * **Cambio decidido por el usuario (2026-10-19), fuera de esas dos excepciones:** el `mensaje` de MOWA MES sale normalizado a GSM-7 (RF-MM-27), así que deja de ser idéntico al de antes del motor cuando el speech tiene tildes u otros caracteres fuera de GSM-7. El Speech original y las versiones guardadas no cambian: la normalización se aplica al generar.
+* **RF-55 — Días de atraso ajustados a la fecha de envío:** Calcular los días de atraso de cada producto ajustados a la fecha de envío de la carga, y usarlos en el segmento calculado de RF-50, en todas las cargas.
+
+  ```
+  dias_atraso_ajustados = dias_atraso (de la sábana) + días calendario entre la fecha de corte y la fecha de envío
+  ```
+
+  * Es la misma fórmula de RF-MM-15, que deja de ser propia de MOWA MES (decisión del usuario, 2026-10-19).
+  * Al generar una carga (`/generar-carga`), el usuario elige la fecha de envío; por defecto es el día en que se genera. La campaña de MOWA MES conserva su propia regla para la fecha de envío (RF-MM-15).
+  * Si la fecha de envío es anterior a la fecha de corte de la sábana, entonces se rechaza indicando las dos fechas.
+  * La previsualización (RF-47) usa la misma fecha de envío que la carga y dice cuál es; en el constructor de columnas, sin una carga en curso, es el día de hoy.
+  * `fecha_envio` y `dias_atraso_ajustados` quedan disponibles como variables de contexto de la carga (RF-43).
+* **RF-56 — Renombrar una definición guardada:** Permitir cambiar el nombre de una definición de columnas guardada (RF-51) sin crear una versión nueva ni modificar ninguna existente.
+  * El nombre identifica la definición, no una versión: las versiones, sus usos y las cargas ya generadas no cambian.
+  * Si ya existe otra definición con ese nombre, entonces se rechaza el cambio.
 
 ## Registro de cambios de esta versión
 
-- **RF nuevos incorporados:** RF-37, RF-38, RF-39, RF-40, RF-41 (sección 10, 2026-09-13); RF-42 a RF-54 (sección 11, motor de texto enriquecido y constructor de columnas, 2026-09-29).
-- **RF existentes ampliados/modificados en su redacción:** ninguno. RF-12 conserva su texto: RF-42 a RF-54 lo amplían, y RF-54 exige que lo que hoy cumple RF-12 siga produciendo el mismo resultado.
+- **RF nuevos incorporados:** RF-37, RF-38, RF-39, RF-40, RF-41 (sección 10, 2026-09-13); RF-42 a RF-54 (sección 11, motor de texto enriquecido y constructor de columnas, 2026-09-29); RF-55 (días de atraso ajustados a la fecha de envío) y RF-56 (renombrar una definición guardada), en la sección 11 (2026-10-19).
+- **RF existentes ampliados/modificados en su redacción:** RF-12 conserva su texto: RF-42 a RF-56 lo amplían, y RF-54 exige que lo que hoy cumple RF-12 siga produciendo el mismo resultado. **2026-10-19, decisiones del usuario:** RF-50 ampliado (el segmento calculado usa los días ajustados de RF-55, y la tabla por defecto es la de MOWA MES); RF-54 ampliado (el `mensaje` de MOWA MES normalizado a GSM-7, RF-MM-27, es un cambio decidido fuera de sus dos excepciones).
 - **Nota de numeración:** los RF-01 a RF-36 conservan su número y su texto. Los nuevos se agregaron como sección 10 al final, sin renumerar, por decisión del usuario: RF-16 a RF-36 se citan por número en el código y en la documentación, y renumerarlos rompería esas referencias. Los requerimientos específicos de cada plataforma se numeran en su propio documento de módulo (por ejemplo, `RF-MM-01` en `requerimientos-mowa-mes.md`) para no mezclar su secuencia con la global.

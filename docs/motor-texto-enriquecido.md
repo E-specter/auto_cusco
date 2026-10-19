@@ -258,11 +258,13 @@ Vuelta atrás: el camino v1 queda en el código hasta cerrar M2.
 - Tabla de rangos en el núcleo compartido.
 - Huella v1 intacta.
 
-**Pendientes a confirmar con el usuario:**
+**Decisiones del usuario del 2026-10-19** (antes pendientes; RF en `atomics-requirements.md` y `requerimientos-mowa-mes.md`):
 
-1. **Tabla de rangos por defecto del segmento calculado.** La de MOWA MES es Preventiva, 1–8, 9–30, 31–60, 61–90 y 91–120. La partición del campo de la sábana es otra: 1–8, 9–15, 16–30, 31–60 y 61–90. Por ahora, la por defecto es la de MOWA MES, que es la que está en uso.
-2. **Codificación SMS.** Un SMS con tildes o caracteres fuera de GSM-7 pasa a UCS-2 y su límite baja de 160 a 70 caracteres. Hoy MOWA MES cuenta caracteres, y MES quita las tildes al enviar. Hay que confirmar con MES cómo cobra y corta. Mientras tanto, `sin_tildes` queda disponible y la previsualización muestra el largo en caracteres.
-3. **Días ajustados en otros módulos.** El ajuste a la fecha de envío es de MOWA MES. En otro canal, el criterio usa `dias_atraso` sin ajuste, salvo que ese módulo aporte `fecha_envio`.
+1. **Tabla de rangos por defecto del segmento calculado:** la de MOWA MES (Preventiva, 1–8, 9–30, 31–60, 61–90 y 91–120), que es la que está en uso. No cambia código (RF-50).
+2. **Codificación SMS:** se **fuerza GSM-7** en el `mensaje` de MOWA MES al generar: se quitan los diacríticos, como la conciliación, y se borran los caracteres sin equivalente. La versión se guarda como se escribió y la previsualización muestra el texto que saldrá. Cambia la salida del Speech original, que tiene tildes: la prueba de oro se actualiza a propósito (RF-MM-27 y RF-54).
+3. **Días ajustados en todas las cargas:** el segmento calculado usa `dias_atraso` ajustados a una fecha de envío, que en `/generar-carga` elige el usuario (por defecto, hoy). `fecha_envio` y `dias_atraso_ajustados` pasan a ser variables de contexto de la carga (RF-55).
+4. **Renombrar una definición guardada** sin tocar sus versiones (RF-56).
+5. **M3 ahora:** las versiones nuevas del speech son solo v2; las v1, incluido el Speech original, siguen usándose en solo lectura y se convierten a v2 para personalizarlas (RF-MM-17).
 
 **Decisiones del usuario del 2026-09-30:**
 

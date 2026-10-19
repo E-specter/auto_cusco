@@ -153,7 +153,8 @@ Formato confirmado con el ejemplo de carga (sección 7).
   * Cada campaña registra la versión de speech con la que se generó.
   * Si una versión ya se usó en alguna campaña, entonces no se modifica: el cambio crea una versión nueva.
   * La versión `Speech original` (RF-MM-18) es la referencia del módulo y **no se modifica nunca**, aunque no se haya usado: personalizarla siempre crea una versión nueva.
-  * La estructura de RF-MM-14 es la de la versión por defecto; una versión nueva puede cambiar el texto de las partes.
+  * La estructura de RF-MM-14 es la de la versión por defecto y la de las versiones de dos partes (v1).
+  * **Versiones nuevas solo con el motor (decisión del usuario, 2026-10-19, fase M3):** una versión nueva se arma con el motor de texto enriquecido, por segmento (v2, RF-42 a RF-50); ya no se crean versiones de dos partes. Las v1 existentes, incluido el Speech original, se siguen usando en campañas y se ven en solo lectura; para personalizar una v1 se la convierte a v2, sin modificarla.
 * **RF-MM-18 — Speech original:** Mantener como versión por defecto el speech vigente, con la fecha incluida en todos los segmentos:
 
   | Segmento | Parte 1 | Parte 2 |
@@ -170,6 +171,13 @@ Formato confirmado con el ejemplo de carga (sección 7).
   * Si supera **160 caracteres** (límite de un SMS), entonces el producto se excluye (RF-MM-13).
   * Si supera **150 caracteres**, entonces se carga pero se advierte, porque el speech se ajusta para no pasar de ~150.
   * La previsualización de una versión de speech muestra el largo máximo que puede alcanzar cada segmento. Con el speech original, `9 a 30` llega a 156 caracteres: se advierte.
+  * El largo se mide sobre el `mensaje` ya normalizado a GSM-7 (RF-MM-27).
+* **RF-MM-27 — Mensaje en GSM-7:** Normalizar cada `mensaje` al alfabeto GSM-7 al generar la carga, para que un SMS nunca pase a UCS-2 y su límite de 160 caracteres (RF-MM-19) sea siempre el real (decisión del usuario, 2026-10-19).
+  * Primero se quitan los signos diacríticos (`á`→`a`, `é`→`e`, `ñ`→`n`, `ü`→`u`), igual que la normalización de la conciliación (RF-MM-22) y que lo que MES hace al enviar.
+  * Después se borran los caracteres que siguen fuera del alfabeto GSM-7 (por ejemplo, un emoji, `«`, `»` o `—`).
+  * La versión de speech se guarda tal como se escribió; la normalización se aplica al generar, y la previsualización muestra el texto que saldrá.
+  * Cambia el `mensaje` de las versiones con tildes, incluido el Speech original (`venció` sale `vencio`): es un cambio decidido, registrado en RF-54.
+  * Supuesto S-MM-9: los caracteres de la tabla extendida de GSM-7 (`€`, `[`, `]`, `{`, `}`, `\`, `~`, `^`, `|`) se conservan y cuentan 2 en el largo, como en el estándar.
 
 ## 5. Reporte de enviados (descargado de MES)
 
@@ -221,6 +229,8 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Dónde se define el nombre de los archivos | Plantilla por defecto en la configuración, editable al crear cada campaña (RF-MM-25) | Usuario (2026-09-28) |
 | Qué se pagina en la previsualización | Las 20 filas de muestra y las 100 exclusiones que ya devuelve, sin recalcular; la lista completa sigue en el seguimiento (RF-MM-26) | Usuario (2026-09-28) |
 | Falta de titular o de fecha en un speech v2 | Se excluye solo si la expresión del segmento usa esa variable, según la expresión compilada; el orden de exclusiones no cambia; una v2 convertida desde una v1 usa esas variables (y además las marca obligatorias) y excluye igual (RF-MM-13) | Usuario (2026-10-03), consultado por coordinador_modulo_mowa_mes |
+| Codificación del SMS (GSM-7 o UCS-2) | Se fuerza GSM-7 al generar: se quitan los diacríticos y se borran los caracteres sin equivalente; la versión se guarda como se escribió (RF-MM-27) | Usuario (2026-10-19), consultado por architec |
+| Retiro del editor de dos partes (fase M3) | Ahora: las versiones nuevas son solo v2; las v1 siguen usándose en solo lectura y se convierten a v2 para personalizarlas (RF-MM-17) | Usuario (2026-10-19), consultado por architec |
 
 ## 7. Evidencia de los ejemplos
 
@@ -249,8 +259,9 @@ Los ejemplos están en `archivos_anexo_chat/`, con prefijo `MOWA_MES_Ejemplo_`: 
 | S-MM-1 | Sin integración por API: se generan archivos y se importa el reporte a mano | Todo el módulo |
 | S-MM-3 | La descripción de campaña no tiene largo máximo mientras no se confirme el de MES | RF-MM-04 |
 | S-MM-4 | Feriados nacionales de Perú vigentes al 2026, calculados por regla para cualquier año; decretos y cambios de ley por configuración | RF-MM-08 |
+| S-MM-9 | Los caracteres de la tabla extendida de GSM-7 se conservan y cuentan 2 en el largo, como en el estándar; falta confirmar con MES cómo los cobra | RF-MM-27, RF-MM-19 |
 
-Quedan abiertos S-MM-1, S-MM-3 y S-MM-4: los tres dependen de información externa (qué ofrece MES y qué dice la ley), no de una preferencia del usuario. S-MM-2, S-MM-5 y S-MM-6 se confirmaron el 2026-09-21, y S-MM-7 y S-MM-8 el 2026-09-14; los cinco pasaron a la sección 6.
+Quedan abiertos S-MM-1, S-MM-3, S-MM-4 y S-MM-9: los cuatro dependen de información externa (qué ofrece MES y qué dice la ley), no de una preferencia del usuario. S-MM-2, S-MM-5 y S-MM-6 se confirmaron el 2026-09-21, y S-MM-7 y S-MM-8 el 2026-09-14; los cinco pasaron a la sección 6.
 
 ## 9. Registro de cambios
 
@@ -261,3 +272,8 @@ Quedan abiertos S-MM-1, S-MM-3 y S-MM-4: los tres dependen de información exter
 
 **2026-10-03**
 - **RF existentes ampliados:** RF-MM-13, para el speech armado con el motor de texto enriquecido (v2): la falta de titular o de fecha excluye solo si el segmento usa esa variable. Decisión del usuario en la sección 6.
+
+**2026-10-19**
+- **RF nuevos incorporados:** RF-MM-27 (mensaje en GSM-7) en la sección 4, con el supuesto S-MM-9.
+- **RF existentes ampliados:** RF-MM-17 (versiones nuevas solo con el motor, fase M3) y RF-MM-19 (el largo se mide sobre el mensaje normalizado). Decisiones del usuario en la sección 6. La fórmula de días ajustados de RF-MM-15 pasa a ser general (RF-55 de `atomics-requirements.md`); RF-MM-15 no cambia.
+- **Nota de numeración:** sin renumerar, como el resto del módulo.
