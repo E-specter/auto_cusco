@@ -328,6 +328,9 @@
   overflow-wrap: anywhere;
   transition: opacity var(--duration-default) var(--ease-default);
 }
+.editor-texto__nota {
+  margin: 0;
+}
 .editor-texto__resultado--pendiente {
   opacity: 0.6;
 }

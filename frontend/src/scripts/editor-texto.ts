@@ -139,6 +139,13 @@ export interface ControladorEditor {
   comprobarAntesDeGuardar(): boolean;
   fijarSoloLectura(soloLectura: boolean): void;
   /**
+   * A note about the sample, already translated, shown right under the
+   * preview it qualifies and said once to a screen reader («Ningún producto
+   * de la muestra cae en…»). `null` removes it. The page owns the text: it
+   * calls this again after a language change.
+   */
+  fijarNotaMuestra(texto: string | null): void;
+  /**
    * Unmount: removes the document listeners, cancels the scheduled and the
    * in-flight requests and stops emitting. The markup stays; the page removes
    * it. Call it before taking the component out of the page.
@@ -194,6 +201,8 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     largoTexto: q<HTMLElement>('[data-largo-texto]'),
     largoNivel: q<HTMLElement>('[data-largo-nivel]'),
     largoAnuncio: q<HTMLElement>('[data-largo-anuncio]'),
+    notaMuestra: q<HTMLElement>('[data-nota-muestra]'),
+    notaAnuncio: q<HTMLElement>('[data-nota-anuncio]'),
     sinConexion: q<HTMLElement>('[data-sin-conexion]'),
     problemasFila: q<HTMLElement>('[data-problemas-fila]'),
     directa: q<HTMLElement>('[data-directa]'),
@@ -1374,6 +1383,15 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
       return false;
     },
     fijarSoloLectura,
+    fijarNotaMuestra(texto) {
+      const nueva = texto ?? '';
+      const cambio = nueva !== el.notaMuestra.textContent;
+      el.notaMuestra.textContent = nueva;
+      el.notaMuestra.hidden = nueva === '';
+      // The visible note is not a live region: one that appears from hidden is not announced
+      // reliably. The announcement goes to its own region, and only when the note changes.
+      if (cambio) el.notaAnuncio.textContent = nueva;
+    },
     destruir() {
       destruido = true;
       document.removeEventListener('languagechange', alCambiarIdioma);

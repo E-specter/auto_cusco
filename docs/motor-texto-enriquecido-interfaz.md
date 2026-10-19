@@ -296,6 +296,7 @@ editor.expresion();                  // el árbol actual, para guardar
 editor.estado();                     // lo mismo que lleva el último evento
 editor.comprobarAntesDeGuardar();    // false si no se puede guardar; con resumen propio, lo vuelve alerta y lleva el foco al primero
 editor.fijarSoloLectura(false);      // «Usar como base» habilita la edición
+editor.fijarNotaMuestra(texto);      // nota bajo la vista previa («Ningún producto…»); null la quita
 editor.destruir();                   // antes de sacarlo de la página
 ```
 

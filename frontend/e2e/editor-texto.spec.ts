@@ -454,6 +454,40 @@ async function llamarEditor(page: Page, metodo: string, ...args: unknown[]): Pro
 const validaciones = (motor: ApiFalsaTextoEnriquecido) =>
   motor.pedidos.filter((p) => p.ruta === '/texto-enriquecido/validacion').length;
 
+test.describe('nota sobre la muestra', () => {
+  test('la página la fija bajo la vista previa, se anuncia una vez y se quita con null', async ({ page }) => {
+    await abrir(page, { expresion: SPEECH });
+    await expect(resultado(page)).toContainText('Hola NOMBRE S');
+    const nota = editor(page).locator('[data-resultado] + [data-nota-muestra]');
+    await expect(nota).toBeHidden();
+
+    await llamar(page, 'fijarNotaMuestra', 'Nota sintética sobre la muestra.');
+    await expect(nota).toBeVisible();
+    await expect(nota).toHaveText('Nota sintética sobre la muestra.');
+    await expect(editor(page).locator('[data-nota-anuncio]')).toHaveText('Nota sintética sobre la muestra.');
+
+    // The same note again is not said again.
+    await editor(page).locator('[data-nota-anuncio]').evaluate((e) => (e.textContent = ''));
+    await llamar(page, 'fijarNotaMuestra', 'Nota sintética sobre la muestra.');
+    await expect(editor(page).locator('[data-nota-anuncio]')).toHaveText('');
+
+    await llamar(page, 'fijarNotaMuestra', null);
+    await expect(nota).toBeHidden();
+  });
+
+  test('en las variantes se llega por su editor y queda junto a su vista previa', async ({ page }) => {
+    await abrir(page, {
+      componente: 'variantes',
+      variantes: [{ segmento: '1_a_8', expresion: { nodos: [{ tipo: 'texto', valor: 'Recuerda tu cuota.' }] } }],
+      extra: '&muestra=0',
+    });
+    await llamarEditor(page, 'fijarNotaMuestra', 'Ningún producto sintético cae en «1 a 8».');
+    await expect(page.locator('#variantes-prueba [data-resultado] + [data-nota-muestra]')).toHaveText(
+      'Ningún producto sintético cae en «1 a 8».',
+    );
+  });
+});
+
 test.describe('montar y desmontar', () => {
   test('el cambio de idioma repinta un editor montado', async ({ page }) => {
     await abrir(page, { expresion: SPEECH });
