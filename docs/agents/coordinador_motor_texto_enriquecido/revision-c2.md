@@ -1,6 +1,6 @@
 # Revisión integral del motor de texto enriquecido (T-MTE-C2)
 
-Cerrada el 2026-10-19, sobre `main` en `e0d2b47`. Están en `main` B1 a B12, F1 a F5, los cambios de designer y el corte final de F3 (`e0d2b47`: la muestra por segmento, sin los arreglos provisorios y con la espera de axe). **RF-42 a RF-54: cumplidos.** Queda una mejora en curso, aprobada por el usuario (§2, punto 8).
+Cerrada el 2026-10-19, sobre `main` en `e0d2b47`. Están en `main` B1 a B12, F1 a F5, los cambios de designer y el corte final de F3 (`e0d2b47`: la muestra por segmento, sin los arreglos provisorios y con la espera de axe). **RF-42 a RF-54: cumplidos.** La mejora de accesibilidad aprobada por el usuario también entró (`c64764d` y `d279345`).
 
 ## 1. Trazabilidad RF → implementación → pruebas
 
@@ -29,7 +29,7 @@ Cerrada el 2026-10-19, sobre `main` en `e0d2b47`. Están en `main` B1 a B12, F1 
 5. **Pendientes del usuario desde el diseño (§14):** tabla de rangos por defecto, codificación SMS GSM-7/UCS-2 y días ajustados fuera de MOWA MES. Siguen abiertos; ninguno bloqueó.
 6. **Pendiente de producto:** renombrar una definición guardada.
 7. **Decisión del usuario del 2026-10-17:** se mantienen los nombres «Cargas» y «Generar carga»; la intro de `/generar-carga` los distingue.
-8. **Mejora de accesibilidad en curso (designer), aprobada por el usuario el 2026-10-19:** `fijarNotaMuestra` en `EditorTexto`, para que la nota «ningún producto de la muestra cae en el segmento» quede bajo la vista previa del editor y se anuncie. Hoy, a 1440 px, sale lejos de lo que explica y no se anuncia. Entró en `c64764d`; falta el ajuste mínimo de dev_frontend en `/columnas` para usarla.
+8. **Mejora de accesibilidad (designer), aprobada por el usuario el 2026-10-19:** `fijarNotaMuestra` en `EditorTexto`, para que la nota «ningún producto de la muestra cae en el segmento» quede bajo la vista previa del editor y se anuncie. Hoy, a 1440 px, sale lejos de lo que explica y no se anuncia. Entró en `c64764d`, y `/columnas` la usa desde `d279345`. **Cerrado.**
 
 ## 3. Lecciones del proceso
 
@@ -41,4 +41,4 @@ Cerrada el 2026-10-19, sobre `main` en `e0d2b47`. Están en `main` B1 a B12, F1 
 
 ## 4. Commits del motor
 
-`61647cd` (diseño), `4e7ccc1` (plan C1), `bbe8570` (B1), `527b0e9` (B5), `0772e78` (B3), `b8b9025` (B7), `2f0b3b3` (B2), `c25801e` (B4a), `01e11c5` (B4b), `ee328b0` (B6), `09ba161` (B8), `9fbd47a` (B9), `98b4311` (B10), `2390adc` (Python 3.13), `ad56a11` (B12), `8eef33d` (B11). Frontend: `5ffeddf` y `e207c46` (estado del editor), `d2abbbc` (`tsc` en la verificación), `49b788b` (F2a), `0a1aacb` (F2b), `12f0c89` (F3), `ba9de60` (F4), `53ce1bb`, `206534d` y `8a612a5` (designer), `f023129` (F5), `e2e0084` (navegación de «Generar carga») y `e0d2b47` (cierre de F3). Todos sin push al cerrar esta revisión.
+`61647cd` (diseño), `4e7ccc1` (plan C1), `bbe8570` (B1), `527b0e9` (B5), `0772e78` (B3), `b8b9025` (B7), `2f0b3b3` (B2), `c25801e` (B4a), `01e11c5` (B4b), `ee328b0` (B6), `09ba161` (B8), `9fbd47a` (B9), `98b4311` (B10), `2390adc` (Python 3.13), `ad56a11` (B12), `8eef33d` (B11). Frontend: `5ffeddf` y `e207c46` (estado del editor), `d2abbbc` (`tsc` en la verificación), `49b788b` (F2a), `0a1aacb` (F2b), `12f0c89` (F3), `ba9de60` (F4), `53ce1bb`, `206534d` y `8a612a5` (designer), `f023129` (F5), `e2e0084` (navegación de «Generar carga»), `e0d2b47` (cierre de F3), `c64764d` (nota de muestra del editor) y `d279345` (`/columnas` usa la nota). Todos sin push al cerrar esta revisión.
