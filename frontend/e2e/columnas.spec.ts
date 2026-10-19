@@ -808,6 +808,10 @@ test.describe('la muestra del editor es el producto del segmento elegido', () =>
     return motor;
   }
 
+  /** The note the editor shows under its own preview, and the region that says it to a screen reader. */
+  const notaDeMuestra = (page: Page) => editorAbierto(page).locator('[data-resultado] + [data-nota-muestra]');
+  const anuncioDeNota = (page: Page) => editorAbierto(page).locator('[data-nota-anuncio]');
+
   /** The samples the open editor asked for, in order. */
   const muestrasDelEditor = (motor: ApiFalsaTextoEnriquecido) =>
     motor.pedidos
@@ -827,7 +831,7 @@ test.describe('la muestra del editor es el producto del segmento elegido', () =>
     await expect
       .poll(() => muestrasDelEditor(motor).at(-1))
       .toMatchObject({ tipo: 'producto_real', pagare: '000000000000000101', fecha_corte: '2026-09-10' });
-    await expect(page.locator('[data-muestra-aviso]')).toBeHidden();
+    await expect(notaDeMuestra(page)).toBeHidden();
 
     await segmento(page, '9 a 30').click();
 
@@ -848,24 +852,31 @@ test.describe('la muestra del editor es el producto del segmento elegido', () =>
     await expect
       .poll(() => muestrasDelEditor(motor).at(-1))
       .toMatchObject({ tipo: 'primeros_de_seleccion', fecha_corte: '2026-09-10', cantidad: 1 });
-    await expect(page.locator('[data-muestra-aviso]')).toBeHidden();
+    await expect(notaDeMuestra(page)).toBeHidden();
   });
 
+  /** A preview in which no product falls in the segment «9 a 30». */
+  const sinProductoEn9a30 = (m: ApiFalsaTextoEnriquecido) => {
+    const original = m.previsualizacion;
+    m.previsualizacion = (cuerpo, catalogo) => {
+      const respuesta = original(cuerpo, catalogo);
+      return 'filas' in respuesta && cuerpo.definicion
+        ? { ...respuesta, filas: respuesta.filas.filter((f) => f.segmento !== '9_a_30') }
+        : respuesta;
+    };
+  };
+
   test('si ningún producto de la muestra cae en el segmento, usa el primero y lo dice en una línea', async ({ page }) => {
-    const motor = await abrirConCarteraReal(page, (m) => {
-      const original = m.previsualizacion;
-      m.previsualizacion = (cuerpo, catalogo) => {
-        const respuesta = original(cuerpo, catalogo);
-        return 'filas' in respuesta && cuerpo.definicion
-          ? { ...respuesta, filas: respuesta.filas.filter((f) => f.segmento !== '9_a_30') }
-          : respuesta;
-      };
-    });
+    const motor = await abrirConCarteraReal(page, sinProductoEn9a30);
 
     await segmento(page, '9 a 30').click();
 
-    await expect(page.locator('[data-muestra-aviso]')).toBeVisible();
-    await expect(page.locator('[data-muestra-aviso]')).toHaveText(
+    await expect(notaDeMuestra(page)).toBeVisible();
+    await expect(notaDeMuestra(page)).toHaveText(
+      'Ningún producto de la muestra cae en «9 a 30»: la vista previa usa el primer producto de la selección.',
+    );
+    // Said once to a screen reader, from the editor's own region.
+    await expect(anuncioDeNota(page)).toHaveText(
       'Ningún producto de la muestra cae en «9 a 30»: la vista previa usa el primer producto de la selección.',
     );
     await expect
@@ -874,10 +885,25 @@ test.describe('la muestra del editor es el producto del segmento elegido', () =>
 
     await segmento(page, '1 a 8').click();
 
-    await expect(page.locator('[data-muestra-aviso]')).toBeHidden();
+    await expect(notaDeMuestra(page)).toBeHidden();
     await expect
       .poll(() => muestrasDelEditor(motor).at(-1))
       .toMatchObject({ tipo: 'producto_real', pagare: '000000000000000101' });
+  });
+
+  test('la nota se vuelve a decir en el idioma nuevo, y queda donde la vista previa del editor', async ({ page }) => {
+    await abrirConCarteraReal(page, sinProductoEn9a30);
+    await segmento(page, '9 a 30').click();
+    await expect(notaDeMuestra(page)).toBeVisible();
+
+    await page.locator('[data-lang="en"]').click();
+
+    await expect(notaDeMuestra(page)).toHaveText(
+      'No product in the sample falls in “9 a 30”: the preview uses the first product of the selection.',
+    );
+    await expect(anuncioDeNota(page)).toHaveText(
+      'No product in the sample falls in “9 a 30”: the preview uses the first product of the selection.',
+    );
   });
 
   test('con ejemplos no hay producto: el editor usa el registro de ejemplo, haya o no segmento', async ({ page }) => {
@@ -897,6 +923,6 @@ test.describe('la muestra del editor es el producto del segmento elegido', () =>
     await segmento(page, '1 a 8').click();
 
     await expect.poll(() => muestrasDelEditor(motor).at(-1)).toMatchObject({ tipo: 'ejemplo' });
-    await expect(page.locator('[data-muestra-aviso]')).toBeHidden();
+    await expect(notaDeMuestra(page)).toBeHidden();
   });
 });

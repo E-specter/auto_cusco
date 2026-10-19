@@ -28,8 +28,8 @@ Cerrada el 2026-10-19, sobre `main` en `e0d2b47`. Están en `main` B1 a B12, F1 
 4. **Límites conocidos de `/archivos-carga`** (B12, documentados): cancelar una descarga no corta el trabajo del servidor, y `usada_en` puede quedar marcado sin entrega.
 5. **Pendientes del usuario desde el diseño (§14):** tabla de rangos por defecto, codificación SMS GSM-7/UCS-2 y días ajustados fuera de MOWA MES. Siguen abiertos; ninguno bloqueó.
 6. **Pendiente de producto:** renombrar una definición guardada.
-8. **Mejora de accesibilidad en curso (designer), aprobada por el usuario el 2026-10-19:** `fijarNotaMuestra` en `EditorTexto`, para que la nota «ningún producto de la muestra cae en el segmento» quede bajo la vista previa del editor y se anuncie. Hoy, a 1440 px, sale lejos de lo que explica y no se anuncia. Es un corte propio que entra después de `e0d2b47`; después, un ajuste mínimo de dev_frontend.
 7. **Decisión del usuario del 2026-10-17:** se mantienen los nombres «Cargas» y «Generar carga»; la intro de `/generar-carga` los distingue.
+8. **Mejora de accesibilidad en curso (designer), aprobada por el usuario el 2026-10-19:** `fijarNotaMuestra` en `EditorTexto`, para que la nota «ningún producto de la muestra cae en el segmento» quede bajo la vista previa del editor y se anuncie. Hoy, a 1440 px, sale lejos de lo que explica y no se anuncia. Entró en `c64764d`; falta el ajuste mínimo de dev_frontend en `/columnas` para usarla.
 
 ## 3. Lecciones del proceso
 

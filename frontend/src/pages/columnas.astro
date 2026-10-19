@@ -744,6 +744,22 @@ import '../styles/columnas.css';
     };
   }
 
+  /**
+   * The note under the editor's own preview when no product of the sample falls in the segment on screen
+   * (`null` removes it). The editor shows it next to the preview it qualifies and says it once to a screen
+   * reader; the text is the page's, so it is given again after a language change.
+   */
+  function pintarNotaMuestra(segmentoSinProducto: string | null = muestraDelEditor().segmentoSinProducto): void {
+    const contenido = estado.contenido;
+    if (!contenido) return;
+    const etiqueta = segmentoSinProducto
+      ? (segmentosActuales().find((x) => x.clave === segmentoSinProducto)?.etiqueta ?? segmentoSinProducto)
+      : '';
+    const nota = segmentoSinProducto ? t('columnas.muestra.sinSegmento', { segmento: etiqueta }) : null;
+    if (contenido.tipo === 'variantes') contenido.ctl.editor.fijarNotaMuestra(nota);
+    else contenido.ctl.fijarNotaMuestra(nota);
+  }
+
   /** The sample last given to the open editor, so a repaint that changes nothing does not re-feed (and re-validate) it. */
   let muestraAplicada = '';
 
@@ -752,14 +768,7 @@ import '../styles/columnas.css';
     if (!contenido) return;
     const { muestra, segmentoSinProducto } = muestraDelEditor();
 
-    const aviso = estado.detalle?.querySelector<HTMLElement>('[data-muestra-aviso]');
-    if (aviso) {
-      const etiqueta = segmentoSinProducto
-        ? (segmentosActuales().find((x) => x.clave === segmentoSinProducto)?.etiqueta ?? segmentoSinProducto)
-        : '';
-      aviso.hidden = !segmentoSinProducto;
-      aviso.textContent = segmentoSinProducto ? t('columnas.muestra.sinSegmento', { segmento: etiqueta }) : '';
-    }
+    pintarNotaMuestra(segmentoSinProducto);
 
     const clave = JSON.stringify(muestra);
     if (clave === muestraAplicada) return;
@@ -911,10 +920,6 @@ import '../styles/columnas.css';
 
     const host = document.createElement('div');
     host.dataset.host = '';
-    const avisoMuestra = document.createElement('p');
-    avisoMuestra.className = 'field__hint';
-    avisoMuestra.dataset.muestraAviso = '';
-    avisoMuestra.hidden = true;
 
     // Varying by segment.
     const variar = document.createElement('div');
@@ -949,7 +954,7 @@ import '../styles/columnas.css';
     campoFormato.dataset.formato = '';
     formato.append(tituloFormato, campoFormato);
 
-    cuerpo.append(modo, host, avisoMuestra, variar, formato);
+    cuerpo.append(modo, host, variar, formato);
     celda.append(cuerpo);
     fila.append(celda);
     return fila;
@@ -2105,6 +2110,7 @@ import '../styles/columnas.css';
     if (!el.contenido.hidden) {
       pintar();
       pintarPrevia();
+      pintarNotaMuestra();
     }
   });
 
