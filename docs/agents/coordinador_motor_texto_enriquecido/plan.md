@@ -519,3 +519,41 @@ F2 no había arrancado; antes solo existía el estado del editor (`5ffeddf` y `e
   - `usada_en` se marca después de generar y exportar bien, pero antes de enviar el cuerpo. Si el cliente cancela, la versión puede quedar marcada sin entrega. Nunca se marca si la generación falla ni en la previsualización.
   - Los dos quedan como límites conocidos. Mitigación en F5: un aviso después de cancelar y no permitir otra descarga mientras haya una en curso.
 - **Designer aprobó el plan de F5:** ruta `/generar-carga`, al final de «Flujo diario». La navegación va en un parche de designer sobre F5.
+
+## 23. F5 entregada (2026-10-16)
+
+- Worktree `auto_cusco_mte_f5`, sobre `ad56a11`. El coordinador comprobó los tipos, Vitest 786 y `build:produccion`; dev_frontend corrió `generar-carga.spec` (35) y axe (11) con un worker.
+- **Orden de entrada:**
+  1. el cambio de designer que agrega la `etiqueta` por opción a `selector-patron-fecha.ts` (aplicado en el worktree de F5 solo para programar), como commit propio;
+  2. F5;
+  3. el parche de navegación de designer, «Generar carga» al final de «Flujo diario».
+- Pendiente antes de architec: la revisión de experiencia de designer.
+- **Revisión de experiencia de F5 (designer, 2026-10-16):** 2 puntos para antes del commit («no alcanzan» como `.notice--info`, y el grupo de problemas con un botón «Ver los N» y `.table--apilable`) y 4 menores, pasados a dev_frontend. La API falsa no debe devolver exclusiones si la definición no tiene segmentación.
+- **Parches de designer y orden de entrada sobre F5** (todos esperan la aprobación del usuario):
+  1. `designer-nav.patch` (`/columnas`);
+  2. `designer-selector-etiqueta.patch`;
+  3. F5;
+  4. `designer-nav-generar.patch` (se apila sobre el 1).
+
+  Aparte: `designer-ui-lectura` (con el arreglo de foco) y el ajuste de la API falsa de B11.
+
+## 24. Aprobación del usuario (2026-10-17)
+
+El usuario aprobó directamente, en la sesión del coordinador, los cinco cambios de designer: `designer-nav.patch`, `designer-nav-generar.patch`, `designer-ui-lectura` (con `controlMuestra` y el arreglo de foco), `designer-selector-etiqueta` y el ajuste de la API falsa de B11. Decidió además **mantener los nombres «Cargas» y «Generar carga»**, con la intro de `/generar-carga` que los distingue.
+
+Orden de commits pasado a architec:
+1. nav de `/columnas`;
+2. ui-lectura;
+3. etiqueta;
+4. F5;
+5. nav de «Generar carga»;
+6. B11.
+
+Después, el corte chico de dev_frontend en `/columnas` y el cierre de C2.
+- **Prueba intermitente (2026-10-17, aviso de MOWA MES):** `accesibilidad.spec.ts:414` (`/columnas`, versión antigua, tema claro) falló una vez por contraste en `thead[data-previa-cabecera]` dentro de una corrida completa; aislada pasa. Hipótesis: axe midió con la vista previa atenuada mientras esperaba la respuesta. El arreglo va en el corte chico de dev_frontend: esperar a que la vista previa esté al día, con una marca observable (`aria-busy` o `data-pendiente`), antes de correr axe. Se revisa el mismo patrón en `/generar-carga`.
+
+## 25. Cierre (2026-10-19)
+
+- El corte final de F3 entró en `e0d2b47` (Playwright completo 369/369). C2 cerrada: RF-42 a RF-54 cumplidos (`revision-c2.md`).
+- **Queda en curso:** `fijarNotaMuestra` (designer), aprobado por el usuario el 2026-10-19. Entra después de `e0d2b47`, seguido de un ajuste mínimo de dev_frontend.
+- **Pendientes del usuario desde el diseño:** tabla de rangos por defecto, codificación SMS y días ajustados fuera de MOWA MES. **Pendiente de producto:** renombrar una definición guardada. **Mejora posible:** una muestra por segmento concreto.
