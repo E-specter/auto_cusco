@@ -32,6 +32,11 @@ const REGLAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 test.use({ reducedMotion: 'reduce' });
 
 async function sinViolaciones(page: Page): Promise<void> {
+  // A preview that is still recalculating is dimmed, and axe would read the dimmed contrast. A screen
+  // with a preview says so (`data-previa` + `data-calculando`): wait for it to be up to date, never
+  // for a fixed time.
+  const previa = page.locator('[data-previa]');
+  if ((await previa.count()) > 0) await expect(previa).toHaveAttribute('data-calculando', 'false');
   const resultado = await new AxeBuilder({ page }).withTags(REGLAS).analyze();
   const resumen = resultado.violations.map(
     (v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`,
@@ -572,8 +577,6 @@ async function abrirGenerarCarga(
   await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 500' });
   await page.getByLabel('Definición guardada').selectOption({ label: 'SMS preventivo' });
   await expect(page.locator('[data-previa-contenido]')).toBeVisible();
-  // The figures dim while the preview recalculates; axe measures contrast only once it is up to date.
-  await expect(page.locator('[data-previa]')).toHaveAttribute('data-calculando', 'false');
   return cargas;
 }
 
@@ -616,8 +619,6 @@ for (const tema of ['light', 'dark'] as const) {
       await page.locator('[data-formatos]').getByRole('button', { name: 'CSV', exact: true }).click();
       await page.getByLabel('Delimitador', { exact: true }).selectOption({ label: 'Personalizado' });
       await expect(page.locator('#gc-op-delimitador-propio')).toBeVisible();
-      // The figures dim while the preview recalculates (as in Cartera); contrast is read once it settles.
-      await expect(page.locator('[data-previa]')).toHaveAttribute('data-calculando', 'false');
       await sinViolaciones(page);
     });
 
@@ -632,7 +633,6 @@ for (const tema of ['light', 'dark'] as const) {
       const cargas = await abrirGenerarCarga(page);
       await Promise.all([page.waitForEvent('download'), page.locator('[data-generar]').click()]);
       await expect(page.locator('[data-resultado-exito]')).toBeVisible();
-      await expect(page.locator('[data-previa]')).toHaveAttribute('data-calculando', 'false');
       await sinViolaciones(page);
 
       const { compuerta, liberar } = crearCompuerta();

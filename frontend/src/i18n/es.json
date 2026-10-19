@@ -1018,6 +1018,7 @@
   "columnas.previa.sinProductos": "La selección no tiene productos con esta fecha de corte.",
   "columnas.previa.fechaFalta": "Elige la fecha de corte para ver productos reales.",
   "columnas.previa.problemas": "La definición tiene problemas; la vista previa se muestra cuando se corrigen.",
+  "columnas.muestra.sinSegmento": "Ningún producto de la muestra cae en «{segmento}»: la vista previa usa el primer producto de la selección.",
   "mowaMes.speech.v2.nivelConLargo": "{nivel} · {n} caracteres",
   "mowaMes.speech.v2.convertir.boton": "Convertir a v2",
   "mowaMes.speech.v2.convertir.hint": "Esta versión guarda cada segmento en dos partes fijas (v1). Conviértela para armar cada mensaje con variables y funciones: obtienes un borrador con los mismos mensajes que no se guarda hasta que lo confirmes.",

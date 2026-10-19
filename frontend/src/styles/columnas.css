@@ -287,12 +287,6 @@
   color: var(--color-danger-text);
 }
 
-/* The page sets the sample of the open row's editor (§9.2), so the editor's own control is not
-   shown. The variants component has no option for it; this rule is what hides it there. */
-.cl-detalle [data-control-muestra] {
-  display: none;
-}
-
 /* The sample picker of the preview is as wide as its two options, never the whole panel, and on a
    phone its options wrap inside the screen instead of being cut at the edge. */
 .cl-politica .segmented {

@@ -238,7 +238,7 @@ import '../styles/columnas.css';
         </div>
       </section>
 
-      <section class="panel" aria-labelledby="cl-previa-title">
+      <section class="panel" aria-labelledby="cl-previa-title" data-previa data-calculando="false" aria-busy="false">
         <div class="panel__head">
           <h2 class="panel__title" id="cl-previa-title" data-i18n="columnas.previa.title">Vista previa</h2>
           <p class="cl-pie__estado" data-previa-estado role="status"></p>
@@ -636,6 +636,8 @@ import '../styles/columnas.css';
     estado.editorPendiente = detalle.pendiente;
     estado.editorValido = detalle.valida;
     recogerProblemas(detalle.problemas);
+    // Another segment on screen is another product of the sample.
+    aplicarMuestraAlEditor();
     if (detalle.origen === 'usuario' && estado.abierta) {
       estado.borrador = fijarExpresion(estado.borrador, estado.abierta, detalle.porDefecto);
       estado.borrador = fijarVariantes(estado.borrador, estado.abierta, detalle.variantes);
@@ -652,6 +654,7 @@ import '../styles/columnas.css';
     const detalle = estado.detalle;
     if (!columna || !detalle) return;
     soltarContenido();
+    muestraAplicada = '';
 
     const host = detalle.querySelector<HTMLElement>('[data-host]')!;
     host.replaceChildren();
@@ -675,6 +678,8 @@ import '../styles/columnas.css';
         variantes: columna.variantes,
         conPorDefecto: true,
         resumen: 'ninguno',
+        // The page sets the sample, so there is one control and not two that do not talk.
+        controlMuestra: false,
         soloLectura,
         soloVariable,
       });
@@ -683,8 +688,6 @@ import '../styles/columnas.css';
         return;
       }
       estado.contenido = { tipo: 'variantes', ctl };
-      // The page sets the sample (the variants component has no option to hide its editor's own
-      // control; `columnas.css` hides it), so there is one control and not two that do not talk.
       aplicarMuestraAlEditor();
     } else {
       raiz.addEventListener(EVENTO_EXPRESION, (evento) => alCambiarEditor((evento as CustomEvent<EstadoEditor>).detail));
@@ -692,7 +695,7 @@ import '../styles/columnas.css';
         contexto: CONTEXTO,
         expresion: columna.expresion,
         controlMuestra: false,
-        muestra: muestraDelEditor(),
+        muestra: muestraDelEditor().muestra,
         resumen: 'ninguno',
         soloLectura,
         soloVariable,
@@ -705,25 +708,62 @@ import '../styles/columnas.css';
     }
   }
 
-  /** The sample the open editor previews with: the first product of the selection, or the example. */
-  function muestraDelEditor(): MuestraTexto {
+  /** The segment on screen in the open variants editor; `null` for the default content or a plain editor. */
+  function segmentoDelEditor(): string | null {
+    const contenido = estado.contenido;
+    return contenido?.tipo === 'variantes' ? contenido.ctl.estado().seleccionado : null;
+  }
+
+  /**
+   * The sample the open editor previews with. With real portfolio and a segment on screen, the product of
+   * the first row of the preview that falls in that segment (its `pagare` and `fecha_corte`, B11); if none
+   * does, the first product of the selection, and `segmentoSinProducto` names the segment so the screen
+   * can say so in one line. Without real portfolio, the example record.
+   */
+  function muestraDelEditor(): { muestra: MuestraTexto; segmentoSinProducto: string | null } {
     const seleccion = estado.seleccion;
-    if (estado.muestra === 'real' && seleccion?.fechaCorte && seleccion.aplicable) {
-      return {
+    if (estado.muestra !== 'real' || !seleccion?.fechaCorte || !seleccion.aplicable) {
+      return { muestra: { tipo: 'ejemplo', cantidad: 1 }, segmentoSinProducto: null };
+    }
+    const segmento = segmentoDelEditor();
+    const fila =
+      segmento === null ? undefined : ultimaPrevia?.filas.find((f) => f.segmento === segmento && f.pagare && f.fecha_corte);
+    if (fila?.pagare && fila.fecha_corte) {
+      return { muestra: { tipo: 'producto_real', pagare: fila.pagare, fecha_corte: fila.fecha_corte, cantidad: 1 }, segmentoSinProducto: null };
+    }
+    return {
+      muestra: {
         tipo: 'primeros_de_seleccion',
         fecha_corte: seleccion.fechaCorte,
         filtros: seleccion.consulta.filtros,
         orden: seleccion.consulta.orden,
         cantidad: 1,
-      };
-    }
-    return { tipo: 'ejemplo', cantidad: 1 };
+      },
+      // Only said once the preview has answered: before that there is nothing to look in.
+      segmentoSinProducto: segmento !== null && ultimaPrevia ? segmento : null,
+    };
   }
+
+  /** The sample last given to the open editor, so a repaint that changes nothing does not re-feed (and re-validate) it. */
+  let muestraAplicada = '';
 
   function aplicarMuestraAlEditor(): void {
     const contenido = estado.contenido;
     if (!contenido) return;
-    const muestra = muestraDelEditor();
+    const { muestra, segmentoSinProducto } = muestraDelEditor();
+
+    const aviso = estado.detalle?.querySelector<HTMLElement>('[data-muestra-aviso]');
+    if (aviso) {
+      const etiqueta = segmentoSinProducto
+        ? (segmentosActuales().find((x) => x.clave === segmentoSinProducto)?.etiqueta ?? segmentoSinProducto)
+        : '';
+      aviso.hidden = !segmentoSinProducto;
+      aviso.textContent = segmentoSinProducto ? t('columnas.muestra.sinSegmento', { segmento: etiqueta }) : '';
+    }
+
+    const clave = JSON.stringify(muestra);
+    if (clave === muestraAplicada) return;
+    muestraAplicada = clave;
     if (contenido.tipo === 'variantes') contenido.ctl.editor.fijarMuestra(muestra);
     else contenido.ctl.fijarMuestra(muestra);
   }
@@ -871,6 +911,10 @@ import '../styles/columnas.css';
 
     const host = document.createElement('div');
     host.dataset.host = '';
+    const avisoMuestra = document.createElement('p');
+    avisoMuestra.className = 'field__hint';
+    avisoMuestra.dataset.muestraAviso = '';
+    avisoMuestra.hidden = true;
 
     // Varying by segment.
     const variar = document.createElement('div');
@@ -905,7 +949,7 @@ import '../styles/columnas.css';
     campoFormato.dataset.formato = '';
     formato.append(tituloFormato, campoFormato);
 
-    cuerpo.append(modo, host, variar, formato);
+    cuerpo.append(modo, host, avisoMuestra, variar, formato);
     celda.append(cuerpo);
     fila.append(celda);
     return fila;
@@ -1632,8 +1676,20 @@ import '../styles/columnas.css';
   let controlPrevia: AbortController | null = null;
   let ultimaPrevia: PrevisualizacionTexto | null = null;
 
+  /**
+   * Whether the preview is out of date: from the moment a change schedules it until its answer (or
+   * its refusal) is on screen. `data-calculando` is what a test waits for; `aria-busy` is what a
+   * screen reader hears. The figures dim while a request is in flight, as before.
+   */
+  function marcarPreviaOcupada(ocupada: boolean): void {
+    const panel = $<HTMLElement>('[data-previa]');
+    panel.dataset.calculando = String(ocupada);
+    panel.setAttribute('aria-busy', String(ocupada));
+  }
+
   function programarPrevia(espera = ESPERA_PREVIA): void {
     estado.previaVigente = false;
+    marcarPreviaOcupada(true);
     window.clearTimeout(temporizadorPrevia);
     temporizadorPrevia = window.setTimeout(() => void calcularPrevia(), espera);
   }
@@ -1741,6 +1797,7 @@ import '../styles/columnas.css';
       ultimaPrevia = null;
       el.previaEstado.textContent = '';
       pintarPrevia();
+      marcarPreviaOcupada(false);
       return;
     }
     const control = new AbortController();
@@ -1757,6 +1814,7 @@ import '../styles/columnas.css';
       ultimaPrevia = null;
       el.previaEstado.textContent = '';
       el.previaContenedor.style.opacity = '';
+      marcarPreviaOcupada(false);
       if (error instanceof ApiError && (error.status === 400 || error.status === 404)) {
         el.previaAviso.hidden = false;
         el.previaAviso.textContent = error.detail;
@@ -1771,7 +1829,10 @@ import '../styles/columnas.css';
     el.previaContenedor.style.opacity = '';
     estado.previaVigente = true;
     pintarPrevia();
+    marcarPreviaOcupada(false);
     refrescarResumenes();
+    // The rows of the preview say which product falls in which segment.
+    aplicarMuestraAlEditor();
   }
 
   document.querySelectorAll<HTMLButtonElement>('[data-muestra]').forEach((opcion) => {

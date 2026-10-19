@@ -287,9 +287,14 @@ test.describe('teclado y anchos', () => {
     await page.keyboard.press('Enter');
 
     await expect(editor(page)).toBeVisible();
-    await expect
-      .poll(() => page.evaluate(() => document.activeElement?.closest('#mm-speech-v2') !== null))
-      .toBe(true);
+    // The first segment control the analyst can see: a button on wide screens, the select on narrow ones.
+    const primero = editor(page).locator('[data-segmento-botones] button:visible, [data-segmento-select]:visible').first();
+    await expect(primero).toBeFocused();
+
+    // The editor validates every segment after the button was pressed, and the focus has to survive
+    // that: wait until it has finished, and the focus must still be on the same control.
+    await expect(editor(page)).toHaveAttribute('data-pendiente', 'false');
+    await expect(primero).toBeFocused();
   });
 
   for (const ancho of [360, 768, 1440]) {

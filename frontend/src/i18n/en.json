@@ -1018,6 +1018,7 @@
   "columnas.previa.sinProductos": "The selection has no products for this cut-off date.",
   "columnas.previa.fechaFalta": "Choose the cut-off date to see real products.",
   "columnas.previa.problemas": "The definition has problems; the preview shows once they are fixed.",
+  "columnas.muestra.sinSegmento": "No product in the sample falls in “{segmento}”: the preview uses the first product of the selection.",
   "mowaMes.speech.v2.nivelConLargo": "{nivel} · {n} characters",
   "mowaMes.speech.v2.convertir.boton": "Convert to v2",
   "mowaMes.speech.v2.convertir.hint": "This version stores each segment as two fixed parts (v1). Convert it to build each message with variables and functions: you get a draft with the same messages that is not saved until you confirm it.",

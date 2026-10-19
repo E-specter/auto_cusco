@@ -9,7 +9,7 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 
-import { apiVacia, montarApi } from './api-falsa';
+import { apiVacia, montarApi, version } from './api-falsa';
 import { apiDefiniciones, definicionFalsa, manejadorDefiniciones, type ApiFalsaDefiniciones } from './api-falsa-definiciones';
 import {
   apiTextoEnriquecidoVacia,
@@ -68,10 +68,12 @@ function motorConDefiniciones(): ApiFalsaTextoEnriquecido {
         };
       }),
     });
-    const filas =
-      cuerpo.muestra.tipo === 'ejemplos_por_segmento'
-        ? catalogo.contexto.segmentos.map((r, i) => fila(i + 1, r.etiqueta, r.clave))
-        : [fila(1, null, null)];
+    const porSegmento =
+      cuerpo.muestra.tipo === 'ejemplos_por_segmento' ||
+      (cuerpo.muestra.tipo === 'primeros_de_seleccion' && Boolean(cuerpo.definicion?.segmentacion));
+    const filas = porSegmento
+      ? catalogo.contexto.segmentos.map((r, i) => fila(i + 1, r.etiqueta, r.clave))
+      : [fila(1, null, null)];
     return { problemas: [], filas, limite_largo: null, umbral_advertencia: null, disponibles: null };
   };
   return motor;
@@ -762,5 +764,139 @@ test.describe('correcciones de la revisión de experiencia', () => {
     const borde = await control.evaluate((e) => e.getBoundingClientRect().right);
     expect(borde).toBeLessThanOrEqual(360);
     await expect(page.getByRole('button', { name: 'Cartera real' })).toBeVisible();
+  });
+});
+
+test('la vista previa dice cuándo está al día: ocupada desde el cambio hasta que llega su respuesta', async ({ page }) => {
+  await conDefinicion(page);
+  const previa = page.locator('[data-previa]');
+  await expect(previa).toHaveAttribute('data-calculando', 'false');
+  await expect(previa).toHaveAttribute('aria-busy', 'false');
+
+  await nombreDeColumna(page, 1).fill('telefono_nuevo');
+
+  // Busy from the change (before the request even leaves), so a test can wait for it instead of a fixed time.
+  await expect(previa).toHaveAttribute('data-calculando', 'true');
+  await expect(previa).toHaveAttribute('aria-busy', 'true');
+  await expect(previa).toHaveAttribute('data-calculando', 'false');
+  await expect(previa).toHaveAttribute('aria-busy', 'false');
+});
+
+test.describe('la muestra del editor es el producto del segmento elegido', () => {
+  /** Real portfolio, a segmentation, and the open row varying by segment: the editor's own preview is the call to watch. */
+  async function abrirConCarteraReal(page: Page, ajustar?: (motor: ApiFalsaTextoEnriquecido) => void) {
+    const definiciones = apiDefiniciones();
+    definiciones.definiciones.push(definicionFalsa({ id: 1, nombre: 'SMS preventivo' }));
+    const motor = motorConDefiniciones();
+    // Every product the editor may ask for by pagaré (rows 1 to 3 of the preview), so none is a 404.
+    for (const numero of [1, 2, 3]) motor.productos[String(99 + numero).padStart(18, '0')] = { telefono: '987654321', titular: 'ZZPRUEBA UNO' };
+    ajustar?.(motor);
+    const base = apiVacia();
+    base.versiones = [version({ fecha_corte: '2026-09-10', vigente: true })];
+    base.manejadores = [manejarTextoEnriquecido(motor), manejadorDefiniciones(definiciones)];
+    await montarApi(page, base);
+    await page.goto(RUTA);
+    await page.getByLabel('Definición guardada').selectOption('1');
+    await expect(nombreDeColumna(page, 1)).toHaveValue('telefono');
+    await page.getByText('Segmentación', { exact: true }).click();
+    await page.getByLabel('Segmentar las columnas').check();
+    await page.getByRole('button', { name: 'Cartera real' }).click();
+    await expect(page.locator('.cl-previa tbody tr')).not.toHaveCount(0);
+    await page.getByRole('button', { name: 'Editar mensaje' }).click();
+    await page.getByLabel('Variar por segmento').check();
+    await expect(editorAbierto(page).locator('[data-segmento-botones] button').first()).toBeVisible();
+    return motor;
+  }
+
+  /** The samples the open editor asked for, in order. */
+  const muestrasDelEditor = (motor: ApiFalsaTextoEnriquecido) =>
+    motor.pedidos
+      .filter((p) => p.ruta.startsWith('/texto-enriquecido/previsualizacion'))
+      .map((p) => p.cuerpo as { expresion?: unknown; muestra: { tipo: string; pagare?: string | null; fecha_corte?: string | null; cantidad?: number } })
+      .filter((c) => c.expresion)
+      .map((c) => c.muestra);
+
+  const segmento = (page: Page, etiqueta: string) =>
+    editorAbierto(page).locator('[data-segmento-botones] button').filter({ hasText: etiqueta }).first();
+
+  test('al elegir un segmento, el editor previsualiza con el pagaré y la fecha de la primera fila de ese segmento', async ({ page }) => {
+    const motor = await abrirConCarteraReal(page);
+
+    await segmento(page, '1 a 8').click();
+
+    await expect
+      .poll(() => muestrasDelEditor(motor).at(-1))
+      .toMatchObject({ tipo: 'producto_real', pagare: '000000000000000101', fecha_corte: '2026-09-10' });
+    await expect(page.locator('[data-muestra-aviso]')).toBeHidden();
+
+    await segmento(page, '9 a 30').click();
+
+    await expect
+      .poll(() => muestrasDelEditor(motor).at(-1))
+      .toMatchObject({ tipo: 'producto_real', pagare: '000000000000000102' });
+  });
+
+  test('al variar abre el primer segmento con su producto; con el contenido por defecto no hay segmento y usa el primero de la selección', async ({ page }) => {
+    const motor = await abrirConCarteraReal(page);
+
+    await expect
+      .poll(() => muestrasDelEditor(motor).at(-1))
+      .toMatchObject({ tipo: 'producto_real', pagare: '000000000000000100', fecha_corte: '2026-09-10' });
+
+    await editorAbierto(page).locator('[data-segmento-botones] button[data-segmento=""]').click();
+
+    await expect
+      .poll(() => muestrasDelEditor(motor).at(-1))
+      .toMatchObject({ tipo: 'primeros_de_seleccion', fecha_corte: '2026-09-10', cantidad: 1 });
+    await expect(page.locator('[data-muestra-aviso]')).toBeHidden();
+  });
+
+  test('si ningún producto de la muestra cae en el segmento, usa el primero y lo dice en una línea', async ({ page }) => {
+    const motor = await abrirConCarteraReal(page, (m) => {
+      const original = m.previsualizacion;
+      m.previsualizacion = (cuerpo, catalogo) => {
+        const respuesta = original(cuerpo, catalogo);
+        return 'filas' in respuesta && cuerpo.definicion
+          ? { ...respuesta, filas: respuesta.filas.filter((f) => f.segmento !== '9_a_30') }
+          : respuesta;
+      };
+    });
+
+    await segmento(page, '9 a 30').click();
+
+    await expect(page.locator('[data-muestra-aviso]')).toBeVisible();
+    await expect(page.locator('[data-muestra-aviso]')).toHaveText(
+      'Ningún producto de la muestra cae en «9 a 30»: la vista previa usa el primer producto de la selección.',
+    );
+    await expect
+      .poll(() => muestrasDelEditor(motor).at(-1))
+      .toMatchObject({ tipo: 'primeros_de_seleccion', cantidad: 1 });
+
+    await segmento(page, '1 a 8').click();
+
+    await expect(page.locator('[data-muestra-aviso]')).toBeHidden();
+    await expect
+      .poll(() => muestrasDelEditor(motor).at(-1))
+      .toMatchObject({ tipo: 'producto_real', pagare: '000000000000000101' });
+  });
+
+  test('con ejemplos no hay producto: el editor usa el registro de ejemplo, haya o no segmento', async ({ page }) => {
+    const definiciones = apiDefiniciones();
+    definiciones.definiciones.push(definicionFalsa({ id: 1, nombre: 'SMS preventivo' }));
+    const motor = motorConDefiniciones();
+    const base = apiVacia();
+    base.manejadores = [manejarTextoEnriquecido(motor), manejadorDefiniciones(definiciones)];
+    await montarApi(page, base);
+    await page.goto(RUTA);
+    await page.getByLabel('Definición guardada').selectOption('1');
+    await page.getByText('Segmentación', { exact: true }).click();
+    await page.getByLabel('Segmentar las columnas').check();
+    await page.getByRole('button', { name: 'Editar mensaje' }).click();
+    await page.getByLabel('Variar por segmento').check();
+
+    await segmento(page, '1 a 8').click();
+
+    await expect.poll(() => muestrasDelEditor(motor).at(-1)).toMatchObject({ tipo: 'ejemplo' });
+    await expect(page.locator('[data-muestra-aviso]')).toBeHidden();
   });
 });

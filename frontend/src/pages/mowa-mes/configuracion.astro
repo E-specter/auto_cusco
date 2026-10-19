@@ -1458,9 +1458,14 @@ import '../../styles/mowa-mes-speech-v2.css';
   let montandoV2: Promise<void> | null = null;
   /** Which content the editor was last given, so a repaint does not re-feed (and re-validate) it. */
   let fuenteV2 = '';
-  /** After converting: put the focus in the editor once it has validated every segment. */
-  let enfocarV2 = false;
-  let temporizadorFocoV2 = 0;
+
+  /** The first segment control the analyst can see: a button (wide screens) or the select (narrow). */
+  function enfocarEditorV2(): void {
+    const visibles = [
+      ...v2El.raiz.querySelectorAll<HTMLElement>('[data-segmento-botones] button, [data-segmento-select]'),
+    ].filter((n) => n.offsetParent !== null);
+    visibles[0]?.focus();
+  }
 
   /** v1 is hidden only while a v2 is on screen; its markup and code are the same either way. */
   function mostrarRama(): void {
@@ -1488,19 +1493,8 @@ import '../../styles/mowa-mes-speech-v2.css';
       v2El.raiz.addEventListener(EVENTO_VARIANTES, (evento) => {
         const detalle = (evento as CustomEvent<EstadoVariantes>).detail;
         estado.v2Editor = { pendiente: detalle.pendiente, valida: detalle.valida };
-        if (enfocarV2) {
-          // The list of segments is repainted after every validation: focus waits until no more
-          // events arrive, so it lands on a button that stays.
-          window.clearTimeout(temporizadorFocoV2);
-          temporizadorFocoV2 = window.setTimeout(() => {
-            if (!enfocarV2 || estado.v2Editor.pendiente) return;
-            enfocarV2 = false;
-            const visibles = [
-              ...v2El.raiz.querySelectorAll<HTMLElement>('[data-segmento-botones] button, [data-segmento-select]'),
-            ].filter((n) => n.offsetParent !== null);
-            visibles[0]?.focus();
-          }, 250);
-        }
+        // What a test (or a script) can wait on: the editor has finished validating every segment.
+        v2El.raiz.dataset.pendiente = String(detalle.pendiente);
         if (detalle.origen === 'usuario' && estado.v2) {
           estado.v2.variantes = detalle.variantes.map((v) => ({ ...v }));
           programarPrevisualizacion(ESPERA_PREVISUALIZACION);
@@ -1638,11 +1632,11 @@ import '../../styles/mowa-mes-speech-v2.css';
       $<HTMLElement>('[data-speech-error]').textContent = '';
       pintarSpeech();
       programarPrevisualizacion(0);
-      // The button that was pressed is now hidden: focus goes to the editor, where the work is. It
-      // waits for the editor to finish validating, because the list of segments is repainted then
-      // and a focus placed earlier would be dropped with the button it was on.
-      enfocarV2 = true;
-      void asegurarEditorV2();
+      // The button that was pressed is now hidden: focus goes to the editor, where the work is. The
+      // list of segments no longer repaints after each validation, so the focus placed once the
+      // editor is mounted stays on its button.
+      await asegurarEditorV2();
+      enfocarEditorV2();
     } catch (caido) {
       $<HTMLElement>('[data-speech-error]').textContent = mensajeDeError(caido);
     } finally {
