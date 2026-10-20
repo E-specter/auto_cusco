@@ -42,6 +42,21 @@ def test_un_origen_no_permitido_no_recibe_la_cabecera() -> None:
     assert "access-control-allow-origin" not in respuesta.headers
 
 
+def test_la_consulta_previa_permite_patch_para_renombrar_una_definicion() -> None:
+    respuesta = _cliente_con_cors([ORIGEN]).options(
+        "/prueba",
+        headers={
+            "Origin": ORIGEN,
+            "Access-Control-Request-Method": "PATCH",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    permitidos = {m.strip() for m in respuesta.headers["access-control-allow-methods"].split(",")}
+    assert respuesta.status_code == 200
+    assert "PATCH" in permitidos
+
+
 def test_la_consulta_previa_permite_los_metodos_que_usa_la_api() -> None:
     respuesta = _cliente_con_cors([ORIGEN]).options(
         "/prueba",

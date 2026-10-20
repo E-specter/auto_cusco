@@ -3172,6 +3172,87 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "definiciones de columnas"
+        ],
+        "summary": "Renombrar Definicion",
+        "description": "Cambia solo el nombre (RF-56): no crea una version ni modifica ninguna, y mueve\n`actualizado_en`. Mismo nombre que el actual: sin error y sin cambios. Otro nombre ya en uso\n(sin distinguir mayusculas ni espacios) es 409 `nombre_repetido`; vacio o de mas de 120\ncaracteres, 400 con el problema en `campo = nombre`. Devuelve la definicion con su version\nvigente.",
+        "operationId": "renombrar_definicion_definiciones_columnas__definicion_id__patch",
+        "parameters": [
+          {
+            "name": "definicion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Definicion Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenombrarDefinicionEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefinicionRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La definicion no se puede guardar: los problemas dicen donde esta cada uno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorDefinicion"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la definicion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ya hay una definicion con ese nombre",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/definiciones-columnas/{definicion_id}/versiones": {
@@ -8045,6 +8126,20 @@
           "hasta"
         ],
         "title": "RangoRespuesta"
+      },
+      "RenombrarDefinicionEntrada": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre"
+        ],
+        "title": "RenombrarDefinicionEntrada",
+        "description": "RF-56: el nombre nuevo. Se recortan los espacios de los extremos."
       },
       "ReporteImportadoRespuesta": {
         "properties": {

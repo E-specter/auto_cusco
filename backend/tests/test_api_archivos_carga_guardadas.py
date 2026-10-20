@@ -134,6 +134,18 @@ def test_la_seleccion_y_el_formato_siguen_en_la_peticion(cliente) -> None:
     assert consulta.recibido["orden"].descendente
 
 
+def test_una_guardada_renombrada_genera_el_archivo_con_el_nombre_nuevo(cliente) -> None:
+    client, _, servicio = cliente
+    id_ = servicio.crear(_guardada()).definicion.id
+    servicio.renombrar(id_, "Cobranza de octubre")
+
+    previa = client.post("/archivos-carga/previsualizacion", json=_pedido(id_)).json()
+    descarga = client.post("/archivos-carga", json=_pedido(id_))
+
+    assert previa["nombre_archivo"] == "Cobranza_de_octubre.xlsx"
+    assert "Cobranza_de_octubre.xlsx" in descarga.headers["content-disposition"]
+
+
 # --- usada_en -------------------------------------------------------------------------------------
 
 

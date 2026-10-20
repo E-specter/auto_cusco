@@ -497,6 +497,17 @@ Estado: hecho y probado sin base (2026-10-03); las pruebas de PostgreSQL (`@pyte
 | `POST /definiciones-columnas` | Guarda una definición nueva con su versión 1. `201` con la definición |
 | `GET /definiciones-columnas/{id}?version=N` | La definición con todas sus versiones (sin contenido) y el contenido de la versión pedida (la vigente por defecto) |
 | `POST /definiciones-columnas/{id}/versiones` | Guarda el cambio como una versión nueva, que pasa a ser la vigente. `201` |
+| `PATCH /definiciones-columnas/{id}` | Cambia solo el nombre (RF-56, B14): `{nombre}`. Sin versión nueva y sin tocar ninguna; mueve `actualizado_en`. `200` con la definición y su versión vigente |
+
+### Renombrar una definición (B14, RF-56)
+
+`PATCH /definiciones-columnas/{id}` con `{"nombre"}` cambia el nombre (y `nombre_normalizado`) y nada más: no crea una versión, no toca ninguna existente (contenido, `usada_en`, `creado_en` quedan como estaban; una prueba de PostgreSQL compara las filas de `definicion_carga_version` antes y después, y otra comprueba que la única escritura es un `UPDATE` de `definicion_carga`) y mueve `actualizado_en` (con la hora real del cambio, `clock_timestamp()`).
+
+- **Reglas del nombre:** las de siempre: entre 1 y 120 caracteres tras recortar los espacios de los extremos, único sin distinguir mayúsculas ni espacios. La unicidad solo pliega la caja (`casefold`), no las tildes: «Mañana» y «Manana» son nombres distintos.
+- **Errores:** `404` `definicion_no_encontrada` (se revisa antes que el nombre); `409` `nombre_repetido` si otra definición ya tiene ese nombre normalizado (la base lo impone con su restricción única, así que dos renombres a la vez al mismo nombre dejan uno y rechazan el otro); `400` `definicion_invalida` con un problema en `campo = nombre` (y `columna` nula) si el nombre está vacío, solo tiene espacios o pasa de 120; `422` si falta `nombre` o no es texto (el esquema).
+- **El mismo nombre no es un error y no cambia nada:** si el nombre, ya recortado, es exactamente el actual, responde `200` con la definición sin escribir, y `actualizado_en` no se mueve (no hubo cambio). Cambiar solo las mayúsculas (`sms` → `SMS`) sí es un cambio: no choca con ella misma, guarda el nombre nuevo, deja igual el normalizado y mueve `actualizado_en`.
+- **Después de renombrar,** las versiones nuevas deben llevar el nombre nuevo (sin distinguir mayúsculas; el viejo da `400`), y el nombre viejo queda libre para otra definición. El nombre guardado en cada carga ya generada no cambia; `/archivos-carga` con una guardada usa el nombre actual para el nombre del archivo.
+- **CORS:** `PATCH` se agregó a los métodos permitidos de `main.py`; sin eso el navegador bloquearía la consulta previa cuando el frontend corre en otro origen (el proxy `/api` de desarrollo no lo necesita).
 
 - **Ninguna versión se modifica:** no hay `PUT`. Un cambio es una versión nueva y las anteriores quedan intactas; `usada_en` es informativo.
 - **Pedido:** el mismo `DefinicionColumnasEntrada` de la previsualización (una sola forma para armar, previsualizar y guardar). En una versión nueva el `nombre` puede faltar o repetir el de la definición (sin distinguir mayúsculas); otro nombre es `400`.

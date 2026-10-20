@@ -66,7 +66,7 @@ def configurar_cors(aplicacion: FastAPI, origenes: list[str]) -> None:
         CORSMiddleware,
         allow_origins=origenes,
         allow_credentials=False,  # la API aun no usa cookies ni sesiones
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type"],
         # Sin esto el navegador no deja leer el nombre del archivo generado ni
         # el resumen de la carga cuando el frontend corre en otro origen.

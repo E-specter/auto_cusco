@@ -7,7 +7,8 @@ informan juntos, cada uno con su columna, su variante y su campo (C-2). Lo que s
 forma canonica, con expresiones (una `plantilla` que llega se convierte) y con la tabla de rangos
 resuelta.
 
-Ninguna version se modifica: un cambio es una version nueva (la vigente es la ultima).
+Ninguna version se modifica: un cambio es una version nueva (la vigente es la ultima). Renombrar
+una definicion (RF-56) cambia solo su nombre: no crea ni toca ninguna version.
 """
 
 from collections.abc import Mapping
@@ -107,6 +108,33 @@ class DefinicionesColumnasService:
         if version is None:
             raise DefinicionNoEncontrada(definicion_id)
         return VistaDefinicion(self._guardada(definicion_id), version)
+
+    def renombrar(self, definicion_id: int, nombre: Any) -> DefinicionGuardada:
+        """Cambia el nombre de la definicion (RF-56), sin version nueva.
+
+        El nombre sigue las reglas de siempre: entre 1 y `LARGO_MAXIMO_NOMBRE` caracteres, sin los
+        espacios de los extremos, unico sin distinguir mayusculas ni espacios. Dejar el mismo
+        nombre no es un error ni cambia nada (tampoco `actualizado_en`: no hubo cambio); cambiar
+        solo las mayusculas si es un cambio y lo guarda.
+        """
+        actual = self._guardada(definicion_id)
+        limpio = nombre.strip() if isinstance(nombre, str) else ""
+        if not 1 <= len(limpio) <= LARGO_MAXIMO_NOMBRE:
+            raise DefinicionInvalida(
+                (
+                    _problema(
+                        CodigoTexto.DEFINICION_INVALIDA,
+                        f"El nombre debe tener entre 1 y {LARGO_MAXIMO_NOMBRE} caracteres",
+                        campo="nombre",
+                    ),
+                )
+            )
+        if limpio == actual.nombre:
+            return actual
+        renombrada = self._repositorio.renombrar(definicion_id, limpio)
+        if renombrada is None:
+            raise DefinicionNoEncontrada(definicion_id)
+        return renombrada
 
     def marcar_usada(self, definicion_id: int, numero: int) -> None:
         """Marca la version como usada en una carga (la primera vez; despues no cambia)."""

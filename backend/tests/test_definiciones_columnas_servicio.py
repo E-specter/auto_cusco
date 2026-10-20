@@ -495,3 +495,133 @@ def test_el_limite_de_variantes_se_ubica_en_la_posicion_del_pedido_y_no_en_la_de
     )
 
     assert _problemas(dato) == [(CodigoTexto.LIMITE_EXCEDIDO, 1, None, "variantes")]
+
+
+# --- Renombrar (RF-56) -----------------------------------------------------------------------
+
+
+def _versiones(guardada) -> list[tuple]:
+    return [(v.numero, dict(v.contenido), v.usada_en, v.creado_en) for v in guardada.versiones]
+
+
+def test_renombrar_cambia_solo_el_nombre_y_deja_intactas_las_versiones() -> None:
+    servicio, _ = _servicio()
+    id_ = servicio.crear(_definicion("SMS")).definicion.id
+    servicio.agregar_version(id_, _definicion("SMS"))
+    servicio.marcar_usada(id_, 1)
+    antes = servicio.obtener(id_).definicion
+
+    despues = servicio.renombrar(id_, "SMS preventiva")
+
+    assert despues.nombre == "SMS preventiva"
+    assert _versiones(despues) == _versiones(antes)  # ni una version nueva ni una tocada
+    assert despues.vigente.numero == antes.vigente.numero == 2
+    assert despues.creado_en == antes.creado_en
+    assert despues.actualizado_en > antes.actualizado_en
+    assert servicio.cargar(id_).nombre == "SMS preventiva"
+
+
+def test_renombrar_recorta_los_espacios_de_los_extremos() -> None:
+    servicio, _ = _servicio()
+    id_ = servicio.crear(_definicion("SMS")).definicion.id
+
+    assert servicio.renombrar(id_, "   Cobranza  ").nombre == "Cobranza"
+
+
+def test_renombrar_a_un_nombre_ajeno_es_nombre_repetido_sin_distinguir_mayusculas() -> None:
+    servicio, repositorio = _servicio()
+    servicio.crear(_definicion("Preventiva"))
+    id_ = servicio.crear(_definicion("Mora")).definicion.id
+    antes = repositorio.obtener(id_)
+
+    for ajeno in ("Preventiva", "  PREVENTIVA ", "preventiva"):
+        with pytest.raises(NombreDeDefinicionRepetido):
+            servicio.renombrar(id_, ajeno)
+
+    assert repositorio.obtener(id_) == antes  # nada cambio
+
+
+def test_renombrar_al_mismo_nombre_no_es_un_error_ni_cambia_nada() -> None:
+    servicio, repositorio = _servicio()
+    id_ = servicio.crear(_definicion("SMS")).definicion.id
+    antes = repositorio.obtener(id_)
+
+    iguales = [servicio.renombrar(id_, "SMS"), servicio.renombrar(id_, "  SMS  ")]
+
+    assert all(d == antes for d in iguales)
+    assert repositorio.obtener(id_).actualizado_en == antes.actualizado_en  # no hubo cambio
+
+
+def test_renombrar_cambiando_solo_las_mayusculas_si_es_un_cambio() -> None:
+    servicio, repositorio = _servicio()
+    id_ = servicio.crear(_definicion("sms preventiva")).definicion.id
+    antes = repositorio.obtener(id_)
+
+    despues = servicio.renombrar(id_, "SMS Preventiva")  # no choca con ella misma
+
+    assert despues.nombre == "SMS Preventiva"
+    assert despues.actualizado_en > antes.actualizado_en
+    assert repositorio.obtener(id_).nombre == "SMS Preventiva"
+
+
+@pytest.mark.parametrize("nombre", ["", "   ", "x" * 121, None, 5])
+def test_renombrar_con_un_nombre_vacio_largo_o_que_no_es_texto_es_invalido(nombre) -> None:
+    servicio, repositorio = _servicio()
+    id_ = servicio.crear(_definicion("SMS")).definicion.id
+
+    with pytest.raises(DefinicionInvalida) as error:
+        servicio.renombrar(id_, nombre)
+
+    (problema,) = error.value.problemas
+    assert (problema.campo, problema.columna) == ("nombre", None)
+    assert problema.problema.codigo is CodigoTexto.DEFINICION_INVALIDA
+    assert repositorio.obtener(id_).nombre == "SMS"
+
+
+def test_renombrar_acepta_un_nombre_de_exactamente_120_caracteres() -> None:
+    servicio, _ = _servicio()
+    id_ = servicio.crear(_definicion("SMS")).definicion.id
+
+    assert len(servicio.renombrar(id_, "n" * 120).nombre) == 120
+
+
+def test_renombrar_una_definicion_que_no_existe_es_404_antes_que_validar_el_nombre() -> None:
+    servicio, _ = _servicio()
+
+    with pytest.raises(DefinicionNoEncontrada):
+        servicio.renombrar(999, "Otro")
+    with pytest.raises(DefinicionNoEncontrada):
+        servicio.renombrar(999, "")
+
+
+def test_despues_de_renombrar_las_versiones_nuevas_siguen_el_nombre_nuevo() -> None:
+    servicio, _ = _servicio()
+    id_ = servicio.crear(_definicion("Viejo")).definicion.id
+    servicio.renombrar(id_, "Nuevo")
+
+    servicio.agregar_version(
+        id_, _definicion("NUEVO")
+    )  # el mismo nombre, sin distinguir mayusculas
+    with pytest.raises(DefinicionInvalida):
+        servicio.agregar_version(id_, _definicion("Viejo"))  # el de antes ya no es el suyo
+
+    assert servicio.obtener(id_).definicion.nombre == "Nuevo"
+
+
+def test_el_nombre_que_se_deja_queda_libre_para_otra_definicion() -> None:
+    servicio, _ = _servicio()
+    id_ = servicio.crear(_definicion("Viejo")).definicion.id
+    servicio.renombrar(id_, "Nuevo")
+
+    otra = servicio.crear(_definicion("viejo"))
+
+    assert otra.definicion.nombre == "viejo"
+
+
+def test_si_la_definicion_desaparece_entre_la_lectura_y_el_cambio_es_404(monkeypatch) -> None:
+    servicio, repositorio = _servicio()
+    id_ = servicio.crear(_definicion("SMS")).definicion.id
+    monkeypatch.setattr(repositorio, "renombrar", lambda *_: None)  # ya no estaba al escribir
+
+    with pytest.raises(DefinicionNoEncontrada):
+        servicio.renombrar(id_, "Otro")

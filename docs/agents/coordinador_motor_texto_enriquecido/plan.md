@@ -557,3 +557,72 @@ Después, el corte chico de dev_frontend en `/columnas` y el cierre de C2.
 - El corte final de F3 entró en `e0d2b47` (Playwright completo 369/369). C2 cerrada: RF-42 a RF-54 cumplidos (`revision-c2.md`).
 - **Queda en curso:** `fijarNotaMuestra` (designer), aprobado por el usuario el 2026-10-19. Entra después de `e0d2b47`, seguido de un ajuste mínimo de dev_frontend.
 - **Pendientes del usuario desde el diseño:** tabla de rangos por defecto, codificación SMS y días ajustados fuera de MOWA MES. **Pendiente de producto:** renombrar una definición guardada. **Mejora posible:** una muestra por segmento concreto.
+
+## 26. Plan de C3: decisiones del usuario del 2026-10-19 (b12d384), para aprobación de architec
+
+### Contraste con el código
+
+- `segmentacion.dias_ajustados(dias_atraso, fecha_corte, fecha_envio)` ya existe en el núcleo (B2), y `CriterioCalculado.variable_dias` decide qué variable se usa. Hoy el valor por defecto es `dias_atraso` (`VARIABLE_DIAS_POR_DEFECTO`), y el núcleo no conoce la fecha de envío: «el módulo aporta la variable ya ajustada».
+- **Cada versión guardada fija `variable_dias` explícito** (B4b guarda la definición resuelta). Las existentes dicen `"dias_atraso"`, y una versión no se modifica nunca.
+- El contexto `cartera` no tiene `fecha_envio` ni `dias_atraso_ajustados`. El contexto `mowa_mes.speech` sí tiene `dias_atraso_ajustados`, pero en la previsualización usa `dias_atraso` sin ajuste (comentario en `plataformas/mowa_mes/contexto_texto.py`).
+- `/archivos-carga` y `/texto-enriquecido/previsualizacion` no reciben una fecha de envío.
+
+### Decisión a escalar (D-C3-1): versiones guardadas antes de RF-55
+
+Las versiones existentes guardan `variable_dias: "dias_atraso"`. Opciones:
+- **(a)** Siguen segmentando sin ajuste, porque son inmutables y reproducibles. Solo las versiones nuevas usan `dias_atraso_ajustados` por defecto, y `/columnas` avisa en una versión antigua: «segmenta sin ajustar a la fecha de envío; guarda una versión nueva para usar el ajuste».
+- **(b)** Al generar, `dias_atraso` en `variable_dias` se interpreta como ajustado. Cumple «en todas las cargas», pero cambia el resultado de versiones ya usadas.
+- **(c)** Una migración de datos que reescribe `variable_dias` solo en las versiones no usadas. Las usadas quedan como (a).
+
+Recomendación del coordinador: **(a)**. Respeta la inmutabilidad (RF-51), y antes de decidir architec puede contar cuántas versiones hay en `auto_cusco`. Si no hay ninguna, (a) y (b) dan lo mismo.
+
+### Cortes
+
+| Corte | Qué | Depende | Revisión |
+|---|---|---|---|
+| **B14** | RF-56: `PATCH /definiciones-columnas/{id}` con `{nombre}`. No crea versión, actualiza `actualizado_en` y responde 409 `nombre_repetido` (normalizado). Prueba `@postgres` | — | consumidores |
+| **B15** | M3: el backend rechaza crear o editar una v1 (`partes`), con un 400 con código. Las v1, incluido el Speech original, se siguen leyendo, usando en campañas y convirtiendo con `como-v2`. Huellas 17 y 92 intactas | — | **MOWA MES (§13)** y consumidores |
+| **B13** | RF-55: `fecha_envio` en `/archivos-carga` (y su previsualización) y en `/texto-enriquecido/previsualizacion` con una muestra de cartera. Por defecto es hoy en Lima (`ahora_en_lima`); anterior a la fecha de corte da 400 con código y las dos fechas. Contexto `cartera`: `fecha_envio` (constante, plegada por B7) y `dias_atraso_ajustados` por producto. `variable_dias` por defecto pasa a `dias_atraso_ajustados` en las definiciones nuevas, según D-C3-1. La previsualización de `mowa_mes.speech` ajusta a la fecha de envío, y MOWA MES conserva su regla de campaña (RF-MM-15). Rendimiento con 46 000 filas (architec) | D-C3-1 | MOWA MES (por su contexto), consumidores |
+| **F7** | Renombrar en `/columnas` (RF-56) | B14, designer | designer |
+| **F8** | M3: fuera el editor de dos partes de `/mowa-mes/configuracion`; las v1 en solo lectura con «Convertir a v2»; el aviso del segmento con producto real pasa a «a la fecha de envío» | B15, designer | **MOWA MES (§13)**, designer |
+| **F6** | «Fecha de envío» en `/generar-carga` (por defecto hoy) y la fecha visible en la vista previa de `/generar-carga` y de `/columnas` (allí, «hoy») | B13, designer | designer |
+
+**Orden** (un solo dev backend): B14 → B15 → B13. En frontend: F7 en cuanto entre B14, F8 tras B15 y F6 tras B13. Designer fija la experiencia de F6, F7 y F8 antes de que se programen, como en F3 y F5.
+
+### GSM-7 (RF-MM-27, T-MM-B9 de MOWA MES)
+
+Si `coordinador_modulo_mowa_mes` consulta, la recomendación es una función del motor `a_gsm7` (familia texto, con cota que no crece) más la normalización al generar, en MOWA MES. Ojo con el oro de B5 (`test_mowa_mes_speech_oro`):
+- si la normalización se aplica después de `ConstructorMensajes`, en la campaña, el oro sigue igual;
+- si se aplica dentro, hay que actualizar las constantes congeladas, y es un cambio decidido según RF-54.
+
+Hay que acordarlo antes de que lo programen.
+
+**Aprobado por architec (2026-10-19).**
+- **D-C3-1 = (a).** architec contó en `auto_cusco`, con una consulta de solo lectura: **0 definiciones, 0 versiones y 0 usadas**. No hace falta migración.
+  - Las versiones nuevas usan `dias_atraso_ajustados` por defecto, y ninguna guardada se reinterpreta.
+  - Para las que se creen antes de que entre B13, `/columnas` muestra un aviso breve en una versión que segmenta sin ajuste.
+- **B13:** «hoy» en hora de Lima, con la zona como constante en un solo lugar. La medición con 46 000 filas la corre architec, antes y después.
+- **GSM-7 (condición de architec):** la normalización va ANTES de medir el largo (la exclusión por más de 160, la advertencia por 150 y la cota de la previsualización se miden sobre el texto normalizado, RF-MM-19). Que cambien las constantes del oro de B5 está aceptado (RF-54). Si se hace como `a_gsm7`, MOWA MES la aplica al final de cada segmento, sin que el usuario la agregue.
+
+### B16: GSM-7 del motor (acordado con `coordinador_modulo_mowa_mes`, su `plan.md` §6)
+
+- **`a_gsm7`** (función del motor, familia texto, con cota):
+  - NFD sin marcas combinantes, igual que `conciliacion.normalizar_mensaje` pero sin el strip;
+  - después borra lo que queda fuera del alfabeto básico y de la tabla extendida de 3GPP TS 23.038;
+  - conserva los extendidos (`€ [ ] { } \ ~ ^ |` y el salto de página) y los saltos de línea.
+- **`largo_gsm7(texto)`** (núcleo): cuenta 2 por cada carácter extendido. La usan la cota y el control de 150 y 160 de MOWA MES.
+- **Pruebas que pide MOWA MES:**
+  - aplicar la función por pieza da lo mismo que aplicarla al segmento entero, siempre que se aplique después de `primeros(8)`;
+  - la cota se mide en unidades GSM-7: exacta para el texto fijo, y las variables cuentan 1 por carácter (supuesto documentado);
+  - una propiedad: con variables sin extendidos, `largo_gsm7(mensaje) <= cota`;
+  - el Speech original conserva su cota («9 a 30» sigue en 156).
+- **Oro de B5:** afirma `salida_nueva == a_gsm7(constante congelada)`, en lugar de reemplazar las constantes (cambio decidido, RF-54).
+- **Reparto:** B16 es de dev_backend_motor. Encima va el corte de `dev_backend_modulo_mowa_mes`: aplicar la función en `speech.py`, medir en `campana.py`, la previsualización, el contrato y la conciliación.
+- **Orden en el equipo del motor:** B14 → B15 → B16 → B13. B16 arranca cuando architec apruebe el plan de MOWA MES.
+
+### Avance de C3 (2026-10-19)
+
+- **Sección 10 de la interfaz** (experiencia de F6, F7 y F8): aprobada por el usuario en la sesión del coordinador. Designer la entrega como commit de documentación.
+- **B14** (renombrar) entregado a architec. Agrega `PATCH` a `allow_methods` de CORS. dev_frontend lo revisa como consumidor.
+- **B15** (M3, backend) listo y revisado. **Entra junto con F8:** hoy `configuracion.astro` todavía crea y edita versiones v1, y con B15 solo ese botón daría 400. Pasa por la §13 de MOWA MES, y designer revisa el texto de `version_v1_retirada`.
+- **B16** (GSM-7) lanzado, con la transliteración que decidió el usuario (RF-MM-27, `204b3dc`): NFD → transliterar (“ ” « » → ", ‘ ’ → ', … → ..., – — → -, ° º → o, ª → a) → borrar lo que quede fuera de GSM-7. Incluye una función que devuelve los caracteres borrados, para el B9 de MOWA MES, y la cota sobre el texto ya transliterado.

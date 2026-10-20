@@ -442,3 +442,114 @@ def test_el_orden_explicito_se_devuelve_tal_cual(cliente) -> None:
     ]
 
     assert [(c["nombre"], c["orden"]) for c in columnas] == [("a", 5), ("b", 20)]
+
+
+# --- Renombrar (RF-56) -----------------------------------------------------------------------
+
+
+def _renombrar(client, id_: int, nombre):
+    return client.patch(f"/definiciones-columnas/{id_}", json={"nombre": nombre})
+
+
+def test_renombrar_cambia_solo_el_nombre_y_las_versiones_quedan_igual(cliente) -> None:
+    client, servicio = cliente
+    id_ = client.post("/definiciones-columnas", json=_definicion("SMS")).json()["id"]
+    client.post(f"/definiciones-columnas/{id_}/versiones", json=_definicion("SMS"))
+    servicio.marcar_usada(id_, 1)
+    antes = client.get(f"/definiciones-columnas/{id_}").json()
+    primera_antes = client.get(f"/definiciones-columnas/{id_}", params={"version": 1}).json()
+
+    respuesta = _renombrar(client, id_, "SMS preventiva")
+
+    cuerpo = respuesta.json()
+    assert respuesta.status_code == 200
+    assert cuerpo["nombre"] == "SMS preventiva"
+    assert cuerpo["version_vigente"] == antes["version_vigente"] == 2
+    assert cuerpo["versiones"] == antes["versiones"]  # mismos numeros, fechas y usada_en
+    assert cuerpo["version"] == antes["version"]  # y el contenido de la vigente
+    assert cuerpo["actualizado_en"] > antes["actualizado_en"]
+    assert cuerpo["creado_en"] == antes["creado_en"]
+    primera = client.get(f"/definiciones-columnas/{id_}", params={"version": 1}).json()
+    assert primera["version"] == primera_antes["version"]
+    assert primera["version"]["usada"] is True
+
+
+def test_lo_renombrado_se_ve_en_el_listado_y_en_la_lectura(cliente) -> None:
+    client, _ = cliente
+    id_ = client.post("/definiciones-columnas", json=_definicion("SMS")).json()["id"]
+
+    _renombrar(client, id_, "Cobranza")
+
+    assert [d["nombre"] for d in client.get("/definiciones-columnas").json()] == ["Cobranza"]
+    assert client.get(f"/definiciones-columnas/{id_}").json()["nombre"] == "Cobranza"
+
+
+def test_renombrar_a_un_nombre_ajeno_es_409_con_su_codigo(cliente) -> None:
+    client, _ = cliente
+    client.post("/definiciones-columnas", json=_definicion("Preventiva"))
+    id_ = client.post("/definiciones-columnas", json=_definicion("Mora")).json()["id"]
+
+    respuesta = _renombrar(client, id_, " PREVENTIVA")
+
+    assert respuesta.status_code == 409
+    assert respuesta.json()["codigo"] == "nombre_repetido"
+    assert client.get(f"/definiciones-columnas/{id_}").json()["nombre"] == "Mora"
+
+
+def test_renombrar_a_si_misma_no_es_un_error_y_no_mueve_actualizado_en(cliente) -> None:
+    client, _ = cliente
+    id_ = client.post("/definiciones-columnas", json=_definicion("SMS")).json()["id"]
+    antes = client.get(f"/definiciones-columnas/{id_}").json()
+
+    mismo = _renombrar(client, id_, "SMS")
+    mayusculas = _renombrar(client, id_, "sms")  # solo cambian las mayusculas: es un cambio
+
+    assert mismo.status_code == 200 and mismo.json()["actualizado_en"] == antes["actualizado_en"]
+    assert mayusculas.status_code == 200
+    assert mayusculas.json()["nombre"] == "sms"
+    assert mayusculas.json()["actualizado_en"] > antes["actualizado_en"]
+
+
+def test_renombrar_algo_que_no_existe_es_404_con_su_codigo(cliente) -> None:
+    client, _ = cliente
+
+    respuesta = _renombrar(client, 999, "Otro")
+
+    assert respuesta.status_code == 404
+    assert respuesta.json()["codigo"] == "definicion_no_encontrada"
+
+
+@pytest.mark.parametrize("nombre", ["", "    ", "x" * 121])
+def test_renombrar_con_un_nombre_vacio_o_largo_es_400_ubicado_en_el_nombre(cliente, nombre) -> None:
+    client, _ = cliente
+    id_ = client.post("/definiciones-columnas", json=_definicion("SMS")).json()["id"]
+
+    respuesta = _renombrar(client, id_, nombre)
+
+    cuerpo = respuesta.json()
+    assert respuesta.status_code == 400
+    assert cuerpo["codigo"] == "definicion_invalida"
+    assert [(p["campo"], p["columna"], p["codigo"]) for p in cuerpo["problemas"]] == [
+        ("nombre", None, "definicion_invalida")
+    ]
+    assert client.get(f"/definiciones-columnas/{id_}").json()["nombre"] == "SMS"
+
+
+def test_renombrar_sin_nombre_o_con_algo_que_no_es_texto_es_422_del_esquema(cliente) -> None:
+    client, _ = cliente
+    id_ = client.post("/definiciones-columnas", json=_definicion("SMS")).json()["id"]
+
+    sin_nombre = client.patch(f"/definiciones-columnas/{id_}", json={})
+    no_texto = client.patch(f"/definiciones-columnas/{id_}", json={"nombre": 5})
+
+    assert (sin_nombre.status_code, no_texto.status_code) == (422, 422)
+
+
+def test_el_contrato_declara_el_patch_con_sus_errores(cliente) -> None:
+    client, _ = cliente
+
+    operacion = client.get("/openapi.json").json()["paths"][
+        "/definiciones-columnas/{definicion_id}"
+    ]["patch"]
+
+    assert {"200", "400", "404", "409", "422"} <= set(operacion["responses"])

@@ -860,7 +860,15 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Renombrar Definicion
+         * @description Cambia solo el nombre (RF-56): no crea una version ni modifica ninguna, y mueve
+         *     `actualizado_en`. Mismo nombre que el actual: sin error y sin cambios. Otro nombre ya en uso
+         *     (sin distinguir mayusculas ni espacios) es 409 `nombre_repetido`; vacio o de mas de 120
+         *     caracteres, 400 con el problema en `campo = nombre`. Devuelve la definicion con su version
+         *     vigente.
+         */
+        patch: operations["renombrar_definicion_definiciones_columnas__definicion_id__patch"];
         trace?: never;
     };
     "/definiciones-columnas/{definicion_id}/versiones": {
@@ -2723,6 +2731,14 @@ export interface components {
             desde: number | null;
             /** Hasta */
             hasta: number | null;
+        };
+        /**
+         * RenombrarDefinicionEntrada
+         * @description RF-56: el nombre nuevo. Se recortan los espacios de los extremos.
+         */
+        RenombrarDefinicionEntrada: {
+            /** Nombre */
+            nombre: string;
         };
         /** ReporteImportadoRespuesta */
         ReporteImportadoRespuesta: {
@@ -5413,6 +5429,68 @@ export interface operations {
             };
             /** @description No existe la definicion o su version */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    renombrar_definicion_definiciones_columnas__definicion_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definicion_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenombrarDefinicionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefinicionRespuesta"];
+                };
+            };
+            /** @description La definicion no se puede guardar: los problemas dicen donde esta cada uno */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorDefinicion"];
+                };
+            };
+            /** @description No existe la definicion */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Ya hay una definicion con ese nombre */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

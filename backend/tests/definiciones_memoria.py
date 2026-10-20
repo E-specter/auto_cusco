@@ -78,6 +78,21 @@ class RepositorioEnMemoria:
         )
         return version
 
+    def renombrar(self, definicion_id: int, nombre: str) -> DefinicionGuardada | None:
+        definicion = self.definiciones.get(definicion_id)
+        if definicion is None:
+            return None
+        if any(
+            d.id != definicion_id and normalizar_nombre(d.nombre) == normalizar_nombre(nombre)
+            for d in self.definiciones.values()
+        ):
+            raise NombreDeDefinicionRepetido(nombre)
+        if definicion.nombre == nombre:
+            return definicion
+        renombrada = replace(definicion, nombre=nombre, actualizado_en=self._ahora())
+        self.definiciones[definicion_id] = renombrada
+        return renombrada
+
     def reemplazar_contenido(
         self, definicion_id: int, numero: int, contenido: Mapping[str, Any]
     ) -> None:

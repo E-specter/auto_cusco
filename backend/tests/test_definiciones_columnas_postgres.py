@@ -213,6 +213,145 @@ def test_varias_versiones_nuevas_a_la_vez_toman_numeros_distintos(repositorio) -
     assert [v.numero for v in repo.obtener(creada.id).versiones] == list(range(1, 10))
 
 
+def _fila_cruda(engine, definicion_id: int):
+    with engine.connect() as cx:
+        return cx.execute(select(_DEFINICION).where(_DEFINICION.c.id == definicion_id)).one()
+
+
+def _versiones_crudas(engine, definicion_id: int) -> list[tuple]:
+    with engine.connect() as cx:
+        filas = cx.execute(
+            select(_VERSION)
+            .where(_VERSION.c.definicion_id == definicion_id)
+            .order_by(_VERSION.c.numero)
+        ).all()
+    return [tuple(fila) for fila in filas]
+
+
+def test_renombrar_cambia_el_nombre_y_el_normalizado_y_deja_las_versiones_intactas(
+    repositorio,
+) -> None:
+    repo, engine = repositorio
+    creada = repo.crear(f"{PREFIJO}Viejo", CONTENIDO)
+    repo.agregar_version(creada.id, {**CONTENIDO, "proteger_formulas": False})
+    repo.marcar_version_usada(creada.id, 1)
+    antes = _fila_cruda(engine, creada.id)
+    versiones_antes = _versiones_crudas(engine, creada.id)
+
+    renombrada = repo.renombrar(creada.id, f"{PREFIJO}Nuevo Mañana")
+
+    despues = _fila_cruda(engine, creada.id)
+    assert renombrada.nombre == despues.nombre == f"{PREFIJO}Nuevo Mañana"
+    assert despues.nombre_normalizado == normalizar_nombre(f"{PREFIJO}Nuevo Mañana")
+    assert (despues.id, despues.creado_en) == (antes.id, antes.creado_en)
+    assert despues.actualizado_en > antes.actualizado_en
+    # las filas de definicion_carga_version, columna por columna (numero, contenido, usada_en...)
+    assert _versiones_crudas(engine, creada.id) == versiones_antes
+    assert [v.numero for v in renombrada.versiones] == [1, 2]
+
+
+def test_renombrar_solo_escribe_en_la_tabla_de_definiciones(repositorio) -> None:
+    from sqlalchemy import event
+
+    repo, engine = repositorio
+    creada = repo.crear(f"{PREFIJO}Sentencias", CONTENIDO)
+    sentencias: list[str] = []
+
+    def registrar(conexion, cursor, sentencia, parametros, contexto, varias):
+        sentencias.append(sentencia)
+
+    event.listen(engine, "before_cursor_execute", registrar)
+    try:
+        repo.renombrar(creada.id, f"{PREFIJO}Otro nombre")
+    finally:
+        event.remove(engine, "before_cursor_execute", registrar)
+
+    escrituras = [
+        s for s in sentencias if s.lstrip().upper().startswith(("UPDATE", "INSERT", "DELETE"))
+    ]
+    assert len(escrituras) == 1
+    assert escrituras[0].startswith("UPDATE definicion_carga ")
+    assert "definicion_carga_version" not in escrituras[0]
+
+
+def test_renombrar_a_un_nombre_ajeno_lo_rechaza_la_base_sin_distinguir_mayusculas(
+    repositorio,
+) -> None:
+    repo, engine = repositorio
+    repo.crear(f"{PREFIJO}Mañana", CONTENIDO)
+    creada = repo.crear(f"{PREFIJO}Otra", CONTENIDO)
+    antes = _fila_cruda(engine, creada.id)
+
+    for ajeno in (f"{PREFIJO}MAÑANA", f"  {PREFIJO}mañana  "):
+        with pytest.raises(NombreDeDefinicionRepetido):
+            repo.renombrar(creada.id, ajeno)
+
+    assert _fila_cruda(engine, creada.id) == antes  # el rechazo no deja nada a medias
+
+
+def test_una_tilde_distingue_nombres_porque_la_unicidad_solo_pliega_la_caja(repositorio) -> None:
+    repo, _ = repositorio
+    repo.crear(f"{PREFIJO}Mañana", CONTENIDO)
+    creada = repo.crear(f"{PREFIJO}Otra", CONTENIDO)
+
+    # `casefold` no quita tildes: «Manana» y «Mañana» son nombres distintos.
+    assert repo.renombrar(creada.id, f"{PREFIJO}Manana").nombre == f"{PREFIJO}Manana"
+
+
+def test_renombrar_cambiando_solo_la_caja_no_choca_con_ella_misma(repositorio) -> None:
+    repo, engine = repositorio
+    creada = repo.crear(f"{PREFIJO}caja", CONTENIDO)
+    antes = _fila_cruda(engine, creada.id)
+
+    repo.renombrar(creada.id, f"{PREFIJO}CAJA")
+
+    despues = _fila_cruda(engine, creada.id)
+    assert despues.nombre == f"{PREFIJO}CAJA"
+    assert despues.nombre_normalizado == antes.nombre_normalizado
+    assert despues.actualizado_en > antes.actualizado_en
+
+
+def test_renombrar_al_mismo_nombre_no_escribe_ni_mueve_actualizado_en(repositorio) -> None:
+    repo, engine = repositorio
+    creada = repo.crear(f"{PREFIJO}igual", CONTENIDO)
+    antes = _fila_cruda(engine, creada.id)
+
+    repo.renombrar(creada.id, f"{PREFIJO}igual")
+
+    assert _fila_cruda(engine, creada.id) == antes
+
+
+def test_renombrar_una_definicion_inexistente_da_none(repositorio) -> None:
+    repo, _ = repositorio
+
+    assert repo.renombrar(2**40, f"{PREFIJO}nada") is None
+
+
+def test_dos_renombres_a_la_vez_al_mismo_nombre_dejan_uno_y_rechazan_el_otro(repositorio) -> None:
+    repo, engine = repositorio
+    una = repo.crear(f"{PREFIJO}una", CONTENIDO)
+    otra = repo.crear(f"{PREFIJO}otra", CONTENIDO)
+    resultados: list[str] = []
+
+    def renombrar(id_: int) -> None:
+        try:
+            repo.renombrar(id_, f"{PREFIJO}destino")
+            resultados.append("ok")
+        except NombreDeDefinicionRepetido:
+            resultados.append("repetido")
+
+    hilos = [threading.Thread(target=renombrar, args=(d.id,)) for d in (una, otra)]
+    for hilo in hilos:
+        hilo.start()
+    for hilo in hilos:
+        hilo.join()
+
+    assert sorted(resultados) == ["ok", "repetido"]
+    nombres = [_fila_cruda(engine, d.id).nombre for d in (una, otra)]
+    assert nombres.count(f"{PREFIJO}destino") == 1  # uno se quedo con el nombre
+    assert nombres.count(f"{PREFIJO}una") + nombres.count(f"{PREFIJO}otra") == 1  # el otro, el suyo
+
+
 def test_usada_en_se_marca_la_primera_vez_y_no_cambia_despues(repositorio) -> None:
     repo, _ = repositorio
     creada = repo.crear(f"{PREFIJO}usada", CONTENIDO)
@@ -414,3 +553,29 @@ def test_la_muestra_de_los_primeros_de_una_seleccion_usa_la_cartera_real(cliente
         "000000000000000003",
     ]
     assert cuerpo["disponibles"] == 5
+
+
+def test_renombrar_por_http_y_las_versiones_siguen_con_el_nombre_nuevo(cliente) -> None:
+    nombre = f"{PREFIJO}renombrar http"
+    id_ = cliente.post("/definiciones-columnas", json=_definicion_http(nombre)).json()["id"]
+    otra = cliente.post("/definiciones-columnas", json=_definicion_http(f"{PREFIJO}ocupado")).json()
+    antes = cliente.get(f"/definiciones-columnas/{id_}").json()
+
+    renombrada = cliente.patch(f"/definiciones-columnas/{id_}", json={"nombre": f"{PREFIJO}Nuevo"})
+    repetido = cliente.patch(
+        f"/definiciones-columnas/{id_}", json={"nombre": f"  {PREFIJO.upper()}OCUPADO"}
+    )
+    version = cliente.post(
+        f"/definiciones-columnas/{id_}/versiones", json=_definicion_http(f"{PREFIJO}NUEVO")
+    )
+    viejo = cliente.post(f"/definiciones-columnas/{id_}/versiones", json=_definicion_http(nombre))
+
+    assert renombrada.status_code == 200 and renombrada.json()["nombre"] == f"{PREFIJO}Nuevo"
+    assert renombrada.json()["versiones"] == antes["versiones"]
+    assert renombrada.json()["actualizado_en"] > antes["actualizado_en"]
+    assert repetido.status_code == 409 and repetido.json()["codigo"] == "nombre_repetido"
+    assert version.status_code == 201 and version.json()["version"]["numero"] == 2
+    assert viejo.status_code == 400  # el nombre de antes ya no es el de la definicion
+    assert (
+        cliente.get(f"/definiciones-columnas/{otra['id']}").json()["nombre"] == f"{PREFIJO}ocupado"
+    )

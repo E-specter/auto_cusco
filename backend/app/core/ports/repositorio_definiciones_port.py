@@ -30,6 +30,15 @@ class RepositorioDefinicionesPort(Protocol):
         """Crea la version siguiente y la deja vigente. None si la definicion no existe."""
         ...
 
+    def renombrar(self, definicion_id: int, nombre: str) -> DefinicionGuardada | None:
+        """Cambia solo el nombre (RF-56): ninguna version se toca y `actualizado_en` se mueve.
+
+        Si el nombre ya es exactamente el actual no escribe nada. Lanza
+        NombreDeDefinicionRepetido si otra definicion tiene ese nombre sin distinguir mayusculas
+        (el cambio de mayusculas de la propia definicion si se permite). None si no existe.
+        """
+        ...
+
     def marcar_version_usada(self, definicion_id: int, numero: int) -> bool:
         """Marca `usada_en` la primera vez y no la cambia despues. False si no existe."""
         ...

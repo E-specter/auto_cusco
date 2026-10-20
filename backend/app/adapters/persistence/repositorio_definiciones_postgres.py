@@ -160,6 +160,33 @@ class RepositorioDefinicionesPostgres(RepositorioDefinicionesPort):
             )
         return _version(fila)
 
+    def renombrar(self, definicion_id: int, nombre: str) -> DefinicionGuardada | None:
+        try:
+            with self._engine.begin() as cx:
+                actual = cx.execute(
+                    select(_DEFINICION.c.nombre)
+                    .where(_DEFINICION.c.id == definicion_id)
+                    .with_for_update()
+                ).one_or_none()
+                if actual is None:
+                    return None
+                if actual.nombre != nombre:
+                    cx.execute(
+                        update(_DEFINICION)
+                        .where(_DEFINICION.c.id == definicion_id)
+                        .values(
+                            nombre=nombre,
+                            nombre_normalizado=normalizar_nombre(nombre),
+                            # la hora real del cambio, como al agregar una version
+                            actualizado_en=func.clock_timestamp(),
+                        )
+                    )
+        except IntegrityError as exc:
+            if _es_nombre_repetido(exc):
+                raise NombreDeDefinicionRepetido(nombre) from exc
+            raise
+        return self.obtener(definicion_id)
+
     def marcar_version_usada(self, definicion_id: int, numero: int) -> bool:
         with self._engine.begin() as cx:
             cx.execute(

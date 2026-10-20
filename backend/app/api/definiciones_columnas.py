@@ -4,11 +4,12 @@
     POST /definiciones-columnas                        guarda una definicion nueva (version 1)
     GET  /definiciones-columnas/{id}?version=N         una definicion con su version vigente o la N
     POST /definiciones-columnas/{id}/versiones         guarda un cambio como una version nueva
+    PATCH /definiciones-columnas/{id}                  cambia solo el nombre (RF-56)
 
 Ninguna version se modifica: un cambio es una version nueva y la vigente es la ultima. El nombre es
-unico sin distinguir mayusculas y no cambia con las versiones. El pedido es la misma definicion del
-constructor que acepta `/texto-enriquecido/previsualizacion` (`DefinicionColumnasEntrada`): una
-sola forma para armar, previsualizar y guardar.
+unico sin distinguir mayusculas y no cambia con las versiones; solo `PATCH` lo cambia. El pedido
+es la misma definicion del constructor que acepta `/texto-enriquecido/previsualizacion`
+(`DefinicionColumnasEntrada`): una sola forma para armar, previsualizar y guardar.
 
 Al guardar se valida con el mismo motor (RF-46): si algo no vale, un `400` que extiende
 `DetalleError` con `codigo` y los `problemas`, cada uno con su ubicacion (columna, variante, campo,
@@ -20,7 +21,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_definiciones_postgres import (
@@ -260,6 +261,12 @@ def _resumen(resumen: ResumenDefinicion) -> ResumenDefinicionRespuesta:
     )
 
 
+class RenombrarDefinicionEntrada(BaseModel):
+    """RF-56: el nombre nuevo. Se recortan los espacios de los extremos."""
+
+    nombre: str
+
+
 def _repetido(error: NombreDeDefinicionRepetido) -> JSONResponse:
     return respuesta_de_error(409, CodigoTexto.NOMBRE_REPETIDO, str(error))
 
@@ -307,6 +314,32 @@ def obtener_definicion(
         return _vista(servicio.obtener(definicion_id, version))
     except (DefinicionNoEncontrada, VersionNoEncontrada) as error:
         return _no_existe(error)
+
+
+@router.patch(
+    "/{definicion_id}",
+    response_model=DefinicionRespuesta,
+    responses=RESPUESTAS_ESCRITURA,
+)
+def renombrar_definicion(
+    definicion_id: int,
+    entrada: RenombrarDefinicionEntrada,
+    servicio: DefinicionesColumnasService = Depends(obtener_servicio_definiciones),
+) -> Any:
+    """Cambia solo el nombre (RF-56): no crea una version ni modifica ninguna, y mueve
+    `actualizado_en`. Mismo nombre que el actual: sin error y sin cambios. Otro nombre ya en uso
+    (sin distinguir mayusculas ni espacios) es 409 `nombre_repetido`; vacio o de mas de 120
+    caracteres, 400 con el problema en `campo = nombre`. Devuelve la definicion con su version
+    vigente."""
+    try:
+        renombrada = servicio.renombrar(definicion_id, entrada.nombre)
+    except DefinicionNoEncontrada as error:
+        return _no_existe(error)
+    except DefinicionInvalida as error:
+        return _invalida(error)
+    except NombreDeDefinicionRepetido as error:
+        return _repetido(error)
+    return _definicion(renombrada, renombrada.vigente)
 
 
 @router.post(
