@@ -133,7 +133,7 @@ El backend devuelve cada problema con su `codigo` (catálogo `CodigoTexto`, trad
 
 ### 5.1 Encabezado de la definición
 
-- **Nombre** (único, RF-51). Se escribe al crear la definición y **no cambia entre versiones** (B4b rechaza un nombre distinto con un problema en `campo=nombre`). Después de la primera versión se muestra de solo lectura, con el hint «El nombre se fija al crear la definición». Renombrar queda como pendiente de producto.
+- **Nombre** (único, RF-51). Se escribe al crear la definición y **no cambia entre versiones** (B4b rechaza un nombre distinto con un problema en `campo=nombre`). Después de la primera versión se muestra de solo lectura y se cambia con «Renombrar», sin crear una versión (RF-56, sección 10.1).
 - **Línea de versión:** «Versión 3» o, si se usó, «Versión 3 · usada en 2 cargas». Ninguna versión se modifica: guardar **siempre** crea una nueva. Por eso, bajo el botón de guardar va **siempre** el hint «Al guardar se crea la versión 4; la 3 no cambia», se haya usado o no. Para una definición nueva: «Al guardar se crea la versión 1». Ajuste de la revisión de B4b, 2026-10-03.
 - **Versiones antiguas: solo lectura hasta que el analista decida partir de ellas.** Guardar crea siempre la vigente + 1 con el contenido en pantalla. Por eso, abrir para mirar una versión que no es la vigente nunca deja listo un guardado que la reemplace (principio «nada cambia sin confirmación explícita», PRODUCT.md):
   - Se muestra **en solo lectura:** editores deshabilitados, sin `+ Agregar columna` ni guardar. Arriba, un `.notice--info`: «Estás viendo la versión 2. La vigente es la 5».
@@ -374,3 +374,71 @@ Las dos piezas se prueban solas en `/pruebas/editor-texto`, una página que exis
 - **«Cartera real»** monta `SelectorSeleccion` en modo compacto con el patrón de `campana.astro`: suscribirse a `seleccioncambiada` antes de montar. Dos diferencias:
   - el pedido de vista previa usa siempre cantidad 5, sea cual sea la cantidad de la selección;
   - recalcula con la misma espera de 500 ms y la misma cancelación que el editor.
+
+## 10. Fase C3: decisiones del usuario del 2026-10-19
+
+Experiencia fijada por `designer` antes de programar (T-MTE-F6 a F8), como en F3 y F5. Las decisiones están en `atomics-requirements.md` (RF-55, RF-56) y `requerimientos-mowa-mes.md` (RF-MM-17, RF-MM-27). El orden de trabajo es F7, F8 y F6.
+
+### 10.1 Renombrar una definición guardada (F7, RF-56)
+
+El nombre es de la definición, no de una versión: renombrar **no crea una versión** y no pasa por «Guardar». Por eso no se edita en el campo «Nombre». Si fuera editable ahí, quien lo cambia esperaría que «Guardar» lo guarde, y «Guardar» siempre crea una versión (5.1).
+
+- **Junto al campo «Nombre»,** de solo lectura (con el estilo `.input[readonly]`), va un botón `.btn--sm` «Renombrar». Una definición nueva, todavía sin guardar, no lo tiene: su nombre se escribe en el campo, como hoy.
+- **El hint del campo** pasa a «El nombre se cambia con Renombrar y no crea una versión».
+- **Diálogo** (`dialog.dialog`, el patrón de confirmación de la pantalla):
+  - **Título:** «Renombrar “SMS preventivo”».
+  - **Campo:** «Nombre nuevo», con el nombre actual y el texto seleccionado. `maxlength` es el `largo_nombre_definicion` del catálogo.
+  - **Hint:** «Las versiones y las cargas ya generadas no cambian».
+  - **Acciones:** «Cancelar» (`.btn`) y «Renombrar» (`.btn--primary`, con `data-loading` mientras responde).
+  - Si el nombre no cambió, después de quitar los espacios de los extremos, «Renombrar» queda inactivo: no hay nada que hacer. Es lo único que la interfaz decide sola. Un nombre vacío o demasiado largo lo rechaza el backend.
+- **Nombre repetido (409, `nombre_repetido`):** el error va bajo el campo del diálogo, con `.field__error`, `aria-invalid` y `aria-describedby`. El diálogo sigue abierto, con lo escrito, y el foco vuelve al campo.
+- **Al renombrar:** el diálogo se cierra y el nombre cambia en el campo y en el `select` de definiciones guardadas. El estado de la pantalla dice «Renombrada a “SMS preventivo B”» en su región `role="status"`, y el foco vuelve a «Renombrar».
+- **Lo que no toca:** un borrador sin guardar sigue igual, y renombrar no pide confirmar cambios sin guardar. Una versión antigua abierta en solo lectura también se puede renombrar, porque el nombre no es de la versión.
+
+### 10.2 Speech de MOWA MES solo v2 (F8, M3, RF-MM-17)
+
+Pantalla de MOWA MES (`/mowa-mes/configuracion`): la revisa también `coordinador_modulo_mowa_mes`.
+
+- **Una versión v1** (incluido el Speech original) **se ve en solo lectura:**
+  - La tabla de segmentos queda con Parte 1, Parte 2, largo y estado como texto, sin campos.
+  - Arriba va el aviso de inmutable que ya existe (`.notice--info` con candado): «Versión de dos partes (v1): se usa en campañas tal como está y ya no se edita».
+  - El pie de guardar (nombre de la versión, Guardar, Descartar) no aparece hasta convertir.
+- **«Convertir a v2» es la única acción de una v1.**
+  - El hint pasa a «Para personalizarla, conviértela a v2: obtienes un borrador con los mismos mensajes, que no se guarda hasta que lo confirmes».
+  - El hint de bloqueo («Guarda o descarta los cambios de las partes…») desaparece, porque las partes ya no se editan.
+- **El aviso del segmento con producto real** pasa a «Con un producto real de muestra, el segmento sale de sus días de atraso ajustados a hoy, como si el mensaje se enviara hoy; en la campaña se ajustan a su fecha de envío». La última parte evita que alguien crea que la campaña también usa hoy: MOWA MES conserva su regla de fecha de envío (RF-MM-15). Usa la misma idea de «hoy» que la vista previa de `/columnas` (10.3).
+- **GSM-7 (RF-MM-27):** el largo y la vista previa vienen normalizados del backend; las partes de una v1 se muestran como se escribieron.
+  - **Hint fijo,** en v1 (incluido el Speech original, que también tiene tildes) y en v2: «Al generar, se quitan las tildes, los signos que el SMS no admite se cambian por uno simple y los que no tienen equivalente se borran. La versión se guarda como la escribes».
+  - **Lo que se cambia por uno simple no se señala,** igual que las tildes. El usuario decidió transliterar (RF-MM-27, 2026-10-19): “ ” « » pasan a ", ‘ ’ a ', … a ..., – y — a -, ° y º a o, y ª a a. Se sigue leyendo igual.
+  - **Lo que se borra sí se señala,** porque desaparece sin que se note en la vista previa: un emoji o un signo sin equivalente. El backend devuelve, por segmento, los caracteres que se borran, sin repetir, en el orden en que aparecen y con su punto de código (T-MM-B9).
+  - **Una línea por segmento, solo cuando hay borrados:** «Al enviar se borran: 👍 ✓».
+    - Cada carácter va en mono, separado por un espacio. Uno que no se ve (un espacio especial) se nombra a partir de su punto de código.
+    - No se marcan dentro del texto y la línea no bloquea guardar.
+    - Lleva el icono `triangle-alert` y el color de advertencia, para no depender solo del color.
+    - **En v2:** `.notice--warning` de una línea, bajo el editor, para el segmento en pantalla.
+    - **En una v1:** la misma línea en la celda «Estado» de su fila.
+    - La implementa la tarea de MOWA MES que espera B9 (T-MM-F7), no F8.
+
+### 10.3 Fecha de envío (F6, RF-55)
+
+- **En `/generar-carga`,** el campo «Fecha de envío» va en el panel «Selección», justo después del selector, porque se lee junto a la fecha de corte.
+  - Es un `input type="date"`.
+  - **Por defecto, hoy en la hora de Lima** (`America/Lima`), nunca la fecha UTC: de noche, UTC ya es el día siguiente.
+  - `min` es la fecha de corte elegida. Así el selector de fecha no ofrece una fecha imposible (principio 3: prevenir antes que reportar). La regla es del backend y está documentada en RF-55.
+  - **Hint:** «Los días de atraso se cuentan hasta esta fecha para calcular el segmento. Por defecto, hoy».
+  - **400 del backend** (envío anterior al corte): el error va bajo el campo y nombra las dos fechas: «La fecha de envío (18 oct. 2026) es anterior a la fecha de corte (19 oct. 2026)». Lo escrito se conserva.
+  - Cambiar la fecha de envío recalcula la vista previa con la misma espera y cancelación que el resto de la pantalla.
+- **Visible en la vista previa de `/generar-carga`:** sobre la tabla, una línea: «Fecha de envío: 21 oct. 2026, 2 días después del corte».
+  - La línea junto al botón la suma: «Se generarán N filas en XLSX con la versión V de “SMS preventivo”, para enviar el 21 oct. 2026».
+  - Las fechas se escriben con `format.ts`, como en el resto del sitio.
+- **Visible en la vista previa de `/columnas`:** ahí no se elige, así que es hoy. Bajo el título de la vista previa va un `.field__hint`: «Segmentos calculados con los días de atraso a hoy, 19 oct. 2026, como si se enviara hoy».
+- **Aviso breve en `/columnas`** cuando la versión abierta segmenta sin el ajuste a la fecha de envío. Es una red de seguridad: hoy no hay ninguna versión así.
+  - Una versión guardada no se reinterpreta: la que segmenta con `dias_atraso` se genera sin ajuste, y solo las versiones nuevas usan `dias_atraso_ajustados` por defecto (D-C3-1, architec).
+  - Va en el panel «Definición», bajo la línea de versión, como `.notice--info` de una sola frase, sin acciones: «Esta versión calcula los segmentos con los días de atraso de la sábana, sin ajustarlos a la fecha de envío. Para usar el ajuste, guarda una versión nueva».
+  - No bloquea guardar ni generar.
+
+### 10.4 Pruebas mínimas de C3
+
+- **F7:** abrir el diálogo, renombrar y ver el nombre nuevo en el campo y en la lista; el 409 bajo el campo, con el diálogo abierto; «Renombrar» inactivo sin cambios; el cuerpo enviado no crea una versión; renombrar desde una versión antigua; axe con el diálogo abierto, en claro y oscuro.
+- **F8:** una v1 en solo lectura, sin campos ni pie de guardar; «Convertir a v2» lleva al editor; el aviso nuevo del segmento y el hint de GSM-7, en v1 y en v2; axe en la v1 de solo lectura. La línea de caracteres borrados se prueba en T-MM-F7: aparece solo con borrados, sin repetir, y no bloquea guardar.
+- **F6:** la fecha por defecto, con el reloj fijado en la noche de Lima, cuando UTC ya es el día siguiente; `min` sigue a la fecha de corte; el 400 bajo el campo con las dos fechas; la fecha de envío en la vista previa y en la línea del botón; la nota de «hoy» en `/columnas`; axe en `/generar-carga` con el error de fecha.
