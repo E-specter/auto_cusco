@@ -48,10 +48,19 @@ from app.core.services.plataformas.mowa_mes.campana import (
     huella_speech,
 )
 from app.core.services.texto_enriquecido import evaluador
+from app.core.services.texto_enriquecido.gsm7 import (
+    a_gsm7,
+    caracteres_borrados,
+    largo_gsm7,
+    largo_gsm7_normalizado,
+)
 from tests.oro_mowa_mes_congelados import (
     MATRIZ_CASOS,
     MATRIZ_CASOS_SIN_WHATSAPP,
+    MATRIZ_FILAS_CON_ESPACIO_ESPECIAL,
+    MATRIZ_FILAS_QUE_CAMBIAN_A_GSM7,
     MATRIZ_HUELLA,
+    MATRIZ_HUELLA_GSM7,
     MENSAJES_DEL_ORIGINAL,
 )
 from tests.oro_mowa_mes_datos import (
@@ -580,3 +589,79 @@ def test_sin_whatsapp_el_segmento_que_lo_usa_tampoco_pide_el_mensaje() -> None:
 
     assert resultado is Segmento.DE_31_A_60
     assert constructor.pedidos == []
+
+
+# --- GSM-7 (RF-MM-27, B16): lo nuevo es solo la normalizacion --------------------------------------
+#
+# Las pruebas de arriba siguen comparando con las constantes de 3e567d7 sin tocarlas: `speech.py`
+# todavia no normaliza (lo hace T-MM-B9, y entonces esas comparaciones pasan a ser contra
+# `a_gsm7(constante)`). Las de abajo ya fijan la referencia nueva con lo que ofrece el motor.
+
+
+def _compilar_como_b9(partes: PartesSegmento):
+    """El segmento tal como lo armara MOWA MES con GSM-7 (T-MM-B9): la expresion de siempre, cruda
+    (sin `a_gsm7` en las variables), compilada con `medida=largo_gsm7_normalizado`; despues se
+    evalua y `a_gsm7` se aplica al texto ya evaluado."""
+    return evaluador.compilar(
+        speech.expresion_de(partes),
+        speech.VARIABLES_DEL_MENSAJE,
+        constantes={speech.VARIABLE_CONTACTO: WHATSAPP},
+        medida=largo_gsm7_normalizado,
+    )
+
+
+def _mensaje_como_b9(partes: PartesSegmento, fila: dict) -> str:
+    return a_gsm7(_compilar_como_b9(partes).evaluar(fila).texto)
+
+
+def test_los_seis_mensajes_normalizados_son_a_gsm7_de_los_congelados() -> None:
+    fila = {"titular": "ZZPRUEBA SINTETICO", "fecha_vencimiento_cuota": VENCIMIENTO}
+
+    obtenidos = {partes.segmento.value: _mensaje_como_b9(partes, fila) for partes in ORIGINAL}
+
+    assert obtenidos == {s: a_gsm7(m) for s, m in MENSAJES_DEL_ORIGINAL.items()}
+    # y lo que cambia es solo la tilde: ni un caracter de mas ni de menos
+    assert obtenidos["1_a_8"].endswith("a traves de Wayki app.")
+    assert "venci\u00f3" not in obtenidos["1_a_8"] and "vencio el 05/09/2026" in obtenidos["1_a_8"]
+    assert "Mas INFO por https://wa.me/+51900000123" in obtenidos["61_a_90"]
+
+
+def test_normalizar_el_speech_original_no_borra_nada_y_no_cambia_ningun_largo() -> None:
+    for segmento, mensaje in MENSAJES_DEL_ORIGINAL.items():
+        assert caracteres_borrados(mensaje) == (), segmento
+        assert len(a_gsm7(mensaje)) == len(mensaje), segmento
+        assert largo_gsm7(a_gsm7(mensaje)) == len(mensaje), segmento  # y ningun extendido
+
+
+def test_la_cota_del_speech_original_en_unidades_gsm7_es_la_de_siempre() -> None:
+    cotas = {p.segmento: _compilar_como_b9(p).cota for p in ORIGINAL}
+
+    esperadas = {segmento: largo for segmento, (largo, _, _) in LARGOS_DEL_ORIGINAL.items()}
+    assert cotas == esperadas
+    assert cotas[Segmento.DE_9_A_30] == 156  # sigue pasando de 150 (RF-MM-19)
+    sin_normalizar = {p.segmento: speech.compilar_segmento(p, WHATSAPP).cota for p in ORIGINAL}
+    assert cotas == sin_normalizar
+
+
+def test_toda_la_matriz_normalizada_da_la_huella_gsm7() -> None:
+    filas = mensajes_de_la_matriz(speech.ConstructorMensajes)
+    normalizadas = [[*f[:-1], None if f[-1] is None else a_gsm7(f[-1])] for f in filas]
+
+    assert huella_de_la_matriz(filas) == MATRIZ_HUELLA  # la de 3e567d7, intacta
+    assert huella_de_la_matriz(normalizadas) == MATRIZ_HUELLA_GSM7
+    assert sum(a != b for a, b in zip(filas, normalizadas, strict=True)) == (
+        MATRIZ_FILAS_QUE_CAMBIAN_A_GSM7
+    )
+
+
+def test_las_filas_que_cambian_por_los_espacios_son_las_de_la_tabulacion_sintetica() -> None:
+    filas = mensajes_de_la_matriz(speech.ConstructorMensajes)
+
+    # El Speech original no tiene espacios especiales ni tabulacion.
+    assert not any(
+        c == "\t" or c.isspace() and c != " " for p in ORIGINAL for c in p.parte_1 + p.parte_2
+    )
+    con_tabulacion = [f for f in filas if f[-1] is not None and "\t" in f[-1]]
+    assert len(con_tabulacion) == MATRIZ_FILAS_CON_ESPACIO_ESPECIAL
+    assert {f[0] for f in con_tabulacion} == {"saltos_de_linea"}  # una version sintetica
+    assert all("\t" not in a_gsm7(f[-1]) and " " in a_gsm7(f[-1]) for f in con_tabulacion)

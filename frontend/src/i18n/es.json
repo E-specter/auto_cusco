@@ -712,6 +712,8 @@
   "textoEnriquecido.funcion.recortar.descripcion": "Quita los espacios de los extremos y junta los repetidos. «  ana   ruiz  » → «ana ruiz».",
   "textoEnriquecido.funcion.sin_tildes.nombre": "Quitar tildes",
   "textoEnriquecido.funcion.sin_tildes.descripcion": "Quita tildes y diéresis, y la virgulilla de la ñ. Peña Núñez → Pena Nunez.",
+  "textoEnriquecido.funcion.a_gsm7.nombre": "Adaptar a SMS (GSM-7)",
+  "textoEnriquecido.funcion.a_gsm7.descripcion": "Deja solo los caracteres que admite un SMS (GSM-7): quita tildes, cambia comillas, guiones y puntos suspensivos por uno simple, y borra lo que no tiene equivalente, como un emoji. Cuota N° 5… → Cuota No 5...",
   "textoEnriquecido.funcion.reemplazar.nombre": "Reemplazar texto",
   "textoEnriquecido.funcion.reemplazar.descripcion": "Cambia un texto por otro, tal cual y sin patrones. ana-ruiz cambiando «-» por un espacio → ana ruiz.",
   "textoEnriquecido.funcion.reemplazar.parametro.buscar": "Texto a buscar",

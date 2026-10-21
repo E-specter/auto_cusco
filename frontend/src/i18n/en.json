@@ -712,6 +712,8 @@
   "textoEnriquecido.funcion.recortar.descripcion": "Removes spaces at both ends and merges repeated ones. “  ana   ruiz  ” → “ana ruiz”.",
   "textoEnriquecido.funcion.sin_tildes.nombre": "Remove accents",
   "textoEnriquecido.funcion.sin_tildes.descripcion": "Removes accents, diaereses and the tilde of ñ. Peña Núñez → Pena Nunez.",
+  "textoEnriquecido.funcion.a_gsm7.nombre": "Adapt to SMS (GSM-7)",
+  "textoEnriquecido.funcion.a_gsm7.descripcion": "Keeps only the characters an SMS accepts (GSM-7): removes accents, replaces quotes, dashes and ellipses with a simple one, and deletes what has no equivalent, such as an emoji. Fee N° 5… → Fee No 5...",
   "textoEnriquecido.funcion.reemplazar.nombre": "Replace text",
   "textoEnriquecido.funcion.reemplazar.descripcion": "Swaps one text for another, literally and without patterns. ana-ruiz replacing “-” with a space → ana ruiz.",
   "textoEnriquecido.funcion.reemplazar.parametro.buscar": "Text to find",

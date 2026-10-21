@@ -16,7 +16,7 @@ FUNCIONES = {f.nombre: f for f in catalogo.catalogo_de_funciones()}
 
 def test_estan_todas_las_funciones_del_registro_en_su_orden() -> None:
     assert [f.nombre for f in catalogo.catalogo_de_funciones()] == list(REGISTRO)
-    assert len(FUNCIONES) == 23
+    assert len(FUNCIONES) == 24
 
 
 def test_cada_funcion_trae_su_familia_y_sus_claves_i18n() -> None:

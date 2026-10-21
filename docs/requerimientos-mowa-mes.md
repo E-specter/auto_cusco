@@ -175,6 +175,7 @@ Formato confirmado con el ejemplo de carga (sección 7).
 * **RF-MM-27 — Mensaje en GSM-7:** Normalizar cada `mensaje` al alfabeto GSM-7 al generar la carga, para que un SMS nunca pase a UCS-2 y su límite de 160 caracteres (RF-MM-19) sea siempre el real (decisión del usuario, 2026-10-19).
   * Primero se quitan los signos diacríticos (`á`→`a`, `é`→`e`, `ñ`→`n`, `ü`→`u`), igual que la normalización de la conciliación (RF-MM-22) y que lo que MES hace al enviar.
   * Después se transliteran los signos tipográficos que tienen un equivalente simple (decisión del usuario, 2026-10-19): comillas `“ ” « »` → `"`, `‘ ’` → `'`, `…` → `...`, `– —` → `-`, `° º` → `o` y `ª` → `a`. Por ejemplo, `N°` sale `No` y `don’t` sale `don't`.
+  * Los espacios especiales (espacio duro, espacio fino y los demás espacios de Unicode) y la tabulación se cambian por un espacio normal, para que las palabras no queden pegadas (decisión del usuario, 2026-10-20).
   * Por último se borran los caracteres que siguen fuera del alfabeto GSM-7 (por ejemplo, un emoji).
   * La versión de speech se guarda tal como se escribió; la normalización se aplica al generar, y la previsualización muestra el texto que saldrá.
   * Cambia el `mensaje` de las versiones con tildes, incluido el Speech original (`venció` sale `vencio`): es un cambio decidido, registrado en RF-54.
@@ -278,3 +279,6 @@ Quedan abiertos S-MM-1, S-MM-3, S-MM-4 y S-MM-9: los cuatro dependen de informac
 - **RF nuevos incorporados:** RF-MM-27 (mensaje en GSM-7) en la sección 4, con el supuesto S-MM-9.
 - **RF existentes ampliados:** RF-MM-17 (versiones nuevas solo con el motor, fase M3) y RF-MM-19 (el largo se mide sobre el mensaje normalizado). Decisiones del usuario en la sección 6. La fórmula de días ajustados de RF-MM-15 pasa a ser general (RF-55 de `atomics-requirements.md`); RF-MM-15 no cambia.
 - **Nota de numeración:** sin renumerar, como el resto del módulo.
+
+**2026-10-20**
+- **RF existentes ampliados:** RF-MM-27 (mensaje en GSM-7): los espacios especiales y la tabulación se cambian por un espacio normal en lugar de borrarse. Decisión del usuario.

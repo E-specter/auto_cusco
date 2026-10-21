@@ -11,9 +11,13 @@ menor que lo que el texto puede llegar a medir.
   transforman (`mayusculas`, `recortar`) la conservan; las que pueden alargar sin
   tope (`formato_numero`, `a_texto` de un numero) la pierden.
 - Una sola parte sin cota deja toda la expresion sin cota.
+
+El texto fijo se mide con `medida` (por defecto `len`, caracteres). MOWA MES pasa
+`largo_gsm7_normalizado`: la cota queda en unidades GSM-7, exacta para el texto fijo (que se
+transliteraba y cuenta 2 por extendido) y de 1 por caracter para las variables (B16).
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from app.core.entities.texto_enriquecido import CodigoTexto, MotivoSinCota
 
@@ -61,12 +65,14 @@ def motivo_sin_cota(partes: Sequence[str | NodoResuelto]) -> MotivoSinCota | Non
     return None
 
 
-def cota_de_expresion(partes: Sequence[str | NodoResuelto]) -> int | None:
-    """Suma de las partes: texto fijo (su largo) o nodos de variable (su cota)."""
+def cota_de_expresion(
+    partes: Sequence[str | NodoResuelto], medida: Callable[[str], int] = len
+) -> int | None:
+    """Suma de las partes: texto fijo (lo que mide `medida`) o nodos de variable (su cota)."""
     total = 0
     for parte in partes:
         if isinstance(parte, str):
-            total += len(parte)
+            total += medida(parte)
             continue
         cota = cota_de_nodo(parte)
         if cota is None:

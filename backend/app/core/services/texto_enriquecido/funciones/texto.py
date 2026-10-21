@@ -10,6 +10,7 @@ import unicodedata
 
 from app.core.entities.texto_enriquecido import TipoValor
 
+from ..gsm7 import a_gsm7
 from .base import Funcion, Parametro
 
 T = TipoValor.TEXTO
@@ -72,6 +73,17 @@ def _reemplazar(valor: str, buscar: str, reemplazo: str) -> str:
     return valor.replace(buscar, reemplazo)
 
 
+def _cota_gsm7(entrada: int | None, args: tuple) -> int | None:
+    """El triple de la entrada: es un tope verdadero (RF-47), en caracteres y en unidades GSM-7.
+
+    El peor caso de `a_gsm7` es `…`: 1 caracter pasa a 3 (y mide 3); un extendido mide 2. El
+    supuesto de «1 por caracter en las variables» que usa MOWA MES no vive en esta funcion sino en
+    como ese conector mide el texto (`compilar(..., medida=...)`, con la variable cruda y la
+    normalizacion aplicada al texto ya evaluado).
+    """
+    return None if entrada is None else 3 * entrada
+
+
 def _cota_reemplazar(entrada: int | None, args: tuple) -> int | None:
     if entrada is None:
         return None
@@ -98,6 +110,7 @@ FUNCIONES = (
     Funcion("capitalizar", "texto", (T,), T, _capitalizar, cota=_conservar_largo),
     Funcion("recortar", "texto", (T,), T, _recortar, cota=_conservar_largo),
     Funcion("sin_tildes", "texto", (T,), T, _sin_tildes, cota=_conservar_largo),
+    Funcion("a_gsm7", "texto", (T,), T, a_gsm7, cota=_cota_gsm7),
     Funcion(
         "reemplazar",
         "texto",

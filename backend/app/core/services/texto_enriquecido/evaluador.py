@@ -19,7 +19,7 @@ igual en cada fila. Plegar no cambia nada observable: el texto, el valor tipado,
 la cota de cada fila son los mismos que sin constantes.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, NamedTuple
@@ -107,11 +107,14 @@ def compilar(
     limites: LimitesExpresion = LIMITES,
     registro: Mapping[str, Funcion] = REGISTRO,
     constantes: Mapping[str, Any] | None = None,
+    medida: Callable[[str], int] = len,
 ) -> "Compilada":
     """Comprueba la expresion contra las variables disponibles y la deja lista para evaluar.
 
     `constantes` son variables del catalogo con un valor fijo para toda la carga: los nodos que
     solo dependen de ellas se evaluan una vez, aqui. Un valor `None` es una constante vacia.
+    `medida` es lo que cuenta el texto fijo en la cota (por defecto, caracteres); un conector
+    que mide en otra unidad, como MOWA MES en GSM-7, pasa la suya.
     """
     for nombre in constantes or ():
         if nombre not in variables:
@@ -119,7 +122,7 @@ def compilar(
     partes, problemas = _resolver(expresion, variables, limites, registro)
     if problemas:
         raise ExpresionInvalida(problemas)
-    return Compilada(expresion, tuple(partes), constantes or {})
+    return Compilada(expresion, tuple(partes), constantes or {}, medida)
 
 
 def compilar_texto(
@@ -211,11 +214,12 @@ class Compilada:
         expresion: Expresion,
         partes: tuple[str | NodoResuelto, ...],
         constantes: Mapping[str, Any] | None = None,
+        medida: Callable[[str], int] = len,
     ) -> None:
         self.expresion = expresion
         self._es_variable_unica = len(partes) == 1 and isinstance(partes[0], NodoResuelto)
         # La cota es la de la expresion sin plegar: lo que ve el usuario no depende de la carga.
-        self._cota = cota_de_expresion(partes)
+        self._cota = cota_de_expresion(partes, medida)
         self._motivo_sin_cota = motivo_sin_cota(partes)
         plegadas, problemas = _plegar(partes, constantes or {}, self._es_variable_unica)
         # Cada parte conserva el indice del nodo de la expresion: los problemas de fila lo informan.
