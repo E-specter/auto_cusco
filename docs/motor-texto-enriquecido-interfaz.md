@@ -409,6 +409,7 @@ Pantalla de MOWA MES (`/mowa-mes/configuracion`): la revisa también `coordinado
 - **El aviso del segmento con producto real** pasa a «Con un producto real de muestra, el segmento sale de sus días de atraso ajustados a hoy, como si el mensaje se enviara hoy; en la campaña se ajustan a su fecha de envío». La última parte evita que alguien crea que la campaña también usa hoy: MOWA MES conserva su regla de fecha de envío (RF-MM-15). Usa la misma idea de «hoy» que la vista previa de `/columnas` (10.3).
 - **GSM-7 (RF-MM-27):** el largo y la vista previa vienen normalizados del backend; las partes de una v1 se muestran como se escribieron.
   - **Hint fijo,** en v1 (incluido el Speech original, que también tiene tildes) y en v2: «Al generar, se quitan las tildes, los signos que el SMS no admite se cambian por uno simple y los que no tienen equivalente se borran. La versión se guarda como la escribes».
+  - **Entra con la normalización, no antes:** la pantalla no promete lo que la generación todavía no hace. El hint y la línea de borrados los implementa T-MM-F7, sobre B16 y T-MM-B9, y no F8 (acuerdo de los dos coordinadores, 2026-10-20).
   - **Lo que se cambia por uno simple no se señala,** igual que las tildes. El usuario decidió transliterar (RF-MM-27, 2026-10-19): “ ” « » pasan a ", ‘ ’ a ', … a ..., – y — a -, ° y º a o, y ª a a. Se sigue leyendo igual.
   - **Lo que se borra sí se señala,** porque desaparece sin que se note en la vista previa: un emoji o un signo sin equivalente. El backend devuelve, por segmento, los caracteres que se borran, sin repetir, en el orden en que aparecen y con su punto de código (T-MM-B9).
   - **Una línea por segmento, solo cuando hay borrados:** «Al enviar se borran: 👍 ✓».
@@ -417,7 +418,6 @@ Pantalla de MOWA MES (`/mowa-mes/configuracion`): la revisa también `coordinado
     - Lleva el icono `triangle-alert` y el color de advertencia, para no depender solo del color.
     - **En v2:** `.notice--warning` de una línea, bajo el editor, para el segmento en pantalla.
     - **En una v1:** la misma línea en la celda «Estado» de su fila.
-    - La implementa la tarea de MOWA MES que espera B9 (T-MM-F7), no F8.
 
 ### 10.3 Fecha de envío (F6, RF-55)
 
@@ -440,5 +440,5 @@ Pantalla de MOWA MES (`/mowa-mes/configuracion`): la revisa también `coordinado
 ### 10.4 Pruebas mínimas de C3
 
 - **F7:** abrir el diálogo, renombrar y ver el nombre nuevo en el campo y en la lista; el 409 bajo el campo, con el diálogo abierto; «Renombrar» inactivo sin cambios; el cuerpo enviado no crea una versión; renombrar desde una versión antigua; axe con el diálogo abierto, en claro y oscuro.
-- **F8:** una v1 en solo lectura, sin campos ni pie de guardar; «Convertir a v2» lleva al editor; el aviso nuevo del segmento y el hint de GSM-7, en v1 y en v2; axe en la v1 de solo lectura. La línea de caracteres borrados se prueba en T-MM-F7: aparece solo con borrados, sin repetir, y no bloquea guardar.
+- **F8:** una v1 en solo lectura, sin campos ni pie de guardar; «Convertir a v2» lleva al editor; el aviso nuevo del segmento; axe en la v1 de solo lectura. En T-MM-F7: el hint de GSM-7 en v1 y en v2, y la línea de caracteres borrados, que aparece solo con borrados, sin repetir, y no bloquea guardar.
 - **F6:** la fecha por defecto, con el reloj fijado en la noche de Lima, cuando UTC ya es el día siguiente; `min` sigue a la fecha de corte; el 400 bajo el campo con las dos fechas; la fecha de envío en la vista previa y en la línea del botón; la nota de «hoy» en `/columnas`; axe en `/generar-carga` con el error de fecha.
