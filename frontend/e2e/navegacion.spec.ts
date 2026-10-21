@@ -110,8 +110,11 @@ test.describe('submenú de un módulo', () => {
     await abrirCartera(page);
 
     await disparador(page).click();
-    await page.locator('.cartera__title').click();
+    // A point well away from the open submenu, like the hover test below. The page title is not
+    // safe: with the wider bar, the submenu can cover it, depending on the system's fonts.
+    await page.mouse.click(5, 600);
     await expect(disparador(page)).toHaveAttribute('aria-expanded', 'false');
+    await expect(page).toHaveURL(/\/cartera$/);
 
     await disparador(page).click();
     await page.keyboard.press('Shift+Tab');

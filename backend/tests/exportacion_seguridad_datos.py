@@ -9,6 +9,7 @@ Ningun valor es real: titulares, numeros y textos inventados.
 
 import hashlib
 import io
+import os
 import re
 import zipfile
 from datetime import date, datetime
@@ -108,6 +109,21 @@ def huella_bytes(contenido: bytes) -> str:
 _MARCAS_DE_TIEMPO = re.compile(rb"(<dcterms:(?:created|modified)[^>]*>)[^<]*(</dcterms:)")
 
 
+def _sin_saltos_del_sistema(nombre: str, datos: bytes) -> bytes:
+    """Deshace el salto de linea que el sistema agrega en las hojas del .xlsx.
+
+    En modo `write_only`, openpyxl escribe cada hoja en un archivo temporal abierto en modo texto
+    (`NamedTemporaryFile(mode="w+")`): un salto de linea dentro de un valor sale como
+    `os.linesep`, es decir CR LF en Windows y LF en Linux. Las demas partes van directo al zip.
+    Sin esto, la huella y el largo congelados dependerian del sistema en que se calcularon, y el
+    CI corre en Linux. Solo se deshace lo que agrega el sistema: en Windows, un CR LF que ya venia
+    en el valor sale CR CR LF y vuelve a CR LF.
+    """
+    if os.linesep == "\n" or not nombre.startswith("xl/worksheets/"):
+        return datos
+    return datos.replace(os.linesep.encode("ascii"), b"\n")
+
+
 def huella_xlsx(contenido: bytes) -> str:
     """SHA-256 de todas las partes del .xlsx, sin las marcas de tiempo de `docProps/core.xml`.
 
@@ -121,6 +137,7 @@ def huella_xlsx(contenido: bytes) -> str:
             datos = libro.read(nombre)
             if nombre == "docProps/core.xml":
                 datos = _MARCAS_DE_TIEMPO.sub(rb"\1\2", datos)
+            datos = _sin_saltos_del_sistema(nombre, datos)
             resumen.update(nombre.encode("utf-8") + b"\0" + datos + b"\0")
     return resumen.hexdigest()
 
@@ -183,5 +200,7 @@ def largo_sin_comprimir_sin_core(contenido: bytes) -> int:
     """
     with zipfile.ZipFile(io.BytesIO(contenido)) as libro:
         return sum(
-            info.file_size for info in libro.infolist() if info.filename != "docProps/core.xml"
+            len(_sin_saltos_del_sistema(nombre, libro.read(nombre)))
+            for nombre in libro.namelist()
+            if nombre != "docProps/core.xml"
         )

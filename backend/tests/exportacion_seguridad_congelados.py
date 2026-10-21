@@ -12,16 +12,22 @@ comportamiento de hoy, no una funcion consigo misma.
   corrida. En B10 el largo pasa de comprimido (5110 y 4878) a sin comprimir (18331 y 17333): los
   exportadores no cambiaron (la huella sigue siendo la de HEAD 3e567d7) y el nuevo largo da lo
   mismo en CPython 3.13.14 (zlib) y 3.14.7 (zlib-ng).
+- 2026-10-20: las dos funciones deshacen el salto de linea del sistema en las hojas
+  (`_sin_saltos_del_sistema`). openpyxl escribe la hoja en un archivo temporal de texto, y en
+  Windows el LF de un valor salia CR LF: las constantes de B10 (18331 y 17333) eran las de
+  Windows, y en Linux, donde corre el CI, daban un byte menos por valor con salto de linea. Los
+  exportadores no cambiaron. Los valores de abajo dan lo mismo en Windows y en Linux (Ubuntu
+  26.04, CPython 3.13.14).
 - CSV y JSON: SHA-256 de los bytes, que son deterministas.
 """
 
 XLSX_GENERICO_SIN_IGUAL = (
-    "85f57bf0fa3646bc5139d43f4b9460558a090058c071f37dadadccbd3608d625",
-    18331,
+    "5664ff029719e92decffc9763dcf552db7a2d70398e5c6f05cb390f7a6c4b16b",
+    18330,
 )
 XLSX_MOWA_SIN_IGUAL = (
-    "1192098ad4a4d86b17ece3ce2ae71cc45bff9ed60d497aa3a5addf9db841e07f",
-    17333,
+    "ae4510e26e92184891c7b49c6ba5a3ccd3a9349c1c7d20a97c42718c5bac52f2",
+    17332,
 )
 
 # CSV con las opciones por defecto, y con `;` y `utf-8-sig`.
