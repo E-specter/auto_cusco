@@ -351,9 +351,11 @@ test('cartera: selección que no aplica, con partes marcadas', async ({ page }) 
 
 // The column builder, in the states where problems hide: an open row with its editor, the
 // variants selector, a dialog, the problems summary and an old version opened to look at.
-async function abrirColumnas(page: Page, versiones = 1) {
+async function abrirColumnas(page: Page, versiones = 1, conOtra = false) {
   const definiciones = apiDefiniciones();
   definiciones.definiciones.push(definicionFalsa({ id: 1, nombre: 'SMS preventivo', versiones }));
+  // A second one, so a name can be taken (the 409 of «Renombrar»).
+  if (conOtra) definiciones.definiciones.push(definicionFalsa({ id: 2, nombre: 'WhatsApp cobranza' }));
   const base = apiVacia();
   base.manejadores = [manejarTextoEnriquecido(apiTextoEnriquecidoVacia()), manejadorDefiniciones(definiciones)];
   await montarApi(page, base);
@@ -417,6 +419,21 @@ for (const tema of ['light', 'dark'] as const) {
       await sinViolaciones(page);
     });
 
+    test('el diálogo de renombrar, abierto y con el error de nombre repetido', async ({ page }) => {
+      await abrirColumnas(page, 1, true);
+      await page.locator('[data-renombrar]').click();
+      await expect(page.getByRole('dialog', { name: /^Renombrar / })).toBeVisible();
+      await sinViolaciones(page);
+
+      await page.getByLabel('Nombre nuevo').fill('whatsapp cobranza');
+      await page.getByRole('dialog').getByRole('button', { name: 'Renombrar', exact: true }).click();
+      await expect(page.locator('[data-renombrar-error]')).toContainText('Ya hay una definición con ese nombre');
+      // The button went from off to on: its colour transition runs even with reduced motion, and axe
+      // would read it half way. Wait for every transition to finish, not for a fixed time.
+      await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+      await sinViolaciones(page);
+    });
+
     test('una versión antigua en solo lectura, con el aviso', async ({ page }) => {
       await abrirColumnas(page, 3);
       await page.getByLabel('Versión', { exact: true }).selectOption('2');
@@ -425,6 +442,16 @@ for (const tema of ['light', 'dark'] as const) {
     });
   });
 }
+
+test('columnas de carga a 360 px: el nombre con su botón «Renombrar» y el diálogo abierto', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  await abrirColumnas(page, 1, true);
+  await expect(page.locator('[data-renombrar]')).toBeVisible();
+  await sinViolaciones(page);
+  await page.locator('[data-renombrar]').click();
+  await expect(page.getByRole('dialog', { name: /^Renombrar / })).toBeVisible();
+  await sinViolaciones(page);
+});
 
 test('columnas de carga a 360 px: la fila abierta y las tablas se alcanzan con teclado', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 640 });

@@ -71,15 +71,21 @@ import '../styles/columnas.css';
 
           <div class="field">
             <label class="field__label" for="cl-nombre" data-i18n="columnas.definicion.nombre">Nombre</label>
-            <input
-              class="input"
-              id="cl-nombre"
-              data-nombre
-              type="text"
-              maxlength="120"
-              autocomplete="off"
-              aria-describedby="cl-nombre-hint cl-nombre-error"
-            />
+            <div class="cl-nombre-fila">
+              <input
+                class="input"
+                id="cl-nombre"
+                data-nombre
+                type="text"
+                maxlength="120"
+                autocomplete="off"
+                aria-describedby="cl-nombre-hint cl-nombre-error"
+              />
+              <!-- RF-56: the name is the definition's, not a version's, so it is not edited here and saved with «Guardar». -->
+              <button type="button" class="btn btn--sm" data-renombrar hidden aria-describedby="cl-nombre-hint" data-i18n="columnas.renombrar.boton">
+                Renombrar
+              </button>
+            </div>
             <p class="field__hint" id="cl-nombre-hint" data-nombre-hint></p>
             <p class="field__error" id="cl-nombre-error" data-nombre-error></p>
           </div>
@@ -297,6 +303,39 @@ import '../styles/columnas.css';
   </template>
 
   <!-- ---- Confirmation (unsaved changes, removing a column with content) ---------- -->
+  <!-- ---- Rename a saved definition (RF-56) ------------------------------------------- -->
+  <dialog class="dialog" data-dialog="renombrar" aria-labelledby="cl-renombrar-title">
+    <form method="dialog" data-renombrar-form novalidate>
+      <div class="dialog__head">
+        <h2 id="cl-renombrar-title" data-renombrar-titulo></h2>
+      </div>
+      <div class="dialog__body">
+        <div class="field">
+          <label class="field__label" for="cl-renombrar-nombre" data-i18n="columnas.renombrar.campo">Nombre nuevo</label>
+          <input
+            class="input"
+            id="cl-renombrar-nombre"
+            data-renombrar-nombre
+            type="text"
+            autocomplete="off"
+            aria-describedby="cl-renombrar-hint cl-renombrar-error"
+          />
+          <p class="field__hint" id="cl-renombrar-hint" data-i18n="columnas.renombrar.hint">
+            Las versiones y las cargas ya generadas no cambian.
+          </p>
+          <p class="field__error" id="cl-renombrar-error" data-renombrar-error role="alert"></p>
+        </div>
+      </div>
+      <div class="dialog__foot">
+        <button type="button" class="btn" data-close data-i18n="common.cancel">Cancelar</button>
+        <button type="submit" class="btn btn--primary" data-renombrar-confirmar>
+          <span class="btn__spinner" aria-hidden="true"></span>
+          <span class="btn__label" data-i18n="columnas.renombrar.confirmar">Renombrar</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog class="dialog" data-dialog="confirmar" aria-labelledby="cl-confirmar-title">
     <div class="dialog__head">
       <h2 id="cl-confirmar-title" data-confirmar-titulo></h2>
@@ -333,6 +372,7 @@ import '../styles/columnas.css';
     listarDefiniciones,
     obtenerDefinicion,
     problemasDeError,
+    renombrarDefinicionGuardada,
     type DefinicionGuardadaRespuesta,
     type ProblemaDefinicion,
     type ResumenDefinicion,
@@ -400,6 +440,12 @@ import '../styles/columnas.css';
     type ModoVista,
   } from '../lib/constructor-version';
   import { openWhenFree } from '../lib/dialogs';
+  import {
+    clasificarErrorDeRenombrar,
+    conNombreRenombrado,
+    hayNombreNuevo,
+    listaConNombre,
+  } from '../lib/renombrar-definicion';
   import { aVariableDirecta } from '../lib/editor-texto';
   import { applyTranslations, t } from '../lib/i18n';
   import { EVENTO_EXPRESION, mensajeProblema, montarEditor, type ControladorEditor, type EstadoEditor } from '../scripts/editor-texto';
@@ -457,6 +503,7 @@ import '../styles/columnas.css';
     nombre: $<HTMLInputElement>('[data-nombre]'),
     nombreHint: $<HTMLElement>('[data-nombre-hint]'),
     nombreError: $<HTMLElement>('[data-nombre-error]'),
+    renombrar: $<HTMLButtonElement>('[data-renombrar]'),
     versionLinea: $<HTMLElement>('[data-version-linea]'),
     lectura: $<HTMLElement>('[data-lectura]'),
     lecturaTexto: $<HTMLElement>('[data-lectura-texto]'),
@@ -496,6 +543,7 @@ import '../styles/columnas.css';
 
   const dialogos = {
     confirmar: $<HTMLDialogElement>('[data-dialog="confirmar"]'),
+    renombrar: $<HTMLDialogElement>('[data-dialog="renombrar"]'),
     error: $<HTMLDialogElement>('[data-dialog="error"]'),
   };
 
@@ -1035,6 +1083,87 @@ import '../styles/columnas.css';
     await montarContenido();
   }
 
+  // ---- Renaming a saved definition (RF-56, §10.1) -------------------------------------------
+
+  const formRenombrar = $<HTMLFormElement>('[data-renombrar-form]');
+  const inputRenombrar = $<HTMLInputElement>('[data-renombrar-nombre]');
+  const errorRenombrar = $<HTMLElement>('[data-renombrar-error]');
+  const confirmarRenombrar = $<HTMLButtonElement>('[data-renombrar-confirmar]');
+  let renombrando = false;
+
+  /** «Renombrar» is off while there is nothing to do or a rename is on its way. */
+  function pintarConfirmarRenombrar(): void {
+    const actual = estado.respuesta?.nombre ?? '';
+    confirmarRenombrar.disabled = renombrando || !hayNombreNuevo(actual, inputRenombrar.value);
+    confirmarRenombrar.dataset.loading = renombrando ? 'true' : 'false';
+  }
+
+  function abrirRenombrar(): void {
+    const respuesta = estado.respuesta;
+    if (!respuesta) return;
+    $<HTMLElement>('[data-renombrar-titulo]').textContent = t('columnas.renombrar.titulo', { nombre: respuesta.nombre });
+    inputRenombrar.value = respuesta.nombre;
+    // The limit is the backend's: it comes with the catalogue.
+    if (catalogo) inputRenombrar.maxLength = catalogo.limites.largo_nombre_definicion;
+    else inputRenombrar.removeAttribute('maxlength');
+    errorRenombrar.textContent = '';
+    inputRenombrar.removeAttribute('aria-invalid');
+    pintarConfirmarRenombrar();
+    void openWhenFree(dialogos.renombrar).then(() => {
+      inputRenombrar.focus();
+      inputRenombrar.select();
+    });
+  }
+
+  /** The reason under the field, in the screen's own words: the backend's `detail` is Spanish prose. */
+  function textoDeErrorDeRenombrar(error: unknown): string {
+    const clasificado = clasificarErrorDeRenombrar(error);
+    if (clasificado.tipo === 'repetido') return t('columnas.error.nombreRepetido');
+    if (clasificado.tipo === 'invalido') {
+      return t('columnas.renombrar.nombreInvalido', { max: catalogo?.limites.largo_nombre_definicion ?? '' });
+    }
+    if (clasificado.tipo === 'no_existe') return t('textoEnriquecido.codigo.definicion_no_encontrada');
+    return mensajeDeError(error);
+  }
+
+  el.renombrar.addEventListener('click', abrirRenombrar);
+  // Closing by any way (Cancel, Escape, a rename that worked) returns the focus to the button.
+  dialogos.renombrar.addEventListener('close', () => el.renombrar.focus());
+
+  inputRenombrar.addEventListener('input', () => {
+    errorRenombrar.textContent = '';
+    inputRenombrar.removeAttribute('aria-invalid');
+    pintarConfirmarRenombrar();
+  });
+
+  formRenombrar.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    const respuesta = estado.respuesta;
+    if (!respuesta || renombrando || !hayNombreNuevo(respuesta.nombre, inputRenombrar.value)) return;
+    renombrando = true;
+    errorRenombrar.textContent = '';
+    pintarConfirmarRenombrar();
+    try {
+      const renombrada = await renombrarDefinicionGuardada(respuesta.id, inputRenombrar.value);
+      // Only the name changes: a version that was open to read stays as it is, and so does a draft.
+      estado.respuesta = conNombreRenombrado(estado.respuesta ?? respuesta, renombrada);
+      estado.lista = listaConNombre(estado.lista, respuesta.id, renombrada);
+      if (estado.guardada) estado.guardada = { ...estado.guardada, nombre: renombrada.nombre };
+      estado.borrador = renombrarDefinicion(estado.borrador, renombrada.nombre);
+      estado.mensaje = t('columnas.renombrar.hecho', { nombre: renombrada.nombre });
+      dialogos.renombrar.close();
+      pintarCabecera();
+      pintarEstado();
+    } catch (error) {
+      errorRenombrar.textContent = textoDeErrorDeRenombrar(error);
+      inputRenombrar.setAttribute('aria-invalid', 'true');
+      inputRenombrar.focus();
+    } finally {
+      renombrando = false;
+      pintarConfirmarRenombrar();
+    }
+  });
+
   // ---- Loading a definition -----------------------------------------------------------------
 
   function poner(respuesta: DefinicionGuardadaRespuesta | null): void {
@@ -1102,6 +1231,8 @@ import '../styles/columnas.css';
     if (estado.respuesta) el.version.value = String(estado.respuesta.version.numero);
 
     if (document.activeElement !== el.nombre) el.nombre.value = estado.borrador.nombre;
+    // Only a saved definition has a name to change; one still being written names itself in the field.
+    el.renombrar.hidden = !guardada;
     const reglas = versionAlGuardar(estado.respuesta);
     el.nombre.readOnly = !reglas.nombreEditable;
     el.nombreHint.textContent = t(

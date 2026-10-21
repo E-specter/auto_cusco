@@ -151,7 +151,8 @@ test.describe('una definición nueva', () => {
 
     // After creating: the name is fixed and the hint says so; the next save is version 2.
     await expect(page.getByLabel('Nombre', { exact: true })).toHaveJSProperty('readOnly', true);
-    await expect(page.getByText('El nombre se fija al crear la definición')).toBeVisible();
+    await expect(page.getByText('El nombre se cambia con Renombrar y no crea una versión.')).toBeVisible();
+    await expect(page.locator('[data-renombrar]')).toBeVisible();
     await expect(page.getByText('Al guardar se crea la versión 2; la 1 no cambia.')).toBeVisible();
     await expect(page.getByText('Versión 1', { exact: true }).first()).toBeVisible();
   });
@@ -924,5 +925,269 @@ test.describe('la muestra del editor es el producto del segmento elegido', () =>
 
     await expect.poll(() => muestrasDelEditor(motor).at(-1)).toMatchObject({ tipo: 'ejemplo' });
     await expect(notaDeMuestra(page)).toBeHidden();
+  });
+});
+
+test.describe('renombrar una definición guardada (RF-56)', () => {
+  const dialogo = (page: Page) => page.getByRole('dialog', { name: /^Renombrar / });
+  const campoDelDialogo = (page: Page) => page.getByLabel('Nombre nuevo');
+  const botonDelDialogo = (page: Page) => dialogo(page).getByRole('button', { name: 'Renombrar', exact: true });
+  const botonDeLaPantalla = (page: Page) => page.locator('[data-renombrar]');
+
+  /** Two saved definitions (so a name can be taken) and the first one open. */
+  async function conDosDefiniciones(page: Page, versiones = 1) {
+    const api = apiDefiniciones();
+    api.definiciones.push(
+      definicionFalsa({ id: 1, nombre: 'SMS preventivo', versiones }),
+      definicionFalsa({ id: 2, nombre: 'WhatsApp cobranza' }),
+    );
+    await abrir(page, api);
+    await page.getByLabel('Definición guardada').selectOption('1');
+    await expect(nombreDeColumna(page, 1)).toHaveValue(versiones > 1 ? 'telefono_v3' : 'telefono');
+    return api;
+  }
+
+  const patches = (api: ApiFalsaDefiniciones) => pedidosA(api, 'PATCH', '/definiciones-columnas/1');
+
+  test('una definición sin guardar no tiene «Renombrar»: su nombre se escribe en el campo', async ({ page }) => {
+    await abrir(page);
+
+    await expect(botonDeLaPantalla(page)).toBeHidden();
+    await expect(page.getByLabel('Nombre', { exact: true })).toBeEditable();
+  });
+
+  test('una guardada: el campo es de solo lectura, el hint manda a «Renombrar» y el botón está junto al campo', async ({ page }) => {
+    await conDosDefiniciones(page);
+
+    await expect(page.getByLabel('Nombre', { exact: true })).not.toBeEditable();
+    await expect(page.locator('[data-nombre-hint]')).toHaveText('El nombre se cambia con Renombrar y no crea una versión.');
+    await expect(botonDeLaPantalla(page)).toBeVisible();
+    await expect(botonDeLaPantalla(page)).toHaveAccessibleDescription(/El nombre se cambia con Renombrar/);
+  });
+
+  test('el diálogo trae el nombre actual seleccionado, el hint, el tope del catálogo y «Renombrar» inactivo', async ({ page }) => {
+    await conDosDefiniciones(page);
+
+    await botonDeLaPantalla(page).click();
+
+    await expect(dialogo(page)).toBeVisible();
+    await expect(dialogo(page).getByRole('heading')).toHaveText('Renombrar “SMS preventivo”');
+    await expect(campoDelDialogo(page)).toHaveValue('SMS preventivo');
+    await expect(campoDelDialogo(page)).toBeFocused();
+    expect(await campoDelDialogo(page).evaluate((e: HTMLInputElement) => [e.selectionStart, e.selectionEnd])).toEqual([0, 14]);
+    await expect(campoDelDialogo(page)).toHaveAttribute('maxlength', '120');
+    await expect(dialogo(page).getByText('Las versiones y las cargas ya generadas no cambian.')).toBeVisible();
+    await expect(botonDelDialogo(page)).toBeDisabled();
+  });
+
+  test('renombrar cambia el nombre en el campo y en la lista, sin crear una versión, y dice qué pasó', async ({ page }) => {
+    const api = await conDosDefiniciones(page);
+    await botonDeLaPantalla(page).click();
+
+    await campoDelDialogo(page).fill('SMS preventivo B');
+    await expect(botonDelDialogo(page)).toBeEnabled();
+    await botonDelDialogo(page).click();
+
+    await expect(dialogo(page)).toBeHidden();
+    await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('SMS preventivo B');
+    await expect(page.getByLabel('Definición guardada').getByRole('option', { name: 'SMS preventivo B' })).toBeAttached();
+    await expect(page.getByLabel('Definición guardada').getByRole('option', { name: 'SMS preventivo', exact: true })).toHaveCount(0);
+    await expect(page.locator('[data-estado]')).toHaveText('Renombrada a “SMS preventivo B”.');
+    await expect(botonDeLaPantalla(page)).toBeFocused();
+    expect(patches(api)).toHaveLength(1);
+    expect(patches(api)[0].cuerpo).toEqual({ nombre: 'SMS preventivo B' });
+    // No version: nothing but the PATCH was written, and the definition keeps its one version.
+    expect(api.pedidos.filter((p) => p.metodo !== 'GET' && p.metodo !== 'PATCH')).toEqual([]);
+    expect(api.definiciones[0].versiones).toHaveLength(1);
+  });
+
+  test('sin cambios «Renombrar» queda inactivo, también con espacios en los extremos; cambiar solo las mayúsculas sí cuenta', async ({ page }) => {
+    const api = await conDosDefiniciones(page);
+    await botonDeLaPantalla(page).click();
+
+    await campoDelDialogo(page).fill('  SMS preventivo  ');
+    await expect(botonDelDialogo(page)).toBeDisabled();
+
+    await campoDelDialogo(page).fill('Sms preventivo');
+    await expect(botonDelDialogo(page)).toBeEnabled();
+    await botonDelDialogo(page).click();
+
+    await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('Sms preventivo');
+    expect(patches(api)[0].cuerpo).toEqual({ nombre: 'Sms preventivo' });
+  });
+
+  test('un nombre repetido (409) se dice bajo el campo, con el diálogo abierto, lo escrito y el foco en el campo', async ({ page }) => {
+    const api = await conDosDefiniciones(page);
+    await botonDeLaPantalla(page).click();
+
+    await campoDelDialogo(page).fill('whatsapp COBRANZA');
+    await botonDelDialogo(page).click();
+
+    await expect(dialogo(page)).toBeVisible();
+    await expect(dialogo(page).locator('[data-renombrar-error]')).toContainText('Ya hay una definición con ese nombre');
+    await expect(campoDelDialogo(page)).toHaveAttribute('aria-invalid', 'true');
+    await expect(campoDelDialogo(page)).toHaveAccessibleDescription(/Ya hay una definición con ese nombre/);
+    await expect(campoDelDialogo(page)).toHaveValue('whatsapp COBRANZA');
+    await expect(campoDelDialogo(page)).toBeFocused();
+    await expect(botonDelDialogo(page)).toBeEnabled();
+    expect(api.definiciones[0].nombre).toBe('SMS preventivo');
+
+    // Editing clears the error: the next try is a new one.
+    await campoDelDialogo(page).fill('WhatsApp cobranza 2');
+    await expect(dialogo(page).locator('[data-renombrar-error]')).toBeEmpty();
+    await expect(campoDelDialogo(page)).not.toHaveAttribute('aria-invalid', 'true');
+  });
+
+  test('un nombre vacío o demasiado largo lo rechaza el backend, y la pantalla lo dice con su propio texto y el tope del catálogo', async ({ page }) => {
+    await conDosDefiniciones(page);
+    await botonDeLaPantalla(page).click();
+
+    await campoDelDialogo(page).fill('   ');
+    await botonDelDialogo(page).click();
+
+    await expect(dialogo(page).locator('[data-renombrar-error]')).toHaveText('Escribe un nombre de 1 a 120 caracteres.');
+    await expect(campoDelDialogo(page)).toHaveAttribute('aria-invalid', 'true');
+    // Not the backend's Spanish sentence: it would stay Spanish in English.
+    await expect(dialogo(page)).not.toContainText('El nombre debe tener entre');
+  });
+
+  test('en inglés el diálogo y el error salen en inglés', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    const definiciones = apiDefiniciones();
+    definiciones.definiciones.push(
+      definicionFalsa({ id: 1, nombre: 'SMS preventivo' }),
+      definicionFalsa({ id: 2, nombre: 'WhatsApp cobranza' }),
+    );
+    const base = apiVacia();
+    base.manejadores = [manejarTextoEnriquecido(motorConDefiniciones()), manejadorDefiniciones(definiciones)];
+    await montarApi(page, base);
+    await page.goto(RUTA);
+    await expect(page.getByRole('heading', { name: 'Load columns', level: 1 })).toBeVisible();
+    await page.locator('[data-definiciones]').selectOption('1');
+    await expect(page.locator('[data-renombrar]')).toBeVisible();
+
+    await page.locator('[data-renombrar]').click();
+    const dialog = page.getByRole('dialog', { name: /^Rename / });
+    await expect(dialog.getByRole('heading')).toHaveText('Rename “SMS preventivo”');
+    await page.getByLabel('New name').fill('   ');
+    await dialog.getByRole('button', { name: 'Rename', exact: true }).click();
+
+    await expect(dialog.locator('[data-renombrar-error]')).toHaveText('Enter a name of 1 to 120 characters.');
+    await page.getByLabel('New name').fill('WhatsApp cobranza');
+    await dialog.getByRole('button', { name: 'Rename', exact: true }).click();
+    await expect(dialog.locator('[data-renombrar-error]')).toContainText('already exists');
+  });
+
+  test('desde una versión antigua en solo lectura solo cambia el nombre: lo que se mira se queda', async ({ page }) => {
+    const api = await conDosDefiniciones(page, 3);
+    await page.getByLabel('Versión', { exact: true }).selectOption('2');
+    await expect(page.getByText('Estás viendo la versión 2. La vigente es la 3.')).toBeVisible();
+    await expect(nombreDeColumna(page, 1)).toHaveValue('telefono_v2');
+
+    await botonDeLaPantalla(page).click();
+    await campoDelDialogo(page).fill('SMS preventivo B');
+    await botonDelDialogo(page).click();
+
+    await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('SMS preventivo B');
+    await expect(page.getByText('Estás viendo la versión 2. La vigente es la 3.')).toBeVisible();
+    await expect(nombreDeColumna(page, 1)).toHaveValue('telefono_v2');
+    await expect(page.getByLabel('Versión', { exact: true })).toHaveValue('2');
+    expect(patches(api)).toHaveLength(1);
+    expect(api.definiciones[0].versiones).toHaveLength(3);
+  });
+
+  test('un borrador sin guardar sigue igual y renombrar no pide confirmar cambios', async ({ page }) => {
+    const api = await conDosDefiniciones(page);
+    await nombreDeColumna(page, 1).fill('telefono_editado');
+    await expect(page.getByRole('button', { name: 'Guardar' })).toBeEnabled();
+
+    await botonDeLaPantalla(page).click();
+    await campoDelDialogo(page).fill('SMS preventivo B');
+    await botonDelDialogo(page).click();
+
+    await expect(dialogo(page)).toBeHidden();
+    await expect(page.getByRole('dialog', { name: /Hay cambios sin guardar/ })).toHaveCount(0);
+    await expect(nombreDeColumna(page, 1)).toHaveValue('telefono_editado');
+    // Still a pending change, and still only that: the new name does not count as one.
+    await expect(page.getByRole('button', { name: 'Guardar' })).toBeEnabled();
+    expect(patches(api)).toHaveLength(1);
+
+    await page.getByRole('button', { name: 'Descartar cambios' }).click();
+    await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('SMS preventivo B');
+    await expect(nombreDeColumna(page, 1)).toHaveValue('telefono');
+  });
+
+  test('renombrar solo no deja cambios sin guardar', async ({ page }) => {
+    await conDosDefiniciones(page);
+    await botonDeLaPantalla(page).click();
+    await campoDelDialogo(page).fill('SMS preventivo B');
+    await botonDelDialogo(page).click();
+    await expect(dialogo(page)).toBeHidden();
+
+    await expect(page.getByRole('button', { name: 'Guardar' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Descartar cambios' })).toBeDisabled();
+  });
+
+  test('Cancelar y Escape no mandan nada y devuelven el foco a «Renombrar»', async ({ page }) => {
+    const api = await conDosDefiniciones(page);
+
+    await botonDeLaPantalla(page).click();
+    await campoDelDialogo(page).fill('Otro nombre');
+    await dialogo(page).getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialogo(page)).toBeHidden();
+    await expect(botonDeLaPantalla(page)).toBeFocused();
+
+    await botonDeLaPantalla(page).click();
+    await expect(campoDelDialogo(page)).toHaveValue('SMS preventivo');
+    await page.keyboard.press('Escape');
+    await expect(dialogo(page)).toBeHidden();
+    await expect(botonDeLaPantalla(page)).toBeFocused();
+    expect(patches(api)).toEqual([]);
+    await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('SMS preventivo');
+  });
+
+  test('se hace con el teclado: Enter en el campo renombra', async ({ page }) => {
+    const api = await conDosDefiniciones(page);
+    await botonDeLaPantalla(page).focus();
+    await page.keyboard.press('Enter');
+    await expect(campoDelDialogo(page)).toBeFocused();
+
+    await page.keyboard.type('Teclado');
+    await page.keyboard.press('Enter');
+
+    await expect(dialogo(page)).toBeHidden();
+    await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('Teclado');
+    expect(patches(api)).toHaveLength(1);
+  });
+
+  test('una definición que ya no existe (404) se dice bajo el campo y no cambia nada', async ({ page }) => {
+    const api = await conDosDefiniciones(page);
+    api.respuestas.renombrar = [{ estado: 404, cuerpo: { detail: 'No existe', codigo: 'definicion_no_encontrada' } }];
+    await botonDeLaPantalla(page).click();
+
+    await campoDelDialogo(page).fill('SMS preventivo B');
+    await botonDelDialogo(page).click();
+
+    await expect(dialogo(page)).toBeVisible();
+    await expect(dialogo(page).locator('[data-renombrar-error]')).toContainText('Esa definición no existe');
+    await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('SMS preventivo');
+  });
+
+  test('sin red lo dice y se puede reintentar', async ({ page }) => {
+    const api = await conDosDefiniciones(page);
+    await botonDeLaPantalla(page).click();
+    await campoDelDialogo(page).fill('SMS preventivo B');
+    api.sinRed = true;
+
+    await botonDelDialogo(page).click();
+
+    await expect(dialogo(page).locator('[data-renombrar-error]')).not.toBeEmpty();
+    await expect(botonDelDialogo(page)).toBeEnabled();
+    api.sinRed = false;
+    await botonDelDialogo(page).click();
+    await expect(dialogo(page)).toBeHidden();
+    await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('SMS preventivo B');
   });
 });

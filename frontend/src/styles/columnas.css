@@ -58,6 +58,19 @@
   }
 }
 
+/* The name and its «Renombrar» button: one line, and on a phone the button drops under the field. */
+.cl-nombre-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cl-nombre-fila .input {
+  flex: 1 1 14rem;
+  min-inline-size: 0;
+}
+
 .cl-linea {
   font-family: var(--font-secondary);
   font-variant-numeric: tabular-nums;

@@ -13,6 +13,7 @@ import {
   listarDefiniciones,
   obtenerDefinicion,
   problemasDeError,
+  renombrarDefinicionGuardada,
 } from '../../src/lib/api-definiciones';
 import { aDefinicion, definicionNueva, fijarExpresion, renombrarDefinicion, renombrarColumna } from '../../src/lib/constructor-columnas';
 
@@ -192,5 +193,35 @@ describe('cuando el backend dice que no', () => {
     const fallo = new ApiError(400, 'x', 'definicion_invalida', { problemas: [{ sin: 'forma' }, PROBLEMA] });
 
     expect(problemasDeError(fallo)).toEqual([PROBLEMA]);
+  });
+});
+
+describe('renombrar', () => {
+  it('es un PATCH a la definición con solo el nombre, sin versión', async () => {
+    const falso = responderCon(200, { id: 7, nombre: 'SMS preventivo B' });
+
+    await renombrarDefinicionGuardada(7, 'SMS preventivo B');
+
+    const { url, opciones } = llamada(falso);
+    expect(url).toBe('/api/definiciones-columnas/7');
+    expect(opciones.method).toBe('PATCH');
+    expect(cuerpoDe(opciones)).toEqual({ nombre: 'SMS preventivo B' });
+  });
+
+  it('manda el nombre tal como se escribió: recortarlo es cosa del backend', async () => {
+    const falso = responderCon(200, {});
+
+    await renombrarDefinicionGuardada(7, '  Con espacios  ');
+
+    expect(cuerpoDe(llamada(falso).opciones)).toEqual({ nombre: '  Con espacios  ' });
+  });
+
+  it('un rechazo llega como ApiError con su código', async () => {
+    responderCon(409, { detail: 'Ya hay una definición con ese nombre', codigo: 'nombre_repetido' });
+
+    const fallo = await renombrarDefinicionGuardada(7, 'otro').catch((e: unknown) => e);
+
+    expect(fallo).toBeInstanceOf(ApiError);
+    expect(fallo).toMatchObject({ status: 409, codigo: 'nombre_repetido' });
   });
 });

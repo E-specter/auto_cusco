@@ -58,6 +58,19 @@ export function guardarVersion(
 }
 
 /**
+ * Renames a saved definition (RF-56). The name is the definition's, not a version's: nothing is
+ * versioned, no version is created. Answers the definition with its latest version, whatever version
+ * the screen is looking at. 409 `nombre_repetido`, 400 with the problem located in `nombre`, 404.
+ */
+export function renombrarDefinicionGuardada(
+  id: number,
+  nombre: string,
+  signal?: AbortSignal,
+): Promise<DefinicionGuardadaRespuesta> {
+  return request<DefinicionGuardadaRespuesta>(`${RUTA}/${id}`, conJson('PATCH', { nombre }, signal));
+}
+
+/**
  * Saves a draft. With no saved definition (`id` is `null`) it creates one and sends the name; with
  * one it saves a new version and sends **no name**: it cannot change between versions, and the
  * backend would answer with a problem on `nombre` if it differed.

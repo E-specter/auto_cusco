@@ -48,7 +48,7 @@ export interface DefinicionFalsa {
 export interface ApiFalsaDefiniciones {
   definiciones: DefinicionFalsa[];
   /** Scripted answers, in order; the last one repeats. Empty means "behave". */
-  respuestas: { crear: Respuesta[]; guardarVersion: Respuesta[] };
+  respuestas: { crear: Respuesta[]; guardarVersion: Respuesta[]; renombrar: Respuesta[] };
   /** When true, every call fails at the network level. */
   sinRed: boolean;
   /** Requests the page made, with their JSON bodies, for asserting on the call. */
@@ -56,7 +56,7 @@ export interface ApiFalsaDefiniciones {
 }
 
 export function apiDefiniciones(): ApiFalsaDefiniciones {
-  return { definiciones: [], respuestas: { crear: [], guardarVersion: [] }, sinRed: false, pedidos: [] };
+  return { definiciones: [], respuestas: { crear: [], guardarVersion: [], renombrar: [] }, sinRed: false, pedidos: [] };
 }
 
 const FORMATO_FINANCIERO = { separador_miles: ',', separador_decimal: '.', decimales: 2 } as const;
@@ -353,6 +353,38 @@ export function manejadorDefiniciones(estado: ApiFalsaDefiniciones): Manejador {
         return true;
       }
       await json(route, 200, respuestaDe(definicion, version));
+      return true;
+    }
+
+    // RF-56 (B14): only the name, no version. The same name (after trimming) answers 200 and changes
+    // nothing; a case-only change is a change; another definition's name, in any case or accent, is 409.
+    if (!coincidencia[2] && metodo === 'PATCH') {
+      const respuesta = guionada(estado.respuestas.renombrar);
+      if (respuesta) {
+        await respuesta;
+        return true;
+      }
+      if (!definicion) {
+        await noExiste(route, 'definicion_no_encontrada', `No existe la definicion ${coincidencia[1]}`);
+        return true;
+      }
+      const nombre = typeof (cuerpo as { nombre?: unknown } | null)?.nombre === 'string' ? (cuerpo as { nombre: string }).nombre.trim() : '';
+      if (nombre.length < 1 || nombre.length > LARGO_MAXIMO_NOMBRE) {
+        await invalida(route, [
+          problema({ campo: 'nombre', detalle: `El nombre debe tener entre 1 y ${LARGO_MAXIMO_NOMBRE} caracteres` }),
+        ]);
+        return true;
+      }
+      if (nombre === definicion.nombre) {
+        await json(route, 200, respuestaDe(definicion));
+        return true;
+      }
+      if (estado.definiciones.some((d) => d.id !== definicion.id && normalizar(d.nombre) === normalizar(nombre))) {
+        await json(route, 409, { detail: 'Ya existe una definicion con ese nombre', codigo: 'nombre_repetido' });
+        return true;
+      }
+      definicion.nombre = nombre;
+      await json(route, 200, respuestaDe(definicion));
       return true;
     }
 
