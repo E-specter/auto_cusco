@@ -50,7 +50,7 @@ test.describe('carga inicial', () => {
     // El nombre de fila no repite el segmento.
     await expect(fila.getByRole('rowheader')).toHaveText('9 a 30(9–30 días)');
     // El ejemplo del peor caso describe las partes de su segmento.
-    await expect(page.getByLabel('Parte 2 del segmento 9 a 30')).toHaveAccessibleDescription(
+    await expect(fila.locator('[data-ejemplo]')).toHaveText(
       /^Ejemplo en el peor caso: XXXXXXXX Caja Cusco te informa que tu cuota venció el dd\/mm\/yyyy/,
     );
     await expect(page.locator('[data-speech-resumen]')).toHaveAttribute('role', 'status');
@@ -73,61 +73,73 @@ test.describe('carga inicial', () => {
 });
 
 test.describe('speech (RF-MM-17)', () => {
-  test('el Speech original nunca se edita: el cambio crea una versión nueva basada en él', async ({ page }) => {
+  const NOTICE_V1 = 'Versión de dos partes (v1): se usa en campañas tal como está y ya no se edita.';
+
+  /** Nothing of a v1 is a field: no textarea, no name, no save, no discard. */
+  async function esSoloLectura(page: Page) {
+    await expect(page.getByText(NOTICE_V1)).toBeVisible();
+    await expect(page.locator('[data-speech-filas] textarea')).toHaveCount(0);
+    await expect(page.locator('[data-speech-filas] input')).toHaveCount(0);
+    await expect(page.locator('[data-speech-pie]')).toBeHidden();
+    await expect(page.getByRole('button', { name: /^Guardar (cambios|como versión nueva)$/ })).toBeHidden();
+    await expect(page.locator('[data-form-speech]').getByRole('button', { name: 'Descartar cambios' })).toBeHidden();
+    await expect(page.getByLabel('Nombre de la versión')).toBeHidden();
+  }
+
+  test('el Speech original es solo lectura: sus partes son texto y «Convertir a v2» es lo único que se puede hacer', async ({ page }) => {
     const api = apiMowaMes();
     await abrir(page, api);
 
-    await expect(page.getByText('El Speech original no se modifica nunca.', { exact: false })).toBeVisible();
-    const guardar = page.getByRole('button', { name: 'Guardar como versión nueva' });
-    await expect(guardar).toBeDisabled();
-
-    const parte = page.getByLabel('Parte 2 del segmento 9 a 30');
-    await parte.fill(', acércate a pagar a nuestras agencias.');
-    await expect(page.locator('[data-speech-filas] tr[data-segmento="9_a_30"]').getByText('Cabe')).toBeVisible();
-
-    await guardar.click();
-
-    await expect(page.getByText('Versión nueva creada.')).toBeVisible();
+    await esSoloLectura(page);
+    await expect(page.locator('[data-speech-filas] tr[data-segmento="9_a_30"]')).toContainText('Caja Cusco');
+    await expect(page.getByRole('button', { name: 'Convertir a v2' })).toBeEnabled();
+    await expect(page.getByText('Para personalizarla, conviértela a v2:', { exact: false })).toBeVisible();
     expect(pedidosA(api, 'PUT', '/mowa-mes/speech/')).toEqual([]);
-    const [creacion] = pedidosA(api, 'POST', '/mowa-mes/speech');
-    expect(creacion.cuerpo).toMatchObject({ nombre: null, basada_en_id: 1 });
-    expect((creacion.cuerpo as { partes: Array<{ segmento: string; parte_2: string }> }).partes).toContainEqual(
-      expect.objectContaining({ segmento: '9_a_30', parte_2: ', acércate a pagar a nuestras agencias.' }),
-    );
-    await expect(page.getByLabel('Versión', { exact: true })).toHaveValue('2');
+    expect(pedidosA(api, 'POST', '/mowa-mes/speech')).toEqual([]);
   });
 
-  test('una versión sin uso se edita en su lugar, conservando los espacios de los extremos', async ({ page }) => {
+  test('una v1 sin uso tampoco se edita: ya no hay editor de dos partes', async ({ page }) => {
     const api = apiMowaMes();
     api.versiones = [api.versiones[0], versionSpeech()];
     await abrir(page, api);
 
     await page.getByLabel('Versión', { exact: true }).selectOption('2');
-    await page.getByLabel('Parte 1 del segmento Preventiva').fill(' te recordamos que tu cuota vence el ');
-    await page.getByRole('button', { name: 'Guardar cambios' }).click();
 
-    await expect(page.getByText('Versión guardada.')).toBeVisible();
-    const [edicion] = pedidosA(api, 'PUT', '/mowa-mes/speech/2');
-    expect((edicion.cuerpo as { partes: Array<{ segmento: string; parte_1: string }> }).partes).toContainEqual(
-      expect.objectContaining({ segmento: 'preventiva', parte_1: ' te recordamos que tu cuota vence el ' }),
+    await esSoloLectura(page);
+    await expect(page.getByRole('button', { name: 'Convertir a v2' })).toBeEnabled();
+  });
+
+  test('las partes se leen tal como se escribieron, con sus espacios', async ({ page }) => {
+    const api = apiMowaMes();
+    api.versiones = [api.versiones[0], versionSpeech()];
+    api.versiones[1].partes[0] = { ...api.versiones[1].partes[0], parte_1: '  dos espacios al inicio ' };
+    await abrir(page, api);
+    await page.getByLabel('Versión', { exact: true }).selectOption('2');
+
+    const celda = page.locator('[data-speech-filas] tr[data-segmento="preventiva"] [data-campo="parte_1"]');
+    // `toHaveText` normalizes spaces: the DOM text is what has to be exact.
+    expect(await celda.evaluate((e) => e.textContent)).toBe('  dos espacios al inicio ');
+    expect(await celda.evaluate((e) => getComputedStyle(e).whiteSpace)).toBe('pre-wrap');
+  });
+
+  test('el hint de estructura de una v1 explica lo que se ve y dónde va el WhatsApp', async ({ page }) => {
+    await abrir(page, apiMowaMes());
+
+    await expect(page.locator('p[data-speech-v1][class*="field__hint"]').first()).toHaveText(
+      'Mensaje = titular (8 caracteres) + parte 1 + fecha de vencimiento (dd/mm/aaaa) + parte 2. Donde dice [whatsapp] va el enlace al WhatsApp de contacto.',
     );
   });
 
-  test('si una campaña la usó mientras tanto, lo dice y la vuelve de solo lectura', async ({ page }) => {
+  test('el backend rechaza crear o editar con partes, y la pantalla nunca las manda', async ({ page }) => {
     const api = apiMowaMes();
-    api.versiones = [api.versiones[0], versionSpeech()];
-    api.respuestas.editarSpeech = [{ estado: 409, cuerpo: { detail: 'La version ya se uso y no se modifica' } }];
     await abrir(page, api);
-
-    await page.getByLabel('Versión', { exact: true }).selectOption('2');
-    api.versiones = [api.versiones[0], versionSpeech({ usada: true, editable: false })];
-    await page.getByLabel('Parte 1 del segmento 1 a 8').fill(' texto sintético ');
-    await page.getByRole('button', { name: 'Guardar cambios' }).click();
-
-    await expect(page.getByText('La version ya se uso y no se modifica')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Guardar como versión nueva' })).toBeEnabled();
-    // Lo escrito no se pierde.
-    await expect(page.getByLabel('Parte 1 del segmento 1 a 8')).toHaveValue(' texto sintético ');
+    // What the real backend answers since M3 (B15): the page has no path that sends `partes`.
+    const respuestas = await page.evaluate(async () => {
+      const crear = await fetch('/api/mowa-mes/speech', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nombre: 'x', partes: [] }) });
+      const editar = await fetch('/api/mowa-mes/speech/1', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nombre: 'x', partes: [] }) });
+      return [crear.status, (await crear.json()).codigo, editar.status, (await editar.json()).codigo];
+    });
+    expect(respuestas).toEqual([400, 'version_v1_retirada', 400, 'version_v1_retirada']);
   });
 
   test('sin WhatsApp los segmentos que lo usan no se generan, y al configurarlo se recalcula', async ({ page }) => {
@@ -140,10 +152,8 @@ test.describe('speech (RF-MM-17)', () => {
     await expect(resumen).toHaveText(
       '3 segmentos no se pueden generar sin WhatsApp. 1 segmento pasa de 150 caracteres.',
     );
-    await expect(page.getByLabel('Parte 1 del segmento 31 a 60')).toHaveAccessibleDescription(
-      'Sin ejemplo: falta el WhatsApp de contacto.',
-    );
     const fila = page.locator('[data-speech-filas] tr[data-segmento="31_a_60"]');
+    await expect(fila.locator('[data-ejemplo]')).toHaveText('Sin ejemplo: falta el WhatsApp de contacto.');
     await expect(fila.getByText('Falta WhatsApp')).toBeVisible();
     await expect(fila.locator('[data-largo]')).toHaveText('—');
 

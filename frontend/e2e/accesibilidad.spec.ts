@@ -150,6 +150,15 @@ for (const tema of ['light', 'dark'] as const) {
       await sinViolaciones(page);
     });
 
+    test('configuración de MOWA MES, con una v1 en solo lectura: sin campos y con el aviso', async ({ page }) => {
+      await montarApiMowaMes(page, apiMowaMes());
+      await page.goto('/mowa-mes/configuracion');
+      await expect(page.getByText('Versión de dos partes (v1): se usa en campañas tal como está y ya no se edita.')).toBeVisible();
+      await expect(page.locator('[data-speech-filas] textarea')).toHaveCount(0);
+      await expect(page.locator('[data-speech-filas] tr[data-segmento="9_a_30"] [data-largo]')).not.toHaveText('—');
+      await sinViolaciones(page);
+    });
+
     test('seguimiento de MOWA MES, con el aviso del límite excedido', async ({ page }) => {
       const api = apiMowaMes();
       api.consumo = (mes) => ({

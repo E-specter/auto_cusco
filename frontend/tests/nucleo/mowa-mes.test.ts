@@ -14,7 +14,6 @@ import {
   campoDeError,
   entradaSupervision,
   FILAS_POR_PAGINA,
-  hayCambiosSpeech,
   insertarVariable,
   modoGuardado,
   moverElemento,
@@ -91,18 +90,6 @@ describe('borrador de speech', () => {
       { segmento: '1_a_8', parte_1: ' p1 ', parte_2: ' p2' },
       { segmento: '9_a_30', parte_1: ' p1 ', parte_2: ' p2' },
     ]);
-  });
-
-  it('sin tocar nada no hay cambios', () => {
-    const v = version();
-    expect(hayCambiosSpeech(v, borradorDesdeVersion(v))).toBe(false);
-  });
-
-  it('un espacio en un extremo cuenta como cambio, porque es texto del mensaje', () => {
-    const v = version();
-    const borrador = borradorDesdeVersion(v);
-    borrador[0] = { ...borrador[0], parte_1: ' p1' };
-    expect(hayCambiosSpeech(v, borrador)).toBe(true);
   });
 });
 

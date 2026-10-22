@@ -46,19 +46,6 @@ export function borradorDesdeVersion(version: VersionSpeech): PartesEntrada[] {
 }
 
 /**
- * Whether the draft differs from the saved version. Parts are compared exactly:
- * the leading and trailing spaces of a part are text the message carries.
- */
-export function hayCambiosSpeech(version: VersionSpeech, borrador: PartesEntrada[]): boolean {
-  const guardado = borradorDesdeVersion(version);
-  if (guardado.length !== borrador.length) return true;
-  return guardado.some((parte) => {
-    const otra = borrador.find((b) => b.segmento === parte.segmento);
-    return !otra || otra.parte_1 !== parte.parte_1 || otra.parte_2 !== parte.parte_2;
-  });
-}
-
-/**
  * RF-MM-17: a version that a campaign used, and the original, never change.
  * Saving one of them creates a new version based on it.
  */

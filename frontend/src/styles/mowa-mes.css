@@ -216,11 +216,11 @@
   font-size: var(--text-xs);
 }
 
-.mm-speech__parte {
-  inline-size: 100%;
-  resize: vertical;
-  /* Spaces at the edges are message text; a visible field keeps them honest. */
+.mm-speech__parte-texto {
+  display: block;
+  /* A v1 is only read: its spaces and line breaks are message text, shown as they were written. */
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .mm-speech__largo {

@@ -260,7 +260,7 @@ import '../../styles/mowa-mes-speech-v2.css';
           </div>
 
           <p class="field__hint" data-speech-v1 data-i18n="mowaMes.speech.estructura">
-            Mensaje = titular (8 caracteres) + parte 1 + fecha de vencimiento (dd/mm/aaaa) + parte 2. Escribe [whatsapp] donde vaya el enlace. Los espacios de los extremos cuentan.
+            Mensaje = titular (8 caracteres) + parte 1 + fecha de vencimiento (dd/mm/aaaa) + parte 2. Donde dice [whatsapp] va el enlace al WhatsApp de contacto.
           </p>
 
           <p class="mm-speech__resumen" role="status" data-speech-v1 data-speech-resumen></p>
@@ -285,16 +285,13 @@ import '../../styles/mowa-mes-speech-v2.css';
           <!-- v2: the segment-by-segment editor, and the way a v1 becomes one. v1 above is untouched. -->
           <div class="mm-speech-v2" data-v2-convertir hidden>
             <p class="field__hint" id="mm-v2-convertir-hint" data-i18n="mowaMes.speech.v2.convertir.hint">
-              Esta versión guarda cada segmento en dos partes fijas (v1). Conviértela para armar cada mensaje con variables y funciones: obtienes un borrador con los mismos mensajes que no se guarda hasta que lo confirmes.
+              Para personalizarla, conviértela a v2: obtienes un borrador con los mismos mensajes, que no se guarda hasta que lo confirmes.
             </p>
             <div class="mm-speech-v2__acciones">
               <button type="button" class="btn" data-v2-convertir-boton aria-describedby="mm-v2-convertir-hint">
                 <span class="btn__spinner" aria-hidden="true"></span>
                 <span class="btn__label" data-i18n="mowaMes.speech.v2.convertir.boton">Convertir a v2</span>
               </button>
-              <p class="field__hint" data-v2-convertir-bloqueo hidden data-i18n="mowaMes.speech.v2.convertir.bloqueo">
-                Guarda o descarta los cambios de las partes antes de convertir.
-              </p>
             </div>
           </div>
 
@@ -309,7 +306,7 @@ import '../../styles/mowa-mes-speech-v2.css';
             </p>
           </div>
 
-          <div class="mm-form__foot mm-speech__foot">
+          <div class="mm-form__foot mm-speech__foot" data-speech-pie hidden>
             <div class="field mm-speech__nombre">
               <label class="field__label" for="mm-speech-nombre" data-i18n="mowaMes.speech.nombre">Nombre de la versión</label>
               <input class="input" id="mm-speech-nombre" type="text" maxlength="120" autocomplete="off" />
@@ -494,7 +491,6 @@ import '../../styles/mowa-mes-speech-v2.css';
     borradorDesdeVersion,
     campoDeError,
     entradaSupervision,
-    hayCambiosSpeech,
     modoGuardado,
     moverElemento,
     nivelDeFila,
@@ -1224,14 +1220,11 @@ import '../../styles/mowa-mes-speech-v2.css';
     if (base) meta.push(t('mowaMes.speech.basadaEn', { nombre: base.nombre }));
     $<HTMLElement>('[data-speech-meta]').textContent = meta.join('  ·  ');
 
-    const inmutable = modoGuardado(version) === 'nueva';
-    $<HTMLElement>('[data-speech-inmutable]').hidden = !inmutable;
-    $<HTMLElement>('[data-speech-inmutable-texto]').textContent = version.original
-      ? t('mowaMes.speech.inmutable.original')
-      : t('mowaMes.speech.inmutable.usada');
-    inputNombre.placeholder = inmutable ? t('mowaMes.speech.nombre.automatico') : '';
+    // A v1 is always immutable now (RF-MM-17, M3): it is used in campaigns as it is, and converted to change it.
+    $<HTMLElement>('[data-speech-inmutable]').hidden = false;
+    $<HTMLElement>('[data-speech-inmutable-texto]').textContent = t('mowaMes.speech.inmutable.v1');
 
-    estado.borrador.forEach((parte, indice) => {
+    estado.borrador.forEach((parte) => {
       const info = version.partes.find((p) => p.segmento === parte.segmento);
       const fila = document.createElement('tr');
       fila.dataset.segmento = parte.segmento;
@@ -1249,32 +1242,15 @@ import '../../styles/mowa-mes-speech-v2.css';
       }
       segmento.append(nombre, rango);
 
+      // A v1 is only read: the parts are text, with their spaces and line breaks as they were written.
       const celdas = (['parte_1', 'parte_2'] as const).map((campo) => {
         const celda = document.createElement('td');
         celda.dataset.etiqueta = t(campo === 'parte_1' ? 'mowaMes.speech.col.parte1' : 'mowaMes.speech.col.parte2');
-        const area = document.createElement('textarea');
-        area.className = 'input mm-speech__parte';
-        area.rows = 3;
-        area.maxLength = 500;
-        area.value = parte[campo];
-        area.spellcheck = true;
-        area.dataset.campo = campo;
-        area.setAttribute(
-          'aria-label',
-          t(campo === 'parte_1' ? 'mowaMes.speech.parte1De' : 'mowaMes.speech.parte2De', {
-            segmento: info?.etiqueta ?? parte.segmento,
-          }),
-        );
-        // The worst-case example below describes both parts of its segment.
-        area.setAttribute('aria-describedby', `mm-ejemplo-${parte.segmento}`);
-        area.addEventListener('input', () => {
-          estado.borrador[indice] = { ...estado.borrador[indice], [campo]: area.value };
-          $<HTMLElement>('[data-speech-error]').textContent = '';
-          pintarEstadoSpeech();
-          pintarConvertir();
-          programarPrevisualizacion(ESPERA_PREVISUALIZACION);
-        });
-        celda.append(area);
+        const texto = document.createElement('span');
+        texto.className = 'mm-speech__parte-texto';
+        texto.dataset.campo = campo;
+        texto.textContent = parte[campo];
+        celda.append(texto);
         return celda;
       });
 
@@ -1307,7 +1283,6 @@ import '../../styles/mowa-mes-speech-v2.css';
 
     pintarPrevisualizacion();
     pintarEstadoSpeech();
-    pintarConvertir();
   }
 
   function pintarEstadoSpeech(): void {
@@ -1323,9 +1298,7 @@ import '../../styles/mowa-mes-speech-v2.css';
       return;
     }
 
-    const cambios = estado.v2
-      ? estado.v2.borrador || hayCambiosV2(version, estado.v2.variantes)
-      : hayCambiosSpeech(version, estado.borrador);
+    const cambios = estado.v2 !== null && (estado.v2.borrador || hayCambiosV2(version, estado.v2.variantes));
     // A draft of a v1 is always saved as a new version: nothing of it exists yet.
     const modo = estado.v2?.borrador ? 'nueva' : modoGuardado(version);
     const renombrada = modo === 'editar' && inputNombre.value.trim() !== version.nombre;
@@ -1448,7 +1421,6 @@ import '../../styles/mowa-mes-speech-v2.css';
   const v2El = {
     convertir: $<HTMLElement>('[data-v2-convertir]'),
     boton: $<HTMLButtonElement>('[data-v2-convertir-boton]'),
-    bloqueo: $<HTMLElement>('[data-v2-convertir-bloqueo]'),
     bloque: $<HTMLElement>('[data-v2-editor-bloque]'),
     borrador: $<HTMLElement>('[data-v2-borrador]'),
     borradorTexto: $<HTMLElement>('[data-v2-borrador-texto]'),
@@ -1474,16 +1446,10 @@ import '../../styles/mowa-mes-speech-v2.css';
       nodo.hidden = enV2;
     });
     v2El.bloque.hidden = !enV2;
+    // A v1 is only read (RF-MM-17, M3): there is nothing to save until it is converted.
+    $<HTMLElement>('[data-speech-pie]').hidden = !enV2;
     const version = versionActual();
     v2El.convertir.hidden = enV2 || !version || esV2(version);
-  }
-
-  function pintarConvertir(): void {
-    const version = versionActual();
-    if (!version || esV2(version) || estado.v2) return;
-    const pendientes = hayCambiosSpeech(version, estado.borrador);
-    v2El.boton.disabled = pendientes;
-    v2El.bloqueo.hidden = !pendientes;
   }
 
   async function asegurarEditorV2(): Promise<ControladorVariantes | null> {
@@ -1548,9 +1514,8 @@ import '../../styles/mowa-mes-speech-v2.css';
     // The same rule as v1 (RF-MM-17): the original and a used version never change.
     const inmutable = !v2.borrador && modoGuardado(version) === 'nueva';
     $<HTMLElement>('[data-speech-inmutable]').hidden = !inmutable;
-    $<HTMLElement>('[data-speech-inmutable-texto]').textContent = version.original
-      ? t('mowaMes.speech.inmutable.original')
-      : t('mowaMes.speech.inmutable.usada');
+    // Only a used v2 is immutable: the original is a v1, which has its own notice.
+    $<HTMLElement>('[data-speech-inmutable-texto]').textContent = t('mowaMes.speech.inmutable.usada');
     inputNombre.placeholder =
       v2.borrador && v2.nombreSugerido
         ? v2.nombreSugerido
@@ -1614,7 +1579,7 @@ import '../../styles/mowa-mes-speech-v2.css';
 
   v2El.boton.addEventListener('click', async () => {
     const version = versionActual();
-    if (!version || esV2(version) || hayCambiosSpeech(version, estado.borrador)) return;
+    if (!version || esV2(version)) return;
     ocupado(v2El.boton, true);
     try {
       const borrador = await obtenerComoV2(version.id);
@@ -1648,7 +1613,7 @@ import '../../styles/mowa-mes-speech-v2.css';
     const version = versionActual();
     const pendientes = estado.v2
       ? estado.v2.borrador || (version !== null && hayCambiosV2(version, estado.v2.variantes))
-      : version !== null && hayCambiosSpeech(version, estado.borrador);
+      : false;
     if (version && pendientes) {
       // Switching versions would silently drop typed parts; ask by staying put
       // and telling what to do instead.
@@ -1672,7 +1637,8 @@ import '../../styles/mowa-mes-speech-v2.css';
   formSpeech.addEventListener('submit', async (evento) => {
     evento.preventDefault();
     const version = versionActual();
-    if (!version) return;
+    // Only a v2 is saved: a v1 has no footer (RF-MM-17, M3), the backend refuses its parts.
+    if (!version || !estado.v2) return;
 
     const error = $<HTMLElement>('[data-speech-error]');
     error.textContent = '';
@@ -1687,38 +1653,33 @@ import '../../styles/mowa-mes-speech-v2.css';
       return;
     }
 
-    // v2: a segment with nothing, or an editor that still has problems, is not sent (§4).
-    if (estado.v2) {
-      const vacios = segmentosSinContenido(estado.v2.variantes, estado.v2.segmentos);
-      if (vacios.length > 0) {
-        error.textContent = t('mowaMes.speech.v2.error.sinContenido', {
-          segmentos: vacios.map((v) => v.etiqueta).join(', '),
-        });
-        ctlV2?.seleccionar(vacios[0].clave);
-        return;
-      }
-      if (estado.v2Editor.pendiente || !estado.v2Editor.valida) {
-        error.textContent = t(
-          estado.v2Editor.pendiente ? 'mowaMes.speech.v2.error.pendiente' : 'mowaMes.speech.v2.error.editor',
-        );
-        return;
-      }
+    // A segment with nothing, or an editor that still has problems, is not sent (§4).
+    const vacios = segmentosSinContenido(estado.v2.variantes, estado.v2.segmentos);
+    if (vacios.length > 0) {
+      error.textContent = t('mowaMes.speech.v2.error.sinContenido', {
+        segmentos: vacios.map((v) => v.etiqueta).join(', '),
+      });
+      ctlV2?.seleccionar(vacios[0].clave);
+      return;
+    }
+    if (estado.v2Editor.pendiente || !estado.v2Editor.valida) {
+      error.textContent = t(
+        estado.v2Editor.pendiente ? 'mowaMes.speech.v2.error.pendiente' : 'mowaMes.speech.v2.error.editor',
+      );
+      return;
     }
 
     const guardar = $<HTMLButtonElement>('[data-speech-guardar]');
     ocupado(guardar, true);
     try {
-      const guardada = estado.v2
-        ? modo === 'editar'
+      const guardada =
+        modo === 'editar'
           ? await editarSpeech(version.id, { nombre, expresiones: entradaDeExpresiones(estado.v2.variantes) })
           : await crearSpeech({
               nombre: nombre || null,
               basada_en_id: estado.v2.borrador ? estado.v2.baseId : version.id,
               expresiones: entradaDeExpresiones(estado.v2.variantes),
-            })
-        : modo === 'editar'
-          ? await editarSpeech(version.id, { nombre, partes: estado.borrador })
-          : await crearSpeech({ nombre: nombre || null, basada_en_id: version.id, partes: estado.borrador });
+            });
       estado.versiones = await listarSpeech();
       ocupado(guardar, false);
       elegirVersion(guardada.id);
@@ -1736,7 +1697,7 @@ import '../../styles/mowa-mes-speech-v2.css';
         pintarVersiones();
         estado.borrador = borrador;
         pintarSpeech();
-      } else if (caido instanceof ApiError && caido.status === 400 && estado.v2) {
+      } else if (caido instanceof ApiError && caido.status === 400) {
         // The backend's located problems: each says its segment and the catalogue its code is from.
         const problemas = problemasDeErrorSpeech(caido);
         if (problemas.length > 0) {

@@ -66,15 +66,6 @@ test.describe('v1 sigue siendo v1', () => {
     await expect(page.getByRole('button', { name: 'Convertir a v2' })).toBeVisible();
     await expect(editor(page)).toBeHidden();
   });
-
-  test('con cambios en las partes no se puede convertir, y el motivo está a la vista', async ({ page }) => {
-    await abrir(page);
-
-    await page.getByLabel('Parte 2 del segmento 9 a 30').fill(', pagar ya.');
-
-    await expect(page.getByRole('button', { name: 'Convertir a v2' })).toBeDisabled();
-    await expect(page.getByText('Guarda o descarta los cambios de las partes antes de convertir.')).toBeVisible();
-  });
 });
 
 test.describe('convertir una v1 en un borrador v2', () => {
@@ -122,7 +113,7 @@ test.describe('convertir una v1 en un borrador v2', () => {
 
     // The original keeps its immutable notice and its own table.
     await version(page).selectOption({ label: 'Speech original (original)' });
-    await expect(page.getByText('El Speech original no se modifica nunca.', { exact: false })).toBeVisible();
+    await expect(page.getByText('Versión de dos partes (v1): se usa en campañas tal como está y ya no se edita.')).toBeVisible();
     await expect(page.locator('[data-speech-filas] tr[data-segmento]')).toHaveCount(6);
   });
 

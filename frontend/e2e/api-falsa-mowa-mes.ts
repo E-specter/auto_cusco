@@ -101,6 +101,13 @@ function partesCompletas(recibidas: PartesEntrada[] | null | undefined): PartesS
   });
 }
 
+/** What the backend answers to a create or an edit with `partes` since M3 (B15). */
+export const VERSION_V1_RETIRADA = {
+  detail: 'Las versiones de dos partes (v1) ya no se crean ni se editan',
+  codigo: 'version_v1_retirada',
+  problemas: [],
+} as const;
+
 export function partesOriginales(): PartesEntrada[] {
   return SEGMENTOS.map(({ segmento }) => ({
     segmento,
@@ -851,33 +858,10 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       const guion = siguiente(estado.respuestas.crearSpeech);
       if (guion) return json(route, guion.estado, guion.cuerpo ?? {});
       const entrada = cuerpo as SpeechNuevoEntrada;
-      const segmentosMal = problemaDeSegmentos(entrada.partes);
-      if (segmentosMal) return json(route, 400, { detail: segmentosMal });
-      if ((entrada.partes ?? []).some((p) => `${p.parte_1}${p.parte_2}`.includes('[@'))) {
-        return json(route, 400, { detail: 'Una parte no puede contener [@' });
-      }
-      if (entrada.basada_en_id != null && !estado.versiones.some((v) => v.id === entrada.basada_en_id)) {
-        return json(route, 404, { detail: `No existe la version ${entrada.basada_en_id}` });
-      }
-      // Like the backend: without a name, one more than the highest "Speech N"
-      // already used (at least "Speech 2"), whatever the ids are.
-      const usados = estado.versiones
-        .map((v) => /^speech (\d+)$/i.exec(v.nombre.trim())?.[1])
-        .filter((n): n is string => n !== undefined)
-        .map(Number);
-      const nombre = entrada.nombre?.trim() || `Speech ${Math.max(1, ...usados) + 1}`;
-      if (estado.versiones.some((v) => v.nombre.toLowerCase() === nombre.toLowerCase())) {
-        return json(route, 409, { detail: 'Ya existe una version con ese nombre' });
-      }
-      const id = Math.max(...estado.versiones.map((v) => v.id)) + 1;
-      const nueva = versionSpeech({
-        id,
-        nombre,
-        basada_en_id: entrada.basada_en_id ?? null,
-        partes: partesCompletas(entrada.partes),
-      });
-      estado.versiones = [...estado.versiones, nueva];
-      return json(route, 201, nueva);
+      // M3 (B15, RF-MM-17): a version of two parts is no longer created. A v2 is answered by
+      // `api-falsa-speech-v2.ts`, layered over this one.
+      if (entrada.partes) return json(route, 400, VERSION_V1_RETIRADA);
+      return json(route, 404, { detail: 'sin ruta falsa para crear una v2 aqui: la contesta api-falsa-speech-v2' });
     }
     if (ruta === '/mowa-mes/speech/previsualizacion' && metodo === 'POST') {
       const pedido = cuerpo as PrevisualizacionSpeechEntrada;
@@ -895,21 +879,14 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       const guion = siguiente(estado.respuestas.editarSpeech);
       if (guion) return json(route, guion.estado, guion.cuerpo ?? {});
       const id = Number(unaVersion[1]);
+      const entrada = cuerpo as SpeechEdicionEntrada;
+      // M3 (B15, RF-MM-17): a version of two parts is no longer edited either, whatever the version is
+      // (the backend looks at this before anything else); a v2 is answered by `api-falsa-speech-v2.ts`.
+      if (entrada.partes) return json(route, 400, VERSION_V1_RETIRADA);
       const actual = estado.versiones.find((v) => v.id === id);
       if (!actual) return json(route, 404, { detail: 'No existe la version' });
       if (!actual.editable) return json(route, 409, { detail: 'La version ya se uso y no se modifica' });
-      const entrada = cuerpo as SpeechEdicionEntrada;
-      const segmentosMal = problemaDeSegmentos(entrada.partes);
-      if (segmentosMal) return json(route, 400, { detail: segmentosMal });
-      if ((entrada.partes ?? []).some((p) => `${p.parte_1}${p.parte_2}`.includes('[@'))) {
-        return json(route, 400, { detail: 'Una parte no puede contener [@' });
-      }
-      if (estado.versiones.some((v) => v.id !== id && v.nombre.toLowerCase() === entrada.nombre.trim().toLowerCase())) {
-        return json(route, 409, { detail: 'Ya existe una version con ese nombre' });
-      }
-      const editada = { ...actual, nombre: entrada.nombre, partes: partesCompletas(entrada.partes) };
-      estado.versiones = estado.versiones.map((v) => (v.id === id ? editada : v));
-      return json(route, 200, editada);
+      return json(route, 404, { detail: 'sin ruta falsa para editar una v2 aqui: la contesta api-falsa-speech-v2' });
     }
 
     if (ruta === '/calendario/feriados' && metodo === 'GET') {
