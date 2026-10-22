@@ -16,7 +16,9 @@ from app.core.entities.mowa_mes import (
     ConfiguracionInvalida,
     ConfiguracionMowaMes,
     DatosSpeech,
+    ExpresionSegmento,
     FaltaWhatsapp,
+    FormatoSpeech,
     NombreDeSpeechRepetido,
     PartesSegmento,
     Programacion,
@@ -26,6 +28,7 @@ from app.core.entities.mowa_mes import (
     SpeechNoEncontrado,
     VersionSpeech,
 )
+from app.core.entities.texto_enriquecido import Expresion, NodoTexto
 from app.core.services.plataformas.mowa_mes import segmentos, speech
 from app.core.services.plataformas.mowa_mes.configuracion import (
     ConfiguracionMowaMesService,
@@ -289,31 +292,100 @@ def test_nombre_siguiente(nombres, siguiente) -> None:
     assert nombre_siguiente(nombres) == siguiente
 
 
-def test_crear_sin_nombre_asigna_el_siguiente_y_conserva_los_espacios_de_las_partes() -> None:
-    servicio, _ = _servicio()
-    desordenadas = tuple(reversed(ORIGINAL))
-
-    creada = servicio.crear_speech("  ", desordenadas, basada_en_id=1)
-
-    assert creada.datos.nombre == "Speech 2"
-    assert creada.datos.partes == ORIGINAL  # ordenadas por segmento, sin recortar
-    assert creada.basada_en_id == 1
+def _v2(contenido: str = "Hola") -> tuple[ExpresionSegmento, ...]:
+    """Una v2 valida: el mismo texto fijo en los 6 segmentos."""
+    return tuple(
+        ExpresionSegmento(rango.segmento, Expresion((NodoTexto(contenido),)))
+        for rango in RANGOS_SEGMENTO
+    )
 
 
-def test_crear_basada_en_una_version_que_no_existe() -> None:
+def _datos_v2(nombre: str, contenido: str = "Hola") -> DatosSpeech:
+    return DatosSpeech(nombre, expresiones=_v2(contenido), formato=FormatoSpeech.V2)
+
+
+def _codigos(error: SpeechInvalido) -> list:
+    return [p.codigo_mowa_mes for p in error.problemas]
+
+
+@pytest.mark.parametrize(
+    ("partes", "basada_en_id"),
+    [
+        (ORIGINAL, None),  # una v1 perfectamente valida
+        (ORIGINAL, 1),
+        (ORIGINAL, 99),  # ni siquiera mira si la base existe
+        ((replace(ORIGINAL[0], parte_1=" [@titular]"), *ORIGINAL[1:]), None),  # ni su contenido
+        (ORIGINAL[:5], None),
+    ],
+)
+def test_ya_no_se_crean_versiones_de_dos_partes(partes, basada_en_id) -> None:
     servicio, repositorio = _servicio()
 
-    with pytest.raises(SpeechNoEncontrado):
-        servicio.crear_speech("Nueva", ORIGINAL, basada_en_id=99)
+    with pytest.raises(SpeechInvalido) as error:
+        servicio.crear_speech("Nueva", partes, basada_en_id=basada_en_id)
+
+    assert _codigos(error.value) == [CodigoMowaMes.VERSION_V1_RETIRADA]
+    assert (error.value.problemas[0].segmento, error.value.problemas[0].campo) == (None, "formato")
+    assert repositorio.escrituras == 0
+    assert list(repositorio.versiones) == [1]
+
+
+@pytest.mark.parametrize("version_id", [1, "v1 sin usar"])
+def test_ya_no_se_editan_versiones_de_dos_partes_ni_la_original(version_id) -> None:
+    servicio, repositorio = _servicio()
+    if version_id != 1:  # una v1 que ya existia y nadie uso
+        version_id = repositorio.crear_speech(DatosSpeech("Heredada", ORIGINAL), None).id
+        repositorio.escrituras = 0
+
+    with pytest.raises(SpeechInvalido) as error:
+        servicio.actualizar_speech(version_id, DatosSpeech("Otro", ORIGINAL))
+
+    assert _codigos(error.value) == [CodigoMowaMes.VERSION_V1_RETIRADA]  # 400 y no 409
     assert repositorio.escrituras == 0
 
 
-def test_crear_con_partes_invalidas_no_escribe() -> None:
-    servicio, repositorio = _servicio()
-    partes = (replace(ORIGINAL[0], parte_1=" [@titular]"), *ORIGINAL[1:])
+def test_la_regla_de_dos_partes_no_depende_de_que_la_version_exista() -> None:
+    servicio, _ = _servicio()
 
     with pytest.raises(SpeechInvalido):
-        servicio.crear_speech("Nueva", partes, basada_en_id=None)
+        servicio.actualizar_speech(999, DatosSpeech("Otro", ORIGINAL))
+
+
+def test_una_v1_que_ya_existe_se_sigue_leyendo_y_convirtiendo() -> None:
+    servicio, repositorio = _servicio()
+    heredada = repositorio.crear_speech(DatosSpeech("Heredada", ORIGINAL), None)
+
+    leida = servicio.obtener_speech(heredada.id)
+    borrador = servicio.como_v2(heredada.id)
+
+    assert leida.datos.formato is FormatoSpeech.V1 and leida.datos.partes == ORIGINAL
+    assert borrador.basada_en_id == heredada.id and len(borrador.expresiones) == 6
+    assert heredada.id in [v.id for v in servicio.listar_speech()]
+
+
+def test_crear_una_v2_sin_nombre_asigna_el_siguiente_y_la_ordena_por_segmento() -> None:
+    servicio, _ = _servicio()
+
+    creada = servicio.crear_speech_v2("  ", tuple(reversed(_v2())), basada_en_id=1)
+
+    assert creada.datos.nombre == "Speech 2"
+    assert [e.segmento for e in creada.datos.expresiones] == [r.segmento for r in RANGOS_SEGMENTO]
+    assert creada.basada_en_id == 1
+
+
+def test_crear_una_v2_basada_en_una_version_que_no_existe() -> None:
+    servicio, repositorio = _servicio()
+
+    with pytest.raises(SpeechNoEncontrado):
+        servicio.crear_speech_v2("Nueva", _v2(), basada_en_id=99)
+    assert repositorio.escrituras == 0
+
+
+def test_crear_una_v2_invalida_no_escribe() -> None:
+    servicio, repositorio = _servicio()
+
+    with pytest.raises(SpeechInvalido):
+        servicio.crear_speech_v2("Nueva", _v2()[:5], basada_en_id=None)
     assert repositorio.escrituras == 0
 
 
@@ -321,26 +393,25 @@ def test_el_speech_original_no_se_modifica() -> None:
     servicio, repositorio = _servicio()
 
     with pytest.raises(SpeechInmutable, match="Speech original"):
-        servicio.actualizar_speech(1, DatosSpeech("Otro nombre", ORIGINAL))
+        servicio.actualizar_speech(1, _datos_v2("Otro nombre"))
     assert repositorio.escrituras == 0
 
 
-def test_una_version_usada_no_se_modifica_y_una_sin_usar_si() -> None:
+def test_una_v2_usada_no_se_modifica_y_una_sin_usar_si() -> None:
     servicio, repositorio = _servicio()
-    creada = servicio.crear_speech("Prueba", ORIGINAL, basada_en_id=None)
-    corregida = (replace(ORIGINAL[0], parte_2=". Mensaje corregido."), *ORIGINAL[1:])
+    creada = servicio.crear_speech_v2("Prueba", _v2(), basada_en_id=None)
 
-    actualizada = servicio.actualizar_speech(creada.id, DatosSpeech("Prueba", corregida))
+    actualizada = servicio.actualizar_speech(creada.id, _datos_v2("Prueba", "Mensaje corregido"))
     repositorio.marcar_speech_usado(creada.id)
 
-    assert actualizada.datos.partes[0].parte_2 == ". Mensaje corregido."
+    assert actualizada.datos.expresiones[0].expresion.nodos == (NodoTexto("Mensaje corregido"),)
     with pytest.raises(SpeechInmutable, match="ya se uso"):
-        servicio.actualizar_speech(creada.id, DatosSpeech("Prueba", ORIGINAL))
+        servicio.actualizar_speech(creada.id, _datos_v2("Prueba"))
 
 
 def test_si_la_version_se_usa_entre_la_lectura_y_la_escritura_tambien_es_inmutable() -> None:
     servicio, repositorio = _servicio()
-    creada = servicio.crear_speech("Prueba", ORIGINAL, basada_en_id=None)
+    creada = servicio.crear_speech_v2("Prueba", _v2(), basada_en_id=None)
     escribir = repositorio.actualizar_speech
 
     def usada_justo_antes(speech_id, datos):
@@ -350,7 +421,7 @@ def test_si_la_version_se_usa_entre_la_lectura_y_la_escritura_tambien_es_inmutab
     repositorio.actualizar_speech = usada_justo_antes
 
     with pytest.raises(SpeechInmutable):
-        servicio.actualizar_speech(creada.id, DatosSpeech("Prueba", ORIGINAL))
+        servicio.actualizar_speech(creada.id, _datos_v2("Prueba"))
 
 
 # --- Configuracion del conector -----------------------------------------

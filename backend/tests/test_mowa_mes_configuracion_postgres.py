@@ -229,41 +229,85 @@ def test_configuracion_por_http(cliente) -> None:
     assert leida["actualizado_en"] is not None
 
 
+EXPRESIONES = [
+    {"segmento": p["segmento"], "expresion": {"nodos": [{"tipo": "texto", "valor": "Hola"}]}}
+    for p in PARTES
+]
+
+
 def test_speech_por_http_de_punta_a_punta(cliente, engine) -> None:
+    # Desde M3 (RF-MM-17) solo se crean y se editan versiones v2.
     creada = cliente.post(
         "/mowa-mes/speech",
-        json={"nombre": f"{PREFIJO}version", "basada_en_id": None, "partes": PARTES},
+        json={"nombre": f"{PREFIJO}version", "basada_en_id": None, "expresiones": EXPRESIONES},
     )
     speech_id = creada.json()["id"]
     editada = cliente.put(
         f"/mowa-mes/speech/{speech_id}",
-        json={"nombre": f"{PREFIJO}version corregida", "partes": PARTES},
+        json={"nombre": f"{PREFIJO}version corregida", "expresiones": EXPRESIONES},
     )
     repetida = cliente.post(
-        "/mowa-mes/speech", json={"nombre": f"{PREFIJO}VERSION CORREGIDA", "partes": PARTES}
+        "/mowa-mes/speech",
+        json={"nombre": f"{PREFIJO}VERSION CORREGIDA", "expresiones": EXPRESIONES},
     )
     original_id = next(v["id"] for v in cliente.get("/mowa-mes/speech").json() if v["original"])
     original = cliente.put(
-        f"/mowa-mes/speech/{original_id}", json={"nombre": f"{PREFIJO}x", "partes": PARTES}
+        f"/mowa-mes/speech/{original_id}",
+        json={"nombre": f"{PREFIJO}x", "expresiones": EXPRESIONES},
     )
     RepositorioMowaMesPostgres(engine).marcar_speech_usado(speech_id)
     usada = cliente.put(
-        f"/mowa-mes/speech/{speech_id}", json={"nombre": f"{PREFIJO}otra", "partes": PARTES}
+        f"/mowa-mes/speech/{speech_id}",
+        json={"nombre": f"{PREFIJO}otra", "expresiones": EXPRESIONES},
     )
     derivada = cliente.post(
         "/mowa-mes/speech",
-        json={"nombre": f"{PREFIJO}derivada", "basada_en_id": speech_id, "partes": PARTES},
+        json={
+            "nombre": f"{PREFIJO}derivada",
+            "basada_en_id": speech_id,
+            "expresiones": EXPRESIONES,
+        },
     )
 
     assert creada.status_code == 201
+    assert creada.json()["formato"] == "v2"
     assert editada.status_code == 200
-    assert editada.json()["partes"] == creada.json()["partes"]
+    assert editada.json()["expresiones"] == creada.json()["expresiones"]
     assert repetida.status_code == 409
     assert original.status_code == 409
     assert usada.status_code == 409
     assert cliente.get(f"/mowa-mes/speech/{speech_id}").json()["usada"] is True
     assert derivada.status_code == 201
     assert derivada.json()["basada_en_id"] == speech_id
+
+
+def test_ya_no_se_crean_ni_se_editan_versiones_de_dos_partes_por_http(cliente, engine) -> None:
+    repositorio = RepositorioMowaMesPostgres(engine)
+    heredada = repositorio.crear_speech(
+        DatosSpeech(f"{PREFIJO}heredada", speech_del_documento()), None
+    )
+    antes = len(cliente.get("/mowa-mes/speech").json())
+
+    creada = cliente.post(
+        "/mowa-mes/speech", json={"nombre": f"{PREFIJO}nueva v1", "partes": PARTES}
+    )
+    editada = cliente.put(
+        f"/mowa-mes/speech/{heredada.id}", json={"nombre": f"{PREFIJO}editada", "partes": PARTES}
+    )
+    original_id = next(v["id"] for v in cliente.get("/mowa-mes/speech").json() if v["original"])
+    original = cliente.put(
+        f"/mowa-mes/speech/{original_id}", json={"nombre": f"{PREFIJO}z", "partes": PARTES}
+    )
+
+    for respuesta in (creada, editada, original):
+        (problema,) = respuesta.json()["problemas"]
+        assert respuesta.status_code == 400
+        assert (problema["codigo"], problema["catalogo"]) == ("version_v1_retirada", "mowa_mes")
+    assert len(cliente.get("/mowa-mes/speech").json()) == antes  # no se creo nada
+    assert repositorio.obtener_speech(heredada.id).datos.nombre == f"{PREFIJO}heredada"
+    # y la heredada se sigue leyendo y convirtiendo
+    assert cliente.get(f"/mowa-mes/speech/{heredada.id}").json()["formato"] == "v1"
+    assert cliente.get(f"/mowa-mes/speech/{heredada.id}/como-v2").status_code == 200
 
 
 def test_la_escritura_misma_no_modifica_una_version_usada_ni_la_original(engine) -> None:

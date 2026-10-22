@@ -46,6 +46,7 @@ Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6
   - Sin nombre, una versión nueva se llama `Speech N`, uno más que el mayor número usado.
   - Los espacios de los extremos de cada parte son texto y no se recortan.
 - **Speech v2 (M2, B6):** una versión puede ser v2, con una expresión del motor por segmento (`formato`, `expresiones`). Conviven con las v1, que conservan su huella. En una v2, `falta_titular` y `falta_vencimiento` excluyen solo si la expresión del segmento usa la variable. Ver [motor-texto-enriquecido.md](motor-texto-enriquecido.md), sección 23.
+- **Retiro del editor de dos partes (M3, B15, RF-MM-17):** ya no se crean ni se editan versiones de dos partes. `POST /mowa-mes/speech` y `PUT /mowa-mes/speech/{id}` con `partes` responden `400` con el código `version_v1_retirada` (tipo `error`, clave `mowaMes.codigo.version_v1_retirada`), antes de mirar el resto del pedido: ni un `basada_en_id` inexistente (que daría `404`) ni la versión original (que daría `409`) lo cambian. Crear y editar una v2 sigue igual. Las v1 que ya existen, incluido el Speech original, se siguen leyendo, usando en campañas y convirtiendo con `GET /{id}/como-v2`, y sus huellas no cambian; la previsualización sigue aceptando `partes` para medir su largo. La regla vive en `ConfiguracionMowaMesService` (`crear_speech` siempre la lanza y `actualizar_speech` la lanza con datos v1); el repositorio puede seguir guardando una v1, que es como las pruebas siembran una versión heredada.
 
 ## 5. Configuración del conector
 
@@ -66,10 +67,10 @@ Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6
 | `PUT /mowa-mes/configuracion` | Igual que `GET` | 400 WhatsApp fuera de RF-02 |
 | `GET /mowa-mes/speech` | Versiones, la original primero, con `usada` y `editable` y cada segmento con etiqueta, rango y `usa_whatsapp` | |
 | `GET /mowa-mes/speech/{id}` | Una versión | 404 |
-| `POST /mowa-mes/speech` | `201` con la versión nueva, v1 (`partes`) o v2 (`expresiones`) | 400 contenido inválido, 404 `basada_en_id`, 409 nombre repetido |
+| `POST /mowa-mes/speech` | `201` con la versión nueva, siempre v2 (`expresiones`); desde M3 con `partes` es `400` `version_v1_retirada` | 400 contenido inválido o `version_v1_retirada`, 404 `basada_en_id`, 409 nombre repetido |
 | `GET /mowa-mes/speech/{id}/como-v2` | Borrador v2 de una v1, sin guardar (M2) | 400 si ya es v2, 404 |
-| `PUT /mowa-mes/speech/{id}` | La versión | 400, 404, 409 usada, original o nombre repetido |
-| `POST /mowa-mes/speech/previsualizacion` | `{whatsapp, largo_advertencia, largo_maximo, problemas, segmentos}`; acepta `partes` o `expresiones`; sin `whatsapp` usa el configurado | 400 WhatsApp fuera de RF-02 o contenido inválido |
+| `PUT /mowa-mes/speech/{id}` | La versión v2 | 400 (con `partes`: `version_v1_retirada`), 404, 409 usada, original o nombre repetido |
+| `POST /mowa-mes/speech/previsualizacion` | `{whatsapp, largo_advertencia, largo_maximo, problemas, segmentos}`; acepta `partes` (para medir una v1 guardada) o `expresiones`; sin `whatsapp` usa el configurado | 400 WhatsApp fuera de RF-02 o contenido inválido |
 
 **Diferencia con el plan:** los feriados se exponen como `/calendario/feriados` (lectura del año) más `/calendario/excepciones` (escritura), porque la tabla guarda excepciones y no feriados.
 
@@ -149,7 +150,7 @@ Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6
 |---|---|
 | exclusión (en orden de evaluación) | `telefono_invalido`, `falta_documento`, `sin_speech`, `falta_titular`, `falta_vencimiento`, `mensaje_excede_160` |
 | advertencia | `mensaje_excede_150`, `documento_no_estandar`, `limite_mensual_excedido`, `id_sin_correspondencia` |
-| error | `falta_whatsapp`, `sin_supervisores`, `sin_productos_cargables` |
+| error | `falta_whatsapp`, `sin_supervisores`, `sin_productos_cargables`, `version_v1_retirada` |
 
 El frontend traduce cada uno con la clave plana `mowaMes.codigo.<codigo>` en `frontend/src/i18n/es.json` y `en.json`; `tests/test_codigos_mowa_mes.py` falla si falta alguna. Las agrega `dev_frontend_modulo_mowa_mes`.
 

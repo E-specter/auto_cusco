@@ -14,6 +14,8 @@ import pytest
 from app.core.entities.gestiones_digitales import ConfiguracionSupervision, Supervisor
 from app.core.entities.mowa_mes import (
     CodigoMowaMes,
+    DatosSpeech,
+    FormatoSpeech,
     PartesSegmento,
     Programacion,
     Segmento,
@@ -477,6 +479,42 @@ def test_una_version_de_speech_elegida_que_no_existe() -> None:
 
     with pytest.raises(SpeechNoEncontrado):
         servicio.previsualizar(peticion(speech_id=99))
+
+
+def _heredada(mowa_mes, nombre: str = "Heredada 92"):
+    """Una v1 como las que ya existian (la 92 del usuario): distinta de la original y sin usar."""
+    partes = tuple(replace(p, parte_2=p.parte_2 + " Heredada.") for p in ORIGINAL)
+    return mowa_mes.crear_speech(DatosSpeech(nombre, partes), None), partes
+
+
+def test_una_campana_con_una_v1_heredada_que_no_es_la_original_la_usa_y_registra_su_huella() -> (
+    None
+):
+    servicio, campanas, mowa_mes = armar_servicio([producto(1), producto(2, dias_atraso=40)])
+    heredada, partes = _heredada(mowa_mes)
+    huella = huella_speech(partes)
+    assert huella != HUELLA_ORIGINAL
+
+    previa = servicio.previsualizar(peticion(speech_id=heredada.id, speech_huella=huella))
+    creada = servicio.crear(peticion(speech_id=heredada.id, speech_huella=huella))
+
+    armada = campanas.guardadas[creada.id][0]
+    assert not previa.errores
+    assert (creada.speech_id, creada.speech_nombre) == (heredada.id, "Heredada 92")
+    assert armada.speech_huella == huella  # la de las partes de la heredada, no la de la original
+    assert armada.speech.datos.formato is FormatoSpeech.V1
+    # los mensajes salen de las partes de la heredada
+    mensajes = [f.mensaje for f in campanas.filas_cargadas(creada.id) if not f.supervision]
+    assert len(mensajes) == 2 and all(m.endswith(" Heredada.") for m in mensajes)
+
+
+def test_una_v1_heredada_con_la_huella_de_la_original_es_speech_cambiado() -> None:
+    servicio, campanas, mowa_mes = armar_servicio([producto(1)])
+    heredada, _ = _heredada(mowa_mes)
+
+    with pytest.raises(SpeechCambiado):
+        servicio.crear(peticion(speech_id=heredada.id, speech_huella=HUELLA_ORIGINAL))
+    assert campanas.campanas == {}
 
 
 # --- Creacion y division ------------------------------------------------

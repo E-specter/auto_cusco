@@ -20,7 +20,13 @@ from sqlalchemy.exc import IntegrityError
 
 from app.adapters.persistence.modelos import MowaMesCampana, MowaMesSpeechVersion
 from app.adapters.persistence.repositorio_mowa_mes_postgres import RepositorioMowaMesPostgres
-from app.core.entities.mowa_mes import ExpresionSegmento, FormatoSpeech, Segmento
+from app.core.entities.mowa_mes import (
+    DatosSpeech,
+    ExpresionSegmento,
+    FormatoSpeech,
+    PartesSegmento,
+    Segmento,
+)
 from app.core.services.plataformas.mowa_mes.campana import huella_de
 from app.core.services.texto_enriquecido.serializacion import expresion_desde_dict
 from tests import test_mowa_mes_campanas_postgres as base
@@ -73,6 +79,16 @@ def _crear_v2(client, nombre: str, expresiones=None, **extra):
     return client.post(
         "/mowa-mes/speech",
         json={"nombre": f"{PREFIJO}{nombre}", "expresiones": expresiones or CUERPO_V2, **extra},
+    )
+
+
+def _v1_heredada(engine, nombre: str) -> int:
+    """Una version de dos partes como las que ya existian: ya no se crean por HTTP (RF-MM-17)."""
+    partes = tuple(PartesSegmento(Segmento(s), "a", "b") for s in SEGMENTOS)
+    return (
+        RepositorioMowaMesPostgres(engine)
+        .crear_speech(DatosSpeech(f"{PREFIJO}{nombre}", partes), None)
+        .id
     )
 
 
@@ -143,11 +159,10 @@ def test_la_huella_de_una_v2_sale_igual_antes_y_despues_de_guardarla(cliente) ->
 
 
 def test_un_nombre_repetido_entre_formatos_lo_rechaza_la_base(cliente) -> None:
-    client, _ = cliente
-    _crear_v2(client, "unico")
+    client, engine = cliente
+    _v1_heredada(engine, "unico")
 
-    partes = [{"segmento": s, "parte_1": "a", "parte_2": "b"} for s in SEGMENTOS]
-    repetido = client.post("/mowa-mes/speech", json={"nombre": f"{PREFIJO}UNICO", "partes": partes})
+    repetido = _crear_v2(client, "UNICO")  # el mismo nombre, otra caja, otro formato
 
     assert repetido.status_code == 409
 
@@ -169,11 +184,8 @@ def _crudo(engine, speech_id: int):
 
 
 def test_una_v1_guarda_expresiones_como_null_de_sql_y_las_partes_como_lista(cliente) -> None:
-    client, engine = cliente
-    partes = [{"segmento": s, "parte_1": "a", "parte_2": "b"} for s in SEGMENTOS]
-    id_ = client.post(
-        "/mowa-mes/speech", json={"nombre": f"{PREFIJO}crudo v1", "partes": partes}
-    ).json()["id"]
+    _, engine = cliente
+    id_ = _v1_heredada(engine, "crudo v1")
 
     fila = _crudo(engine, id_)
 
@@ -195,12 +207,13 @@ def test_una_v2_guarda_expresiones_como_lista_y_las_partes_como_lista_vacia(clie
 def test_editar_no_cambia_lo_que_hay_en_la_columna(cliente) -> None:
     client, engine = cliente
     partes = [{"segmento": s, "parte_1": "a", "parte_2": "b"} for s in SEGMENTOS]
-    v1 = client.post(
-        "/mowa-mes/speech", json={"nombre": f"{PREFIJO}crudo ed v1", "partes": partes}
-    ).json()["id"]
+    v1 = _v1_heredada(engine, "crudo ed v1")
     v2 = _crear_v2(client, "crudo ed v2").json()["id"]
 
-    client.put(f"/mowa-mes/speech/{v1}", json={"nombre": f"{PREFIJO}crudo ed v1", "partes": partes})
+    intento = client.put(
+        f"/mowa-mes/speech/{v1}", json={"nombre": f"{PREFIJO}crudo ed v1", "partes": partes}
+    )
+    assert intento.status_code == 400  # una v1 ya no se edita, y el rechazo no la toca
     client.put(
         f"/mowa-mes/speech/{v2}",
         json={"nombre": f"{PREFIJO}crudo ed v2", "expresiones": _expresiones(_nodo_titular())},
@@ -334,6 +347,7 @@ def test_la_base_no_deja_cambiar_el_formato_al_editar(cliente) -> None:
     )
 
     assert por_http.status_code == 400
+    assert por_http.json()["problemas"][0]["codigo"] == "version_v1_retirada"
     assert _fila(engine, id_).formato == "v2"
 
 

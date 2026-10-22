@@ -442,6 +442,7 @@
   "mowaMes.codigo.falta_whatsapp": "A segment with products uses [whatsapp] and there is no contact WhatsApp number.",
   "mowaMes.codigo.sin_supervisores": "The campaign has no supervisors: it cannot be created without them.",
   "mowaMes.codigo.sin_productos_cargables": "No product made it into the load: there is nothing to send.",
+  "mowaMes.codigo.version_v1_retirada": "Two-part versions (v1) can no longer be created or edited. To customize this version, convert it to v2.",
   "mowaMes.codigo.documento_no_estandar": "The document is neither a DNI nor a RUC: it is loaded anyway, but it is worth checking.",
   "mowaMes.plataforma.registros": "Rows per file",
   "mowaMes.plataforma.registros.hint": "Up to {max} rows per file; supervision counts within the first one.",

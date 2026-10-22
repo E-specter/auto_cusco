@@ -17,6 +17,7 @@ from app.core.entities.mowa_mes import (
     BYTES_POR_ARCHIVO_MINIMO,
     REGISTROS_POR_ARCHIVO,
     CampoConfiguracion,
+    CodigoMowaMes,
     ConfiguracionInvalida,
     ConfiguracionMowaMes,
     DatosSpeech,
@@ -46,6 +47,27 @@ def nombre_siguiente(nombres: list[str]) -> str:
         if (coincidencia := _NOMBRE_AUTOMATICO.fullmatch(nombre.strip()))
     ]
     return f"Speech {max([1, *numeros]) + 1}"
+
+
+MENSAJE_V1_RETIRADA = (
+    "Las versiones nuevas del speech se arman con el motor de texto, una expresion por segmento "
+    "(v2): una version de dos partes ya no se crea ni se edita. Convierte la que quieras "
+    "personalizar con como-v2 y guarda el resultado"
+)
+
+
+def version_v1_retirada() -> SpeechInvalido:
+    """El rechazo de crear o editar una version de dos partes (RF-MM-17, M3)."""
+    return SpeechInvalido(
+        (
+            ProblemaSpeech(
+                None,
+                "formato",
+                MENSAJE_V1_RETIRADA,
+                codigo_mowa_mes=CodigoMowaMes.VERSION_V1_RETIRADA,
+            ),
+        )
+    )
 
 
 @dataclass(frozen=True)
@@ -141,8 +163,16 @@ class ConfiguracionMowaMesService:
     def crear_speech(
         self, nombre: str | None, partes: tuple[PartesSegmento, ...], basada_en_id: int | None
     ) -> VersionSpeech:
-        """Una version v1 nueva."""
-        return self._crear(nombre, DatosSpeech(nombre="", partes=partes), basada_en_id)
+        """Ya no se crean versiones de dos partes (RF-MM-17, M3): siempre `SpeechInvalido` con el
+        codigo `version_v1_retirada`, antes de mirar el resto del pedido. Las v1 que ya existen
+        se siguen leyendo, usando en campanas y convirtiendo con `como_v2`.
+
+        La firma se mantiene aunque ningun argumento se use: es la de siempre del caso de uso, la
+        que llama el endpoint con lo que trae el pedido, y asi el rechazo sigue siendo UN solo
+        lugar (aqui) y no un `if` en cada adaptador. Si un dia se quita la ruta con `partes`, se
+        borra este metodo entero.
+        """
+        raise version_v1_retirada()
 
     def crear_speech_v2(
         self,
@@ -179,6 +209,8 @@ class ConfiguracionMowaMesService:
         return BorradorV2(version.id, nombre, expresiones, problemas)
 
     def actualizar_speech(self, speech_id: int, datos: DatosSpeech) -> VersionSpeech:
+        if datos.formato is FormatoSpeech.V1:
+            raise version_v1_retirada()  # tampoco se editan en dos partes (RF-MM-17, M3)
         version = self.obtener_speech(speech_id)
         if not version.editable:
             raise SpeechInmutable(version)

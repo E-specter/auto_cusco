@@ -7,14 +7,17 @@ Primer corte (B6a), configuracion:
     POST /mowa-mes/plantilla-nombre-archivo/previsualizacion   nombres de muestra, sin guardar
     GET  /mowa-mes/speech                     versiones, la original primero
     GET  /mowa-mes/speech/{id}
-    POST /mowa-mes/speech                     version nueva
-    PUT  /mowa-mes/speech/{id}                solo si no se uso y no es la original; si no, 409
-    POST /mowa-mes/speech/previsualizacion    largo maximo por segmento, sin guardar
+    POST /mowa-mes/speech                     version nueva (solo v2: con `partes`, 400)
+    PUT  /mowa-mes/speech/{id}                solo v2, si no se uso; si no, 409 (con `partes`, 400)
+    POST /mowa-mes/speech/previsualizacion    largo maximo por segmento, sin guardar (v1 o v2)
     GET  /mowa-mes/speech/{id}/como-v2        el borrador v2 de una v1 (sus mismos mensajes)
 
 Una version es v1 (`partes`, dos por segmento) o v2 (`expresiones`, una del motor de texto
-enriquecido por segmento, M2); el pedido lleva `partes` o `expresiones`, no las dos. Un 400 de una
-version trae `problemas`, cada uno con su segmento, su campo y, en una v2, su codigo y su ubicacion.
+enriquecido por segmento, M2); el pedido lleva `partes` o `expresiones`, no las dos. Desde M3
+(RF-MM-17) solo se crean y editan versiones v2: crear o editar con `partes` es 400 con el codigo
+`version_v1_retirada`; las v1 que existen se leen, se usan en campanas y se convierten con
+`como-v2`, y la previsualizacion sigue aceptando `partes`. Un 400 de una version trae `problemas`,
+cada uno con su segmento, su campo y, en una v2, su codigo y su ubicacion.
 """
 
 from datetime import datetime
@@ -677,8 +680,9 @@ def crear_speech(
     entrada: SpeechNuevoEntrada,
     servicio: ConfiguracionMowaMesService = Depends(obtener_servicio_mowa_mes),
 ) -> Any:
-    """Guarda una version nueva, v1 (`partes`) o v2 (`expresiones`). 404 si `basada_en_id` no
-    existe."""
+    """Guarda una version v2 nueva (`expresiones`). Con `partes` (una v1) es 400 con el codigo
+    `version_v1_retirada`: ya no se crean versiones de dos partes (RF-MM-17). 404 si
+    `basada_en_id` no existe."""
     try:
         partes, expresiones = _contenido(entrada.partes, entrada.expresiones)
         if entrada.expresiones is not None:
@@ -700,8 +704,9 @@ def actualizar_speech(
     entrada: SpeechEdicionEntrada,
     servicio: ConfiguracionMowaMesService = Depends(obtener_servicio_mowa_mes),
 ) -> Any:
-    """Reemplaza una version que nadie uso, en su mismo formato. Si ya se uso o es la original,
-    409; si el contenido es del otro formato, 400."""
+    """Reemplaza una version v2 que nadie uso. Con `partes` es 400 `version_v1_retirada` (ni se
+    crean ni se editan versiones de dos partes, RF-MM-17); si ya se uso o es la original, 409; si
+    es una v1 y el contenido es v2, 400."""
     try:
         partes, expresiones = _contenido(entrada.partes, entrada.expresiones)
         formato = FormatoSpeech.V2 if entrada.expresiones is not None else FormatoSpeech.V1

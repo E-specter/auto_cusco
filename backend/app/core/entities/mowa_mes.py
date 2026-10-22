@@ -106,6 +106,7 @@ class CodigoMowaMes(StrEnum):
     FALTA_WHATSAPP = "falta_whatsapp"
     SIN_SUPERVISORES = "sin_supervisores"
     SIN_PRODUCTOS_CARGABLES = "sin_productos_cargables"
+    VERSION_V1_RETIRADA = "version_v1_retirada"  # RF-MM-17 (M3): no se crean versiones de 2 partes
 
 
 TIPO_CODIGO: dict[CodigoMowaMes, TipoCodigo] = {
@@ -122,6 +123,7 @@ TIPO_CODIGO: dict[CodigoMowaMes, TipoCodigo] = {
     CodigoMowaMes.FALTA_WHATSAPP: TipoCodigo.ERROR,
     CodigoMowaMes.SIN_SUPERVISORES: TipoCodigo.ERROR,
     CodigoMowaMes.SIN_PRODUCTOS_CARGABLES: TipoCodigo.ERROR,
+    CodigoMowaMes.VERSION_V1_RETIRADA: TipoCodigo.ERROR,
 }
 
 # RF-MM-11. Son el maximo de la plataforma: la configuracion solo puede bajarlos.

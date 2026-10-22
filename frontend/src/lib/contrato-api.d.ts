@@ -508,8 +508,9 @@ export interface paths {
         put?: never;
         /**
          * Crear Speech
-         * @description Guarda una version nueva, v1 (`partes`) o v2 (`expresiones`). 404 si `basada_en_id` no
-         *     existe.
+         * @description Guarda una version v2 nueva (`expresiones`). Con `partes` (una v1) es 400 con el codigo
+         *     `version_v1_retirada`: ya no se crean versiones de dos partes (RF-MM-17). 404 si
+         *     `basada_en_id` no existe.
          */
         post: operations["crear_speech_mowa_mes_speech_post"];
         delete?: never;
@@ -557,8 +558,9 @@ export interface paths {
         get: operations["obtener_speech_mowa_mes_speech__speech_id__get"];
         /**
          * Actualizar Speech
-         * @description Reemplaza una version que nadie uso, en su mismo formato. Si ya se uso o es la original,
-         *     409; si el contenido es del otro formato, 400.
+         * @description Reemplaza una version v2 que nadie uso. Con `partes` es 400 `version_v1_retirada` (ni se
+         *     crean ni se editan versiones de dos partes, RF-MM-17); si ya se uso o es la original, 409; si
+         *     es una v1 y el contenido es v2, 400.
          */
         put: operations["actualizar_speech_mowa_mes_speech__speech_id__put"];
         post?: never;
@@ -1186,7 +1188,7 @@ export interface components {
          *     `NOMBRE = "codigo"`: la prueba espejo del frontend lee esta clase.
          * @enum {string}
          */
-        CodigoMowaMes: "telefono_invalido" | "falta_documento" | "sin_speech" | "falta_titular" | "falta_vencimiento" | "mensaje_excede_160" | "mensaje_excede_150" | "documento_no_estandar" | "limite_mensual_excedido" | "id_sin_correspondencia" | "falta_whatsapp" | "sin_supervisores" | "sin_productos_cargables";
+        CodigoMowaMes: "telefono_invalido" | "falta_documento" | "sin_speech" | "falta_titular" | "falta_vencimiento" | "mensaje_excede_160" | "mensaje_excede_150" | "documento_no_estandar" | "limite_mensual_excedido" | "id_sin_correspondencia" | "falta_whatsapp" | "sin_supervisores" | "sin_productos_cargables" | "version_v1_retirada";
         /**
          * CodigoTexto
          * @description Catalogo de codigos que el frontend traducira como `textoEnriquecido.codigo.<codigo>`.

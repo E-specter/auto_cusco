@@ -45,9 +45,10 @@ from app.adapters.persistence.repositorio_supervision_postgres import (
     RepositorioSupervisionPostgres,
 )
 from app.core.entities.gestiones_digitales import ConfiguracionSupervision, Supervisor
-from app.core.entities.mowa_mes import CodigoMowaMes
+from app.core.entities.mowa_mes import CodigoMowaMes, DatosSpeech, PartesSegmento
 from app.core.entities.mowa_mes_reporte import COLUMNAS_REPORTE, FilaReporte
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService
+from app.core.services.plataformas.mowa_mes.campana import huella_speech
 from app.main import app
 from tests.test_sabana_cabeceras import CABECERAS_10_09
 from tests.test_sabana_normalizador import _fila_sintetica
@@ -349,20 +350,27 @@ def test_limite_mensual_y_confirmacion(cliente) -> None:
     assert confirmada.json()["confirmo_limite"] is True
 
 
-def test_si_el_speech_cambia_despues_de_previsualizar_no_se_crea_nada(cliente) -> None:
-    client, engine = cliente
-    partes = [
-        {"segmento": p.segmento.value, "parte_1": p.parte_1, "parte_2": p.parte_2}
-        for p in speech_del_documento()
+def _expresiones_v2(texto: str) -> list[dict]:
+    """Una v2 sencilla: el mismo texto fijo en los 6 segmentos (sin variables)."""
+    segmentos = ["preventiva", "1_a_8", "9_a_30", "31_a_60", "61_a_90", "91_a_120"]
+    return [
+        {"segmento": s, "expresion": {"nodos": [{"tipo": "texto", "valor": texto}]}}
+        for s in segmentos
     ]
+
+
+def test_si_el_speech_cambia_despues_de_previsualizar_no_se_crea_nada(cliente) -> None:
+    # Ya no se crean versiones de dos partes (RF-MM-17, M3): la huella de una v2 es la que cambia.
+    client, engine = cliente
+    nombre = f"{PREFIJO}v2"
     version = client.post(
-        "/mowa-mes/speech", json={"nombre": f"{PREFIJO}v1", "partes": partes}
+        "/mowa-mes/speech", json={"nombre": nombre, "expresiones": _expresiones_v2("Cuota vencida")}
     ).json()
 
     previa = _previsualizar(client, speech_id=version["id"])
-    partes[0]["parte_2"] = ". Texto sintetico cambiado."
     editada = client.put(
-        f"/mowa-mes/speech/{version['id']}", json={"nombre": f"{PREFIJO}v1", "partes": partes}
+        f"/mowa-mes/speech/{version['id']}",
+        json={"nombre": nombre, "expresiones": _expresiones_v2("Texto sintetico cambiado.")},
     )
     rechazada = _crear(client, previa["speech"]["huella"], speech_id=version["id"])
 
@@ -375,6 +383,41 @@ def test_si_el_speech_cambia_despues_de_previsualizar_no_se_crea_nada(cliente) -
         ).scalar_one()
     assert creadas == 0
     assert client.get(f"/mowa-mes/speech/{version['id']}").json()["usada"] is False
+
+
+def test_una_campana_con_una_v1_heredada_la_usa_y_registra_su_huella(cliente) -> None:
+    # La version 92 del usuario: una v1 que no es la original. Ya no se crea por HTTP (RF-MM-17),
+    # asi que se siembra por el repositorio; la campana debe poder usarla de punta a punta.
+    client, engine = cliente
+    partes = tuple(
+        PartesSegmento(p.segmento, p.parte_1, p.parte_2 + " Heredada.")
+        for p in speech_del_documento()
+    )
+    heredada = RepositorioMowaMesPostgres(engine).crear_speech(
+        DatosSpeech(f"{PREFIJO}heredada", partes), None
+    )
+    huella = huella_speech(partes)
+
+    previa = _previsualizar(client, speech_id=heredada.id)
+    creada = _crear(client, previa["speech"]["huella"], speech_id=heredada.id)
+    campana = creada.json()
+    descarga = client.get(f"/mowa-mes/campanas/{campana['id']}/archivos/1")
+    with engine.connect() as cx:
+        guardada = cx.execute(
+            select(_CAMPANA.c.speech_huella, _CAMPANA.c.speech_version_id).where(
+                _CAMPANA.c.id == campana["id"]
+            )
+        ).one()
+        usada_en = cx.execute(
+            select(_SPEECH.c.usada_en).where(_SPEECH.c.id == heredada.id)
+        ).scalar_one()
+
+    assert previa["speech"]["huella"] == huella and previa["speech"]["formato"] == "v1"
+    assert creada.status_code == 201, creada.text
+    assert (guardada.speech_huella, guardada.speech_version_id) == (huella, heredada.id)
+    assert campana["speech"] == {"id": heredada.id, "nombre": f"{PREFIJO}heredada"}
+    assert usada_en is not None  # la campana la marco usada
+    assert any(f[1].endswith(" Heredada.") for f in _filas_xlsx(descarga.content))
 
 
 def test_sin_whatsapp_la_creacion_responde_400(cliente) -> None:

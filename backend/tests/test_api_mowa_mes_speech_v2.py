@@ -300,10 +300,10 @@ def test_una_v2_sin_usar_se_edita_en_su_formato(cliente) -> None:
 
 
 def test_el_formato_no_cambia_al_editar(cliente) -> None:
-    client, _ = cliente
+    client, repositorio = cliente
     id_v2 = _crear(client).json()["id"]
     partes = [{"segmento": s, "parte_1": "a", "parte_2": "b"} for s in SEGMENTOS]
-    v1 = client.post("/mowa-mes/speech", json={"nombre": "una v1", "partes": partes}).json()["id"]
+    v1 = repositorio.crear_speech(DatosSpeech("una v1", ORIGINAL), None).id  # una heredada
 
     v2_con_partes = client.put(f"/mowa-mes/speech/{id_v2}", json={"nombre": "x", "partes": partes})
     v1_con_expresiones = client.put(
@@ -312,6 +312,7 @@ def test_el_formato_no_cambia_al_editar(cliente) -> None:
 
     assert (v2_con_partes.status_code, v1_con_expresiones.status_code) == (400, 400)
     assert v2_con_partes.json()["problemas"][0]["campo"] == "formato"
+    assert v2_con_partes.json()["problemas"][0]["codigo"] == "version_v1_retirada"
     assert client.get(f"/mowa-mes/speech/{v1}").json()["formato"] == "v1"
 
 

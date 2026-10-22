@@ -1880,7 +1880,7 @@
           "mowa-mes"
         ],
         "summary": "Crear Speech",
-        "description": "Guarda una version nueva, v1 (`partes`) o v2 (`expresiones`). 404 si `basada_en_id` no\nexiste.",
+        "description": "Guarda una version v2 nueva (`expresiones`). Con `partes` (una v1) es 400 con el codigo\n`version_v1_retirada`: ya no se crean versiones de dos partes (RF-MM-17). 404 si\n`basada_en_id` no existe.",
         "operationId": "crear_speech_mowa_mes_speech_post",
         "requestBody": {
           "content": {
@@ -2054,7 +2054,7 @@
           "mowa-mes"
         ],
         "summary": "Actualizar Speech",
-        "description": "Reemplaza una version que nadie uso, en su mismo formato. Si ya se uso o es la original,\n409; si el contenido es del otro formato, 400.",
+        "description": "Reemplaza una version v2 que nadie uso. Con `partes` es 400 `version_v1_retirada` (ni se\ncrean ni se editan versiones de dos partes, RF-MM-17); si ya se uso o es la original, 409; si\nes una v1 y el contenido es v2, 400.",
         "operationId": "actualizar_speech_mowa_mes_speech__speech_id__put",
         "parameters": [
           {
@@ -4069,7 +4069,8 @@
           "id_sin_correspondencia",
           "falta_whatsapp",
           "sin_supervisores",
-          "sin_productos_cargables"
+          "sin_productos_cargables",
+          "version_v1_retirada"
         ],
         "title": "CodigoMowaMes",
         "description": "Catalogo de codigos que el frontend traduce como `mowaMes.codigo.<codigo>`.\n\nLas exclusiones van en el orden en que se evaluan: un producto excluido lleva\nun solo motivo, el primero que falla. Un codigo por linea, con la forma\n`NOMBRE = \"codigo\"`: la prueba espejo del frontend lee esta clase."

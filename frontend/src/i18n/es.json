@@ -442,6 +442,7 @@
   "mowaMes.codigo.falta_whatsapp": "Un segmento con productos usa [whatsapp] y no hay número de WhatsApp de contacto.",
   "mowaMes.codigo.sin_supervisores": "La campaña no tiene supervisores: sin ellos no se puede crear.",
   "mowaMes.codigo.sin_productos_cargables": "Ningún producto quedó dentro de la carga: no hay nada que enviar.",
+  "mowaMes.codigo.version_v1_retirada": "Las versiones de dos partes (v1) ya no se crean ni se editan. Para personalizar esta versión, conviértela a v2.",
   "mowaMes.codigo.documento_no_estandar": "El documento no es un DNI ni un RUC: se carga igual, pero conviene revisarlo.",
   "mowaMes.plataforma.registros": "Filas por archivo",
   "mowaMes.plataforma.registros.hint": "Hasta {max} filas por archivo; la supervisión cuenta dentro del primero.",
