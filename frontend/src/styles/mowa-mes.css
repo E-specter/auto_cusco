@@ -248,6 +248,26 @@
   color: var(--color-text-muted);
 }
 
+/* What GSM-7 deletes from the segment (RF-MM-27), in the status cell of a v1 row: the warning colour
+   and the icon, so it does not rely on colour alone. In v2 the same line is a .notice--warning. */
+.mm-speech__borrados {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  /* The cells of the table read in the data font; the sentence and the names are text, and only the
+     characters and their code points are mono (§10.2). */
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-data);
+  color: var(--color-warning-text);
+  overflow-wrap: anywhere;
+}
+
+.mm-speech__borrados svg {
+  flex: none;
+  margin-block-start: 0.1em;
+}
+
 /* The worst-case example, at the hint scale, under the segment's status. */
 .mm-speech__ejemplo {
   margin-block-start: var(--space-2);

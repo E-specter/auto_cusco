@@ -49,9 +49,9 @@ test.describe('carga inicial', () => {
     await expect(fila.getByText('Más de 150')).toBeVisible();
     // El nombre de fila no repite el segmento.
     await expect(fila.getByRole('rowheader')).toHaveText('9 a 30(9–30 días)');
-    // El ejemplo del peor caso describe las partes de su segmento.
+    // El ejemplo del peor caso describe las partes de su segmento, ya normalizado a GSM-7 (RF-MM-27): sin tildes.
     await expect(fila.locator('[data-ejemplo]')).toHaveText(
-      /^Ejemplo en el peor caso: XXXXXXXX Caja Cusco te informa que tu cuota venció el dd\/mm\/yyyy/,
+      /^Ejemplo en el peor caso: XXXXXXXX Caja Cusco te informa que tu cuota vencio el dd\/mm\/yyyy/,
     );
     await expect(page.locator('[data-speech-resumen]')).toHaveAttribute('role', 'status');
     await expect(page.locator('[data-speech-resumen]')).toHaveText('1 segmento pasa de 150 caracteres.');

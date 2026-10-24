@@ -14,6 +14,7 @@ import type { Page, Route } from '@playwright/test';
 import type { LargoSegmento, PartesSpeech, VersionSpeech } from '../src/lib/api-mowa-mes';
 import type { BorradorV2, ExpresionSegmentoEntrada, ProblemaSpeech } from '../src/lib/mowa-mes-speech-v2';
 import type { components } from '../src/lib/contrato-api';
+import { caracteresQuitados, normalizarGsm7 } from './api-falsa-gsm7';
 import type { ApiFalsaMowaMes } from './api-falsa-mowa-mes';
 import type { ApiFalsaTextoEnriquecido, } from './api-falsa-texto-enriquecido';
 import { manejarTextoEnriquecido } from './api-falsa-texto-enriquecido';
@@ -206,9 +207,11 @@ export async function montarApiSpeechV2(
             ? { codigo: 'sin_cota_variable', detalle: 'El largo depende del dato', ubicacion: { nodo: 0, funcion: null, parametro: null } }
             : null,
           codigo: maximo === null ? null : maximo > 160 ? 'mensaje_excede_160' : maximo > 150 ? 'mensaje_excede_150' : null,
-          ejemplo: maximo === null ? null : 'Ejemplo sintético',
-          // Contrato de B9: siempre presente; la lista real es de T-MM-F7.
-          caracteres_quitados: [],
+          // Normalised like the backend's (RF-MM-27); what is deleted comes from the segment's fixed text.
+          ejemplo: maximo === null ? null : normalizarGsm7('Ejemplo sintético'),
+          caracteres_quitados: caracteresQuitados(
+            guardada.nodos.map((n) => (n.tipo === 'texto' ? (n.valor ?? '') : '')).join(' '),
+          ),
         });
       }
       return json(route, 200, { whatsapp, largo_advertencia: 150, largo_maximo: 160, problemas, segmentos });

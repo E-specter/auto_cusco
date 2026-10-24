@@ -23,6 +23,7 @@ import { apiArchivosCarga, crearCompuerta, manejadorArchivosCarga } from './api-
 import { apiDefiniciones, definicionFalsa, manejadorDefiniciones } from './api-falsa-definiciones';
 import { apiTextoEnriquecidoVacia, manejarTextoEnriquecido } from './api-falsa-texto-enriquecido';
 import { apiSpeechV2, montarApiSpeechV2, versionV2Sintetica } from './api-falsa-speech-v2';
+import { v1ConBorrados, v2ConBorrados } from './fixtures-gsm7';
 
 const REGLAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
@@ -520,6 +521,23 @@ for (const tema of ['light', 'dark'] as const) {
       await abrirSpeechV2(page, (api) => api.versiones.push(versionV2Sintetica(api.versiones[0])));
       await page.locator('#mm-version').selectOption({ label: 'Speech v2' });
       await expect(page.locator('#mm-speech-v2 [data-segmento-botones] button').nth(2)).toContainText('156');
+      await sinViolaciones(page);
+    });
+
+    test('la línea de lo que GSM-7 borra, en una v2 y en una v1', async ({ page }) => {
+      await abrirSpeechV2(page, (api) => {
+        v2ConBorrados(api);
+        const v2 = api.versiones.at(-1)!;
+        v1ConBorrados(api);
+        api.versiones.push(v2);
+      });
+      await page.locator('#mm-version').selectOption({ label: 'Speech v2' });
+      await page.locator('#mm-speech-v2 [data-segmento-botones] button').nth(0).click();
+      await expect(page.locator('[data-borrados-v2]')).toBeVisible();
+      await sinViolaciones(page);
+
+      await page.locator('#mm-version').selectOption({ label: 'Speech con símbolos' });
+      await expect(page.locator('[data-speech-filas] tr[data-segmento="preventiva"] [data-borrados]')).toBeVisible();
       await sinViolaciones(page);
     });
 

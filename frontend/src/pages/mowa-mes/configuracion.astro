@@ -301,10 +301,19 @@ import '../../styles/mowa-mes-speech-v2.css';
               <span data-v2-borrador-texto></span>
             </p>
             <VariantesSegmento id="mm-speech-v2" etiqueta="Speech por segmento" claveEtiqueta="mowaMes.speech.title" />
+            <!-- What GSM-7 deletes from the segment on screen (RF-MM-27); no live region: it would re-announce on every keystroke. -->
+            <p class="notice notice--warning" data-borrados-v2 hidden>
+              <Icon name="triangle-alert" size={20} />
+              <span data-borrados-v2-texto></span>
+            </p>
             <p class="field__hint" data-i18n="mowaMes.speech.v2.avisoSegmento">
               Con un producto real de muestra, el segmento sale de sus días de atraso ajustados a hoy, como si el mensaje se enviara hoy; en la campaña se ajustan a su fecha de envío.
             </p>
           </div>
+
+          <p class="field__hint" data-speech-gsm7 hidden data-i18n="mowaMes.speech.gsm7">
+            Al generar, se quitan las tildes, los signos que el SMS no admite se cambian por uno simple y los que no tienen equivalente se borran. La versión se guarda como la escribes.
+          </p>
 
           <div class="mm-form__foot mm-speech__foot" data-speech-pie hidden>
             <div class="field mm-speech__nombre">
@@ -376,6 +385,7 @@ import '../../styles/mowa-mes-speech-v2.css';
   <!-- Icons for rows the script builds: rendered once here, cloned per row. -->
   <template data-icono-arriba><Icon name="arrow-up" size={16} /></template>
   <template data-icono-abajo><Icon name="arrow-down" size={16} /></template>
+  <template data-icono-borrados><Icon name="triangle-alert" size={16} /></template>
 
   <!-- ---- Exception: an added day or a law holiday withdrawn -------------- -->
   <dialog class="dialog" data-dialog="excepcion" aria-labelledby="mm-excepcion-title">
@@ -466,6 +476,7 @@ import '../../styles/mowa-mes-speech-v2.css';
   import { notaVariablesDesconocidas, pintarBotonesDeVariables } from '../../lib/mowa-mes-plantilla';
   import { formatBytes, formatDate, formatDateTime, formatNumber, parseApiDate } from '../../lib/format';
   import { obtenerComoV2, problemasDeErrorSpeech } from '../../lib/api-speech-v2';
+  import { SEPARADOR_BORRADOS, elementosBorrados, type CaracterQuitado } from '../../lib/mowa-mes-gsm7';
   import { applyTranslations, locale, t } from '../../lib/i18n';
   import {
     entradaDeExpresiones,
@@ -1178,6 +1189,7 @@ import '../../styles/mowa-mes-speech-v2.css';
     const version = versionActual();
     estado.borrador = version ? borradorDesdeVersion(version) : [];
     estado.previsualizacion = null;
+    estado.largosV2 = [];
     // A saved v2 opens in the v2 editor; a v1 (or none) in the table of parts, exactly as before.
     estado.v2 =
       version && esV2(version)
@@ -1198,9 +1210,55 @@ import '../../styles/mowa-mes-speech-v2.css';
     programarPrevisualizacion(0);
   }
 
+  /**
+   * «Al enviar se borran: …» (RF-MM-27, §10.2). The elements are what the backend says is deleted, in
+   * its order and each one once; a visible one in mono, an invisible one by its name with its code point
+   * in mono. An empty list hides the host: a segment with nothing deleted has no line.
+   */
+  function pintarBorrados(host: HTMLElement, quitados: readonly CaracterQuitado[]): void {
+    const elementos = elementosBorrados(quitados);
+    host.hidden = elementos.length === 0;
+    if (elementos.length === 0) {
+      host.replaceChildren();
+      return;
+    }
+    const icono = $<HTMLTemplateElement>('template[data-icono-borrados]').content.cloneNode(true);
+    const texto = document.createElement('span');
+    texto.dataset.borradosTexto = '';
+    texto.append(`${t('mowaMes.speech.borrados.prefijo')} `);
+    elementos.forEach((elemento, i) => {
+      if (i > 0) texto.append(SEPARADOR_BORRADOS);
+      if (elemento.nombre === null) {
+        const visible = document.createElement('span');
+        visible.className = 'mono';
+        visible.dataset.borradoVisible = '';
+        visible.textContent = elemento.caracter;
+        texto.append(visible);
+        return;
+      }
+      const nombre = document.createElement('span');
+      nombre.dataset.borradoNombre = '';
+      nombre.textContent = elemento.nombre;
+      const codigo = document.createElement('span');
+      codigo.className = 'mono';
+      codigo.dataset.borradoCodigo = '';
+      codigo.textContent = elemento.codigo;
+      texto.append(nombre, ' ', codigo);
+    });
+    host.replaceChildren(icono, texto);
+  }
+
+  /** v2: the line of the segment on screen, under the editor. */
+  function pintarBorradosV2(): void {
+    const seleccionado = ctlV2?.estado().seleccionado ?? null;
+    const segmento = seleccionado === null ? undefined : estado.largosV2.find((s) => s.segmento === seleccionado);
+    pintarBorrados($<HTMLElement>('[data-borrados-v2]'), segmento?.caracteres_quitados ?? []);
+  }
+
   function pintarSpeech(): void {
     const version = versionActual();
     mostrarRama();
+    $<HTMLElement>('[data-speech-gsm7]').hidden = !version;
     if (estado.v2 && version) {
       pintarSpeechV2(version);
       return;
@@ -1231,6 +1289,8 @@ import '../../styles/mowa-mes-speech-v2.css';
 
       const segmento = document.createElement('th');
       segmento.scope = 'row';
+      // The stacked card reads segment, length, status, and then the parts with their example.
+      segmento.dataset.orden = '1';
       const nombre = document.createElement('span');
       nombre.className = 'mm-speech__segmento';
       nombre.textContent = info?.etiqueta ?? parte.segmento;
@@ -1258,8 +1318,7 @@ import '../../styles/mowa-mes-speech-v2.css';
       largo.className = 'num mm-speech__largo';
       largo.dataset.largo = '';
       largo.dataset.etiqueta = t('mowaMes.speech.col.largo');
-      // What the analyst watches while typing rises to the top of the stacked
-      // block, ahead of the parts themselves.
+      // Segment, length and status rise to the top of the stacked block, ahead of the parts.
       largo.dataset.orden = '1';
       largo.textContent = '—';
 
@@ -1275,7 +1334,11 @@ import '../../styles/mowa-mes-speech-v2.css';
       ejemplo.className = 'mono mm-speech__ejemplo';
       ejemplo.id = `mm-ejemplo-${parte.segmento}`;
       ejemplo.dataset.ejemplo = '';
-      nivel.append(tags, ejemplo);
+      const borrados = document.createElement('p');
+      borrados.className = 'mm-speech__borrados';
+      borrados.dataset.borrados = '';
+      borrados.hidden = true;
+      nivel.append(tags, borrados, ejemplo);
 
       fila.append(segmento, ...celdas, largo, nivel);
       filas.append(fila);
@@ -1316,14 +1379,17 @@ import '../../styles/mowa-mes-speech-v2.css';
       const largo = fila.querySelector<HTMLElement>('[data-largo]')!;
       const nivelCelda = fila.querySelector<HTMLElement>('[data-nivel-tags]')!;
       const ejemplo = fila.querySelector<HTMLElement>('[data-ejemplo]');
+      const borrados = fila.querySelector<HTMLElement>('[data-borrados]')!;
       nivelCelda.replaceChildren();
 
       if (!segmento || !vista) {
         largo.textContent = '—';
         fila.dataset.nivelLargo = '';
         if (ejemplo) ejemplo.textContent = '';
+        pintarBorrados(borrados, []);
         return;
       }
+      pintarBorrados(borrados, segmento.caracteres_quitados);
 
       // A segment with no maximum (`largo_maximo` null) shows "—" and no level, the same
       // criterion as when the WhatsApp is missing; a number never goes to `formatNumber` as null.
@@ -1383,10 +1449,10 @@ import '../../styles/mowa-mes-speech-v2.css';
     if (resumen.textContent !== textoResumen) resumen.textContent = textoResumen;
 
     $<HTMLElement>('[data-speech-calculo]').textContent = vista
-      ? t('mowaMes.speech.calculo', {
+      ? `${t('mowaMes.speech.calculo', {
           advertencia: vista.largo_advertencia,
           maximo: vista.largo_maximo,
-        })
+        })} ${t('mowaMes.speech.calculoUnidad')}`
       : '';
   }
 
@@ -1465,9 +1531,16 @@ import '../../styles/mowa-mes-speech-v2.css';
           estado.v2.variantes = detalle.variantes.map((v) => ({ ...v }));
           programarPrevisualizacion(ESPERA_PREVISUALIZACION);
         }
+        // The segment on screen can change with no click or change on our side (saving jumps to an empty
+        // one, a problem is opened from the list, the chosen segment disappears): every such change ends
+        // in this event, so the line follows the segment from here too.
+        pintarBorradosV2();
         pintarEstadoSpeech();
       });
       const segmentos = estado.v2.segmentos;
+      // Choosing a segment by hand repaints at once, without waiting for the editor to validate it.
+      v2El.raiz.addEventListener('click', () => pintarBorradosV2());
+      v2El.raiz.addEventListener('change', () => pintarBorradosV2());
       montandoV2 = montarVariantes(v2El.raiz, {
         contexto: 'mowa_mes.speech',
         segmentos,
@@ -1538,7 +1611,9 @@ import '../../styles/mowa-mes-speech-v2.css';
         ctl.fijarSegmentos(estado.v2.segmentos);
         ctl.fijarVariantes({ porDefecto: null, variantes: estado.v2.variantes });
       }
+      pintarBorradosV2();
     });
+    pintarBorradosV2();
     pintarEstadoSpeech();
   }
 
@@ -1550,6 +1625,7 @@ import '../../styles/mowa-mes-speech-v2.css';
     if (expresiones.length === 0) {
       estado.largosV2 = [];
       ctl?.fijarNiveles({});
+      pintarBorradosV2();
       return;
     }
     controlPrevisualizacion?.abort();
@@ -1561,6 +1637,7 @@ import '../../styles/mowa-mes-speech-v2.css';
       if (estado.v2 !== v2) return;
       estado.largosV2 = vista.segmentos;
       ctl?.fijarNiveles(nivelesDeV2(vista.segmentos));
+      pintarBorradosV2();
       $<HTMLElement>('[data-speech-falta-whatsapp]').hidden = !vista.segmentos.some((s) => s.falta_whatsapp);
       mostrarProblemasV2(vista.problemas);
     } catch (caido) {

@@ -8,6 +8,7 @@
  */
 import type { Page, Route } from '@playwright/test';
 
+import { caracteresQuitados, largoGsm7, normalizarGsm7 } from './api-falsa-gsm7';
 import type {
   AvisoCampana,
   Campana,
@@ -190,11 +191,12 @@ export function previsualizacionSintetica(
     });
     const usa = usaWhatsapp(parte);
     const falta = usa && !whatsapp;
+    // Like the backend (RF-MM-27): the length is the normalised message's, in GSM-7 units.
     const largo =
       8 +
-      parte.parte_1.replaceAll('[whatsapp]', enlaceLargo).length +
+      largoGsm7(normalizarGsm7(parte.parte_1.replaceAll('[whatsapp]', enlaceLargo))) +
       10 +
-      parte.parte_2.replaceAll('[whatsapp]', enlaceLargo).length;
+      largoGsm7(normalizarGsm7(parte.parte_2.replaceAll('[whatsapp]', enlaceLargo)));
     segmentos.push({
       segmento,
       etiqueta,
@@ -206,9 +208,11 @@ export function previsualizacionSintetica(
       // The backend's worst case: an 8-character holder and the date as a pattern.
       ejemplo: falta
         ? null
-        : `XXXXXXXX${parte.parte_1.replaceAll('[whatsapp]', enlace)}dd/mm/yyyy${parte.parte_2.replaceAll('[whatsapp]', enlace)}`,
-      // B9 contract: always present; the real list is T-MM-F7's, so the fake never reports any.
-      caracteres_quitados: [],
+        : normalizarGsm7(
+            `XXXXXXXX${parte.parte_1.replaceAll('[whatsapp]', enlace)}dd/mm/yyyy${parte.parte_2.replaceAll('[whatsapp]', enlace)}`,
+          ),
+      // What the normalisation deletes from the segment's fixed text (not from a real row's data).
+      caracteres_quitados: caracteresQuitados(`${parte.parte_1} ${parte.parte_2}`),
     });
   });
 
