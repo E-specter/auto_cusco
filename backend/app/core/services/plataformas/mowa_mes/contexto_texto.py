@@ -13,6 +13,7 @@ from app.core.entities.contexto_texto import ORIGEN_CARTERA, ContextoTexto, Vari
 from app.core.entities.mowa_mes import LARGO_ADVERTENCIA, LARGO_MAXIMO, RANGOS_SEGMENTO
 from app.core.entities.segmentacion import RangoDias
 from app.core.services.plataformas.mowa_mes import speech
+from app.core.services.texto_enriquecido.gsm7 import a_gsm7, largo_gsm7_normalizado
 
 NOMBRE = "mowa_mes.speech"
 VARIABLE_DIAS = speech.VARIABLE_DIAS
@@ -66,4 +67,8 @@ def contexto_speech() -> ContextoTexto:
             RangoDias(r.segmento.value, r.etiqueta, r.desde, r.hasta) for r in RANGOS_SEGMENTO
         ),
         registro_de_producto=_registro_de_producto,
+        # Como el mensaje que se envia (RF-MM-27): se mide en unidades GSM-7 lo que SALDRIA de
+        # normalizar, y la previsualizacion muestra el texto ya normalizado.
+        medida=largo_gsm7_normalizado,
+        salida=a_gsm7,
     )

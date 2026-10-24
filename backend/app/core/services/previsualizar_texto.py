@@ -21,7 +21,7 @@ Lima, nunca anterior a la fecha de corte (`FechaEnvioAnterior`). El producto lle
 respuesta dice cual se uso. Las muestras de ejemplo no tienen fecha de envio.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import date
 from typing import Any
@@ -167,10 +167,9 @@ class ColumnaPrevia:
     sin_cota: MotivoSinCota | None
     usa_variante: bool
     problemas: tuple[Problema, ...]
-
-    @property
-    def largo(self) -> int:
-        return len(self.texto)
+    # El largo de `texto` en la unidad del contexto (`ContextoTexto.medida`): la misma con que se
+    # calcula la cota y se comparan el umbral y el limite.
+    largo: int
 
 
 @dataclass(frozen=True)
@@ -230,10 +229,10 @@ class PrevisualizacionTextoService:
     # --- validacion ---
 
     def validar(self, contexto: str, expresion: Any) -> ValidacionTexto:
-        tipos = self._contextos.obtener(contexto).tipos
+        ctx = self._contextos.obtener(contexto)
         try:
             leida = expresion_desde_dict(expresion)
-            compilada = evaluador.compilar(leida, tipos)
+            compilada = evaluador.compilar(leida, ctx.tipos, medida=ctx.medida)
         except ExpresionInvalida as error:
             return ValidacionTexto(error.problemas, None, None, None, ())
         return ValidacionTexto(
@@ -295,10 +294,14 @@ class PrevisualizacionTextoService:
             return sin_filas(problemas)
 
         constantes = {} if envio is None else envio.constantes(ctx.tipos)
-        generador = GeneradorCargas(definicion_leida, ctx.tipos, constantes)
+        # El contexto manda la unidad del largo y lo que se le hace al texto (RF-MM-27): el editor
+        # y la tabla del conector miden y muestran lo mismo.
+        generador = GeneradorCargas(
+            definicion_leida, ctx.tipos, constantes, medida=ctx.medida, salida=ctx.salida
+        )
         registros, disponibles = self._registros(ctx, definicion_leida, muestra, envio)
         filas = tuple(
-            self._fila(generador, numero, representado, registro, producto)
+            self._fila(generador, ctx.medida, numero, representado, registro, producto)
             for numero, (representado, registro, producto) in enumerate(registros, 1)
         )
         return Previsualizacion(
@@ -314,6 +317,7 @@ class PrevisualizacionTextoService:
     @staticmethod
     def _fila(
         generador: GeneradorCargas,
+        medida: Callable[[str], int],
         numero: int,
         representado: Representado | None,
         registro: Mapping[str, Any],
@@ -338,6 +342,7 @@ class PrevisualizacionTextoService:
                     sin_cota=celda.motivo_sin_cota,
                     usa_variante=celda.usa_variante,
                     problemas=celda.problemas,
+                    largo=medida(celda.texto),
                 )
                 for celda in detalle.celdas
             ),

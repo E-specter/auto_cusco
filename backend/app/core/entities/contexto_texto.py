@@ -6,7 +6,7 @@ Las arma la composicion (`services/contextos_texto.py`).
 """
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from app.core.entities.segmentacion import RangoDias
@@ -14,6 +14,11 @@ from app.core.entities.texto_enriquecido import TipoValor
 
 # El contexto que aporta los campos de la cartera: el origen de casi todas las variables.
 ORIGEN_CARTERA = "cartera"
+
+
+def _sin_cambios(texto: str) -> str:
+    """La `salida` por defecto: el texto tal cual se evalua."""
+    return texto
 
 
 @dataclass(frozen=True)
@@ -41,6 +46,12 @@ class ContextoTexto:
     variable_dias: str
     tabla_rangos: tuple[RangoDias, ...]
     registro_de_producto: Callable[[Mapping[str, Any]], dict[str, Any]]
+    # Comportamiento del canal, no datos del catalogo (por eso no entran en `repr`, en la
+    # comparacion ni en el contrato). `medida` es la unidad del largo y de la cota (por defecto,
+    # caracteres); `salida` es lo que se le hace al texto antes de enviarlo (por defecto, nada). El
+    # speech de MOWA MES mide en unidades GSM-7 y normaliza a GSM-7 (RF-MM-27).
+    medida: Callable[[str], int] = field(default=len, repr=False, compare=False)
+    salida: Callable[[str], str] = field(default=_sin_cambios, repr=False, compare=False)
 
     @property
     def tipos(self) -> dict[str, TipoValor]:

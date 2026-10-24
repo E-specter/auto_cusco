@@ -13,8 +13,8 @@ campo, y el resto de la carga se sigue construyendo. Asi el usuario ve de una
 vez todo lo que hay que corregir.
 """
 
-from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from typing import Any
 
 from app.core.entities.mapeo import (
@@ -107,6 +107,10 @@ class GeneradorCargas:
 
     `constantes` son variables del catalogo con el mismo valor en toda la carga (la fecha de envio,
     RF-55): el motor las pliega al compilar (B7) y el producto no las trae.
+
+    `medida` es la unidad de la cota de cada columna (por defecto, caracteres) y `salida`, lo que
+    la PREVISUALIZACION le hace al texto de cada celda (`detallar_fila`) para mostrar lo que se
+    enviaria; sin ella el texto sale tal cual. La generacion de cargas no usa `salida`.
     """
 
     def __init__(
@@ -114,8 +118,13 @@ class GeneradorCargas:
         definicion: DefinicionCarga,
         campos_disponibles: Iterable[str] | Mapping[str, Any],
         constantes: Mapping[str, Any] | None = None,
+        *,
+        medida: Callable[[str], int] = len,
+        salida: Callable[[str], str] | None = None,
     ) -> None:
         self._definicion = definicion
+        self._medida = medida
+        self._salida = salida
         self._validar_nombres(definicion.campos)
         self._variables = variables_de(campos_disponibles)
         self._constantes = constantes
@@ -177,9 +186,15 @@ class GeneradorCargas:
                 limites = limites_de_plantilla(plantilla)
                 expresion = sintaxis.leer(plantilla, limites)
                 return evaluador.compilar(
-                    expresion, self._variables, limites, constantes=self._constantes
+                    expresion,
+                    self._variables,
+                    limites,
+                    constantes=self._constantes,
+                    medida=self._medida,
                 )
-            return evaluador.compilar(expresion, self._variables, constantes=self._constantes)
+            return evaluador.compilar(
+                expresion, self._variables, constantes=self._constantes, medida=self._medida
+            )
         except ExpresionInvalida as error:
             raise PlantillaInvalida(_mensaje(texto, donde, error)) from error
 
@@ -352,25 +367,36 @@ class GeneradorCargas:
             tuple(self._detallar_celda(columna, clave, producto) for columna in self._columnas),
         )
 
-    @staticmethod
     def _detallar_celda(
-        columna: _Columna, clave: str | None, producto: Mapping[str, Any]
+        self, columna: _Columna, clave: str | None, producto: Mapping[str, Any]
     ) -> CeldaDetallada:
         campo = columna.campo
         usa_variante = clave is not None and clave in columna.variantes
         compilada = columna.variantes[clave] if usa_variante else columna.por_defecto  # type: ignore[index]
         resultado = compilada.evaluar_por_nodo(producto)
         problemas = list(resultado.problemas)
-        texto = resultado.texto
+        texto, nodos = resultado.texto, resultado.nodos
+        crudo = resultado.valor
+        # Primero se decide el texto de la celda sobre el texto CRUDO, igual que la generacion: un
+        # texto que solo trae signos que la salida borra no es un texto vacio.
         if texto == "" and campo.valor_por_defecto is not None:
             texto, crudo = campo.valor_por_defecto, None
-        else:
-            crudo = resultado.valor
+        a_tipar = campo
+        if self._salida is not None:
+            # Despues, lo que se enviaria: el texto de la celda y el de cada nodo con la salida del
+            # canal. Si la salida cambio el texto, el valor tipado ya no es el que se muestra: se
+            # vuelve a tipar desde el texto de salida, sin decidir otra vez el valor por defecto.
+            de_salida = self._salida(texto)
+            if de_salida != texto:
+                crudo = None
+                a_tipar = replace(campo, valor_por_defecto=None)
+            texto = de_salida
+            nodos = tuple(nodo._replace(texto=self._salida(nodo.texto)) for nodo in nodos)
         valor = None
         if not problemas:
             fila: dict[str, Any] = {}
             errores: list[ErrorGeneracion] = []
-            GeneradorCargas._convertir(campo, texto, crudo, 0, fila, errores)
+            GeneradorCargas._convertir(a_tipar, texto, crudo, 0, fila, errores)
             valor = fila[campo.nombre]
             problemas.extend(
                 Problema(CodigoTexto.VALOR_NO_CONVERTIBLE, error.detalle) for error in errores
@@ -379,7 +405,7 @@ class GeneradorCargas:
             campo=campo,
             texto=texto,
             valor=valor,
-            nodos=resultado.nodos,
+            nodos=nodos,
             problemas=tuple(problemas),
             cota=compilada.cota,
             motivo_sin_cota=compilada.motivo_sin_cota,
