@@ -62,6 +62,11 @@ from app.core.entities.texto_enriquecido import (
 from app.core.services.gestiones_digitales.supervision import numero_valido
 from app.core.services.texto_enriquecido import evaluador
 from app.core.services.texto_enriquecido.evaluador import Compilada
+from app.core.services.texto_enriquecido.gsm7 import (
+    a_gsm7,
+    grafemas_borrados,
+    largo_gsm7_normalizado,
+)
 from app.core.services.texto_enriquecido.uso import variables_usadas
 
 CAMPO_MENSAJE = "mensaje"
@@ -238,7 +243,13 @@ def _compilar(
     whatsapp: str | None,
 ) -> Compilada:
     constantes = {VARIABLE_CONTACTO: whatsapp} if whatsapp else None
-    return evaluador.compilar(expresion, variables, limites, constantes=constantes)
+    # La cota queda en unidades GSM-7 (RF-MM-27): el texto fijo se mide ya normalizado y los
+    # extendidos cuentan 2; las variables cuentan 1 por caracter (supuesto documentado, docs/
+    # motor-texto-enriquecido.md §24: el control exacto sigue siendo el de cada fila).
+    # NO se cuelga `a_gsm7` de las variables: su cota es el triple y romperia el 156 de «9 a 30».
+    return evaluador.compilar(
+        expresion, variables, limites, constantes=constantes, medida=largo_gsm7_normalizado
+    )
 
 
 def compilar_segmento(partes: PartesSegmento, whatsapp: str | None = None) -> Compilada:
@@ -363,7 +374,10 @@ class ConstructorMensajes:
         resultado = self._compiladas[segmento].evaluar(contexto)
         if resultado.problemas:
             raise MensajeNoGenerable(segmento, resultado.problemas)
-        return resultado.texto
+        # Ultimo paso fijo (RF-MM-27): el SMS nunca pasa a UCS-2. Se aplica al texto YA evaluado,
+        # despues de `primeros(8)` y antes de medir los 150 y los 160; el archivo, la fila
+        # guardada, la supervision y la conciliacion ven todos este mismo texto.
+        return a_gsm7(resultado.texto)
 
     def mensaje_de(
         self,
@@ -382,6 +396,13 @@ class ConstructorMensajes:
                 VARIABLE_DIAS: dias_ajustados,
             },
         )
+
+
+def _borrados_de(trozos: Sequence[str]) -> tuple[str, ...]:
+    """Los grafemas que se borran, sin repetir y en orden, de trozos que en el mensaje NO van
+    pegados: un trozo termina en la mitad de una bandera y el siguiente la completa, y eso no
+    forma una bandera que nadie escribio."""
+    return tuple(dict.fromkeys(g for trozo in trozos for g in grafemas_borrados(trozo)))
 
 
 def previsualizar(
@@ -408,12 +429,20 @@ def previsualizar(
         ejemplo = None
         if not con_whatsapp or whatsapp:
             enlace = enlace_whatsapp(whatsapp) if whatsapp else ""
-            ejemplo = (
+            # Lo que se enviaria: el ejemplo ya normalizado a GSM-7 (RF-MM-27).
+            ejemplo = a_gsm7(
                 _TITULAR_EJEMPLO
                 + segmento.parte_1.replace(VARIABLE_WHATSAPP, enlace)
                 + _VENCIMIENTO_EJEMPLO
                 + segmento.parte_2.replace(VARIABLE_WHATSAPP, enlace)
             )
+        # Los datos de ejemplo son ASCII: lo que se borra es siempre del texto fijo, haya o no
+        # numero de WhatsApp (el aviso sale aunque `ejemplo` sea nulo). Cada trozo fijo va APARTE:
+        # en el mensaje los separan la fecha o el enlace, y unidos podrian fingir un grafema.
+        fijos = [
+            *segmento.parte_1.split(VARIABLE_WHATSAPP),
+            *segmento.parte_2.split(VARIABLE_WHATSAPP),
+        ]
         resultado.append(
             LargoSegmento(
                 rango=rango,
@@ -421,6 +450,7 @@ def previsualizar(
                 largo_maximo=largo,
                 codigo=codigo_por_largo(largo),
                 ejemplo=ejemplo,
+                caracteres_quitados=_borrados_de(fijos),
             )
         )
     return tuple(resultado)
@@ -449,6 +479,7 @@ def previsualizar_v2(
             continue
         con_whatsapp = VARIABLE_CONTACTO in variables_usadas(item.expresion)
         ejemplo = None
+        crudo = None  # el texto evaluado ANTES de normalizar: de ahi salen los borrados
         if not con_whatsapp or whatsapp:
             dias = rango.desde if rango.desde is not None else rango.hasta
             muestra = compilada.evaluar(
@@ -459,7 +490,13 @@ def previsualizar_v2(
                     VARIABLE_DIAS: dias,
                 }
             )
-            ejemplo = None if muestra.problemas else muestra.texto
+            if not muestra.problemas:
+                crudo = muestra.texto
+                ejemplo = a_gsm7(crudo)  # lo que se enviaria (RF-MM-27)
+        if crudo is None:  # sin ejemplo (falta el WhatsApp): cada texto fijo del segmento, aparte
+            trozos = [n.valor for n in item.expresion.nodos if isinstance(n, NodoTexto)]
+        else:
+            trozos = [crudo]
         largo = compilada.cota
         resultado.append(
             LargoSegmento(
@@ -469,6 +506,7 @@ def previsualizar_v2(
                 codigo=None if largo is None else codigo_por_largo(largo),
                 ejemplo=ejemplo,
                 motivo_sin_cota=compilada.motivo_sin_cota,
+                caracteres_quitados=_borrados_de(trozos),
             )
         )
     return tuple(resultado)

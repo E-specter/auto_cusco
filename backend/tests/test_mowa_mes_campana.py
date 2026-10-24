@@ -48,6 +48,7 @@ from app.core.services.plataformas.mowa_mes.campana import (
 from app.core.services.plataformas.mowa_mes.reportes import ReportesMowaMesService
 from app.core.services.seleccion_cartera import expresiones
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
+from app.core.services.texto_enriquecido.gsm7 import a_gsm7
 from tests.test_gestiones_digitales import PROCEDENCIAS, SUPERVISORES, RepositorioSupervisionFalso
 from tests.test_mowa_mes_speech import ORIGINAL, WHATSAPP, RepositorioMowaMesFalso
 
@@ -320,8 +321,8 @@ def test_el_segmento_sale_de_los_dias_ajustados_al_envio() -> None:
     fila = evaluar_producto(producto(1), FECHA_CORTE, date(2026, 10, 1), constructor)
 
     assert fila.segmento is Segmento.DE_9_A_30
-    assert fila.mensaje.startswith(
-        "ZZPRU001 Caja Cusco te informa que tu cuota venció el 06/09/2026"
+    assert fila.mensaje.startswith(  # normalizado a GSM-7 (RF-MM-27): venció -> vencio
+        a_gsm7("ZZPRU001 Caja Cusco te informa que tu cuota venció el 06/09/2026")
     )
 
 

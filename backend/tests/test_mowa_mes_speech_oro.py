@@ -129,16 +129,20 @@ def _previsualizar_de_antes(partes, whatsapp):
             continue
         texto = segmento.parte_1 + segmento.parte_2
         cantidad_variables = texto.count(VARIABLE_WHATSAPP)
+        # RF-MM-27: la misma aritmetica de antes, con el texto fijo medido ya normalizado a
+        # GSM-7 (un extendido cuenta 2, la elipsis mide 3) en lugar de contar caracteres.
         largo = (
             LARGO_TITULAR
             + LARGO_VENCIMIENTO
-            + len(texto)
-            - cantidad_variables * (len(VARIABLE_WHATSAPP) - largo_enlace)
+            + largo_gsm7_normalizado(texto)
+            # el marcador "[whatsapp]" mide 12 en GSM-7 (los corchetes son extendidos) y se
+            # reemplaza por el enlace de 26
+            - cantidad_variables * (largo_gsm7_normalizado(VARIABLE_WHATSAPP) - largo_enlace)
         )
         ejemplo = None
         if not cantidad_variables or whatsapp:
             enlace = speech.enlace_whatsapp(whatsapp) if whatsapp else ""
-            ejemplo = (
+            ejemplo = a_gsm7(  # el ejemplo sale como se enviaria (RF-MM-27)
                 "X" * LARGO_TITULAR
                 + segmento.parte_1.replace(VARIABLE_WHATSAPP, enlace)
                 + "dd/mm/yyyy"
@@ -167,27 +171,30 @@ def test_los_seis_mensajes_del_speech_original_son_los_congelados_en_head() -> N
         for partes in ORIGINAL
     }
 
-    assert obtenidos == MENSAJES_DEL_ORIGINAL
+    # RF-MM-27 (T-MM-B9): el constructor normaliza a GSM-7 como ultimo paso. Lo unico que cambia
+    # respecto de las constantes de 3e567d7 es esa normalizacion: el esperado es a_gsm7(constante).
+    assert obtenidos == {s: a_gsm7(m) for s, m in MENSAJES_DEL_ORIGINAL.items()}
     assert len(MENSAJES_DEL_ORIGINAL) == len(RANGOS_SEGMENTO)
 
 
-def test_toda_la_matriz_de_mensajes_da_la_huella_congelada_en_head() -> None:
-    # Versiones x segmentos x numeros x titulares x vencimientos, en orden estable. Calculada en
-    # HEAD 3e567d7 con el codigo viejo; aqui con el motor.
+def test_toda_la_matriz_de_mensajes_da_la_huella_gsm7_de_la_congelada_en_head() -> None:
+    # Versiones x segmentos x numeros x titulares x vencimientos, en orden estable. La matriz de
+    # 3e567d7 (MATRIZ_HUELLA) es la referencia historica; con RF-MM-27 el constructor entrega cada
+    # mensaje ya normalizado, y su SHA es MATRIZ_HUELLA_GSM7 (la misma matriz con a_gsm7 aplicada).
     filas = mensajes_de_la_matriz(speech.ConstructorMensajes)
 
     assert len(filas) == MATRIZ_CASOS
     assert sum(fila[-1] is None for fila in filas) == MATRIZ_CASOS_SIN_WHATSAPP
-    assert huella_de_la_matriz(filas) == MATRIZ_HUELLA
+    assert huella_de_la_matriz(filas) == MATRIZ_HUELLA_GSM7
 
 
 def test_el_mensaje_del_speech_original_conserva_su_texto_conocido() -> None:
     constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
 
-    assert constructor.mensaje_de(Segmento.DE_1_A_8, "ZZPRUEBA SINTETICO", VENCIMIENTO) == (
+    assert constructor.mensaje_de(Segmento.DE_1_A_8, "ZZPRUEBA SINTETICO", VENCIMIENTO) == a_gsm7(
         "ZZPRUEBA Caja Cusco te informa que tu cuota venció el 05/09/2026, acércate a pagar"
         " a nuestras agencias, agentes KASNET o a través de Wayki app."
-    )
+    )  # el texto de siempre, normalizado por RF-MM-27 (venció -> vencio)
     assert constructor.mensaje_de(Segmento.DE_31_A_60, "ZZPRUEBA", VENCIMIENTO).endswith(
         "INFO por https://wa.me/+51900000123"
     )
@@ -238,7 +245,7 @@ def test_un_titular_en_blanco_no_llega_al_mensaje_y_si_llegara_el_motor_lo_da_po
 
     mensaje = constructor.mensaje_de(Segmento.DE_1_A_8, "   ", VENCIMIENTO)
 
-    assert mensaje.startswith(ORIGINAL[1].parte_1)
+    assert mensaje.startswith(a_gsm7(ORIGINAL[1].parte_1))  # normalizada (RF-MM-27)
 
 
 def test_un_whatsapp_invalido_no_sale_como_un_sms_sin_enlace_sino_como_error() -> None:
@@ -328,7 +335,7 @@ def test_el_largo_previsto_es_el_del_mensaje_mas_largo_que_se_construye() -> Non
         constructor = speech.ConstructorMensajes(version, WHATSAPP)
         for largo in speech.previsualizar(version, WHATSAPP):
             mensaje = constructor.mensaje_de(largo.rango.segmento, "12345678", date(2026, 12, 31))
-            assert largo.largo_maximo == len(mensaje), (nombre, largo.rango.segmento)
+            assert largo.largo_maximo == largo_gsm7(mensaje), (nombre, largo.rango.segmento)
 
 
 def _con_parte_2(largo_total: int) -> tuple[PartesSegmento, ...]:
@@ -438,7 +445,7 @@ def test_una_fila_cargada_lleva_el_mensaje_del_speech_con_titular_de_8_y_fecha()
         + ORIGINAL[3].parte_2.replace(VARIABLE_WHATSAPP, enlace)
     )
     assert fila.segmento is Segmento.DE_31_A_60
-    assert fila.mensaje == esperado
+    assert fila.mensaje == a_gsm7(esperado)  # el titular "Peña" sale "Pena" (RF-MM-27)
 
 
 # --- El enlace de WhatsApp: el dueño del prefijo es el nucleo ------------------------------------
@@ -591,11 +598,21 @@ def test_sin_whatsapp_el_segmento_que_lo_usa_tampoco_pide_el_mensaje() -> None:
     assert constructor.pedidos == []
 
 
-# --- GSM-7 (RF-MM-27, B16): lo nuevo es solo la normalizacion --------------------------------------
+# --- GSM-7 (RF-MM-27, B16 y B9): lo nuevo es solo la normalizacion ----------------------------------
 #
-# Las pruebas de arriba siguen comparando con las constantes de 3e567d7 sin tocarlas: `speech.py`
-# todavia no normaliza (lo hace T-MM-B9, y entonces esas comparaciones pasan a ser contra
-# `a_gsm7(constante)`). Las de abajo ya fijan la referencia nueva con lo que ofrece el motor.
+# Las constantes de 3e567d7 no se tocan: las pruebas de arriba comparan contra `a_gsm7(constante)`
+# porque `speech.py` normaliza desde T-MM-B9. Las de abajo fijan, con lo que ofrece el motor, que
+# esa es la UNICA diferencia con el camino de antes.
+
+
+class _ConstructorCrudo(speech.ConstructorMensajes):
+    """El constructor SIN el ultimo paso de GSM-7: la referencia cruda para comparar. Solo existe
+    en las pruebas; MOWA MES siempre entrega el mensaje normalizado."""
+
+    def mensaje(self, segmento, contexto):
+        if segmento in self._sin_whatsapp:
+            raise FaltaWhatsapp((segmento,))
+        return self._compiladas[segmento].evaluar(contexto).texto
 
 
 def _compilar_como_b9(partes: PartesSegmento):
@@ -644,7 +661,7 @@ def test_la_cota_del_speech_original_en_unidades_gsm7_es_la_de_siempre() -> None
 
 
 def test_toda_la_matriz_normalizada_da_la_huella_gsm7() -> None:
-    filas = mensajes_de_la_matriz(speech.ConstructorMensajes)
+    filas = mensajes_de_la_matriz(_ConstructorCrudo)
     normalizadas = [[*f[:-1], None if f[-1] is None else a_gsm7(f[-1])] for f in filas]
 
     assert huella_de_la_matriz(filas) == MATRIZ_HUELLA  # la de 3e567d7, intacta
@@ -652,10 +669,12 @@ def test_toda_la_matriz_normalizada_da_la_huella_gsm7() -> None:
     assert sum(a != b for a, b in zip(filas, normalizadas, strict=True)) == (
         MATRIZ_FILAS_QUE_CAMBIAN_A_GSM7
     )
+    # y lo que entrega MOWA MES es exactamente esa matriz normalizada
+    assert mensajes_de_la_matriz(speech.ConstructorMensajes) == normalizadas
 
 
 def test_las_filas_que_cambian_por_los_espacios_son_las_de_la_tabulacion_sintetica() -> None:
-    filas = mensajes_de_la_matriz(speech.ConstructorMensajes)
+    filas = mensajes_de_la_matriz(_ConstructorCrudo)
 
     # El Speech original no tiene espacios especiales ni tabulacion.
     assert not any(

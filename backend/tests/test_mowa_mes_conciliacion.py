@@ -1,11 +1,15 @@
 """Pruebas de la conciliacion de cargados y enviados (RF-MM-22, C-3, C-5), con datos sinteticos."""
 
+from datetime import date
+
 import pytest
 
-from app.core.entities.mowa_mes import CodigoMowaMes
+from app.core.entities.mowa_mes import CodigoMowaMes, PartesSegmento, Segmento
 from app.core.entities.mowa_mes_campana import FilaCarga
 from app.core.entities.mowa_mes_reporte import FilaReporte
+from app.core.services.plataformas.mowa_mes import speech
 from app.core.services.plataformas.mowa_mes.conciliacion import conciliar, normalizar_mensaje
+from app.core.services.texto_enriquecido.gsm7 import a_gsm7
 
 MES_ID = 70001
 
@@ -60,6 +64,63 @@ def test_la_normalizacion_se_aplica_a_los_dos_lados() -> None:
     )
 
     assert resultado.total.enviados == 1
+
+
+# --- Mensaje en GSM-7 (RF-MM-27, T-MM-B9): la conciliacion no cambia de codigo -------------------
+#
+# Los mensajes nuevos se guardan ya normalizados y `normalizar_mensaje` es idempotente sobre ellos;
+# una campana anterior, con tildes guardadas, sigue conciliando como siempre.
+
+_EMOJI = "\N{THUMBS UP SIGN}"
+_NBSP = "\N{NO-BREAK SPACE}"
+_ANGULAR_I = "\N{LEFT-POINTING DOUBLE ANGLE QUOTATION MARK}"
+_ANGULAR_D = "\N{RIGHT-POINTING DOUBLE ANGLE QUOTATION MARK}"
+_EURO = "\N{EURO SIGN}"
+
+
+def _mensaje_nuevo_de_mowa_mes() -> str:
+    """El mensaje tal como lo arma MOWA MES hoy: un emoji que se borra, una guillemet que se
+    transliteran, un espacio duro, tildes y un extendido (el euro)."""
+    partes = PartesSegmento(
+        Segmento.DE_1_A_8,
+        f" tu cuota venció {_EMOJI}{_ANGULAR_I}mañana{_ANGULAR_D}{_NBSP}paga {_EURO}10",
+        " gracias",
+    )
+    return speech.ConstructorMensajes((partes,), None).mensaje_de(
+        Segmento.DE_1_A_8, "ZZPRUEBA", date(2026, 9, 5)
+    )
+
+
+def test_la_campana_nueva_normalizada_concilia_contra_un_reporte_con_el_mismo_texto() -> None:
+    mensaje = _mensaje_nuevo_de_mowa_mes()
+    nueva = FilaCarga("900000104", mensaje, "22222222")
+
+    resultado = conciliar([nueva], [_enviada(2, nueva)])
+
+    assert mensaje == 'ZZPRUEBA tu cuota vencio "manana" paga €10' + "05/09/2026 gracias"
+    assert (resultado.total.enviados, resultado.sin_correspondencia) == (1, 0)
+
+
+def test_la_campana_nueva_y_la_anterior_con_tildes_concilian_igual() -> None:
+    texto_enviado = "ZZPRUEBA te informa que tu cuota vencio, acercate"  # lo que MES devuelve
+    anterior = FilaCarga("900000105", "ZZPRUEBA te informa que tu cuota venció, acércate", "1")
+    nueva = FilaCarga("900000106", a_gsm7(anterior.mensaje), "2")
+    reporte = [
+        _enviada(2, anterior, mensaje=texto_enviado),
+        _enviada(3, nueva, mensaje=texto_enviado),
+    ]
+
+    resultado = conciliar([anterior, nueva], reporte)
+
+    assert nueva.mensaje != anterior.mensaje  # una se guardo con tildes y la otra normalizada
+    assert (resultado.total.enviados, resultado.sin_correspondencia) == (2, 0)
+
+
+def test_normalizar_mensaje_es_idempotente_sobre_un_mensaje_ya_normalizado() -> None:
+    mensaje = _mensaje_nuevo_de_mowa_mes()
+
+    assert normalizar_mensaje(mensaje) == normalizar_mensaje(normalizar_mensaje(mensaje))
+    assert normalizar_mensaje(mensaje) == mensaje.strip()
 
 
 def test_un_mismo_telefono_con_el_mismo_mensaje_se_empareja_una_fila_por_fila() -> None:

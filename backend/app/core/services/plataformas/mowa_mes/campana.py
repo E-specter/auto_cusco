@@ -68,6 +68,7 @@ from app.core.services.plataformas.mowa_mes.segmentos import ProgramacionInvalid
 from app.core.services.seleccion_cartera import expresiones
 from app.core.services.seleccion_cartera.recorrido import SeleccionPaginada
 from app.core.services.seleccion_cartera.servicio import CANTIDAD_MAXIMA, ConsultaCarteraService
+from app.core.services.texto_enriquecido.gsm7 import largo_gsm7
 from app.core.services.texto_enriquecido.serializacion import expresion_a_dict
 
 COLUMNA_NUMERO = "numero"
@@ -210,7 +211,9 @@ def evaluar_producto(
     if constructor.requiere_whatsapp_faltante(rango.segmento):
         return rango.segmento
     mensaje = constructor.mensaje_de(rango.segmento, titular, vencimiento, dias_ajustados)
-    codigo = speech.codigo_por_largo(len(mensaje))
+    # El mensaje ya viene normalizado a GSM-7 (RF-MM-27) y se mide en unidades GSM-7 (un extendido
+    # cuenta 2): se normaliza ANTES de los 150 y de los 160, no despues.
+    codigo = speech.codigo_por_largo(largo_gsm7(mensaje))
     if codigo is CodigoMowaMes.MENSAJE_EXCEDE_160:
         return Exclusion(pagare, codigo)
     dni = str(documento).strip()

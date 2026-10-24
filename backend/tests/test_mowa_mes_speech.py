@@ -34,6 +34,7 @@ from app.core.services.plataformas.mowa_mes.configuracion import (
     ConfiguracionMowaMesService,
     nombre_siguiente,
 )
+from app.core.services.texto_enriquecido.gsm7 import a_gsm7
 from tests.test_speech_original import speech_de_la_migracion
 
 MOMENTO = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
@@ -179,7 +180,7 @@ def test_el_mensaje_une_titular_8_parte_1_fecha_y_parte_2() -> None:
 
     mensaje = constructor.mensaje_de(Segmento.DE_1_A_8, "ZZPRUEBA SINTETICO", VENCIMIENTO)
 
-    assert mensaje == (
+    assert mensaje == a_gsm7(  # RF-MM-27: el mensaje sale normalizado (venció -> vencio)
         "ZZPRUEBA Caja Cusco te informa que tu cuota venció el 05/09/2026, acércate a pagar"
         " a nuestras agencias, agentes KASNET o a través de Wayki app."
     )

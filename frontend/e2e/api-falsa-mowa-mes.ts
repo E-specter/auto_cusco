@@ -207,6 +207,8 @@ export function previsualizacionSintetica(
       ejemplo: falta
         ? null
         : `XXXXXXXX${parte.parte_1.replaceAll('[whatsapp]', enlace)}dd/mm/yyyy${parte.parte_2.replaceAll('[whatsapp]', enlace)}`,
+      // B9 contract: always present; the real list is T-MM-F7's, so the fake never reports any.
+      caracteres_quitados: [],
     });
   });
 

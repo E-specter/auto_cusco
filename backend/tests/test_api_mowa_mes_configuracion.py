@@ -340,6 +340,42 @@ def test_previsualizacion_sin_whatsapp_marca_los_segmentos_que_lo_necesitan(clie
     assert por_segmento["preventiva"]["falta_whatsapp"] is False
 
 
+def test_la_previsualizacion_v1_normaliza_el_ejemplo_y_trae_la_lista_de_borrados(cliente) -> None:
+    client, _ = cliente
+    emoji = "\N{THUMBS UP SIGN}"
+    o_tilde = "\N{LATIN SMALL LETTER O WITH ACUTE}"
+    partes = [
+        PARTES[0],
+        {**PARTES[1], "parte_1": f" venci{o_tilde} {emoji}", "parte_2": "."},
+        *PARTES[2:],
+    ]
+
+    cuerpo = client.post(
+        "/mowa-mes/speech/previsualizacion", json={"partes": partes, "whatsapp": "900000123"}
+    ).json()
+
+    por_segmento = {s["segmento"]: s for s in cuerpo["segmentos"]}
+    assert por_segmento["1_a_8"]["ejemplo"] == "XXXXXXXX vencio dd/mm/yyyy."
+    assert por_segmento["1_a_8"]["caracteres_quitados"] == [
+        {"caracter": emoji, "punto_de_codigo": "U+1F44D"}
+    ]
+    # el Speech original no pierde nada y su 9 a 30 sigue en 156 (RF-MM-19)
+    assert por_segmento["preventiva"]["caracteres_quitados"] == []
+    assert por_segmento["9_a_30"]["largo_maximo"] == 156
+
+
+def test_el_contrato_declara_los_caracteres_quitados_por_grafema() -> None:
+    from app.api import contrato
+
+    esquemas = contrato.generar()["components"]["schemas"]
+    segmento = esquemas["LargoSegmentoRespuesta"]
+    quitado = esquemas["CaracterQuitadoRespuesta"]
+
+    assert "caracteres_quitados" in segmento["required"]  # siempre presente, vacia si no hay
+    assert set(quitado["required"]) == {"caracter", "punto_de_codigo"}
+    assert "U+1F44D U+1F3FD" in quitado["properties"]["punto_de_codigo"]["description"]
+
+
 def test_previsualizacion_con_whatsapp_y_problemas(cliente) -> None:
     client, _ = cliente
     partes = [{**PARTES[0], "parte_2": " [@"}, *PARTES[1:]]

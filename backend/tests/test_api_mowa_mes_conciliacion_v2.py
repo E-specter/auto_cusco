@@ -23,6 +23,7 @@ from fastapi.testclient import TestClient
 from app.api.mowa_mes import obtener_servicio_mowa_mes
 from app.core.entities.mowa_mes_reporte import COLUMNAS_REPORTE
 from app.core.services.plataformas.mowa_mes.configuracion import ConfiguracionMowaMesService
+from app.core.services.texto_enriquecido.gsm7 import a_gsm7
 from app.main import app
 from tests.test_api_mowa_mes_campanas import CUERPO, Entorno, _cliente
 from tests.test_mowa_mes_campana import producto
@@ -38,8 +39,12 @@ SIN_TITULAR = [
     },
     {"tipo": "texto", "valor": ". ¡Regularice hoy, gracias! "},
 ]
+# El mensaje sale normalizado a GSM-7 (RF-MM-27, T-MM-B9): "venció" sale "vencio". El patron se
+# arma con a_gsm7 del texto fijo escrito en SIN_TITULAR, no con un literal copiado de la salida.
 MENSAJE_SIN_TITULAR = re.compile(
-    r"  Cobranza: su cuota venció el \d{2}/\d{2}/\d{4}\. ¡Regularice hoy, gracias! "
+    re.escape(a_gsm7(SIN_TITULAR[0]["valor"]))
+    + r"\d{2}/\d{2}/\d{4}"
+    + re.escape(a_gsm7(SIN_TITULAR[2]["valor"]))
 )
 
 

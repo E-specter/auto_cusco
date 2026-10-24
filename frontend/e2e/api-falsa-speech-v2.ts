@@ -207,6 +207,8 @@ export async function montarApiSpeechV2(
             : null,
           codigo: maximo === null ? null : maximo > 160 ? 'mensaje_excede_160' : maximo > 150 ? 'mensaje_excede_150' : null,
           ejemplo: maximo === null ? null : 'Ejemplo sintético',
+          // Contrato de B9: siempre presente; la lista real es de T-MM-F7.
+          caracteres_quitados: [],
         });
       }
       return json(route, 200, { whatsapp, largo_advertencia: 150, largo_maximo: 160, problemas, segmentos });

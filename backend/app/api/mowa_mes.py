@@ -416,9 +416,27 @@ class BorradorV2Respuesta(ModeloRespuesta):
     problemas: list[ProblemaSpeechRespuesta]
 
 
+class CaracterQuitadoRespuesta(ModeloRespuesta):
+    """Un grafema que la normalizacion a GSM-7 BORRA del mensaje (RF-MM-27)."""
+
+    caracter: str = Field(
+        description="El grafema completo de lo borrado (un emoji compuesto es un solo elemento)"
+    )
+    punto_de_codigo: str = Field(
+        description=(
+            'Sus puntos de codigo, "U+XXXX" en mayusculas con minimo 4 digitos y separados por '
+            'un espacio: "U+1F600", "U+1F44D U+1F3FD"'
+        )
+    )
+
+
 class LargoSegmentoRespuesta(ModeloRespuesta):
     """`largo_maximo` es nulo cuando la expresion de una v2 no tiene maximo calculable: `sin_maximo`
-    dice por que (una variable cuyo largo depende del dato, o una funcion que no lo acota)."""
+    dice por que (una variable cuyo largo depende del dato, o una funcion que no lo acota).
+
+    Desde RF-MM-27 el largo va en unidades GSM-7 (un extendido cuenta 2; el texto fijo se mide ya
+    transliterado) y el `ejemplo` sale normalizado a GSM-7, tal como se enviaria.
+    """
 
     segmento: Segmento
     etiqueta: str
@@ -428,6 +446,15 @@ class LargoSegmentoRespuesta(ModeloRespuesta):
     sin_maximo: SinCotaRespuesta | None
     codigo: CodigoMowaMes | None
     ejemplo: str | None
+    caracteres_quitados: list[CaracterQuitadoRespuesta] = Field(
+        description=(
+            "Lo que la normalizacion BORRA del texto del segmento, por grafema, sin repetir y en "
+            "orden de aparicion; vacia si no se borra nada. No incluye los diacriticos que se "
+            "quitan, lo transliterado ni los espacios especiales que pasan a un espacio normal. Se "
+            "calcula sobre el texto fijo del segmento, aunque `ejemplo` sea nulo; no incluye datos "
+            "de filas reales. Si el grafema es mixto, solo la parte que se borra"
+        )
+    )
 
 
 class PrevisualizacionRespuesta(ModeloRespuesta):
@@ -436,6 +463,13 @@ class PrevisualizacionRespuesta(ModeloRespuesta):
     largo_maximo: int
     problemas: list[ProblemaSpeechRespuesta]
     segmentos: list[LargoSegmentoRespuesta]
+
+
+def _caracter_quitado(grafema: str) -> CaracterQuitadoRespuesta:
+    return CaracterQuitadoRespuesta(
+        caracter=grafema,
+        punto_de_codigo=" ".join(f"U+{ord(c):04X}" for c in grafema),
+    )
 
 
 def _partes(entrada: list[PartesEntrada]) -> tuple[PartesSegmento, ...]:
@@ -626,6 +660,7 @@ def previsualizar_speech(
                 sin_maximo=_sin_maximo(largo.motivo_sin_cota),
                 codigo=largo.codigo,
                 ejemplo=largo.ejemplo,
+                caracteres_quitados=[_caracter_quitado(g) for g in largo.caracteres_quitados],
             )
             for largo in largos
         ],

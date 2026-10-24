@@ -34,6 +34,7 @@ from app.adapters.persistence.repositorio_campanas_mowa_mes_postgres import (
     RepositorioCampanasMowaMesPostgres,
 )
 from app.core.entities.mowa_mes_reporte import COLUMNAS_REPORTE
+from app.core.services.texto_enriquecido.gsm7 import a_gsm7
 from tests import test_mowa_mes_campanas_postgres as base
 from tests.test_mowa_mes_campanas_postgres import (
     MES_IDS,
@@ -75,8 +76,13 @@ SIN_TITULAR = [
     },
     {"tipo": "texto", "valor": ". ¡Regularice hoy, gracias! "},
 ]
+# El mensaje sale normalizado a GSM-7 (RF-MM-27, T-MM-B9): "venció" sale "vencio" y "¡" se borra. El
+# patron se arma con a_gsm7 del texto fijo escrito en SIN_TITULAR, no con un literal copiado de la
+# salida (igual que en test_api_mowa_mes_conciliacion_v2.py).
 MENSAJE_SIN_TITULAR = re.compile(
-    r"  Cobranza: su cuota venció el \d{2}/\d{2}/\d{4}\. ¡Regularice hoy, gracias! "
+    re.escape(a_gsm7(SIN_TITULAR[0]["valor"]))
+    + r"\d{2}/\d{2}/\d{4}"
+    + re.escape(a_gsm7(SIN_TITULAR[2]["valor"]))
 )
 
 # La fixture `cliente` (sabana, supervisores, configuracion y limpieza) es la de las campanas.
@@ -305,10 +311,10 @@ def test_una_v2_sin_titular_carga_un_producto_sin_titular_y_se_concilia_entera(c
     ]
     assert 10 in por_pagare and por_pagare[10].supervision is False
     # El mensaje no lleva titular: el del producto sin titular es el de cualquiera del segmento,
-    # con sus tildes y los espacios de los extremos tal cual los armo la v2.
+    # normalizado a GSM-7 pero con los espacios de los extremos tal cual los armo la v2.
     sin_titular = por_pagare[10]
     assert MENSAJE_SIN_TITULAR.fullmatch(sin_titular.mensaje)
-    assert sin_titular.mensaje != _como_mes(sin_titular.mensaje)
+    assert sin_titular.mensaje != _como_mes(sin_titular.mensaje)  # MES recorta los extremos
     assert sin_titular.mensaje == por_pagare[1].mensaje
     assert sin_titular.numero == "900000110" and sin_titular.dni == "10000010"
 
@@ -328,7 +334,8 @@ def test_una_v2_sin_titular_carga_un_producto_sin_titular_y_se_concilia_entera(c
     assert del_10.estado == "enviado"
     assert _como_mes(del_10.mensaje) == _como_mes(sin_titular.mensaje)
     del_1 = en_reporte[(por_pagare[1].numero, por_pagare[1].dni)]
-    assert del_1.mensaje == _como_mes(por_pagare[1].mensaje) != por_pagare[1].mensaje  # normalizado
+    # el reporte trae el mensaje como lo deja MES: sin los espacios de los extremos
+    assert del_1.mensaje == _como_mes(por_pagare[1].mensaje) != por_pagare[1].mensaje
     assert conciliacion["sin_correspondencia"] == 0 and conciliacion["advertencias"] == []
     assert conciliacion["por_id"] == _por_id_esperado(enviadas)
     assert conciliacion["supervision"]["cargados"] == conciliacion["supervision"]["enviados"] == 5

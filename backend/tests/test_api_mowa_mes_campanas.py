@@ -476,6 +476,36 @@ def _con_tarifa(entorno: Entorno, tarifa: str) -> None:
     )
 
 
+def test_la_muestra_de_la_campana_trae_el_mensaje_normalizado_y_su_largo_en_unidades_gsm7() -> None:
+    # RF-MM-27: el mensaje sale normalizado (tilde fuera, emoji borrado) y el largo cuenta 2 por
+    # cada extendido y 3 por la elipsis, como el control de los 150 y los 160.
+    entorno = Entorno()
+    version = entorno.mowa_mes.versiones[1]
+    partes = tuple(
+        replace(
+            p,
+            parte_1=" venci\N{LATIN SMALL LETTER O WITH ACUTE} \N{THUMBS UP SIGN}\N{EURO SIGN}10",
+            parte_2=" \N{HORIZONTAL ELLIPSIS}",
+        )
+        if p.segmento.value == "1_a_8"
+        else p
+        for p in version.datos.partes
+    )
+    entorno.mowa_mes.versiones[1] = replace(version, datos=replace(version.datos, partes=partes))
+    client = _cliente(entorno)
+
+    cuerpo = client.post("/mowa-mes/campanas/previsualizacion", json=CUERPO).json()
+
+    mensaje = cuerpo["muestra"][-1]["mensaje"]  # el unico producto cargado: segmento 1 a 8
+    assert mensaje.startswith("ZZPRU001 vencio \N{EURO SIGN}10")
+    assert mensaje.endswith(" ...") and "\N{THUMBS UP SIGN}" not in mensaje
+    assert cuerpo["muestra"][-1]["largo"] == len(mensaje) + 1  # el euro cuenta 2
+    assert all(
+        m["largo"] == len(m["mensaje"]) + m["mensaje"].count("\N{EURO SIGN}")
+        for m in cuerpo["muestra"]
+    )
+
+
 def test_la_previsualizacion_trae_tarifa_costo_y_nombre_del_primer_archivo() -> None:
     client = _cliente(Entorno())
 

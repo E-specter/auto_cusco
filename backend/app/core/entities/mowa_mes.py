@@ -227,7 +227,10 @@ class ProblemaSpeech:
 
 @dataclass(frozen=True)
 class LargoSegmento:
-    """Largo maximo que puede alcanzar el mensaje de un segmento (RF-MM-19)."""
+    """Largo maximo que puede alcanzar el mensaje de un segmento (RF-MM-19, RF-MM-27).
+
+    El largo va en unidades GSM-7 (un extendido cuenta 2) y el `ejemplo` ya normalizado a GSM-7.
+    """
 
     rango: RangoSegmento
     usa_whatsapp: bool
@@ -235,6 +238,9 @@ class LargoSegmento:
     codigo: CodigoMowaMes | None  # MENSAJE_EXCEDE_150, MENSAJE_EXCEDE_160 o None
     ejemplo: str | None  # None si usa [whatsapp] y no hay numero: nunca un enlace roto
     motivo_sin_cota: MotivoSinCota | None = None
+    # Lo que la normalizacion BORRA del texto del segmento (no lo transliterado ni los
+    # diacriticos), sin repetir y en orden de aparicion: para avisar al usuario (RF-MM-27).
+    caracteres_quitados: tuple[str, ...] = ()
 
 
 class CampoConfiguracion(StrEnum):

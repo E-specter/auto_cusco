@@ -127,6 +127,84 @@ def caracteres_borrados(texto: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(c for c in texto if _caracter(c)[1]))
 
 
+# --- Lo borrado, agrupado como lo ve una persona (T-MM-B9) ---------------------------------
+
+_ZWJ = "\N{ZERO WIDTH JOINER}"
+_KEYCAP = "\N{COMBINING ENCLOSING KEYCAP}"
+_INDICADORES_REGIONALES = range(0x1F1E6, 0x1F200)
+_MODIFICADORES_DE_PIEL = range(0x1F3FB, 0x1F400)
+_SELECTORES_DE_VARIACION = (range(0xFE00, 0xFE10), range(0xE0100, 0xE01F0))
+_ETIQUETAS = range(0xE0020, 0xE0080)
+
+
+def _extiende(c: str) -> bool:
+    """Si `c` se pega al caracter anterior en un mismo grafema (UAX #29, reglas de emoji)."""
+    codigo = ord(c)
+    return (
+        c in (_ZWJ, _KEYCAP)
+        or codigo in _MODIFICADORES_DE_PIEL
+        or codigo in _ETIQUETAS
+        or any(codigo in selectores for selectores in _SELECTORES_DE_VARIACION)
+        or unicodedata.category(c) in ("Mn", "Me", "Mc")
+    )
+
+
+def _se_pega(ultimo: str, regionales: int, c: str) -> bool:
+    """Si `c` se pega al grupo en curso, cuyo ultimo caracter es `ultimo` y que lleva `regionales`
+    indicadores regionales (la cuenta se arrastra: recontarlos por caracter seria cuadratico)."""
+    if _extiende(c) or ultimo == _ZWJ:
+        return True
+    # Dos indicadores regionales seguidos son una bandera; el tercero empieza otra.
+    return (
+        ord(c) in _INDICADORES_REGIONALES
+        and ord(ultimo) in _INDICADORES_REGIONALES
+        and regionales % 2 == 1
+    )
+
+
+def grafemas_borrados(texto: str) -> tuple[str, ...]:
+    """Lo que `a_gsm7` BORRA del texto, agrupado por grafema, sin repetir y en orden de aparicion.
+
+    Un emoji compuesto (una mano con tono de piel, una familia con ZWJ, una bandera) es UN elemento
+    y no varios: es lo que la persona escribio, y asi se le avisa. Si el grafema es mixto (una letra
+    que se conserva seguida de un ZWJ suelto, un `1` con su selector y su keycap), solo se informa
+    la parte que se borra. Lo transliterado, los diacriticos y los espacios que pasan a un espacio
+    normal nunca aparecen.
+
+    Entrada: el texto ORIGINAL (no la salida de `caracteres_borrados`, que ya quito repetidos y
+    perdio las secuencias). Que se borra lo decide la misma regla por caracter (`_caracter`) que usa
+    `a_gsm7`: no hay una tabla aparte; aqui solo se AGRUPAN las secuencias contiguas de caracteres
+    borrados. La union de los puntos de codigo de los elementos es exactamente el conjunto que
+    devuelve `caracteres_borrados`. Una pasada, lineal en el largo, sin caches nuevas.
+
+    Alcance. Agrupa con las reglas de emoji de UAX #29 (ZWJ, selectores de variacion, modificadores
+    de tono de piel, keycap, etiquetas, marcas combinantes y pares de indicadores regionales) y no
+    con la `\\X` de la libreria `regex`, que el proyecto no usa. NO implementa el resto de UAX #29:
+    ni las silabas de hangul ni los conjuntos de las escrituras indicas (virama): un caracter de
+    esas escrituras fuera de GSM-7 se agrupa solo con las marcas que lo siguen. Para el aviso al
+    usuario ("al enviar se borran: ...") basta: lo que importa es no partir un emoji.
+    """
+    grupos: list[str] = []
+    actual: list[str] = []
+    regionales = 0  # indicadores regionales del grupo en curso
+    for c in texto:
+        if not _caracter(c)[1]:  # se conserva, se transliteran o pierde solo su diacritico
+            if actual:
+                grupos.append("".join(actual))
+                actual = []
+        elif actual and _se_pega(actual[-1], regionales, c):
+            actual.append(c)
+            regionales += ord(c) in _INDICADORES_REGIONALES
+        else:
+            if actual:
+                grupos.append("".join(actual))
+            actual = [c]
+            regionales = int(ord(c) in _INDICADORES_REGIONALES)
+    if actual:
+        grupos.append("".join(actual))
+    return tuple(dict.fromkeys(grupos))
+
+
 def largo_gsm7(texto: str) -> int:
     """Largo del SMS en unidades GSM-7: 1 por caracter y 2 por cada extendido."""
     return len(texto) + sum(texto.count(c) for c in EXTENDIDOS)

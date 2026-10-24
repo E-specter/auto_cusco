@@ -70,6 +70,7 @@ function largo(parcial: Partial<LargoSegmento> = {}): LargoSegmento {
     sin_maximo: null,
     codigo: null,
     ejemplo: 'ejemplo',
+    caracteres_quitados: [],
     ...parcial,
   };
 }

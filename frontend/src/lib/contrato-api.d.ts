@@ -1108,6 +1108,22 @@ export interface components {
             /** Operadores */
             operadores: string[];
         };
+        /**
+         * CaracterQuitadoRespuesta
+         * @description Un grafema que la normalizacion a GSM-7 BORRA del mensaje (RF-MM-27).
+         */
+        CaracterQuitadoRespuesta: {
+            /**
+             * Caracter
+             * @description El grafema completo de lo borrado (un emoji compuesto es un solo elemento)
+             */
+            caracter: string;
+            /**
+             * Punto De Codigo
+             * @description Sus puntos de codigo, "U+XXXX" en mayusculas con minimo 4 digitos y separados por un espacio: "U+1F600", "U+1F44D U+1F3FD"
+             */
+            punto_de_codigo: string;
+        };
         /** CargaCreadaRespuesta */
         CargaCreadaRespuesta: {
             /** Id */
@@ -2078,6 +2094,9 @@ export interface components {
          * LargoSegmentoRespuesta
          * @description `largo_maximo` es nulo cuando la expresion de una v2 no tiene maximo calculable: `sin_maximo`
          *     dice por que (una variable cuyo largo depende del dato, o una funcion que no lo acota).
+         *
+         *     Desde RF-MM-27 el largo va en unidades GSM-7 (un extendido cuenta 2; el texto fijo se mide ya
+         *     transliterado) y el `ejemplo` sale normalizado a GSM-7, tal como se enviaria.
          */
         LargoSegmentoRespuesta: {
             segmento: components["schemas"]["Segmento"];
@@ -2093,6 +2112,11 @@ export interface components {
             codigo: components["schemas"]["CodigoMowaMes"] | null;
             /** Ejemplo */
             ejemplo: string | null;
+            /**
+             * Caracteres Quitados
+             * @description Lo que la normalizacion BORRA del texto del segmento, por grafema, sin repetir y en orden de aparicion; vacia si no se borra nada. No incluye los diacriticos que se quitan, lo transliterado ni los espacios especiales que pasan a un espacio normal. Se calcula sobre el texto fijo del segmento, aunque `ejemplo` sea nulo; no incluye datos de filas reales. Si el grafema es mixto, solo la parte que se borra
+             */
+            caracteres_quitados: components["schemas"]["CaracterQuitadoRespuesta"][];
         };
         /**
          * LimitesRespuesta

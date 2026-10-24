@@ -2,7 +2,7 @@
 
 Conector SMS de MOWA MES. Requerimientos en [requerimientos-mowa-mes.md](requerimientos-mowa-mes.md) (RF-MM-01 a RF-MM-22) y RF-37 a RF-41 de [atomics-requirements.md](atomics-requirements.md). Plan del coordinador en `docs/agents/coordinador_modulo_mowa_mes/plan.md`.
 
-Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6a, commit `7849ef0`), segundo corte (B4, B5 y B6b: campaña, archivos, reporte de enviados y conciliación, secciones 9 a 14), el `409` con código (sección 15) y B8: tarifa, costos y nombre de los archivos (sección 16).**
+Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6a, commit `7849ef0`), segundo corte (B4, B5 y B6b: campaña, archivos, reporte de enviados y conciliación, secciones 9 a 14), el `409` con código (sección 15) B8: tarifa, costos y nombre de los archivos (sección 16) y B9: mensaje en GSM-7 (sección 17).**
 
 ## 1. Piezas
 
@@ -268,3 +268,50 @@ Antes el frontend ubicaba el error bajo su campo adivinando por el texto del `de
 | `tests/test_mowa_mes_campanas_postgres.py` | Defectos de la base, tarifa exacta, congelado y costo del mes contra la base real, campañas sin tarifa, consistencia de `enviados_conciliados` con la conciliación tras cada paso, atomicidad de la importación, restricciones (`CHECK` y `UNIQUE`) y nombres guardados |
 
 **Mutaciones (en un worktree pinneado, 24 en total, todas detectadas; las 7 últimas son del `campo` del `400` —campo equivocado en la tarifa, el WhatsApp, la plantilla de la configuración y del `PUT`, plantilla de campaña sin campo, `campo` descartado en el `400` de campañas— y el lock global retirado):** tarifa actual en lugar de la congelada (costo real del núcleo, del listado y costo del mes en SQL), `float` en lugar de `Decimal` (costo y lectura de la tarifa), costo real con cualquier estado (núcleo y postgres), sufijo recortado por el límite de 120, variable desconocida aceptada, reemplazo que no recalcula el conteo, campaña de origen de un id movido sin recalcular, `0` en lugar de `NULL` sin reporte, conteo fuera de la transacción, descarga sin `filename*`, campañas sin tarifa sin contarse, costo estimado sin la supervisión y descarga con el nombre de la plantilla actual en lugar del guardado.
+
+## 17. Mensaje en GSM-7 (B9, RF-MM-27 y RF-MM-19 ampliado)
+
+Un SMS con un carácter fuera de GSM-7 pasa a UCS-2 y su límite baja de 160 a 70. Decisión del usuario (2026-10-19): el `mensaje` se normaliza a GSM-7 al generar la carga, de modo que el límite de 160 sea siempre el real. La tabla y las funciones son del motor (`app/core/services/texto_enriquecido/gsm7.py`, §24 de `motor-texto-enriquecido.md`); MOWA MES las usa.
+
+### 17.1 Qué hace el conector
+
+| Dónde | Qué |
+|---|---|
+| `ConstructorMensajes.mensaje` (`plataformas/mowa_mes/speech.py`) | Evalúa la expresión del segmento y aplica `a_gsm7` al **texto ya evaluado**, como último paso fijo, tanto en una v1 como en una v2. El archivo `.xlsx`, la fila guardada, la supervisión (que copia el mensaje de la primera fila) y la conciliación ven todos el mismo texto |
+| `_compilar` (mismo archivo) | Compila con `medida=largo_gsm7_normalizado`: el texto fijo de la cota se mide ya transliterado y con los extendidos contando 2 |
+| `evaluar_producto` (`campana.py`) | `codigo_por_largo(largo_gsm7(mensaje))` sobre el mensaje ya normalizado: se normaliza **antes** de los 150 y de los 160 |
+| `POST /mowa-mes/campanas/previsualizacion` | `muestra[].largo` en unidades GSM-7 y `mensaje` ya normalizado |
+| `POST /mowa-mes/speech/previsualizacion` | `ejemplo` normalizado, `largo_maximo` en unidades GSM-7 y `caracteres_quitados` (17.3) |
+
+- **`a_gsm7` NO se cuelga de las variables.** La función `a_gsm7` del motor tiene como cota el triple de la de su entrada: aplicada al titular subiría la cota de «9 a 30» de 156 a 172 y rompería la advertencia de RF-MM-19. Se normaliza el texto final, no el dato. Además `primeros(8)` corta antes de normalizar, así que un titular con `ñ` cuenta la `ñ` como un carácter y después pierde la virgulilla (`  Peña R` sale `  Pena R`).
+- **La versión se guarda como se escribió.** Las huellas del Speech original y de las versiones guardadas no cambian; lo que cambia es el mensaje que sale (`venció` → `vencio`), un cambio decidido y registrado en RF-54. La prueba de oro compara con `a_gsm7(constante congelada)` y no reemplaza las constantes de 3e567d7.
+- **Cota en unidades GSM-7.** Exacta para el texto fijo; las variables cuentan 1 por carácter (el titular de 8 y la fecha de 10 son ASCII). Es un supuesto documentado: un dato con un extendido (cuenta 2) o con `…` (pasa a 3) puede pasarla, y el control exacto sigue siendo el de cada fila, sobre el mensaje real. Una propiedad con semilla fija comprueba que, con un titular de 8 y una fecha de 10, el largo del mensaje real es exactamente la cota.
+- **Extendidos.** `€ [ ] { } \ ~ ^ |` y el salto de página se conservan y cuentan 2 (supuesto S-MM-9: así lo cuenta el estándar; falta confirmar con MES cómo lo cobra). Por eso `[whatsapp]` mide 12 en GSM-7 y los corchetes pesan en el largo.
+
+### 17.2 La conciliación no cambia de código
+
+Los mensajes nuevos se guardan ya normalizados y `normalizar_mensaje` (NFD sin marcas y sin espacios en los extremos) es idempotente sobre ellos; una campaña anterior, guardada con tildes, concilia como siempre contra el reporte de MES, que ya viene sin tildes. Las pruebas de `test_mowa_mes_conciliacion.py` lo fijan: una campaña nueva (emoji borrado, comillas angulares transliteradas, espacio duro, tildes y un extendido) concilia contra un reporte con el mismo texto, y una anterior y una nueva concilian igual.
+
+### 17.3 `caracteres_quitados` en la previsualización del speech
+
+`segmentos[].caracteres_quitados: [{ caracter, punto_de_codigo }]`, siempre presente, vacía si no se borra nada. Forma cerrada con `dev_frontend_modulo_mowa_mes` y `designer` (el texto visible y el nombre de los invisibles son del frontend):
+
+- **Por grafema, no por punto de código:** un emoji compuesto (👍🏽, una familia con ZWJ, una bandera) es **un** elemento. `caracter` es el grafema de lo borrado y `punto_de_codigo` trae sus puntos como «U+XXXX» (mayúsculas, mínimo 4 dígitos) separados por un espacio: `U+1F44D U+1F3FD`.
+- **Sin repetir** el grafema entero y **en orden de aparición**.
+- **De un grafema mixto, solo la parte borrada:** una letra que se conserva seguida de un ZWJ suelto da `U+200D`; un `1` con su selector y su keycap da `U+FE0F U+20E3`.
+- **Nunca aparece lo que no se pierde:** ni los diacríticos que se quitan, ni lo transliterado (`«` → `"`, `…` → `...`, `°` → `o`), ni los espacios especiales que pasan a un espacio normal.
+- **Qué texto:** el del segmento **antes** de normalizar. Una v1 y una v2 que se puede evaluar: el texto evaluado con el ejemplo (titular de 8, fecha de ejemplo y WhatsApp si hay), o sea el texto fijo, porque los datos de ejemplo son ASCII. Si el segmento usa `[whatsapp]` y no hay número, o una v2 no se puede evaluar, se calcula sobre el texto fijo: el aviso sale aunque `ejemplo` sea nulo. No incluye datos de filas reales; ese control es por fila en la campaña.
+- **Cada trozo fijo se agrupa por su lado:** en una v1 las dos partes (y lo que separa el marcador `[whatsapp]`) van separadas en el mensaje por la fecha o el enlace; en una v2 sin ejemplo, cada texto fijo es un nodo aparte. Se calcula `grafemas_borrados` por trozo y se unen sin repetir y en orden; si no, un trozo que termina en una mitad de bandera y el siguiente que la completa formarían una bandera que nadie escribió (lo mismo con un emoji y un tono de piel).
+- **Dónde vive:** la agrupación es `grafemas_borrados` en `gsm7.py` del motor, junto a `caracteres_borrados` (única fuente de qué se borra). Agrupa con las reglas de emoji de UAX #29 y no con la `\X` de la librería `regex`, que el proyecto no usa; su alcance está declarado en su docstring y en §24.
+
+### 17.4 Pruebas
+
+| Archivo | Qué cubre |
+|---|---|
+| `tests/test_mowa_mes_speech_gsm7.py` | Mensaje normalizado de una v1 y de una v2, normalizar después de evaluar (titular recortado antes), extendidos que se conservan, supervisión, huellas intactas, los bordes de 150 y 160 en unidades GSM-7 con extendido y con elipsis, cota de una v2, «9 a 30» en 156, propiedad cota == largo real, ejemplo y borrados de la previsualización (v1 y v2, con y sin WhatsApp), y que dos trozos fijos separados en el mensaje no formen un grafema (bandera partida entre las dos partes o por el enlace, emoji y tono de piel, nodos de texto de una v2) |
+| `tests/test_texto_enriquecido_gsm7_grafemas.py` | `grafemas_borrados`: tono de piel, familia con ZWJ, bandera y dos banderas seguidas, keycap, corazón con selector, bandera de subdivisión con etiquetas, repetidos, ZWJ suelto, invisibles, VS16 suelto, indicador regional impar, emoji junto a letra con tilde; propiedades con semilla fija (la unión es exactamente lo que borra `a_gsm7`; sin repetir; orden de primera aparición); corridas de 20 000 indicadores regionales; cadena larga de ZWJ seguida de una bandera |
+| `tests/test_mowa_mes_speech_oro.py` | Oro: los seis mensajes, la matriz completa y el texto conocido contra `a_gsm7(constante)`; la matriz cruda se recupera con un constructor de prueba sin normalizar |
+| `tests/test_mowa_mes_conciliacion.py` | Regresión de la conciliación (17.2) |
+| `tests/test_api_mowa_mes_speech_v2.py`, `test_api_mowa_mes_configuracion.py`, `test_api_mowa_mes_campanas.py` | Contrato de `caracteres_quitados`, ejemplo normalizado, largo de la muestra de la campaña en unidades GSM-7 |
+
+**Mutaciones (en un worktree, 20, todas detectadas; la G19 por tiempo):** no normalizar (v1 y v2; solo la v2; solo la v1), colgar `a_gsm7` de las variables, medir el control de 150/160 en caracteres, medir la cota en caracteres, sacar los borrados del texto ya normalizado (v1 y v2), ejemplo sin normalizar (v1 y v2), largo de la muestra en caracteres, punto de código en minúscula, y las del agrupador (no agrupar, el ZWJ no une, dos banderas se funden, grafema repetido dos veces, informar también lo que se conserva), pegar los trozos fijos antes de agrupar, recontar los indicadores regionales con `sum` en cada carácter (no termina en 180 s con el grupo largo de ZWJ) y no reiniciar la cuenta al abrir un grupo.

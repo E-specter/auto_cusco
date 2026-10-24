@@ -49,6 +49,7 @@ from app.core.entities.mowa_mes import CodigoMowaMes, DatosSpeech, PartesSegment
 from app.core.entities.mowa_mes_reporte import COLUMNAS_REPORTE, FilaReporte
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService
 from app.core.services.plataformas.mowa_mes.campana import huella_speech
+from app.core.services.texto_enriquecido.gsm7 import largo_gsm7
 from app.main import app
 from tests.test_sabana_cabeceras import CABECERAS_10_09
 from tests.test_sabana_normalizador import _fila_sintetica
@@ -529,7 +530,9 @@ def test_la_muestra_de_la_previsualizacion_trae_la_supervision_primero(cliente) 
     assert [f["supervision"] for f in muestra] == [True] * 5 + [False] * 6
     assert [f["dni"] for f in muestra[:5]] == [f"0000000{i}" for i in range(1, 6)]
     assert {f["mensaje"] for f in muestra[:5]} == {muestra[5]["mensaje"]}
-    assert all(f["largo"] == len(f["mensaje"]) for f in muestra)
+    # El largo va en unidades GSM-7 (un extendido cuenta 2; RF-MM-27): aqui no hay extendidos, asi
+    # que coincide con los caracteres, pero se mide con la misma regla del control de 150/160.
+    assert all(f["largo"] == largo_gsm7(f["mensaje"]) for f in muestra)
     assert muestra[5]["pagare"] == "000000000000000001"
 
 

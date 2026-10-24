@@ -5,6 +5,7 @@ usa el entorno de `test_api_mowa_mes_campanas.py`. La integracion con PostgreSQL
 `test_mowa_mes_speech_v2_postgres.py`. Datos sinteticos.
 """
 
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -361,6 +362,53 @@ def test_la_previsualizacion_v2_da_largo_nivel_y_ejemplo_por_segmento(cliente) -
     )
     assert primero["sin_maximo"] is None
     assert primero["ejemplo"] == "XXXXXXXX vence el 05/10/2026"
+
+
+_EMOJI = "\N{THUMBS UP SIGN}"
+_TONO = "\N{EMOJI MODIFIER FITZPATRICK TYPE-4}"
+_ELIPSIS = "\N{HORIZONTAL ELLIPSIS}"
+_EURO = "\N{EURO SIGN}"
+
+
+def test_la_previsualizacion_v2_normaliza_el_ejemplo_y_avisa_lo_que_se_borra(cliente) -> None:
+    client, _ = cliente
+    expresiones = _por_segmento(_texto(f"Hola {_EMOJI}{_TONO} {_ELIPSIS} {_EURO} {_EMOJI}"))
+
+    segmento = client.post(
+        "/mowa-mes/speech/previsualizacion", json={"expresiones": expresiones}
+    ).json()["segmentos"][0]
+
+    assert segmento["ejemplo"] == f"Hola  ... {_EURO} "  # el ejemplo sale como se enviaria
+    assert segmento["caracteres_quitados"] == [
+        {"caracter": _EMOJI + _TONO, "punto_de_codigo": "U+1F44D U+1F3FD"},
+        {"caracter": _EMOJI, "punto_de_codigo": "U+1F44D"},
+    ]
+    # la elipsis mide 3 y el euro 2 (unidades GSM-7): "Hola " 5 + "  " 2... del texto ya normalizado
+    assert segmento["largo_maximo"] == len(segmento["ejemplo"]) + 1
+
+
+def test_la_previsualizacion_v2_trae_la_lista_vacia_si_no_se_borra_nada(cliente) -> None:
+    client, _ = cliente
+
+    segmentos = client.post(
+        "/mowa-mes/speech/previsualizacion", json={"expresiones": CUERPO_V2}
+    ).json()["segmentos"]
+
+    assert [s["caracteres_quitados"] for s in segmentos] == [[]] * 6
+
+
+def test_sin_whatsapp_el_aviso_de_lo_borrado_sale_aunque_no_haya_ejemplo(cliente) -> None:
+    client, repositorio = cliente
+    repositorio.configuracion = replace(repositorio.configuracion, whatsapp_contacto=None)
+    contacto = _variable("whatsapp_contacto", _funcion("enlace_whatsapp"))
+    expresiones = _por_segmento(_texto(f"Escribe {_EMOJI} a "), contacto)
+
+    segmento = client.post(
+        "/mowa-mes/speech/previsualizacion", json={"expresiones": expresiones}
+    ).json()["segmentos"][0]
+
+    assert segmento["falta_whatsapp"] is True and segmento["ejemplo"] is None
+    assert segmento["caracteres_quitados"] == [{"caracter": _EMOJI, "punto_de_codigo": "U+1F44D"}]
 
 
 def test_sin_maximo_calculable_trae_el_motivo_y_el_ejemplo(cliente) -> None:
