@@ -189,3 +189,102 @@ Delegados por `architec` el 2026-09-28, con los requerimientos commiteados en `9
 ### 5.4 Costo real en el listado (2026-09-28)
 
 `architec` aprobó la opción (iii), con apoyo de `designer`: la campaña guarda un conteo derivado, `enviados_conciliados` (E-1). Se escribe en la misma transacción que importa o reemplaza el reporte. Sin reportes es `NULL` (pendiente), nunca 0. No se hace backfill: las campañas anteriores no tienen tarifa. El costo real se calcula al leer como conteo × tarifa congelada, así que el listado lleva estimado y real por fila. Hay una prueba postgres de consistencia contra la conciliación, con su mutación. RF-MM-24 no cambia.
+
+## 6. Mensaje en GSM-7 (RF-MM-27, RF-MM-19 ampliado; T-MM-B9, T-MM-F7, T-MM-C4), 2026-10-19
+
+Decisión del usuario del 2026-10-19 (b12d384). Plan para aprobación de `architec`.
+
+### 6.1 Lo que encontré en el código
+
+- El `mensaje` de cada producto se arma y se mide en un solo lugar: `campana.py`, `constructor.mensaje_de(...)` seguido de `codigo_por_largo(len(mensaje))`. Las filas de supervisión copian `plantilla.mensaje`, así que heredan lo que salga de ahí.
+- La campaña guarda ese `mensaje` en `FilaCarga`, y la conciliación lo compara con el del reporte de MES. `conciliacion.normalizar_mensaje` ya quita los diacríticos (NFD sin marcas combinantes) de los dos lados, y además recorta los espacios de los extremos.
+- El Speech original solo tiene `á`, `é`, `í` y `ó` (lo confirman las constantes de `oro_mowa_mes_congelados.py`). Al normalizarlo, el largo no cambia: `9 a 30` sigue llegando a 156 y se sigue advirtiendo.
+- Las huellas de las versiones guardadas (17 y 92) no deben cambiar: la versión se guarda tal como se escribió.
+
+### 6.2 Diseño propuesto (T-MM-B9)
+
+1. **Función del motor `a_gsm7` y función del núcleo `largo_gsm7(texto)`.** Lo acordé con `coordinador_motor_texto_enriquecido` y lo aceptó `architec`.
+   - `a_gsm7` es de la familia texto y vive en el registro, con su cota:
+     - primero quita los diacríticos (NFD sin marcas combinantes), igual que la conciliación;
+     - después translitera los signos con equivalente simple (decisión del usuario, 204b3dc): `“ ” « »`→`"`, `‘ ’`→`'`, `…`→`...`, `– —`→`-`, `° º`→`o`, `ª`→`a`. `N°` sale `No` y `don’t` sale `don't`;
+     - por último borra lo que siga fuera del alfabeto básico y de la tabla extendida de GSM-7 (3GPP TS 23.038), por ejemplo un emoji;
+     - los extendidos (`€ [ ] { } \ ~ ^ |` y el salto de página) se conservan.
+   - `largo_gsm7` cuenta 2 cada extendido (S-MM-9). Lo usan la cota y el control de 160.
+2. **MOWA MES aplica `a_gsm7` como último paso fijo de cada segmento**, sin que el usuario la agregue. Se hace sobre el texto ya evaluado, no colgando la función de cada variable (precisado en la revisión de B16, 2026-10-21):
+   - compilar las v1 y las v2 con `medida=largo_gsm7_normalizado`;
+   - evaluar, aplicar `a_gsm7` al texto y medir con `largo_gsm7`;
+   - sacar `caracteres_borrados` del texto evaluado antes de normalizar.
+   La cota de la función `a_gsm7` del catálogo es 3 por carácter (tope verdadero del motor); el supuesto de «1 por carácter en las variables» es de MOWA MES. Antes de medir, la campaña pasa a `codigo_por_largo(largo_gsm7(mensaje))`. Así el archivo XLSX, la fila guardada, la supervisión, la previsualización de la campaña y la conciliación ven todos el mismo texto.
+   - Condición de `architec`: se normaliza ANTES de medir los 150, los 160 y la cota (RF-MM-19).
+   - Lo que exijo de la implementación, que elige el motor:
+     - el texto final es igual a `a_gsm7` del texto completo;
+     - la cota está en unidades GSM-7: exacta para el texto fijo, y las variables cuentan su cota a 1 por carácter. Es un supuesto documentado, porque un dato con un extendido puede pasarla, y el control exacto sigue siendo el de cada fila;
+     - una prueba de propiedad: con variables sin extendidos, `largo_gsm7(mensaje) <= cota`.
+3. **Previsualización del speech** (largo máximo por segmento):
+   - el `ejemplo` sale normalizado;
+   - la cota pasa a contarse en unidades GSM-7: el texto fijo se normaliza y cada extendido suma 1;
+   - las variables siguen contando 1 por carácter, porque el control exacto sigue siendo el de cada fila;
+   - la respuesta agrega lo que F7 necesita para avisar, sin que el frontend tenga que recalcular nada: por ejemplo, `caracteres_quitados` por segmento (los caracteres del texto fijo que se borran; los transliterados no cuentan) y un indicador de si el texto cambió. El nombre y la forma los cierra backend con dev_frontend y designer.
+   - Hay que regenerar `contratos/openapi.json` y `contrato-api.d.ts`.
+4. **Conciliación sin cambios de código.** Los mensajes nuevos ya salen normalizados, y `normalizar_mensaje` es idempotente sobre ellos. Las campañas anteriores, con tildes guardadas, siguen conciliando como hoy. Se prueba con:
+   - las pruebas de conciliación actuales, intactas;
+   - una regresión nueva: una campaña generada después del cambio (con un emoji borrado, una `«` transliterada y un extendido) concilia contra un reporte con el mismo texto;
+   - una campaña anterior, con tildes, sigue conciliando igual.
+5. **Prueba de oro, actualizada a propósito (RF-54):** en lugar de reemplazar las constantes, la prueba pasa a afirmar que la salida nueva es igual a `a_gsm7(constante congelada)`, mensaje por mensaje y con el SHA de la matriz recalculado así. Eso prueba que la única diferencia con el camino de antes es la normalización. Las constantes de 3e567d7 quedan como referencia histórica.
+6. **Pruebas de `a_gsm7`:**
+   - tabla de casos: `ñ`→`n`, `ü`→`u`, un caso por signo de la tabla de transliteración, emoji borrado, extendidos conservados que cuentan 2, saltos de línea conservados;
+   - propiedades con Hypothesis: idempotencia, salida siempre dentro de GSM-7, y `largo_gsm7(a_gsm7(x)) <= 2 * len(x)`;
+   - mutaciones: no borrar fuera de GSM-7, borrar en vez de transliterar, transliterar antes de quitar diacríticos, contar el extendido como 1, normalizar después de medir.
+7. **Rendimiento:** el costo es lineal y chico por fila. La medición con 46 000 filas y `-ConBase` la corre `architec`.
+
+**Agregado a B9 (2026-10-22, hallazgo de designer, acordado con `coordinador_motor_texto_enriquecido`).**
+- El editor v2 muestra su propio largo, calculado por los endpoints genéricos del motor. Ahora el contexto `mowa_mes.speech` mide igual que la tabla.
+- `ContextoTexto` gana `medida` (por defecto `len`) y `salida` (por defecto la identidad). Son campos de comportamiento, fuera del catálogo y del contrato.
+- `contexto_speech()` declara `medida=largo_gsm7_normalizado` y `salida=a_gsm7`.
+- `salida` se aplica a todas las salidas de texto: la muestra, los ejemplos, el producto real y la selección. Los problemas siguen ubicados sobre la expresión escrita.
+- Pruebas:
+  - paridad: cartera sigue con `len` y sin salida;
+  - con «…» y con un extendido en el texto fijo, el editor y la tabla dan el mismo número.
+- `caracteres_borrados` no va en la previsualización del motor. Las líneas del motor las revisa su coordinador. Con B13, entra primero el que esté listo antes, y el otro se rebasa.
+
+### 6.3 Frontend (T-MM-F7), espera B9
+
+- Textos de designer (2026-10-22):
+  - el largo sigue diciendo «caracteres», y la nota de cálculo explica la unidad una sola vez (los extendidos cuentan 2 y «…» cuenta 3);
+  - los invisibles llevan su nombre (11 en es y en), y el resto un genérico, «carácter invisible U+XXXX»;
+  - los elementos se separan con « · ».
+
+- La previsualización de la campaña ya muestra el `mensaje` que devuelve el backend, así que ahí basta con el aviso.
+- En el editor del speech (v1 en solo lectura y v2), el ejemplo y los largos ya vienen normalizados del backend. Falta el aviso de los caracteres que se borran (los transliterados no se señalan).
+- La experiencia está fijada por designer en `motor-texto-enriquecido-interfaz.md` §10.2 y §10.4 (2026-10-19):
+  - un hint fijo de GSM-7, en v1 y en v2;
+  - una línea por segmento, solo cuando hay borrados: «Al enviar se borran: …». Cada carácter va en mono, sin repetir, y los invisibles por su nombre. No bloquea guardar. En una v2 es un `.notice--warning` bajo el editor; en una v1 va en la celda «Estado». Quitar las tildes no se señala.
+  - El hint fijo de GSM-7 (`mowaMes.speech.gsm7`) entra en F7 y no en F8: hasta B9 la carga no normaliza, y la pantalla no puede prometerlo antes (acordado con `coordinador_motor_texto_enriquecido`, 2026-10-20).
+  - Entra también en F7, después de F8 (hallazgo de designer, 2026-10-20): por debajo de 64rem, la tarjeta apilada del speech la abre el segmento, seguido de «Largo máximo» y «Estado». Es `data-orden="1"` también en la celda del segmento, y se actualiza el comentario, porque la v1 ya no se escribe. Lleva una prueba Playwright del orden visual de la primera tarjeta.
+  - Para B9: los caracteres borrados van por segmento, sin repetir, en el orden en que aparecen y sin contar los diacríticos. El nombre de un invisible lo pone el frontend (o el backend devuelve el punto de código, a acordar en B9).
+
+### 6.4 Consultas
+
+- Con `coordinador_motor_texto_enriquecido`: resuelto (6.2, punto 1, y 6.5).
+- A `architec`, sobre los signos tipográficos: el usuario respondió «transliterar» (RF-MM-27, 204b3dc). Ver 6.2, punto 1. Plan §6 aprobado por `architec` el 2026-10-19.
+
+### 6.5 Reparto y orden
+
+- **Corte del motor** (`dev_backend_motor_texto_enriquecido`, lo revisa su coordinador y pasa por §13 conmigo): `a_gsm7` en el registro, con su cota; `largo_gsm7`; las pruebas de la función; y el oro de B5 actualizado con el cambio declarado (RF-54), que es su prueba.
+- **B9** (`dev_backend_modulo_mowa_mes`, sobre el corte del motor): `a_gsm7` como último paso en `expresion_de` y al compilar las v2; la medida en `campana.py`; los campos nuevos de la previsualización; el contrato; la regresión de conciliación; i18n de los códigos si los hay; y las mutaciones.
+- **Orden del motor** (un solo dev, acordado el 2026-10-19): B14 → B15 (M3, `speech.py` y la API) → **B16** (`a_gsm7`, `largo_gsm7`, la propiedad de la cota y el oro) → B13. B9 va encima de B16, que ya incluye B15, así que nadie rebasa contra un `speech.py` a medio cambiar. B16 arranca cuando `architec` apruebe este §6.
+- Después: F7 (frontend, con designer), C4 (mi revisión) y `architec`.
+
+### 6.6 Estado al 2026-10-24
+
+- **Entraron:**
+  - B16 del motor (535a61b), con `a_gsm7` y la normalización;
+  - B15 y F8, M3 (32bfebf y 3fe79af);
+  - B13 del motor (5ce9834);
+  - **T-MM-B9** (8894874), la base;
+  - F6 del motor (19adb4c), con `avisoSegmento`;
+  - **T-MM-B9, segunda parte** (0de6f47), medida y salida del contexto del speech.
+- **Medición de B9** (46 000 filas): previsualizar +9 % y crear +11 %, unos 10 µs por mensaje. `architec` lo aceptó.
+- **T-MM-B9c, atajo para el texto ya simple: probado y descartado.** El ahorro (~1 µs por mensaje, ~0,05 s por campaña) queda dentro del ruido de ±0,3 s. Las corridas del dev con y sin atajo (3 alternadas) lo confirman: 6,5 a 7,8 µs por fila con el atajo y 5,9 a 7,5 sin él. Si algún día interesa recuperar los ~9 µs restantes, el paso es una tarea de diagnóstico sin código: un perfil con cProfile de crear campaña con unas 5 000 filas, antes y después de B9. Hoy no es prioridad.
+- **T-MM-F7** entró en `97ebfe0` (Playwright 442/442).
+- **T-MM-C4 cerrada:** `revision-c4.md`.
