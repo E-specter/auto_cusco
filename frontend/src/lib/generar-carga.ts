@@ -14,6 +14,7 @@
  *   - Wording is the screen's (i18n): this only says which case applies and with which numbers.
  */
 
+import { ApiError } from './api';
 import type { components } from './contrato-api';
 import { CANTIDAD_MAXIMA, leerCantidad, type Consulta } from './seleccion';
 
@@ -42,6 +43,11 @@ export const FORMATOS: readonly FormatoArchivo[] = ['csv', 'xlsx', 'json'];
  */
 export type Borrador = {
   fechaCorte: string | null;
+  /**
+   * The send date as written in its field (RF-55): by default today in Lima. It always travels, so what
+   * the analyst sees is what is generated. Whether it is not before the cut-off is the backend's to say.
+   */
+  fechaEnvio: string;
   /** The selection as the selector last emitted it. */
   consulta: Consulta;
   /** False while the API says a part of the selection does not apply. */
@@ -68,6 +74,38 @@ export type Borrador = {
 /** A control's value: a checkbox is a boolean, anything else is what the user typed. */
 export type ValorOpcion = string | boolean;
 
+/** The time zone of the operation: the send date "today" is the date in Lima, never the UTC one. */
+export const ZONA_HORARIA = 'America/Lima';
+
+/**
+ * Today's date in Lima as `YYYY-MM-DD`. At night UTC is already tomorrow (Lima is UTC-5), so the
+ * browser's own zone is not asked either: a machine set to another zone would give another day.
+ */
+export function hoyEnLima(ahora: Date = new Date()): string {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: ZONA_HORARIA,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(ahora);
+  const de = (tipo: string) => partes.find((p) => p.type === tipo)!.value;
+  return `${de('year')}-${de('month')}-${de('day')}`;
+}
+
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Calendar days from `desde` to `hasta` (both `YYYY-MM-DD`); negative if `hasta` is earlier. Only for
+ * showing "N days after the cut-off": the adjustment of the days past due is the backend's.
+ */
+export function diasEntre(desde: string, hasta: string): number {
+  const dia = (fecha: string) => {
+    const [anio, mes, dd] = fecha.split('-').map(Number);
+    return Date.UTC(anio, mes - 1, dd) / 86_400_000;
+  };
+  return Math.round(dia(hasta) - dia(desde));
+}
+
 export const consultaVacia = (): Consulta => ({ filtros: [], orden: null, cantidad: null, indicadores: [] });
 
 /** The amount the selection suggests: its top n, or the contract's default when it has none. */
@@ -75,9 +113,10 @@ export function cantidadInicial(consulta: Pick<Consulta, 'cantidad'>): number {
   return consulta.cantidad ?? CANTIDAD_POR_DEFECTO;
 }
 
-export function borradorNuevo(): Borrador {
+export function borradorNuevo(hoy: string = hoyEnLima()): Borrador {
   return {
     fechaCorte: null,
+    fechaEnvio: hoy,
     consulta: consultaVacia(),
     aplicable: true,
     definicionId: null,
@@ -120,6 +159,10 @@ export function conDefinicion(borrador: Borrador, id: number | null, versionVige
 /** The latest version is "no explicit version", so the request never pins what is already current. */
 export function conVersion(borrador: Borrador, numero: number): Borrador {
   return { ...borrador, version: numero === borrador.versionVigente ? null : numero };
+}
+
+export function conFechaEnvio(borrador: Borrador, fecha: string): Borrador {
+  return { ...borrador, fechaEnvio: fecha };
 }
 
 export function conFormato(borrador: Borrador, formato: FormatoArchivo): Borrador {
@@ -238,6 +281,7 @@ export function cantidadInvalida(borrador: Pick<Borrador, 'cantidadTexto'>): boo
  */
 export type MotivoInactivo =
   | 'sin_fecha'
+  | 'sin_fecha_envio'
   | 'seleccion_no_aplica'
   | 'sin_definicion'
   | 'cantidad_invalida'
@@ -245,6 +289,7 @@ export type MotivoInactivo =
 
 export function motivoInactivo(borrador: Borrador): MotivoInactivo | null {
   if (!borrador.fechaCorte) return 'sin_fecha';
+  if (!FECHA_ISO.test(borrador.fechaEnvio)) return 'sin_fecha_envio';
   if (!borrador.aplicable) return 'seleccion_no_aplica';
   if (borrador.definicionId === null) return 'sin_definicion';
   if (cantidadInvalida(borrador)) return 'cantidad_invalida';
@@ -267,6 +312,7 @@ export function peticionDe(borrador: Borrador): PeticionGeneracion | null {
       : { id: borrador.definicionId!, version: borrador.version };
   return {
     fecha_corte: borrador.fechaCorte!,
+    fecha_envio: borrador.fechaEnvio,
     definicion_guardada: guardada,
     formato: borrador.formato,
     filtros: [...borrador.consulta.filtros],
@@ -412,4 +458,23 @@ export function agruparProblemas(problemas: readonly ProblemaDeCarga[], umbral =
     }
   }
   return elementos;
+}
+
+// ---- The send date refused (RF-55) ------------------------------------------------------------------
+
+/** The two dates of a 400 `fecha_envio_anterior`, as the backend sent them (ISO). */
+export type FechasRechazadas = { fechaEnvio: string; fechaCorte: string };
+
+/**
+ * Reads the refusal "the send date is before the cut-off". The 400 carries both dates as fields of its
+ * own, so the text can name them; anything that is not that refusal (or lacks a date) is `null`.
+ */
+export function fechasDeEnvioRechazadas(error: unknown): FechasRechazadas | null {
+  if (!(error instanceof ApiError) || error.status !== 400 || error.codigo !== 'fecha_envio_anterior') return null;
+  const envio = error.cuerpo?.fecha_envio;
+  const corte = error.cuerpo?.fecha_corte;
+  if (typeof envio !== 'string' || typeof corte !== 'string' || !FECHA_ISO.test(envio) || !FECHA_ISO.test(corte)) {
+    return null;
+  }
+  return { fechaEnvio: envio, fechaCorte: corte };
 }

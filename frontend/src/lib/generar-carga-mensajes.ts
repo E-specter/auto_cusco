@@ -12,7 +12,16 @@
  */
 
 import { ApiError } from './api';
-import type { ElementoDeProblemas, FormatoArchivo, MotivoInactivo, ProblemaDeCarga, ResumenDeCarga } from './generar-carga';
+import { formatDate } from './format';
+import {
+  diasEntre,
+  type ElementoDeProblemas,
+  type FechasRechazadas,
+  type FormatoArchivo,
+  type MotivoInactivo,
+  type ProblemaDeCarga,
+  type ResumenDeCarga,
+} from './generar-carga';
 import { t } from './i18n';
 
 /** The text of a code of the engine, or the backend's own sentence when this build lacks it. */
@@ -80,6 +89,8 @@ export function lineaDeSalida(datos: {
   formato: FormatoArchivo;
   version: number | null;
   nombre: string;
+  /** `YYYY-MM-DD`: the day the file is meant to go out (RF-55). */
+  fechaEnvio: string;
 }): string {
   const clave = datos.esTope ? 'generar.linea.hasta' : 'generar.linea.exacta';
   return t(clave, {
@@ -87,6 +98,29 @@ export function lineaDeSalida(datos: {
     formato: etiquetaDeFormato(datos.formato),
     version: datos.version ?? '—',
     nombre: datos.nombre,
+    fecha: formatDate(datos.fechaEnvio),
+  });
+}
+
+/**
+ * Above the preview: «Fecha de envío: 21 oct. 2026, 2 días después del corte» (1 día; el mismo día del
+ * corte). The dates are the ones of the preview, written with `format.ts`.
+ */
+export function lineaDeEnvio(datos: { fechaEnvio: string; fechaCorte: string }): string {
+  const dias = diasEntre(datos.fechaCorte, datos.fechaEnvio);
+  const clave = dias === 0 ? 'generar.envio.linea.cero' : dias === 1 ? 'generar.envio.linea.uno' : 'generar.envio.linea.otros';
+  return t(clave, { fecha: formatDate(datos.fechaEnvio), n: dias });
+}
+
+/**
+ * The refusal of a send date before the cut-off, with both dates in the words of the catalogue
+ * (`textoEnriquecido.codigo.fecha_envio_anterior`). That text has markers, and `textoDeCodigo` does not
+ * fill them, so this one does: the braces must never reach the screen.
+ */
+export function textoDeFechaEnvioAnterior(fechas: FechasRechazadas): string {
+  return t('textoEnriquecido.codigo.fecha_envio_anterior', {
+    fecha_envio: formatDate(fechas.fechaEnvio),
+    fecha_corte: formatDate(fechas.fechaCorte),
   });
 }
 

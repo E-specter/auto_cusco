@@ -927,6 +927,60 @@ test.describe('la muestra del editor es el producto del segmento elegido', () =>
     await expect.poll(() => muestrasDelEditor(motor).at(-1)).toMatchObject({ tipo: 'ejemplo' });
     await expect(notaDeMuestra(page)).toBeHidden();
   });
+
+  test('con cartera real, bajo el título de la vista previa dice a qué día están calculados los segmentos', async ({ page }) => {
+    await abrirConCarteraReal(page);
+
+    const aviso = page.locator('[data-previa-envio]');
+    await expect(aviso).toBeVisible();
+    await expect(aviso).toHaveText(/^Segmentos calculados con los días de atraso a hoy, .+ \d{4}, como si se enviara hoy\.$/);
+    // Under the title, before the sample control.
+    const ordenCorrecto = await page.evaluate(() => {
+      const titulo = document.querySelector('#cl-previa-title')!;
+      const hint = document.querySelector('[data-previa-envio]')!;
+      const muestra = document.querySelector('#cl-muestra-etiqueta')!;
+      return (
+        Boolean(titulo.compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+        Boolean(hint.compareDocumentPosition(muestra) & Node.DOCUMENT_POSITION_FOLLOWING)
+      );
+    });
+    expect(ordenCorrecto).toBe(true);
+  });
+
+  test('con ejemplos no hay producto ni fecha: no hay aviso, y al volver de la cartera real se va', async ({ page }) => {
+    await abrirConCarteraReal(page);
+    await expect(page.locator('[data-previa-envio]')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Ejemplos por segmento' }).click();
+
+    await expect(page.locator('[data-previa-envio]')).toBeHidden();
+  });
+
+  test('sin tocar la muestra (ejemplos) el aviso nunca sale', async ({ page }) => {
+    await conDefinicion(page);
+    await expect(page.locator('.cl-previa tbody tr').first()).toBeVisible();
+
+    await expect(page.locator('[data-previa-envio]')).toBeHidden();
+  });
+
+  test('en inglés el aviso sale en inglés', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    const definiciones = apiDefiniciones();
+    definiciones.definiciones.push(definicionFalsa({ id: 1, nombre: 'SMS preventivo' }));
+    const base = apiVacia();
+    base.versiones = [version({ fecha_corte: '2026-09-10', vigente: true })];
+    base.manejadores = [manejarTextoEnriquecido(motorConDefiniciones()), manejadorDefiniciones(definiciones)];
+    await montarApi(page, base);
+    await page.goto(RUTA);
+    await page.locator('[data-definiciones]').selectOption('1');
+    await page.locator('[data-muestra="real"]').click();
+
+    await expect(page.locator('[data-previa-envio]')).toHaveText(
+      /^Segments worked out with the days past due as of today, .+, as if it were sent today\.$/,
+    );
+  });
 });
 
 test.describe('renombrar una definición guardada (RF-56)', () => {
@@ -1190,5 +1244,101 @@ test.describe('renombrar una definición guardada (RF-56)', () => {
     await botonDelDialogo(page).click();
     await expect(dialogo(page)).toBeHidden();
     await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('SMS preventivo B');
+  });
+});
+
+test.describe('una versión que segmenta sin el ajuste a la fecha de envío (D-C3-1)', () => {
+  const AVISO = 'Esta versión calcula los segmentos con los días de atraso de la sábana, sin ajustarlos a la fecha de envío. Para usar el ajuste, guarda una versión nueva.';
+  const aviso = (page: Page) => page.locator('[data-sin-ajuste]');
+  const tabla = [{ clave: 'preventiva', etiqueta: 'Preventiva', desde: null, hasta: 0 }];
+
+  type Segmentacion = NonNullable<ReturnType<typeof definicionFalsa>['versiones'][number]['contenido']['segmentacion']>;
+  const calculado = (variable: string): Segmentacion => ({
+    criterio: { tipo: 'calculado', variable_dias: variable, tabla },
+    politica: 'excluir',
+  });
+  const porCampo: Segmentacion = { criterio: { tipo: 'campo', campo: 'segmento_financiero' }, politica: 'excluir' };
+
+  async function conSegmentacion(page: Page, versiones: Array<Segmentacion | null>) {
+    const definiciones = apiDefiniciones();
+    const definicion = definicionFalsa({ id: 1, nombre: 'SMS preventivo', versiones: versiones.length });
+    definicion.versiones.forEach((v, i) => {
+      v.contenido.segmentacion = versiones[i];
+    });
+    definiciones.definiciones.push(definicion);
+    await abrir(page, definiciones);
+    await page.getByLabel('Definición guardada').selectOption('1');
+    await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('SMS preventivo');
+  }
+
+  test('con los días de la sábana se avisa, en el panel de la definición, bajo la línea de versión', async ({ page }) => {
+    await conSegmentacion(page, [calculado('dias_atraso')]);
+
+    await expect(aviso(page)).toBeVisible();
+    await expect(aviso(page)).toHaveText(AVISO);
+    await expect(aviso(page)).toHaveClass(/notice--info/);
+    const orden = await page.evaluate(() => {
+      const linea = document.querySelector('[data-version-linea]')!;
+      return Boolean(linea.compareDocumentPosition(document.querySelector('[data-sin-ajuste]')!) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    expect(orden).toBe(true);
+  });
+
+  test('con la variable ajustada que el catálogo da por defecto no hay aviso', async ({ page }) => {
+    await conSegmentacion(page, [calculado('dias_atraso_ajustados')]);
+
+    await expect(aviso(page)).toBeHidden();
+  });
+
+  test('un criterio por campo no cuenta días: sin aviso', async ({ page }) => {
+    await conSegmentacion(page, [porCampo]);
+
+    await expect(aviso(page)).toBeHidden();
+  });
+
+  test('sin segmentación, sin aviso; una definición sin guardar tampoco lo tiene', async ({ page }) => {
+    await conSegmentacion(page, [null]);
+    await expect(aviso(page)).toBeHidden();
+  });
+
+  test('no se reinterpreta una versión guardada: cada versión dice lo suyo al elegirla', async ({ page }) => {
+    await conSegmentacion(page, [calculado('dias_atraso'), calculado('dias_atraso_ajustados')]);
+    // The latest (2) is adjusted; the first one counts the sheet's days.
+    await expect(aviso(page)).toBeHidden();
+
+    await page.getByLabel('Versión', { exact: true }).selectOption('1');
+
+    await expect(aviso(page)).toBeVisible();
+
+    await page.getByLabel('Versión', { exact: true }).selectOption('2');
+
+    await expect(aviso(page)).toBeHidden();
+  });
+
+  test('no bloquea guardar ni nada más: es un aviso sin acciones', async ({ page }) => {
+    await conSegmentacion(page, [calculado('dias_atraso')]);
+
+    await expect(aviso(page).getByRole('button')).toHaveCount(0);
+    await nombreDeColumna(page, 1).fill('telefono_editado');
+    await expect(page.getByRole('button', { name: 'Guardar' })).toBeEnabled();
+  });
+
+  test('en inglés el aviso sale en inglés', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    const definiciones = apiDefiniciones();
+    const definicion = definicionFalsa({ id: 1, nombre: 'SMS preventivo' });
+    definicion.versiones[0].contenido.segmentacion = calculado('dias_atraso');
+    definiciones.definiciones.push(definicion);
+    const base = apiVacia();
+    base.manejadores = [manejarTextoEnriquecido(motorConDefiniciones()), manejadorDefiniciones(definiciones)];
+    await montarApi(page, base);
+    await page.goto(RUTA);
+    await page.locator('[data-definiciones]').selectOption('1');
+
+    await expect(aviso(page)).toHaveText(
+      'This version works out the segments with the days past due from the sheet, without adjusting them to the send date. To use the adjustment, save a new version.',
+    );
   });
 });

@@ -410,7 +410,9 @@ test.describe('vista previa', () => {
     await expect(page.locator('[data-aviso-exclusiones]')).toBeHidden();
     await expect(page.locator('[data-aviso-errores]')).toBeHidden();
     await expect(page.locator('[data-problemas]')).toBeHidden();
-    await expect(linea(page)).toHaveText('Se generarán 500 filas en XLSX con la versión 4 de “SMS preventivo”.');
+    await expect(linea(page)).toHaveText(
+      /^Se generarán 500 filas en XLSX con la versión 4 de “SMS preventivo”, para enviar el .+ \d{4}\.$/,
+    );
     expect(cargas.pedidos.some((p) => p.ruta === '/archivos-carga' && p.metodo === 'POST')).toBe(false);
   });
 
@@ -752,5 +754,218 @@ test.describe('generar', () => {
     cargas.sinRed = false;
     const [descarga] = await Promise.all([page.waitForEvent('download'), generar(page).click()]);
     expect(descarga.suggestedFilename()).toBe('sms_preventivo.xlsx');
+  });
+});
+
+test.describe('fecha de envío (RF-55)', () => {
+  const campo = (page: Page) => page.getByLabel('Fecha de envío');
+  const errorDeFecha = (page: Page) => page.locator('[data-envio-error]');
+  const lineaDeEnvio = (page: Page) => page.locator('[data-previa-envio]');
+
+  // Lima is UTC-5: 02:30 UTC on the 20th is 21:30 in Lima on the 19th.
+  const NOCHE_DE_LIMA = '2026-10-20T02:30:00Z';
+
+  test('está en el panel «Selección», junto al selector, y es una fecha', async ({ page }) => {
+    await abrir(page);
+
+    await expect(page.locator('[data-selector] [data-envio]')).toHaveCount(1);
+    await expect(campo(page)).toHaveAttribute('type', 'date');
+    await expect(page.locator('#gc-envio-hint')).toHaveText(
+      'Los días de atraso se cuentan hasta esta fecha para calcular el segmento. Por defecto, hoy.',
+    );
+    await expect(campo(page)).toHaveAccessibleDescription(/Los días de atraso se cuentan hasta esta fecha/);
+  });
+
+  test('por defecto es hoy en Lima: de noche, cuando UTC ya es mañana, sigue siendo hoy', async ({ page }) => {
+    await page.clock.setFixedTime(new Date(NOCHE_DE_LIMA));
+    await abrir(page);
+
+    await expect(campo(page)).toHaveValue('2026-10-19');
+  });
+
+  test('con el reloj ya en el día siguiente de Lima, el defecto es ese día', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-10-20T05:00:00Z'));
+    await abrir(page);
+
+    await expect(campo(page)).toHaveValue('2026-10-20');
+  });
+
+  test('el mínimo es la fecha de corte elegida', async ({ page }) => {
+    await abrir(page);
+
+    await expect(campo(page)).toHaveAttribute('min', '2026-09-10');
+  });
+
+  test('viaja siempre, explícita, y es la misma en la vista previa y en la descarga', async ({ page }) => {
+    await page.clock.setFixedTime(new Date(NOCHE_DE_LIMA));
+    const { cargas } = await abrir(page);
+    await elegirDefinicion(page);
+    await conPreviaLista(page);
+
+    expect(ultimaPrevia(cargas)!.fecha_envio).toBe('2026-10-19');
+    await Promise.all([page.waitForEvent('download'), generar(page).click()]);
+    expect(descargas(cargas)[0].cuerpo).toEqual(ultimaPrevia(cargas));
+  });
+
+  test('cambiarla recalcula la vista previa y la línea del botón dice para cuándo es', async ({ page }) => {
+    const { cargas } = await abrir(page);
+    await elegirDefinicion(page);
+    await conPreviaLista(page);
+    const antes = previas(cargas).length;
+
+    await campo(page).fill('2026-09-14');
+
+    await expect.poll(() => previas(cargas).length).toBeGreaterThan(antes);
+    expect(ultimaPrevia(cargas)!.fecha_envio).toBe('2026-09-14');
+    await expect(linea(page)).toContainText('para enviar el');
+    await expect(linea(page)).toContainText('2026');
+  });
+
+  test('la vista previa dice la fecha de envío y cuántos días pasaron desde el corte: varios, uno o el mismo día', async ({ page }) => {
+    await abrir(page);
+    await elegirDefinicion(page);
+    await conPreviaLista(page);
+
+    await campo(page).fill('2026-09-14');
+    await expect(lineaDeEnvio(page)).toContainText('Fecha de envío:');
+    await expect(lineaDeEnvio(page)).toContainText('4 días después del corte');
+    await campo(page).fill('2026-09-11');
+    await expect(lineaDeEnvio(page)).toContainText('1 día después del corte');
+    await expect(lineaDeEnvio(page)).not.toContainText('1 días');
+    await campo(page).fill('2026-09-10');
+    await expect(lineaDeEnvio(page)).toContainText('el mismo día del corte');
+  });
+
+  test('en inglés la línea de la vista previa sale en inglés', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    const base = apiVacia();
+    base.versiones = [version({ fecha_corte: '2026-09-10', vigente: true })];
+    const definiciones = apiDefiniciones();
+    definiciones.definiciones = [definicionFalsa({ id: 7, nombre: 'SMS preventivo', versiones: 2 })];
+    const cargas = apiArchivosCarga();
+    base.manejadores = [manejadorDefiniciones(definiciones), manejadorArchivosCarga(cargas)];
+    await montarApi(page, base);
+    await page.goto(RUTA);
+    await expect(page.locator('[data-contenido]')).toBeVisible();
+    await page.getByLabel('Saved definition').selectOption({ label: 'SMS preventivo' });
+    await expect(page.locator('[data-previa-contenido]')).toBeVisible();
+
+    await page.getByLabel('Send date').fill('2026-09-12');
+
+    await expect(page.locator('[data-previa-envio]')).toContainText('Send date:');
+    await expect(page.locator('[data-previa-envio]')).toContainText('2 days after the cut-off');
+  });
+
+  test('una fecha anterior al corte la rechaza el backend: el error va bajo el campo con las dos fechas, sin llaves, y lo escrito se queda', async ({ page }) => {
+    await abrir(page);
+    await elegirDefinicion(page);
+    await conPreviaLista(page);
+
+    await campo(page).fill('2026-09-01');
+
+    await expect(errorDeFecha(page)).toHaveText(
+      /^La fecha de envío \(.+\) es anterior a la fecha de corte \(.+\)\. Elige una fecha igual o posterior\.$/,
+    );
+    await expect(errorDeFecha(page)).not.toContainText('{');
+    await expect(errorDeFecha(page)).not.toContainText('}');
+    // Both dates are named, written by format.ts (the month's spelling is the browser's, not ours).
+    await expect(errorDeFecha(page)).toHaveText(/\(01 .+ 2026\).+\(10 .+ 2026\)/);
+    await expect(campo(page)).toHaveAttribute('aria-invalid', 'true');
+    await expect(campo(page)).toHaveAccessibleDescription(/es anterior a la fecha de corte/);
+    await expect(campo(page)).toHaveValue('2026-09-01');
+    // No second summary in the preview panel, and the button says what to do.
+    await expect(page.locator('[data-previa-error]')).toBeHidden();
+    await expect(generar(page)).toBeDisabled();
+    await expect(linea(page)).toHaveText('Corrige la fecha de envío para poder generar.');
+
+    await campo(page).fill('2026-09-10');
+
+    await expect(errorDeFecha(page)).toBeEmpty();
+    await expect(campo(page)).not.toHaveAttribute('aria-invalid', 'true');
+    await expect(generar(page)).toBeEnabled();
+    await conPreviaLista(page);
+  });
+
+  test('el rechazo de la descarga también va bajo el campo, no en el aviso general', async ({ page }) => {
+    const { cargas } = await abrir(page, ({ cargas: c }) => {
+      c.respuestas.generar = [
+        {
+          estado: 400,
+          cuerpo: { detail: 'x', codigo: 'fecha_envio_anterior', fecha_envio: '2026-09-09', fecha_corte: '2026-09-10' },
+        },
+      ];
+    });
+    await elegirDefinicion(page);
+    await conPreviaLista(page);
+
+    await generar(page).click();
+
+    await expect(errorDeFecha(page)).toContainText('es anterior a la fecha de corte');
+    await expect(page.locator('[data-resultado-error]')).toBeHidden();
+    expect(descargas(cargas)).toHaveLength(1);
+  });
+
+  test('en inglés el error sale en inglés, con las dos fechas', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    const base = apiVacia();
+    base.versiones = [version({ fecha_corte: '2026-09-10', vigente: true })];
+    const definiciones = apiDefiniciones();
+    definiciones.definiciones = [definicionFalsa({ id: 7, nombre: 'SMS preventivo' })];
+    base.manejadores = [manejadorDefiniciones(definiciones), manejadorArchivosCarga(apiArchivosCarga())];
+    await montarApi(page, base);
+    await page.goto(RUTA);
+    await page.getByLabel('Saved definition').selectOption({ label: 'SMS preventivo' });
+
+    await page.getByLabel('Send date').fill('2026-09-01');
+
+    await expect(page.locator('[data-envio-error]')).toHaveText(
+      /^The send date \(.+\) is before the cut-off date \(.+\)\. Choose the same date or a later one\.$/,
+    );
+  });
+
+  test('sin fecha de envío no se puede pedir, y lo dice', async ({ page }) => {
+    await abrir(page);
+    await elegirDefinicion(page);
+    await conPreviaLista(page);
+
+    await campo(page).fill('');
+
+    await expect(generar(page)).toBeDisabled();
+    await expect(linea(page)).toHaveText('Elige la fecha de envío para poder generar.');
+  });
+
+  test('pasada la medianoche, al volver a la pestaña con la fecha sin tocar, se toma el hoy de Lima otra vez', async ({ page }) => {
+    await page.clock.setFixedTime(new Date(NOCHE_DE_LIMA));
+    const { cargas } = await abrir(page);
+    await elegirDefinicion(page);
+    await conPreviaLista(page);
+    await expect(campo(page)).toHaveValue('2026-10-19');
+
+    // Lima turns the 20th while the screen stays open.
+    await page.clock.setFixedTime(new Date('2026-10-20T06:00:00Z'));
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+
+    await expect(campo(page)).toHaveValue('2026-10-20');
+    await expect.poll(() => ultimaPrevia(cargas)?.fecha_envio).toBe('2026-10-20');
+  });
+
+  test('una fecha que el analista tocó se respeta aunque pase la medianoche', async ({ page }) => {
+    await page.clock.setFixedTime(new Date(NOCHE_DE_LIMA));
+    const { cargas } = await abrir(page);
+    await elegirDefinicion(page);
+    await conPreviaLista(page);
+    await campo(page).fill('2026-09-30');
+    await expect.poll(() => ultimaPrevia(cargas)?.fecha_envio).toBe('2026-09-30');
+
+    await page.clock.setFixedTime(new Date('2026-10-20T06:00:00Z'));
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.waitForTimeout(300);
+
+    await expect(campo(page)).toHaveValue('2026-09-30');
+    expect(ultimaPrevia(cargas)!.fecha_envio).toBe('2026-09-30');
   });
 });

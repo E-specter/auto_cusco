@@ -35,11 +35,14 @@ import {
   conCantidad,
   conDefinicion,
   conFormato,
+  conFechaEnvio,
   conFormatos,
   conOpcion,
   conSeleccion,
   conVersion,
+  fechasDeEnvioRechazadas,
   filasMaximas,
+  hoyEnLima,
   mismaPeticion,
   motivoInactivo,
   opcionesDe,
@@ -50,6 +53,7 @@ import {
   valorDeOpcion,
   versionEfectiva,
   type Borrador,
+  type FechasRechazadas,
   type FormatoArchivo,
   type OpcionFormato,
   type PeticionGeneracion,
@@ -65,8 +69,10 @@ import {
   descripcionDeProblema,
   etiquetaDeFormato,
   etiquetaDeSugerido,
+  lineaDeEnvio,
   lineaDeSalida,
   mensajeDeError,
+  textoDeFechaEnvioAnterior,
   textoMotivo,
 } from '../lib/generar-carga-mensajes';
 import { t } from '../lib/i18n';
@@ -92,6 +98,10 @@ export async function arrancar(): Promise<void> {
     contenido: q<HTMLElement>('[data-contenido]'),
     reintentar: q<HTMLButtonElement>('[data-reintentar]'),
     selector: q<HTMLElement>('[data-selector]'),
+    envio: q<HTMLElement>('[data-envio]'),
+    envioCampo: q<HTMLInputElement>('[data-envio-campo]'),
+    envioError: q<HTMLElement>('[data-envio-error]'),
+    previaEnvio: q<HTMLElement>('[data-previa-envio]'),
     vacio: q<HTMLElement>('[data-vacio]'),
     camposDefinicion: q<HTMLElement>('[data-definicion-campos]'),
     definicion: q<HTMLSelectElement>('[data-definicion]'),
@@ -158,6 +168,14 @@ export async function arrancar(): Promise<void> {
 
   /** Bumped by every definition load, so a slow answer for a choice already replaced is dropped. */
   let cargaDefinicion = 0;
+
+  /**
+   * The two dates of the last refusal «the send date is before the cut-off» (RF-55), until the analyst
+   * changes either date. The backend is the one that says it; the screen shows it under the field.
+   */
+  let fechasRechazadas: FechasRechazadas | null = null;
+  /** True once the analyst edits the send date: from then on it is theirs, and it is not renewed. */
+  let fechaEnvioTocada = false;
 
   let generando = false;
   let controladorGeneracion: AbortController | null = null;
@@ -563,6 +581,10 @@ export async function arrancar(): Promise<void> {
       el.previaPendiente.textContent = t('generar.previa.vacia');
       return;
     }
+    el.previaEnvio.textContent = lineaDeEnvio({
+      fechaEnvio: datos.fecha_envio,
+      fechaCorte: peticionPrevia?.fecha_corte ?? borrador.fechaCorte ?? datos.fecha_envio,
+    });
     el.cifraDisponibles.textContent = formatNumber(datos.disponibles);
     el.cifraSolicitados.textContent = formatNumber(datos.solicitados);
     el.cifraMuestra.textContent = formatNumber(datos.generados);
@@ -606,10 +628,18 @@ export async function arrancar(): Promise<void> {
       estadoPrevia = 'lista';
     } catch (error) {
       if (esAborto(error) || controladorPrevia !== controlador) return;
-      textoErrorPrevia = mensajeDeError(error);
       datosPrevia = null;
       peticionPrevia = null;
-      estadoPrevia = 'error';
+      const rechazadas = fechasDeEnvioRechazadas(error);
+      if (rechazadas) {
+        // Not a failure of the preview: a date to fix, and the reason is under that field.
+        fechasRechazadas = rechazadas;
+        estadoPrevia = 'pendiente';
+        pintarFechaEnvio();
+      } else {
+        textoErrorPrevia = mensajeDeError(error);
+        estadoPrevia = 'error';
+      }
     }
     controladorPrevia = null;
     pintarPrevia();
@@ -656,6 +686,8 @@ export async function arrancar(): Promise<void> {
     const peticion = peticionDe(borrador);
     if (motivo || !peticion) {
       el.linea.textContent = textoMotivo(motivo ?? 'sin_definicion', opcionInvalida());
+    } else if (fechasRechazadas) {
+      el.linea.textContent = t('generar.motivo.fecha_envio_rechazada');
     } else {
       const previaVigente = estadoPrevia === 'lista' && mismaPeticion(peticion, peticionPrevia) ? datosPrevia : null;
       el.linea.textContent = lineaDeSalida({
@@ -664,9 +696,10 @@ export async function arrancar(): Promise<void> {
         formato: peticion.formato,
         version: versionEfectiva(borrador),
         nombre: definicion?.nombre ?? definiciones.find((d) => d.id === borrador.definicionId)?.nombre ?? '',
+        fechaEnvio: peticion.fecha_envio ?? borrador.fechaEnvio,
       });
     }
-    el.generar.disabled = motivo !== null || generando;
+    el.generar.disabled = motivo !== null || fechasRechazadas !== null || generando;
     el.generar.dataset.loading = String(generando);
     q<HTMLElement>('[data-generar-texto]').textContent = t(generando ? 'generar.generando' : 'generar.generar');
     el.cancelar.hidden = !generando;
@@ -717,6 +750,9 @@ export async function arrancar(): Promise<void> {
       if (esAborto(error)) {
         el.canceladoTexto.textContent = avisoDeCancelacion(version);
         el.cancelado.hidden = false;
+      } else if (fechasDeEnvioRechazadas(error)) {
+        fechasRechazadas = fechasDeEnvioRechazadas(error);
+        pintarFechaEnvio();
       } else {
         el.errorTexto.textContent = mensajeDeError(error);
         el.error.hidden = false;
@@ -733,6 +769,38 @@ export async function arrancar(): Promise<void> {
   el.generar.addEventListener('click', () => void generar());
   el.cancelar.addEventListener('click', () => controladorGeneracion?.abort());
 
+  // ---- Send date (RF-55) -------------------------------------------------------------------
+
+  function pintarFechaEnvio(): void {
+    // Not before the cut-off: the date picker does not offer an impossible date. The backend still decides.
+    if (borrador.fechaCorte) el.envioCampo.min = borrador.fechaCorte;
+    else el.envioCampo.removeAttribute('min');
+    el.envioError.textContent = fechasRechazadas ? textoDeFechaEnvioAnterior(fechasRechazadas) : '';
+    if (fechasRechazadas) el.envioCampo.setAttribute('aria-invalid', 'true');
+    else el.envioCampo.removeAttribute('aria-invalid');
+  }
+
+  el.envioCampo.addEventListener('input', () => {
+    fechaEnvioTocada = true;
+    fechasRechazadas = null;
+    borrador = conFechaEnvio(borrador, el.envioCampo.value);
+    pintarFechaEnvio();
+    programarPrevia();
+  });
+
+  // A screen left open past midnight and an untouched date: coming back to the tab takes today in Lima
+  // again. A date the analyst chose is respected.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || fechaEnvioTocada || generando) return;
+    const hoy = hoyEnLima();
+    if (hoy === borrador.fechaEnvio) return;
+    borrador = conFechaEnvio(borrador, hoy);
+    el.envioCampo.value = hoy;
+    fechasRechazadas = null;
+    pintarFechaEnvio();
+    programarPrevia();
+  });
+
   // ---- Selection and start-up ----------------------------------------------------------------
 
   // Subscribed before mounting, so the first emission is never missed.
@@ -740,6 +808,9 @@ export async function arrancar(): Promise<void> {
     const seleccion = (event as CustomEvent<EstadoSeleccion>).detail;
     // `conSeleccion` leaves an edited amount as written, so rewriting the field is always right.
     borrador = conSeleccion(borrador, seleccion);
+    // A new cut-off date is a new question for the backend: the old refusal no longer stands.
+    fechasRechazadas = null;
+    pintarFechaEnvio();
     pintarCantidad(true);
     programarPrevia();
   });
@@ -751,6 +822,10 @@ export async function arrancar(): Promise<void> {
   }
 
   let montado = false;
+
+  // The field belongs to the «Selección» panel: it goes in, after the picker's own fields.
+  el.selector.append(el.envio);
+  el.envioCampo.value = borrador.fechaEnvio;
 
   async function cargar(): Promise<void> {
     try {

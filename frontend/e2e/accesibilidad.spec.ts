@@ -360,9 +360,16 @@ test('cartera: selección que no aplica, con partes marcadas', async ({ page }) 
 
 // The column builder, in the states where problems hide: an open row with its editor, the
 // variants selector, a dialog, the problems summary and an old version opened to look at.
-async function abrirColumnas(page: Page, versiones = 1, conOtra = false) {
+async function abrirColumnas(
+  page: Page,
+  versiones = 1,
+  conOtra = false,
+  ajustar?: (definicion: ReturnType<typeof definicionFalsa>) => void,
+) {
   const definiciones = apiDefiniciones();
-  definiciones.definiciones.push(definicionFalsa({ id: 1, nombre: 'SMS preventivo', versiones }));
+  const principal = definicionFalsa({ id: 1, nombre: 'SMS preventivo', versiones });
+  ajustar?.(principal);
+  definiciones.definiciones.push(principal);
   // A second one, so a name can be taken (the 409 of «Renombrar»).
   if (conOtra) definiciones.definiciones.push(definicionFalsa({ id: 2, nombre: 'WhatsApp cobranza' }));
   const base = apiVacia();
@@ -440,6 +447,21 @@ for (const tema of ['light', 'dark'] as const) {
       // The button went from off to on: its colour transition runs even with reduced motion, and axe
       // would read it half way. Wait for every transition to finish, not for a fixed time.
       await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+      await sinViolaciones(page);
+    });
+
+    test('el aviso de una versión que segmenta sin el ajuste a la fecha de envío', async ({ page }) => {
+      await abrirColumnas(page, 1, false, (definicion) => {
+        definicion.versiones[0].contenido.segmentacion = {
+          criterio: {
+            tipo: 'calculado',
+            variable_dias: 'dias_atraso',
+            tabla: [{ clave: 'preventiva', etiqueta: 'Preventiva', desde: null, hasta: 0 }],
+          },
+          politica: 'excluir',
+        };
+      });
+      await expect(page.locator('[data-sin-ajuste]')).toBeVisible();
       await sinViolaciones(page);
     });
 
@@ -658,6 +680,20 @@ for (const tema of ['light', 'dark'] as const) {
       await sinViolaciones(page);
     });
 
+    test('con la fecha de envío rechazada: el error bajo el campo y el motivo junto al botón', async ({ page }) => {
+      await abrirGenerarCarga(page);
+      await page.getByLabel('Fecha de envío').fill('2026-09-01');
+      await expect(page.locator('[data-envio-error]')).toContainText('es anterior a la fecha de corte');
+      await sinViolaciones(page);
+    });
+
+    test('con la línea de la fecha de envío sobre la tabla', async ({ page }) => {
+      await abrirGenerarCarga(page);
+      await page.getByLabel('Fecha de envío').fill('2026-09-12');
+      await expect(page.locator('[data-previa-envio]')).toContainText('2 días después del corte');
+      await sinViolaciones(page);
+    });
+
     test('con la cantidad inválida y el motivo junto al botón', async ({ page }) => {
       await abrirGenerarCarga(page);
       await page.getByLabel('Cantidad a generar').fill('0');
@@ -687,6 +723,14 @@ for (const tema of ['light', 'dark'] as const) {
     });
   });
 }
+
+test('generar carga a 360 px: el campo de la fecha de envío y su error', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await abrirGenerarCarga(page);
+  await page.getByLabel('Fecha de envío').fill('2026-09-01');
+  await expect(page.locator('[data-envio-error]')).not.toBeEmpty();
+  await sinViolaciones(page);
+});
 
 test('generar carga a 360 px: la tabla de la muestra y la de problemas se alcanzan con teclado', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });

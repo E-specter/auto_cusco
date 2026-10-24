@@ -153,6 +153,17 @@ export function previsualizacionSintetica(estado: ApiFalsaArchivosCarga, peticio
   };
 }
 
+/** What the backend answers when the send date is before the cut-off (RF-55): both dates, in ISO. */
+function rechazoDeFechaEnvio(peticion: PeticionGeneracion | null) {
+  if (!peticion?.fecha_envio || peticion.fecha_envio >= peticion.fecha_corte) return null;
+  return {
+    detail: 'La fecha de envio es anterior a la fecha de corte',
+    codigo: 'fecha_envio_anterior',
+    fecha_envio: peticion.fecha_envio,
+    fecha_corte: peticion.fecha_corte,
+  };
+}
+
 const json = (route: Route, estado: number, cuerpo: unknown) =>
   route.fulfill({ status: estado, contentType: 'application/json', body: JSON.stringify(cuerpo) });
 
@@ -186,6 +197,11 @@ export function manejadorArchivosCarga(estado: ApiFalsaArchivosCarga): Manejador
       estado.compuertaPrevia = null;
       if (espera) await espera;
       try {
+        const rechazo = rechazoDeFechaEnvio(cuerpo);
+        if (rechazo) {
+          await json(route, 400, rechazo);
+          return true;
+        }
         const guionada = siguiente(estado.respuestas.previsualizar);
         if (guionada) {
           await json(route, guionada.estado, guionada.cuerpo ?? {});
@@ -202,6 +218,11 @@ export function manejadorArchivosCarga(estado: ApiFalsaArchivosCarga): Manejador
       if (estado.compuerta) await estado.compuerta;
       const guionada = siguiente(estado.respuestas.generar);
       try {
+        const rechazo = rechazoDeFechaEnvio(cuerpo);
+        if (rechazo && !guionada) {
+          await json(route, 400, rechazo);
+          return true;
+        }
         if (guionada) {
           await json(route, guionada.estado, guionada.cuerpo ?? {});
           return true;

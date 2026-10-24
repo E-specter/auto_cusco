@@ -6,6 +6,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+import { ApiError, NetworkError } from '../../src/lib/api';
+
 import {
   CANTIDAD_MAXIMA,
   CANTIDAD_POR_DEFECTO,
@@ -17,6 +19,10 @@ import {
   agruparProblemas,
   cantidadSigueLaSeleccion,
   conCantidad,
+  conFechaEnvio,
+  diasEntre,
+  fechasDeEnvioRechazadas,
+  hoyEnLima,
   conDefinicion,
   conFormato,
   conFormatos,
@@ -40,6 +46,9 @@ import {
 } from '../../src/lib/generar-carga';
 import type { Consulta } from '../../src/lib/seleccion';
 
+/** The send date the screens start from in these tests: fixed, so none depends on the clock. */
+const HOY = '2026-10-19';
+
 const CONSULTA: Consulta = {
   filtros: ['segmento_financiero:igual:1. Preventiva', 'telefono:no_vacio'],
   orden: '-saldo_capital_pendiente',
@@ -49,7 +58,7 @@ const CONSULTA: Consulta = {
 
 /** A screen with everything chosen: ready to generate. */
 function listo(): Borrador {
-  let b = borradorNuevo();
+  let b = borradorNuevo(HOY);
   b = conSeleccion(b, { fechaCorte: '2026-09-10', consulta: CONSULTA, aplicable: true });
   b = conDefinicion(b, 7, 4);
   return b;
@@ -68,7 +77,7 @@ describe('cantidadInicial', () => {
 
 describe('cantidad que sigue a la selección', () => {
   it('sigue a la selección hasta que el usuario la edita', () => {
-    let b = conSeleccion(borradorNuevo(), { fechaCorte: '2026-09-10', consulta: CONSULTA, aplicable: true });
+    let b = conSeleccion(borradorNuevo(HOY), { fechaCorte: '2026-09-10', consulta: CONSULTA, aplicable: true });
     expect(b.cantidadTexto).toBe('500');
     expect(cantidadSigueLaSeleccion(b)).toBe(true);
 
@@ -79,7 +88,7 @@ describe('cantidad que sigue a la selección', () => {
   });
 
   it('deja de seguirla con la primera edición, aunque el texto quede igual', () => {
-    let b = conSeleccion(borradorNuevo(), { fechaCorte: '2026-09-10', consulta: CONSULTA, aplicable: true });
+    let b = conSeleccion(borradorNuevo(HOY), { fechaCorte: '2026-09-10', consulta: CONSULTA, aplicable: true });
     b = conCantidad(b, '500');
     expect(cantidadSigueLaSeleccion(b)).toBe(false);
 
@@ -187,7 +196,7 @@ describe('peticionDe', () => {
   });
 
   it('es nula mientras falte algo', () => {
-    expect(peticionDe(borradorNuevo())).toBeNull();
+    expect(peticionDe(borradorNuevo(HOY))).toBeNull();
     expect(peticionDe(conCantidad(listo(), '0'))).toBeNull();
     expect(peticionDe(conDefinicion(listo(), null, null))).toBeNull();
     expect(peticionDe(conSeleccion(listo(), { fechaCorte: null, consulta: CONSULTA, aplicable: true }))).toBeNull();
@@ -201,21 +210,21 @@ describe('motivoInactivo', () => {
   });
 
   it('dice lo primero que falta, en el orden en que el usuario lo encuentra', () => {
-    expect(motivoInactivo(borradorNuevo())).toBe('sin_fecha');
+    expect(motivoInactivo(borradorNuevo(HOY))).toBe('sin_fecha');
 
-    const sinAplicar = conSeleccion(borradorNuevo(), { fechaCorte: '2026-09-10', consulta: CONSULTA, aplicable: false });
+    const sinAplicar = conSeleccion(borradorNuevo(HOY), { fechaCorte: '2026-09-10', consulta: CONSULTA, aplicable: false });
     expect(motivoInactivo(sinAplicar)).toBe('seleccion_no_aplica');
 
-    const sinDefinicion = conSeleccion(borradorNuevo(), { fechaCorte: '2026-09-10', consulta: CONSULTA, aplicable: true });
+    const sinDefinicion = conSeleccion(borradorNuevo(HOY), { fechaCorte: '2026-09-10', consulta: CONSULTA, aplicable: true });
     expect(motivoInactivo(sinDefinicion)).toBe('sin_definicion');
 
     expect(motivoInactivo(conCantidad(listo(), '0'))).toBe('cantidad_invalida');
   });
 
   it('con varias cosas faltando gana la primera', () => {
-    const b = conCantidad(borradorNuevo(), 'x');
+    const b = conCantidad(borradorNuevo(HOY), 'x');
     expect(motivoInactivo(b)).toBe('sin_fecha');
-    const c = conCantidad(conSeleccion(borradorNuevo(), { fechaCorte: '2026-09-10', consulta: CONSULTA, aplicable: true }), 'x');
+    const c = conCantidad(conSeleccion(borradorNuevo(HOY), { fechaCorte: '2026-09-10', consulta: CONSULTA, aplicable: true }), 'x');
     expect(motivoInactivo(c)).toBe('sin_definicion');
   });
 });
@@ -480,6 +489,106 @@ describe('problemas de la vista previa', () => {
       exclusiones: [],
     } as never);
     expect(agruparProblemas(lista).every((e) => e.tipo === 'fila')).toBe(true);
+  });
+});
+
+describe('hoyEnLima', () => {
+  it('de noche, cuando UTC ya es mañana, sigue siendo hoy en Lima', () => {
+    // 21:30 in Lima (UTC-5) on the 19th is 02:30 UTC on the 20th.
+    expect(hoyEnLima(new Date('2026-10-20T02:30:00Z'))).toBe('2026-10-19');
+  });
+
+  it('el día cambia a la medianoche de Lima, no a la de UTC', () => {
+    expect(hoyEnLima(new Date('2026-10-20T04:59:59Z'))).toBe('2026-10-19');
+    expect(hoyEnLima(new Date('2026-10-20T05:00:00Z'))).toBe('2026-10-20');
+  });
+
+  it('al mediodía UTC y Lima coinciden', () => {
+    expect(hoyEnLima(new Date('2026-10-19T12:00:00Z'))).toBe('2026-10-19');
+  });
+
+  it('cruza el fin de mes y de año con Lima por detrás', () => {
+    expect(hoyEnLima(new Date('2027-01-01T03:00:00Z'))).toBe('2026-12-31');
+    expect(hoyEnLima(new Date('2026-11-01T04:00:00Z'))).toBe('2026-10-31');
+  });
+
+  it('devuelve el formato de la API, con ceros', () => {
+    expect(hoyEnLima(new Date('2026-03-05T15:00:00Z'))).toBe('2026-03-05');
+  });
+});
+
+describe('diasEntre', () => {
+  it('cuenta días de calendario', () => {
+    expect(diasEntre('2026-10-19', '2026-10-19')).toBe(0);
+    expect(diasEntre('2026-10-19', '2026-10-20')).toBe(1);
+    expect(diasEntre('2026-10-19', '2026-10-21')).toBe(2);
+  });
+
+  it('cruza meses y años', () => {
+    expect(diasEntre('2026-10-30', '2026-11-02')).toBe(3);
+    expect(diasEntre('2026-12-31', '2027-01-01')).toBe(1);
+  });
+
+  it('un envío anterior al corte da negativo', () => {
+    expect(diasEntre('2026-10-19', '2026-10-18')).toBe(-1);
+  });
+});
+
+describe('fecha de envío en el pedido', () => {
+  it('arranca con hoy y viaja siempre, explícita', () => {
+    expect(borradorNuevo(HOY).fechaEnvio).toBe(HOY);
+    expect(peticionDe(listo())!.fecha_envio).toBe(HOY);
+  });
+
+  it('lo que se escribe es lo que viaja, sin ajustarlo al corte: eso lo dice el backend', () => {
+    const antes = conFechaEnvio(listo(), '2026-09-01');
+    expect(peticionDe(antes)!.fecha_envio).toBe('2026-09-01');
+  });
+
+  it('cambiarla es otro pedido', () => {
+    expect(mismaPeticion(peticionDe(listo()), peticionDe(conFechaEnvio(listo(), '2026-10-20')))).toBe(false);
+  });
+
+  it('un campo vacío impide pedir y lo dice', () => {
+    const b = conFechaEnvio(listo(), '');
+    expect(motivoInactivo(b)).toBe('sin_fecha_envio');
+    expect(peticionDe(b)).toBeNull();
+  });
+
+  it('una fecha a medio escribir tampoco se manda', () => {
+    expect(motivoInactivo(conFechaEnvio(listo(), '2026-10'))).toBe('sin_fecha_envio');
+  });
+
+  it('el orden de los motivos no cambia: antes la fecha de corte', () => {
+    expect(motivoInactivo(conFechaEnvio(borradorNuevo(HOY), ''))).toBe('sin_fecha');
+  });
+});
+
+describe('fechasDeEnvioRechazadas', () => {
+  const cuerpo = { fecha_envio: '2026-10-18', fecha_corte: '2026-10-19' };
+
+  it('lee las dos fechas del 400 fecha_envio_anterior', () => {
+    expect(fechasDeEnvioRechazadas(new ApiError(400, 'x', 'fecha_envio_anterior', cuerpo))).toEqual({
+      fechaEnvio: '2026-10-18',
+      fechaCorte: '2026-10-19',
+    });
+  });
+
+  it('otro código o otro estado no es esta negativa', () => {
+    expect(fechasDeEnvioRechazadas(new ApiError(400, 'x', 'definicion_invalida', cuerpo))).toBeNull();
+    expect(fechasDeEnvioRechazadas(new ApiError(404, 'x', 'fecha_envio_anterior', cuerpo))).toBeNull();
+    expect(fechasDeEnvioRechazadas(new ApiError(400, 'x'))).toBeNull();
+  });
+
+  it('sin las dos fechas, o con una que no es ISO, no hay con qué escribir el texto', () => {
+    expect(fechasDeEnvioRechazadas(new ApiError(400, 'x', 'fecha_envio_anterior', { fecha_envio: '2026-10-18' }))).toBeNull();
+    expect(fechasDeEnvioRechazadas(new ApiError(400, 'x', 'fecha_envio_anterior', { ...cuerpo, fecha_corte: '19/10/2026' }))).toBeNull();
+    expect(fechasDeEnvioRechazadas(new ApiError(400, 'x', 'fecha_envio_anterior', { fecha_envio: 18, fecha_corte: 19 }))).toBeNull();
+  });
+
+  it('una red caída no es una fecha rechazada', () => {
+    expect(fechasDeEnvioRechazadas(new NetworkError())).toBeNull();
+    expect(fechasDeEnvioRechazadas(undefined)).toBeNull();
   });
 });
 

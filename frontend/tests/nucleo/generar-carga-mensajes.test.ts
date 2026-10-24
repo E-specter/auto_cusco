@@ -17,12 +17,15 @@ import {
   descripcionDeProblema,
   etiquetaDeFormato,
   etiquetaDeSugerido,
+  lineaDeEnvio,
   lineaDeSalida,
   mensajeDeError,
   textoDeCodigo,
+  textoDeFechaEnvioAnterior,
   textoMotivo,
 } from '../../src/lib/generar-carga-mensajes';
 import type { ProblemaDeCarga, ResumenDeCarga } from '../../src/lib/generar-carga';
+import { formatDate } from '../../src/lib/format';
 import { setLanguageForTests } from './idioma';
 
 beforeEach(() => setLanguageForTests('es'));
@@ -88,16 +91,23 @@ describe('textoMotivo', () => {
 });
 
 describe('lineaDeSalida', () => {
-  const base = { filas: 500, formato: 'xlsx' as const, version: 4, nombre: 'SMS preventivo' };
+  const base = { filas: 500, formato: 'xlsx' as const, version: 4, nombre: 'SMS preventivo', fechaEnvio: '2026-10-21' };
 
   it('exacta cuando el archivo no puede perder productos', () => {
-    expect(lineaDeSalida({ ...base, esTope: false })).toBe('Se generarán 500 filas en XLSX con la versión 4 de “SMS preventivo”.');
+    expect(lineaDeSalida({ ...base, esTope: false })).toBe(
+      `Se generarán 500 filas en XLSX con la versión 4 de “SMS preventivo”, para enviar el ${formatDate('2026-10-21')}.`,
+    );
   });
 
   it('«hasta» cuando puede dejar productos fuera, y lo explica', () => {
     const linea = lineaDeSalida({ ...base, esTope: true });
     expect(linea).toContain('Se generarán hasta 500 filas');
     expect(linea).toContain('los productos sin segmento quedan fuera');
+    expect(linea).toContain(`para enviar el ${formatDate('2026-10-21')}`);
+  });
+
+  it('la fecha va escrita con format.ts, nunca en ISO', () => {
+    expect(lineaDeSalida({ ...base, esTope: false })).not.toContain('2026-10-21');
   });
 
   it('usa comillas inglesas dobles dentro, nunca «» anidadas', () => {
@@ -234,5 +244,60 @@ describe('etiquetaDeSugerido', () => {
   it('un delimitador sin nombre o una opción que se lee sola no lleva etiqueta', () => {
     expect(etiquetaDeSugerido('delimitador', '~')).toBeUndefined();
     expect(etiquetaDeSugerido('codificacion', 'utf-8')).toBeUndefined();
+  });
+});
+
+describe('lineaDeEnvio', () => {
+  const corte = '2026-10-19';
+
+  it('con el plural del español: varios días, uno, o el mismo día', () => {
+    expect(lineaDeEnvio({ fechaCorte: corte, fechaEnvio: '2026-10-21' })).toBe(
+      `Fecha de envío: ${formatDate('2026-10-21')}, 2 días después del corte.`,
+    );
+    expect(lineaDeEnvio({ fechaCorte: corte, fechaEnvio: '2026-10-20' })).toBe(
+      `Fecha de envío: ${formatDate('2026-10-20')}, 1 día después del corte.`,
+    );
+    expect(lineaDeEnvio({ fechaCorte: corte, fechaEnvio: corte })).toBe(
+      `Fecha de envío: ${formatDate(corte)}, el mismo día del corte.`,
+    );
+  });
+
+  it('y en inglés', () => {
+    setLanguageForTests('en');
+    expect(lineaDeEnvio({ fechaCorte: corte, fechaEnvio: '2026-10-21' })).toBe(
+      `Send date: ${formatDate('2026-10-21')}, 2 days after the cut-off.`,
+    );
+    expect(lineaDeEnvio({ fechaCorte: corte, fechaEnvio: '2026-10-20' })).toContain('1 day after the cut-off');
+    expect(lineaDeEnvio({ fechaCorte: corte, fechaEnvio: corte })).toContain('the same day as the cut-off');
+  });
+
+  it('cruza el fin de mes', () => {
+    expect(lineaDeEnvio({ fechaCorte: '2026-10-30', fechaEnvio: '2026-11-02' })).toContain('3 días después del corte');
+  });
+});
+
+describe('textoDeFechaEnvioAnterior', () => {
+  const fechas = { fechaEnvio: '2026-10-18', fechaCorte: '2026-10-19' };
+
+  it('nombra las dos fechas, escritas con format.ts, y no deja llaves', () => {
+    const texto = textoDeFechaEnvioAnterior(fechas);
+    expect(texto).toContain(formatDate('2026-10-18'));
+    expect(texto).toContain(formatDate('2026-10-19'));
+    expect(texto).not.toContain('{');
+    expect(texto).not.toContain('}');
+    expect(texto).toMatch(/^La fecha de envío \(.*\) es anterior a la fecha de corte \(.*\)\. Elige una fecha igual o posterior\.$/);
+  });
+
+  it('en inglés también', () => {
+    setLanguageForTests('en');
+    const texto = textoDeFechaEnvioAnterior(fechas);
+    expect(texto).toContain(formatDate('2026-10-18'));
+    expect(texto).toContain(formatDate('2026-10-19'));
+    expect(texto).not.toMatch(/[{}]/);
+    expect(texto).toMatch(/^The send date/);
+  });
+
+  it('textoDeCodigo, el genérico, NO llena esos marcadores: por eso esta función existe', () => {
+    expect(textoDeCodigo('fecha_envio_anterior', 'respaldo')).toContain('{fecha_envio}');
   });
 });

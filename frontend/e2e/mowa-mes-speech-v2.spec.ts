@@ -241,7 +241,9 @@ test.describe('una versión v2 guardada', () => {
     await conV2(page);
 
     await expect(
-      page.getByText('el segmento sale de sus días de atraso a la fecha de corte, no de los ajustados a la fecha de envío'),
+      page.getByText(
+        'el segmento sale de sus días de atraso ajustados a hoy, como si el mensaje se enviara hoy; en la campaña se ajustan a su fecha de envío',
+      ),
     ).toBeVisible();
   });
 });

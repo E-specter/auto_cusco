@@ -92,6 +92,12 @@ import '../styles/columnas.css';
 
           <p class="cl-linea" data-version-linea></p>
 
+          <!-- RF-55 / D-C3-1: a saved version is never reinterpreted; this one segments without the send-date adjustment. -->
+          <p class="notice notice--info" data-sin-ajuste hidden>
+            <Icon name="info" size={20} />
+            <span data-sin-ajuste-texto></span>
+          </p>
+
           <div class="notice notice--info cl-aviso" data-lectura hidden>
             <Icon name="info" size={20} />
             <span class="cl-aviso__texto" data-lectura-texto></span>
@@ -250,6 +256,7 @@ import '../styles/columnas.css';
           <p class="cl-pie__estado" data-previa-estado role="status"></p>
         </div>
         <div class="panel__body cl-form">
+          <p class="field__hint" data-previa-envio hidden></p>
           <div class="cl-politica">
             <p class="field__label" id="cl-muestra-etiqueta" data-i18n="columnas.previa.muestra">Muestra</p>
             <div class="segmented" role="group" aria-labelledby="cl-muestra-etiqueta">
@@ -440,6 +447,7 @@ import '../styles/columnas.css';
     type ModoVista,
   } from '../lib/constructor-version';
   import { openWhenFree } from '../lib/dialogs';
+  import { formatDate } from '../lib/format';
   import {
     clasificarErrorDeRenombrar,
     conNombreRenombrado,
@@ -505,6 +513,9 @@ import '../styles/columnas.css';
     nombreError: $<HTMLElement>('[data-nombre-error]'),
     renombrar: $<HTMLButtonElement>('[data-renombrar]'),
     versionLinea: $<HTMLElement>('[data-version-linea]'),
+    sinAjuste: $<HTMLElement>('[data-sin-ajuste]'),
+    sinAjusteTexto: $<HTMLElement>('[data-sin-ajuste-texto]'),
+    previaEnvio: $<HTMLElement>('[data-previa-envio]'),
     lectura: $<HTMLElement>('[data-lectura]'),
     lecturaTexto: $<HTMLElement>('[data-lectura-texto]'),
     base: $<HTMLElement>('[data-base]'),
@@ -1245,6 +1256,13 @@ import '../styles/columnas.css';
     if (problemaNombre) el.nombre.setAttribute('aria-invalid', 'true');
     else el.nombre.removeAttribute('aria-invalid');
 
+    // A saved version that counts days with a variable other than the catalogue's default (the one adjusted
+    // to the send date) is never reinterpreted: it says so. A by-field criterion counts no days.
+    const criterio = estado.respuesta?.version.contenido.segmentacion?.criterio;
+    const sinAjuste = criterio?.tipo === 'calculado' && catalogo !== null && criterio.variable_dias !== catalogo.contexto.variable_dias;
+    el.sinAjuste.hidden = !sinAjuste;
+    el.sinAjusteTexto.textContent = sinAjuste ? t('columnas.version.sinAjuste') : '';
+
     el.versionLinea.textContent = estado.respuesta
       ? t(estado.respuesta.version.usada ? 'columnas.version.lineaUsada' : 'columnas.version.linea', {
           numero: estado.respuesta.version.numero,
@@ -1847,6 +1865,11 @@ import '../styles/columnas.css';
   }
 
   function pintarPrevia(): void {
+    // Only a real product has its segment worked out from days, so only then there is a date to say
+    // (the preview answers `fecha_envio` null for an example): that day is today, as it is not chosen here.
+    const diaDeEnvio = estado.muestra === 'real' ? (ultimaPrevia?.fecha_envio ?? null) : null;
+    el.previaEnvio.hidden = diaDeEnvio === null;
+    el.previaEnvio.textContent = diaDeEnvio === null ? '' : t('columnas.previa.envioHoy', { fecha: formatDate(diaDeEnvio) });
     el.previaFilas.replaceChildren();
     el.previaCabecera.replaceChildren();
     el.previaAviso.hidden = true;

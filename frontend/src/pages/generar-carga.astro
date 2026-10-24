@@ -40,6 +40,24 @@ import '../styles/generar-carga.css';
     <div class="gc__contenido" data-contenido hidden>
       <SelectorSeleccion modo="compacto" id="seleccion" />
 
+      <!-- RF-55: read together with the cut-off date, so it lives in the «Selección» panel; the script
+           moves it in, because the picker is a shared component. -->
+      <div class="field gc-envio" data-envio>
+        <label class="field__label" for="gc-envio" data-i18n="generar.envio">Fecha de envío</label>
+        <input
+          class="input mono"
+          id="gc-envio"
+          data-envio-campo
+          type="date"
+          required
+          aria-describedby="gc-envio-hint gc-envio-error"
+        />
+        <p class="field__hint" id="gc-envio-hint" data-i18n="generar.envio.hint">
+          Los días de atraso se cuentan hasta esta fecha para calcular el segmento. Por defecto, hoy.
+        </p>
+        <p class="field__error" id="gc-envio-error" data-envio-error role="alert"></p>
+      </div>
+
       <section class="panel" aria-labelledby="gc-definicion-title">
         <div class="panel__head">
           <h2 class="panel__title" id="gc-definicion-title" data-i18n="generar.definicion.title">Definición de columnas</h2>
@@ -165,6 +183,8 @@ import '../styles/generar-carga.css';
                 <span data-aviso-errores-texto></span>
               </p>
             </div>
+
+            <p class="gc-envio-linea" data-previa-envio></p>
 
             <div class="table-scroll" data-tabla-contenedor>
               <table class="table gc-tabla">

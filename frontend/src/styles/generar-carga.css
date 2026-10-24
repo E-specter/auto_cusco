@@ -306,3 +306,22 @@
 .gc-resultado:not(:has(.notice:not([hidden]))) {
   display: none;
 }
+
+/* ---- Send date (RF-55): inside the «Selección» panel, after the picker's own fields ------------------ */
+
+.gc-envio {
+  padding: var(--space-4);
+  max-inline-size: 42rem;
+}
+
+.gc-envio .input {
+  max-inline-size: 14rem;
+}
+
+.gc-envio-linea {
+  font-size: var(--text-sm);
+}
+
+.gc-envio-linea:empty {
+  display: none;
+}
