@@ -626,3 +626,8 @@ Hay que acordarlo antes de que lo programen.
 - **B14** (renombrar) entregado a architec. Agrega `PATCH` a `allow_methods` de CORS. dev_frontend lo revisa como consumidor.
 - **B15** (M3, backend) listo y revisado. **Entra junto con F8:** hoy `configuracion.astro` todavía crea y edita versiones v1, y con B15 solo ese botón daría 400. Pasa por la §13 de MOWA MES, y designer revisa el texto de `version_v1_retirada`.
 - **B16** (GSM-7) lanzado, con la transliteración que decidió el usuario (RF-MM-27, `204b3dc`): NFD → transliterar (“ ” « » → ", ‘ ’ → ', … → ..., – — → -, ° º → o, ª → a) → borrar lo que quede fuera de GSM-7. Incluye una función que devuelve los caracteres borrados, para el B9 de MOWA MES, y la cota sobre el texto ya transliterado.
+- **F8** (2026-10-20): visto bueno §13 de MOWA MES, con un ajuste. El texto nuevo del aviso del segmento con producto real («ajustados a hoy… en la campaña se ajustan a su fecha de envío») **pasa a F6**, porque recién es cierto con B13; F8 conserva el texto actual. También se quita `mowaMes.speech.inmutable.original` si quedó sin uso. **Orden:** B15 y enseguida F8, rebasado sobre B15 y sin su copia del parche.
+
+### Cierre de C3 (2026-10-24)
+
+Todos los cortes del motor de C3 están en `main`: B14 (`3cdb54f`), F7 (`eb97a55`), B16 (`535a61b`), B15 (`32bfebf`), F8 (`3fe79af`), B13 (`5ce9834`) y F6 (`19adb4c`). La revisión de cierre está en `revision-c3.md`. De MOWA MES quedan `b9b`, que mide el editor en GSM-7 (las líneas del motor ya revisadas), y T-MM-F7. Los dos son de `coordinador_modulo_mowa_mes`.
