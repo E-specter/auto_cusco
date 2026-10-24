@@ -14,6 +14,7 @@ from app.core.entities.contexto_texto import ContextoDesconocido
 from app.core.entities.mowa_mes import LARGO_ADVERTENCIA, LARGO_MAXIMO, RANGOS_SEGMENTO, Segmento
 from app.core.entities.texto_enriquecido import TipoValor
 from app.core.services.contextos_texto import RegistroContextos, contexto_cartera
+from app.core.services.fecha_envio import VARIABLES_DE_ENVIO
 from app.core.services.plataformas.mowa_mes import speech
 from app.core.services.plataformas.mowa_mes.contexto_texto import contexto_speech
 from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA
@@ -75,6 +76,7 @@ def test_cada_contexto_trae_su_clave_i18n() -> None:
 
 def test_las_variables_de_la_cartera_son_sus_campos_con_su_tipo() -> None:
     esperado = {nombre: TipoValor(tipo.value) for nombre, tipo in CAMPOS_CARTERA.items()}
+    esperado |= VARIABLES_DE_ENVIO  # la fecha de envio suma sus dos variables (RF-55)
 
     assert {v.nombre: v.tipo for v in CARTERA.variables} == esperado
     assert any(t is TipoValor.BOOLEANO for t in esperado.values())  # D2: tambien los booleanos
@@ -85,7 +87,23 @@ def test_la_cartera_no_pone_limite_de_largo() -> None:
 
 
 def test_los_campos_de_la_cartera_no_llevan_clave_i18n_propia() -> None:
-    assert all(v.clave_nombre is None for v in CARTERA.variables)
+    assert all(v.clave_nombre is None for v in CARTERA.variables if v.nombre in CAMPOS_CARTERA)
+
+
+def test_las_variables_de_la_fecha_de_envio_llevan_su_clave_y_son_de_la_cartera() -> None:
+    de_envio = {v.nombre: v for v in CARTERA.variables if v.nombre not in CAMPOS_CARTERA}
+
+    assert set(de_envio) == {"fecha_envio", "dias_atraso_ajustados"}
+    assert de_envio["fecha_envio"].clave_nombre == "textoEnriquecido.variable.fecha_envio"
+    assert (
+        de_envio["dias_atraso_ajustados"].clave_nombre
+        == "textoEnriquecido.variable.dias_atraso_ajustados"
+    )
+    assert {v.origen for v in de_envio.values()} == {"cartera"}
+    assert (de_envio["fecha_envio"].tipo, de_envio["dias_atraso_ajustados"].tipo) == (
+        TipoValor.FECHA,
+        TipoValor.NUMERO,
+    )
 
 
 def test_el_registro_de_ejemplo_de_la_cartera_tiene_un_valor_del_tipo_de_cada_variable() -> None:
@@ -119,8 +137,9 @@ def test_el_registro_de_ejemplo_se_puede_evaluar_con_las_variables_del_contexto(
     assert compilada.evaluar(CARTERA.ejemplo).texto == "TITU https://wa.me/+51987654321"
 
 
-def test_la_segmentacion_por_defecto_de_la_cartera_usa_dias_atraso_y_la_tabla_de_siempre() -> None:
-    assert CARTERA.variable_dias == "dias_atraso"
+def test_la_segmentacion_por_defecto_de_la_cartera_usa_los_dias_ajustados() -> None:
+    # RF-55 / D-C3-1: una definicion NUEVA segmenta por los dias ajustados a la fecha de envio.
+    assert CARTERA.variable_dias == "dias_atraso_ajustados"
     assert [r.clave for r in CARTERA.tabla_rangos] == [s.value for s in Segmento]
     assert "dias_atraso" in {v.nombre for v in CARTERA.variables}
 
@@ -183,7 +202,8 @@ def test_el_producto_se_convierte_al_registro_del_speech() -> None:
     producto = {
         "titular": "OTRO/SINTETICO,TRES",
         "fecha_vencimiento_cuota": date(2026, 9, 5),
-        "dias_atraso": 45,
+        "dias_atraso": 40,
+        "dias_atraso_ajustados": 45,  # los calcula la previsualizacion con la fecha de envio
         "telefono": "987654321",
     }
 
@@ -195,6 +215,13 @@ def test_el_producto_se_convierte_al_registro_del_speech() -> None:
         "whatsapp_contacto": SPEECH.ejemplo["whatsapp_contacto"],
         "dias_atraso_ajustados": 45,
     }
+
+
+def test_el_registro_del_speech_no_ajusta_los_dias_por_su_cuenta() -> None:
+    # El ajuste a la fecha de envio es de quien arma la muestra, no de este contexto.
+    registro = SPEECH.registro_de_producto({"titular": "X", "dias_atraso": 45})
+
+    assert registro["dias_atraso_ajustados"] is None
 
 
 def test_un_producto_sin_dias_de_atraso_queda_sin_dias_ajustados() -> None:

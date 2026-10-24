@@ -15,7 +15,7 @@ Fecha del ano 2099 para no cruzarse con datos de trabajo; se borra al terminar.
 
 import io
 import os
-from datetime import date
+from datetime import UTC, date, datetime
 
 import openpyxl
 import pytest
@@ -30,6 +30,7 @@ from app.adapters.persistence.repositorio_cargas_postgres import RepositorioCarg
 from app.adapters.persistence.repositorio_cartera_postgres import RepositorioCarteraPostgres
 from app.core.entities.cartera import Filtro, Operador, Orden
 from app.core.entities.mapeo import CampoSalida, DefinicionCarga, TipoSalida
+from app.core.services import fecha_envio
 from app.core.services.generacion_cargas import servicio as generacion
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService
 from app.core.services.seleccion_cartera import recorrido
@@ -126,7 +127,8 @@ def generador():
     assert ingesta.procesar_carga(carga.id).vigente
     consulta = ConsultaCarteraService(RepositorioCarteraPostgres(engine))
     try:
-        yield generacion.GeneracionCargasService(consulta), engine
+        # La sabana es de 2099: el reloj del servicio es su fecha de corte, no el de la maquina.
+        yield generacion.GeneracionCargasService(consulta, hoy=lambda: FECHA), engine
     finally:
         _limpiar(engine)
 
@@ -140,6 +142,7 @@ def cliente(generador):
 def _peticion(**extra) -> dict:
     return {
         "fecha_corte": FECHA.isoformat(),
+        "fecha_envio": FECHA.isoformat(),  # la sabana es de 2099: hoy seria anterior al corte
         "definicion": DEFINICION_HTTP,
         "cantidad": 10,
         **extra,
@@ -288,10 +291,32 @@ def test_previsualizar_por_http_antes_de_descargar(cliente) -> None:
 
 def test_una_fecha_sin_version_vigente_es_404_por_http(cliente) -> None:
     respuesta = cliente.post(
-        "/archivos-carga", json=_peticion(fecha_corte=date(2099, 4, 2).isoformat())
+        "/archivos-carga",
+        json=_peticion(
+            fecha_corte=date(2099, 4, 2).isoformat(), fecha_envio=date(2099, 4, 2).isoformat()
+        ),
     )
 
     assert respuesta.status_code == 404
+
+
+@pytest.mark.parametrize("ruta", ["/archivos-carga", "/archivos-carga/previsualizacion"])
+def test_sin_fecha_de_envio_y_un_corte_futuro_es_400_con_las_dos_fechas_contra_la_base(
+    cliente, monkeypatch, ruta
+) -> None:
+    # RF-55: el corte de la sabana ingestada es de 2099 y «hoy en Lima» (fijo) es anterior.
+    monkeypatch.setattr(
+        fecha_envio, "ahora_en_lima", lambda: datetime(2026, 9, 16, 3, 0, tzinfo=UTC)
+    )
+    peticion = _peticion()
+    del peticion["fecha_envio"]
+
+    respuesta = cliente.post(ruta, json=peticion)
+
+    cuerpo = respuesta.json()
+    assert respuesta.status_code == 400
+    assert cuerpo["codigo"] == "fecha_envio_anterior"
+    assert (cuerpo["fecha_envio"], cuerpo["fecha_corte"]) == ("2026-09-15", FECHA.isoformat())
 
 
 # --- Metricas de la seleccion frente al archivo --------------------------

@@ -52,7 +52,11 @@ TABLA_RANGOS_POR_DEFECTO: tuple[RangoDias, ...] = (
     RangoDias("91_a_120", "91 a 120", 91, 120),
 )
 
+# El nucleo segmenta por defecto sobre los dias de la sabana, sin ajuste. Las definiciones NUEVAS de
+# la cartera nombran `VARIABLE_DIAS_AJUSTADOS` (RF-55): lo resuelve el contexto al guardar, y una
+# version ya guardada conserva la variable que guardo.
 VARIABLE_DIAS_POR_DEFECTO = "dias_atraso"
+VARIABLE_DIAS_AJUSTADOS = "dias_atraso_ajustados"
 
 
 @dataclass(frozen=True)

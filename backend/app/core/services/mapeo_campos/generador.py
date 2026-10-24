@@ -104,16 +104,21 @@ class GeneradorCargas:
     `campos_disponibles` son las variables de la fila: un mapa nombre -> tipo (como
     `CAMPOS_CARTERA`, o ya `TipoValor`) o solo los nombres, que se toman como texto (una columna
     de variable directa sale igual con cualquiera de los dos).
+
+    `constantes` son variables del catalogo con el mismo valor en toda la carga (la fecha de envio,
+    RF-55): el motor las pliega al compilar (B7) y el producto no las trae.
     """
 
     def __init__(
         self,
         definicion: DefinicionCarga,
         campos_disponibles: Iterable[str] | Mapping[str, Any],
+        constantes: Mapping[str, Any] | None = None,
     ) -> None:
         self._definicion = definicion
         self._validar_nombres(definicion.campos)
         self._variables = variables_de(campos_disponibles)
+        self._constantes = constantes
         self._segmentacion = definicion.segmentacion
         self._columnas = tuple(self._compilar_columna(campo) for campo in definicion.campos)
         self._claves_con_variante = {
@@ -171,8 +176,10 @@ class GeneradorCargas:
                 # fijo crecen con ella. Una expresion explicita conserva los topes (RF-48).
                 limites = limites_de_plantilla(plantilla)
                 expresion = sintaxis.leer(plantilla, limites)
-                return evaluador.compilar(expresion, self._variables, limites)
-            return evaluador.compilar(expresion, self._variables)
+                return evaluador.compilar(
+                    expresion, self._variables, limites, constantes=self._constantes
+                )
+            return evaluador.compilar(expresion, self._variables, constantes=self._constantes)
         except ExpresionInvalida as error:
             raise PlantillaInvalida(_mensaje(texto, donde, error)) from error
 

@@ -97,7 +97,10 @@ def test_el_producto_real_pasa_por_el_registro_del_contexto() -> None:
             }
             return PaginaCartera(total=1, filas=(fila,), limite=limite)
 
-    servicio = PrevisualizacionTextoService(RegistroContextos([SPEECH]), Cartera())
+    # Con la fecha de envio igual a la de corte los dias no se mueven (RF-55).
+    servicio = PrevisualizacionTextoService(
+        RegistroContextos([SPEECH]), Cartera(), hoy=lambda: date(2026, 9, 10)
+    )
 
     previa = servicio.previsualizar(
         "mowa_mes.speech",

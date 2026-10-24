@@ -80,7 +80,14 @@ def _guardada(nombre: str = "SMS preventiva", *, proteger: bool = True, extra: s
 
 def _pedido(id_: int, version: int | None = None, **extra) -> dict:
     guardada = {"id": id_} if version is None else {"id": id_, "version": version}
-    cuerpo = {"fecha_corte": FECHA, "definicion_guardada": guardada, "cantidad": 2, **extra}
+    # La fecha de envio va fija: sin ella seria hoy y los dias ajustados cambiarian cada dia.
+    cuerpo = {
+        "fecha_corte": FECHA,
+        "fecha_envio": FECHA,
+        "definicion_guardada": guardada,
+        "cantidad": 2,
+        **extra,
+    }
     return cuerpo
 
 
@@ -351,7 +358,9 @@ def test_la_previsualizacion_lista_los_excluidos_con_fila_pagare_codigo_y_detall
 ) -> None:
     client, _, id_ = segmentada
 
-    cuerpo = client.post("/archivos-carga/previsualizacion", json=_pedido(id_, cantidad=4)).json()
+    cuerpo = client.post(
+        "/archivos-carga/previsualizacion", json=_pedido(id_, cantidad=4, fecha_envio=FECHA)
+    ).json()
 
     assert (cuerpo["generados"], cuerpo["excluidos"]) == (2, 2)
     assert [(e["fila"], e["pagare"], e["codigo"]) for e in cuerpo["exclusiones"]] == [

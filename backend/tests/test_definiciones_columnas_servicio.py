@@ -97,7 +97,7 @@ def test_lo_guardado_es_la_forma_canonica_con_la_segmentacion_resuelta() -> None
     assert contenido["segmentacion"]["politica"] == "excluir"
     criterio = contenido["segmentacion"]["criterio"]
     assert criterio["tipo"] == "calculado"
-    assert criterio["variable_dias"] == "dias_atraso"
+    assert criterio["variable_dias"] == "dias_atraso_ajustados"  # RF-55: una definicion nueva
     assert [r["clave"] for r in criterio["tabla"]][:2] == ["preventiva", "1_a_8"]
     assert criterio["tabla"][0] == {
         "clave": "preventiva",
@@ -117,8 +117,28 @@ def test_una_definicion_guardada_no_cambia_si_cambia_la_tabla_por_defecto() -> N
     cargada = DefinicionesColumnasService(repositorio, otra).cargar(id_)
 
     criterio = cargada.definicion.segmentacion.criterio  # type: ignore[union-attr]
-    assert criterio.variable_dias == "dias_atraso"
+    assert criterio.variable_dias == "dias_atraso_ajustados"
     assert [r.clave for r in criterio.tabla][0] == "preventiva"
+
+
+def test_una_version_guardada_con_dias_atraso_no_se_reinterpreta_con_los_dias_ajustados() -> None:
+    # RF-55 / D-C3-1: antes del cambio la cartera segmentaba por `dias_atraso`. Esa version sigue
+    # segmentando por `dias_atraso` aunque hoy el contexto resuelva `dias_atraso_ajustados`.
+    anterior = replace(CARTERA, variable_dias="dias_atraso")
+    repositorio = RepositorioEnMemoria()
+    creada = DefinicionesColumnasService(repositorio, anterior).crear(_definicion(segmentacion={}))
+    cargada = DefinicionesColumnasService(repositorio, CARTERA).cargar(creada.definicion.id)
+
+    assert creada.version.contenido["segmentacion"]["criterio"]["variable_dias"] == "dias_atraso"
+    criterio = cargada.definicion.segmentacion.criterio  # type: ignore[union-attr]
+    assert criterio.variable_dias == "dias_atraso"
+    # y una nueva, hoy, guarda la ajustada: la diferencia es solo de lo que se guarda al crear
+    nueva = DefinicionesColumnasService(repositorio, CARTERA).crear(
+        _definicion("Otra", segmentacion={})
+    )
+    assert nueva.version.contenido["segmentacion"]["criterio"]["variable_dias"] == (
+        "dias_atraso_ajustados"
+    )
 
 
 def test_una_plantilla_se_convierte_a_expresion_y_se_devuelve_expresion() -> None:

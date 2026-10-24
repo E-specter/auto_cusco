@@ -918,7 +918,12 @@ def test_la_previsualizacion_da_lo_mismo_que_la_carga(cliente) -> None:
         client,
         contexto="cartera",
         definicion=DEFINICION,
-        muestra={"tipo": "producto_real", "fecha_corte": CORTE, "pagare": "x"},
+        muestra={
+            "tipo": "producto_real",
+            "fecha_corte": CORTE,
+            "fecha_envio": CORTE,  # sin ajuste: la carga de abajo usa la misma fecha
+            "pagare": "x",
+        },
     )["filas"][0]
 
     assert [c["valor"] for c in fila["columnas"]] == [

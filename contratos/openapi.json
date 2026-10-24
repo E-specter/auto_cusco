@@ -957,8 +957,8 @@
               }
             }
           },
-          "400": {
-            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+          "404": {
+            "description": "No existe lo pedido",
             "content": {
               "application/json": {
                 "schema": {
@@ -967,12 +967,12 @@
               }
             }
           },
-          "404": {
-            "description": "No existe lo pedido",
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail. Con el codigo fecha_envio_anterior trae ademas fecha_envio y fecha_corte",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DetalleErrorConCodigo"
+                  "$ref": "#/components/schemas/DetalleErrorFechaEnvio"
                 }
               }
             }
@@ -1085,8 +1085,8 @@
               }
             }
           },
-          "400": {
-            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+          "404": {
+            "description": "No existe lo pedido",
             "content": {
               "application/json": {
                 "schema": {
@@ -1095,12 +1095,12 @@
               }
             }
           },
-          "404": {
-            "description": "No existe lo pedido",
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail. Con el codigo fecha_envio_anterior trae ademas fecha_envio y fecha_corte",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DetalleErrorConCodigo"
+                  "$ref": "#/components/schemas/DetalleErrorFechaEnvio"
                 }
               }
             }
@@ -2984,11 +2984,11 @@
             }
           },
           "400": {
-            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail. Con el codigo fecha_envio_anterior trae ademas fecha_envio y fecha_corte",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DetalleErrorConCodigo"
+                  "$ref": "#/components/schemas/DetalleErrorFechaEnvio"
                 }
               }
             }
@@ -4105,7 +4105,8 @@
           "definicion_no_encontrada",
           "version_no_encontrada",
           "nombre_repetido",
-          "seleccion_no_encontrada"
+          "seleccion_no_encontrada",
+          "fecha_envio_anterior"
         ],
         "title": "CodigoTexto",
         "description": "Catalogo de codigos que el frontend traducira como `textoEnriquecido.codigo.<codigo>`.\n\nUn codigo por linea, con la forma `NOMBRE = \"codigo\"`: la prueba espejo del\nfrontend lee esta clase. Los primeros se detectan al compilar (una expresion\ninvalida no procesa ninguna fila); los siguientes, al evaluar una fila concreta; al final,\nlos que solo informa la API del motor (B4a): lo que no se puede leer, el contexto o el\nproducto que no existen, y por que una expresion no tiene largo maximo."
@@ -5267,6 +5268,55 @@
         ],
         "title": "DetalleErrorDefinicion",
         "description": "Un `400` al guardar: el motivo, el `codigo` y todos los problemas con su ubicacion."
+      },
+      "DetalleErrorFechaEnvio": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "codigo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodigoTexto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fecha_envio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Envio"
+          },
+          "fecha_corte": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Corte"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "codigo"
+        ],
+        "title": "DetalleErrorFechaEnvio",
+        "description": "Un `400`: `fecha_envio` y `fecha_corte` solo viajan cuando el `codigo` es\n`fecha_envio_anterior`; en cualquier otro `400` de estas entradas no vienen."
       },
       "DetalleErrorSpeech": {
         "properties": {
@@ -6592,6 +6642,18 @@
             ],
             "title": "Fecha Corte"
           },
+          "fecha_envio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Envio"
+          },
           "pagare": {
             "anyOf": [
               {
@@ -6649,7 +6711,7 @@
         },
         "type": "object",
         "title": "MuestraEntrada",
-        "description": "La muestra con la que se evalua.\n\n`ejemplos_por_segmento` (por defecto), `ejemplo`, `producto_real` (`fecha_corte` y `pagare`) o\n`primeros_de_seleccion`: la `fecha_corte` y una seleccion con la forma de `/cartera`\n(`filtros` y `orden`) o una guardada (`seleccion_id`), con `cantidad` de 1 a 5 (5 por\ndefecto), el mismo orden y desempate que la carga. Solo lectura."
+        "description": "La muestra con la que se evalua.\n\n`ejemplos_por_segmento` (por defecto), `ejemplo`, `producto_real` (`fecha_corte` y `pagare`) o\n`primeros_de_seleccion`: la `fecha_corte` y una seleccion con la forma de `/cartera`\n(`filtros` y `orden`) o una guardada (`seleccion_id`), con `cantidad` de 1 a 5 (5 por\ndefecto), el mismo orden y desempate que la carga. Solo lectura.\n\nLas dos muestras de la cartera real aceptan `fecha_envio` (RF-55): por defecto, hoy en\nAmerica/Lima, y no puede ser anterior a la `fecha_corte`. Ajusta `dias_atraso_ajustados`; la\nrespuesta dice cual se uso. Una muestra de ejemplo no la admite."
       },
       "NodoEntrada": {
         "properties": {
@@ -7386,6 +7448,19 @@
             "format": "date",
             "title": "Fecha Corte"
           },
+          "fecha_envio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Envio",
+            "description": "Fecha en que se envia la carga (RF-55); por defecto, hoy en America/Lima. No puede ser anterior a fecha_corte. Ajusta dias_atraso_ajustados a los dias que pasaron"
+          },
           "definicion": {
             "anyOf": [
               {
@@ -7843,6 +7918,18 @@
               }
             ],
             "title": "Disponibles"
+          },
+          "fecha_envio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Envio"
           }
         },
         "type": "object",
@@ -7851,7 +7938,8 @@
           "filas",
           "limite_largo",
           "umbral_advertencia",
-          "disponibles"
+          "disponibles",
+          "fecha_envio"
         ],
         "title": "PrevisualizacionTextoRespuesta",
         "description": "O `problemas` (no compila: sin filas) o `filas`."
@@ -9425,6 +9513,11 @@
             "type": "boolean",
             "title": "Completa"
           },
+          "fecha_envio": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Envio"
+          },
           "errores": {
             "items": {
               "$ref": "#/components/schemas/ErrorGeneracionRespuesta"
@@ -9451,6 +9544,7 @@
           "excluidos",
           "suficiente",
           "completa",
+          "fecha_envio",
           "errores",
           "exclusiones"
         ],

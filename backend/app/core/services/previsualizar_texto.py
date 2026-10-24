@@ -13,6 +13,12 @@ La muestra de la previsualizacion es una de tres:
   un valor sintetico de dias que cae en cada rango de la tabla (de la tabla, no escrito a mano). Con
   un criterio por campo, una fila por cada valor que alguna columna contempla.
 - `producto_real`: un producto de la cartera, por fecha de corte y pagare.
+- `primeros_de_seleccion`: los primeros productos de una seleccion de la cartera.
+
+Las dos muestras de la cartera real llevan una fecha de envio (RF-55): la pedida o, sin ella, hoy en
+Lima, nunca anterior a la fecha de corte (`FechaEnvioAnterior`). El producto llega al contexto con
+`dias_atraso_ajustados` ya calculado, y `fecha_envio` se pliega como constante de la carga; la
+respuesta dice cual se uso. Las muestras de ejemplo no tienen fecha de envio.
 """
 
 from collections.abc import Mapping
@@ -33,6 +39,13 @@ from app.core.entities.texto_enriquecido import (
     TipoValor,
 )
 from app.core.services.contextos_texto import RegistroContextos
+from app.core.services.fecha_envio import (
+    DIAS_AJUSTADOS,
+    DIAS_ATRASO,
+    EnvioDeCarga,
+    Reloj,
+    hoy_en_lima,
+)
 from app.core.services.mapeo_campos.diagnostico import diagnosticar_leida
 from app.core.services.mapeo_campos.generador import GeneradorCargas
 from app.core.services.mapeo_campos.serializacion import (
@@ -117,6 +130,7 @@ class MuestraEjemplosPorSegmento:
 class MuestraProductoReal:
     fecha_corte: date
     pagare: str
+    fecha_envio: date | None = None  # por defecto, hoy en Lima (RF-55)
 
 
 MAXIMO_MUESTRA = 5  # los primeros N de una seleccion: lo bastante para ver, poco para esperar
@@ -134,6 +148,7 @@ class MuestraPrimerosDeSeleccion:
     orden: str | None = None
     seleccion_id: int | None = None
     cantidad: int = MUESTRA_POR_DEFECTO
+    fecha_envio: date | None = None  # por defecto, hoy en Lima (RF-55)
 
 
 Muestra = (
@@ -180,6 +195,8 @@ class Previsualizacion:
     limite_largo: int | None
     umbral_advertencia: int | None
     disponibles: int | None = None  # el total de la seleccion, si la muestra es una seleccion
+    # La fecha de envio con la que se evaluo: solo si la muestra es de la cartera real (RF-55).
+    fecha_envio: date | None = None
 
 
 class PrevisualizacionTextoService:
@@ -188,10 +205,12 @@ class PrevisualizacionTextoService:
         contextos: RegistroContextos,
         cartera: ConsultaCarteraService | None = None,
         selecciones: SeleccionesService | None = None,
+        hoy: Reloj = hoy_en_lima,
     ) -> None:
         self._contextos = contextos
         self._cartera = cartera
         self._selecciones = selecciones
+        self._hoy = hoy
 
     # --- catalogo ---
 
@@ -230,13 +249,20 @@ class PrevisualizacionTextoService:
         expresion: Any = None,
         definicion: Any = None,
     ) -> Previsualizacion:
-        """Una `expresion` o una `definicion` (la forma JSON de cada una), no las dos."""
+        """Una `expresion` o una `definicion` (la forma JSON de cada una), no las dos.
+
+        Con una muestra de la cartera real, `FechaEnvioAnterior` si la fecha de envio es anterior
+        a la de corte: se rechaza antes de leer la definicion o la cartera.
+        """
         if (expresion is None) == (definicion is None):
             raise ValueError("Se pide la previsualizacion de una expresion o de una definicion")
         ctx = self._contextos.obtener(contexto)
+        envio = self._envio(muestra)
 
         def sin_filas(problemas: tuple[ProblemaDeDefinicion, ...]) -> Previsualizacion:
-            return Previsualizacion(problemas, (), ctx.limite_largo, ctx.umbral_advertencia)
+            return Previsualizacion(
+                problemas, (), ctx.limite_largo, ctx.umbral_advertencia, None, _fecha(envio)
+            )
 
         try:
             if expresion is not None:
@@ -268,13 +294,22 @@ class PrevisualizacionTextoService:
                 problemas = tuple(replace(p, columna=None) for p in problemas)
             return sin_filas(problemas)
 
-        generador = GeneradorCargas(definicion_leida, ctx.tipos)
-        registros, disponibles = self._registros(ctx, definicion_leida, muestra)
+        constantes = {} if envio is None else envio.constantes(ctx.tipos)
+        generador = GeneradorCargas(definicion_leida, ctx.tipos, constantes)
+        registros, disponibles = self._registros(ctx, definicion_leida, muestra, envio)
         filas = tuple(
             self._fila(generador, numero, representado, registro, producto)
             for numero, (representado, registro, producto) in enumerate(registros, 1)
         )
-        return Previsualizacion((), filas, ctx.limite_largo, ctx.umbral_advertencia, disponibles)
+        return Previsualizacion(
+            (), filas, ctx.limite_largo, ctx.umbral_advertencia, disponibles, _fecha(envio)
+        )
+
+    def _envio(self, muestra: Muestra) -> EnvioDeCarga | None:
+        """La fecha de envio de una muestra de la cartera real; None en las de ejemplo."""
+        if isinstance(muestra, (MuestraProductoReal, MuestraPrimerosDeSeleccion)):
+            return EnvioDeCarga.de(muestra.fecha_corte, muestra.fecha_envio, self._hoy)
+        return None
 
     @staticmethod
     def _fila(
@@ -313,19 +348,30 @@ class PrevisualizacionTextoService:
     # --- muestras ---
 
     def _registros(
-        self, contexto: ContextoTexto, definicion: DefinicionCarga, muestra: Muestra
+        self,
+        contexto: ContextoTexto,
+        definicion: DefinicionCarga,
+        muestra: Muestra,
+        envio: EnvioDeCarga | None,
     ) -> tuple[list[_Registro], int | None]:
         """Los registros de la muestra y, si es una seleccion, cuantos productos tiene. Cada uno
         lleva, ademas, el producto real que representa (None en las muestras de ejemplo)."""
+
+        def registro(producto: Mapping[str, Any]) -> dict[str, Any]:
+            # Los dias de atraso se ajustan a la fecha de envio ANTES de que el contexto arme el
+            # registro, para cualquier contexto que los declare (la cartera, el speech de MOWA MES).
+            if envio is not None and DIAS_AJUSTADOS in contexto.tipos:
+                producto = envio.ajustar(producto)
+            return contexto.registro_de_producto(producto)
+
         if isinstance(muestra, MuestraProductoReal):
             producto = self._producto(muestra)
             origen = _origen(producto, muestra.fecha_corte, muestra.pagare)
-            return [(None, contexto.registro_de_producto(producto), origen)], None
+            return [(None, registro(producto), origen)], None
         if isinstance(muestra, MuestraPrimerosDeSeleccion):
             productos, disponibles = self._primeros(muestra)
             return [
-                (None, contexto.registro_de_producto(p), _origen(p, muestra.fecha_corte))
-                for p in productos
+                (None, registro(p), _origen(p, muestra.fecha_corte)) for p in productos
             ], disponibles
         if isinstance(muestra, MuestraEjemplosPorSegmento):
             return [(r, reg, None) for r, reg in _ejemplos_por_segmento(contexto, definicion)], None
@@ -366,6 +412,10 @@ class PrevisualizacionTextoService:
         return pagina.filas[0]
 
 
+def _fecha(envio: EnvioDeCarga | None) -> date | None:
+    return None if envio is None else envio.fecha_envio
+
+
 def _origen(
     producto: Mapping[str, Any], fecha_corte: date, pagare: str | None = None
 ) -> ProductoDeMuestra | None:
@@ -394,7 +444,12 @@ def _ejemplos_por_segmento(
         for rango in criterio.tabla:
             registro = dict(contexto.ejemplo)
             if contexto.tipos.get(criterio.variable_dias) is TipoValor.NUMERO:
-                registro[criterio.variable_dias] = _dias_de_ejemplo(rango)
+                dias = _dias_de_ejemplo(rango)
+                registro[criterio.variable_dias] = dias
+                # Un ejemplo no tiene fecha de envio: los dias ajustados son los de la sabana, asi
+                # que una columna que muestre `dias_atraso` ve los mismos dias que la segmentacion.
+                if criterio.variable_dias == DIAS_AJUSTADOS and DIAS_ATRASO in contexto.tipos:
+                    registro[DIAS_ATRASO] = dias
             filas.append(((rango.etiqueta, rango.clave), registro))
         return filas
     claves = dict.fromkeys(v.segmento for c in definicion.campos for v in c.variantes)

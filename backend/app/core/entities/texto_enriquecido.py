@@ -70,6 +70,8 @@ class CodigoTexto(StrEnum):
     VERSION_NO_ENCONTRADA = "version_no_encontrada"
     NOMBRE_REPETIDO = "nombre_repetido"  # ya hay una definicion con ese nombre
     SELECCION_NO_ENCONTRADA = "seleccion_no_encontrada"
+    # La fecha de envio de una carga (RF-55)
+    FECHA_ENVIO_ANTERIOR = "fecha_envio_anterior"  # la fecha de envio es anterior a la de corte
 
 
 @dataclass(frozen=True)

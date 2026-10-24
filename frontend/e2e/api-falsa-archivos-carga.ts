@@ -114,6 +114,9 @@ export function crearCompuerta(): { compuerta: Promise<void>; liberar: () => voi
   return { compuerta, liberar };
 }
 
+/** Send date the fake answers when the request does not name one (the backend answers today in Lima). */
+const FECHA_ENVIO_SINTETICA = '2026-10-19';
+
 /** Synthetic rows for the sample; pagares are 900000xxx and nothing here is a real person. */
 function filasSinteticas(cantidad: number): Array<Record<string, unknown>> {
   return Array.from({ length: cantidad }, (_, i) => ({
@@ -144,6 +147,7 @@ export function previsualizacionSintetica(estado: ApiFalsaArchivosCarga, peticio
     excluidos,
     suficiente: estado.disponibles >= peticion.cantidad,
     completa: estado.errores.length === 0,
+    fecha_envio: peticion.fecha_envio ?? FECHA_ENVIO_SINTETICA,
     errores: estado.errores,
     exclusiones: estado.exclusiones.slice(0, excluidos),
   };

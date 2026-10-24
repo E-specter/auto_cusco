@@ -74,7 +74,8 @@ function motorConDefiniciones(): ApiFalsaTextoEnriquecido {
     const filas = porSegmento
       ? catalogo.contexto.segmentos.map((r, i) => fila(i + 1, r.etiqueta, r.clave))
       : [fila(1, null, null)];
-    return { problemas: [], filas, limite_largo: null, umbral_advertencia: null, disponibles: null };
+    const fecha_envio = esProductoReal ? (cuerpo.muestra.fecha_envio ?? '2026-10-19') : null;
+    return { problemas: [], filas, limite_largo: null, umbral_advertencia: null, disponibles: null, fecha_envio };
   };
   return motor;
 }

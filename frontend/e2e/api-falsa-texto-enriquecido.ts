@@ -225,6 +225,9 @@ export interface ApiFalsaTextoEnriquecido {
 /** Cut-off date of the synthetic products when the request does not name one. */
 const FECHA_CORTE_SINTETICA = '2026-10-05';
 
+/** Send date of a real-portfolio sample that does not name one (the backend answers today in Lima). */
+const FECHA_ENVIO_SINTETICA = '2026-10-19';
+
 export function previsualizacionSintetica(cuerpo: Peticion, catalogo: Catalogo, productos: ApiFalsaTextoEnriquecido['productos'] = {}): Previsualizacion | { estado: number; cuerpo: unknown } {
   const expresion = cuerpo.expresion ?? { nodos: [] };
   const ejemplo = catalogo.contexto.ejemplo;
@@ -233,6 +236,7 @@ export function previsualizacionSintetica(cuerpo: Peticion, catalogo: Catalogo, 
     limite_largo: catalogo.contexto.limite_largo,
     umbral_advertencia: catalogo.contexto.umbral_advertencia,
     disponibles: null,
+    fecha_envio: null as string | null,
   };
   // `pagare` and `fecha_corte` say which product a row is, like the backend: only a real
   // product or a selection has one; the example record answers null and null.
@@ -258,7 +262,11 @@ export function previsualizacionSintetica(cuerpo: Peticion, catalogo: Catalogo, 
       return { estado: 404, cuerpo: { detail: 'No hay un producto con ese pagaré', codigo: 'producto_no_encontrado' } };
     }
     const fecha = cuerpo.muestra.fecha_corte ?? FECHA_CORTE_SINTETICA;
-    return { ...base, filas: [fila(1, producto, null, null, { pagare: cuerpo.muestra.pagare!, fecha_corte: fecha })] };
+    return {
+      ...base,
+      fecha_envio: cuerpo.muestra.fecha_envio ?? FECHA_ENVIO_SINTETICA,
+      filas: [fila(1, producto, null, null, { pagare: cuerpo.muestra.pagare!, fecha_corte: fecha })],
+    };
   }
   if (cuerpo.muestra.tipo === 'ejemplo') return { ...base, filas: [fila(1, ejemplo, null, null)] };
   if (cuerpo.muestra.tipo === 'primeros_de_seleccion') {
@@ -266,6 +274,7 @@ export function previsualizacionSintetica(cuerpo: Peticion, catalogo: Catalogo, 
     const fecha = cuerpo.muestra.fecha_corte ?? FECHA_CORTE_SINTETICA;
     return {
       ...base,
+      fecha_envio: cuerpo.muestra.fecha_envio ?? FECHA_ENVIO_SINTETICA,
       filas: catalogo.contexto.segmentos.map((s, i) =>
         fila(i + 1, ejemplo, s.etiqueta, s.clave, { pagare: String(100 + i).padStart(18, '0'), fecha_corte: fecha }),
       ),

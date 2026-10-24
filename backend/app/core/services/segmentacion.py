@@ -1,8 +1,9 @@
 """Segmento de un producto segun el criterio de la definicion (RF-50).
 
 Nucleo compartido: no conoce MOWA MES ni nombra campos de la sabana. La fecha de envio tampoco
-entra aqui (la aporta cada modulo, ya aplicada, como una variable numerica); solo esta
-`dias_ajustados`, que MOWA MES reexporta.
+entra aqui (la aporta cada modulo, ya aplicada, como una variable numerica: la cartera con
+`services/fecha_envio.py`, MOWA MES con su campana); solo esta `dias_ajustados`, que MOWA MES
+reexporta.
 """
 
 from collections.abc import Mapping, Sequence
@@ -20,7 +21,9 @@ from app.core.entities.segmentacion import (
 )
 
 
-def dias_ajustados(dias_atraso: int, fecha_corte: date, fecha_envio: date) -> int:
+def dias_ajustados(
+    dias_atraso: int | Decimal, fecha_corte: date, fecha_envio: date
+) -> int | Decimal:
     """dias_atraso de la sabana + dias calendario entre la fecha de corte y la de envio."""
     return dias_atraso + (fecha_envio - fecha_corte).days
 

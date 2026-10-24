@@ -17,11 +17,9 @@ from app.core.entities.contexto_texto import (
     ContextoTexto,
     VariableContexto,
 )
-from app.core.entities.segmentacion import (
-    TABLA_RANGOS_POR_DEFECTO,
-    VARIABLE_DIAS_POR_DEFECTO,
-)
+from app.core.entities.segmentacion import TABLA_RANGOS_POR_DEFECTO, VARIABLE_DIAS_AJUSTADOS
 from app.core.entities.texto_enriquecido import TipoValor
+from app.core.services.fecha_envio import DIAS_AJUSTADOS, FECHA_ENVIO, VARIABLES_DE_ENVIO
 from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA
 
 __all__ = ["ContextoDesconocido", "RegistroContextos", "contexto_cartera"]
@@ -44,6 +42,14 @@ _EJEMPLO_POR_CAMPO: dict[str, Any] = {
     "moneda": "PEN",
     "region": "CUSCO",
     "agencia": "AGENCIA SINTETICA",
+    FECHA_ENVIO: date(2026, 10, 5),
+    DIAS_AJUSTADOS: 12,
+}
+# Las variables de la fecha de envio (RF-55) se nombran en la interfaz con su clave propia: no son
+# columnas de la sabana. `dias_atraso_ajustados` comparte clave con la de MOWA MES (es la misma).
+_CLAVES_DE_ENVIO = {
+    FECHA_ENVIO: "textoEnriquecido.variable.fecha_envio",
+    DIAS_AJUSTADOS: "textoEnriquecido.variable.dias_atraso_ajustados",
 }
 _EJEMPLO_POR_TIPO: dict[TipoValor, Any] = {
     TipoValor.TEXTO: "EJEMPLO",
@@ -61,6 +67,9 @@ def contexto_cartera() -> ContextoTexto:
     variables = tuple(
         VariableContexto(nombre, _tipo(tipo), None, ORIGEN_CARTERA)
         for nombre, tipo in CAMPOS_CARTERA.items()
+    ) + tuple(
+        VariableContexto(nombre, tipo, _CLAVES_DE_ENVIO[nombre], ORIGEN_CARTERA)
+        for nombre, tipo in VARIABLES_DE_ENVIO.items()
     )
     ejemplo = {
         v.nombre: _EJEMPLO_POR_CAMPO.get(v.nombre, _EJEMPLO_POR_TIPO[v.tipo]) for v in variables
@@ -72,7 +81,9 @@ def contexto_cartera() -> ContextoTexto:
         ejemplo=ejemplo,
         limite_largo=None,
         umbral_advertencia=None,
-        variable_dias=VARIABLE_DIAS_POR_DEFECTO,
+        # Una definicion NUEVA segmenta por los dias ajustados a la fecha de envio (RF-55); una
+        # version ya guardada conserva la variable que guardo y no se reinterpreta.
+        variable_dias=VARIABLE_DIAS_AJUSTADOS,
         tabla_rangos=TABLA_RANGOS_POR_DEFECTO,
         registro_de_producto=dict,
     )

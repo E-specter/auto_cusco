@@ -8,8 +8,9 @@ se detiene si DB_NAME no termina en _test):
     uv run python scripts/medir_generacion.py sabana_120k.xlsx 60000,120000
 
 Ingesta la sabana en una fecha de 2099, genera con una definicion corta (6
-columnas) y otra con todos los campos, escribe CSV y XLSX, y borra todo al
-terminar. Solo imprime agregados. Los resultados de referencia estan en
+columnas), otra con todos los campos y otra segmentada por los dias ajustados a la fecha de
+envio (RF-55: paga el ajuste por producto), escribe CSV y XLSX, y borra todo al terminar. La
+fecha de envio es la de corte. Solo imprime agregados. Los resultados de referencia estan en
 docs/generacion-cargas.md, seccion 4.
 """
 
@@ -35,7 +36,18 @@ from app.adapters.persistence.repositorio_cartera_postgres import (  # noqa: E40
     RepositorioCarteraPostgres,
 )
 from app.core.config import exigir_base_de_pruebas, get_settings  # noqa: E402
-from app.core.entities.mapeo import CampoSalida, DefinicionCarga, TipoSalida  # noqa: E402
+from app.core.entities.mapeo import (  # noqa: E402
+    CampoSalida,
+    DefinicionCarga,
+    TipoSalida,
+    VarianteCampo,
+)
+from app.core.entities.segmentacion import (  # noqa: E402
+    TABLA_RANGOS_POR_DEFECTO,
+    VARIABLE_DIAS_AJUSTADOS,
+    CriterioCalculado,
+    Segmentacion,
+)
 from app.core.services.generacion_cargas import servicio as generacion  # noqa: E402
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService  # noqa: E402
 from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA  # noqa: E402
@@ -67,6 +79,31 @@ COMPLETA = DefinicionCarga(
     nombre="completa",
     campos=tuple(CampoSalida(nombre=c, plantilla=f"[@{c}]") for c in CAMPOS_CARTERA),
 )
+# Como una definicion nueva de la cartera (RF-55): segmento calculado sobre los dias ajustados con
+# la tabla por defecto, una columna con el contenido propio de cada segmento y otra con
+# `fecha_envio`.
+AJUSTADA = DefinicionCarga(
+    nombre="ajustada",
+    campos=(
+        CampoSalida(nombre="numero", plantilla="51[@telefono]"),
+        CampoSalida(nombre="pagare", plantilla="[@pagare]"),
+        CampoSalida(
+            nombre="envio",
+            plantilla="[@fecha_envio]",
+            tipo=TipoSalida.FECHA,
+            formato_fecha="%d/%m/%Y",
+        ),
+        CampoSalida(
+            nombre="mensaje",
+            plantilla="sin segmento",
+            variantes=tuple(
+                VarianteCampo(rango.clave, plantilla=f"{rango.etiqueta}: [@documento_numero]")
+                for rango in TABLA_RANGOS_POR_DEFECTO
+            ),
+        ),
+    ),
+    segmentacion=Segmentacion(CriterioCalculado(variable_dias=VARIABLE_DIAS_AJUSTADOS)),
+)
 
 
 def _limpiar(engine) -> None:
@@ -94,10 +131,10 @@ def main() -> None:
         servicio = generacion.GeneracionCargasService(
             ConsultaCarteraService(RepositorioCarteraPostgres(engine))
         )
-        for definicion in (CORTA, COMPLETA):
+        for definicion in (CORTA, COMPLETA, AJUSTADA):
             for cantidad in cantidades:
                 inicio = time.perf_counter()
-                generada = servicio.generar(FECHA, definicion, cantidad=cantidad)
+                generada = servicio.generar(FECHA, definicion, cantidad=cantidad, fecha_envio=FECHA)
                 t_generar = time.perf_counter() - inicio
                 for formato in ("csv", "xlsx"):
                     inicio = time.perf_counter()
@@ -111,7 +148,9 @@ def main() -> None:
                 del generada, archivo
                 gc.collect()
             tracemalloc.start()
-            generada = servicio.generar(FECHA, definicion, cantidad=max(cantidades))
+            generada = servicio.generar(
+                FECHA, definicion, cantidad=max(cantidades), fecha_envio=FECHA
+            )
             exportadores.exportar(generada.tabla, "xlsx")
             _, pico = tracemalloc.get_traced_memory()
             tracemalloc.stop()

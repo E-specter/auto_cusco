@@ -12,6 +12,10 @@ en la pantalla de cartera se reutiliza tal cual.
 
 La definicion de la carga viaja en el cuerpo: todavia no se guarda en la base,
 asi que el frontend la envia completa en cada llamada (ver docs/mapeo-campos.md).
+
+La carga tiene una fecha de envio (RF-55): la que pide `fecha_envio` o, sin ella, hoy en Lima. Si
+es anterior a la fecha de corte se rechaza con `400` y las dos fechas; las respuestas dicen cual
+se uso.
 """
 
 from datetime import date
@@ -26,6 +30,7 @@ from app.api.cartera import obtener_servicio_cartera
 from app.api.consultas import parsear_filtro, parsear_orden, texto_si_es_monto
 from app.api.definiciones_columnas import obtener_servicio_definiciones
 from app.api.errores import ErrorConCodigo, respuestas_de_error_con_codigo
+from app.api.fecha_envio import DetalleErrorFechaEnvio, error_de_fecha_envio
 from app.api.respuestas import ModeloRespuesta
 from app.core.entities.cartera import ConsultaInvalida, SinVersionVigente
 from app.core.entities.definiciones_columnas import DefinicionNoEncontrada, VersionNoEncontrada
@@ -53,6 +58,7 @@ from app.core.services.definiciones_columnas.servicio import (
     DefinicionCargada,
     DefinicionesColumnasService,
 )
+from app.core.services.fecha_envio import FechaEnvioAnterior
 from app.core.services.generacion_cargas.servicio import (
     CANTIDAD_MAXIMA,
     CANTIDAD_POR_DEFECTO,
@@ -62,6 +68,18 @@ from app.core.services.generacion_cargas.servicio import (
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
 
 router = APIRouter(prefix="/archivos-carga", tags=["archivos de carga"])
+
+# Los `400` de estas entradas pueden traer, con `fecha_envio_anterior`, las dos fechas.
+RESPUESTAS_ERROR: dict[int | str, dict[str, Any]] = {
+    **respuestas_de_error_con_codigo(404),
+    400: {
+        "model": DetalleErrorFechaEnvio,
+        "description": (
+            "La peticion no se puede atender tal como viene; el motivo esta en detail. Con el "
+            "codigo fecha_envio_anterior trae ademas fecha_envio y fecha_corte"
+        ),
+    },
+}
 
 FILAS_DE_MUESTRA = 20
 
@@ -137,6 +155,13 @@ class PeticionGeneracion(BaseModel):
     """
 
     fecha_corte: date
+    fecha_envio: date | None = Field(
+        default=None,
+        description=(
+            "Fecha en que se envia la carga (RF-55); por defecto, hoy en America/Lima. No puede "
+            "ser anterior a fecha_corte. Ajusta dias_atraso_ajustados a los dias que pasaron"
+        ),
+    )
     definicion: DefinicionEntrada | None = None
     definicion_guardada: DefinicionGuardadaEntrada | None = None
     formato: FormatoArchivo = FormatoArchivo.XLSX
@@ -178,6 +203,7 @@ class PrevisualizacionRespuesta(ModeloRespuesta):
     excluidos: int
     suficiente: bool
     completa: bool
+    fecha_envio: date  # la que se uso: la pedida o, sin ella, hoy en Lima (RF-55)
     errores: list[ErrorGeneracionRespuesta]
     exclusiones: list[ExclusionCargaRespuesta]
 
@@ -303,7 +329,10 @@ def _generar(
             [parsear_filtro(crudo) for crudo in peticion.filtros],
             parsear_orden(peticion.orden),
             cantidad,
+            peticion.fecha_envio,
         )
+    except FechaEnvioAnterior as exc:
+        raise error_de_fecha_envio(exc) from exc
     except (ConsultaInvalida, PlantillaInvalida, SinVersionVigente) as exc:
         raise _error(exc) from exc
 
@@ -328,7 +357,7 @@ def listar_formatos() -> list[FormatoRespuesta]:
 @router.post(
     "/previsualizacion",
     response_model=PrevisualizacionRespuesta,
-    responses=respuestas_de_error_con_codigo(400, 404),
+    responses=RESPUESTAS_ERROR,
 )
 def previsualizar(
     peticion: PeticionGeneracion,
@@ -356,6 +385,7 @@ def previsualizar(
         excluidos=resultado.excluidos,
         suficiente=resultado.disponibles >= peticion.cantidad,
         completa=resultado.completa,
+        fecha_envio=resultado.fecha_envio,
         errores=[
             ErrorGeneracionRespuesta(fila=error.fila, campo=error.campo, detalle=error.detalle)
             for error in resultado.errores
@@ -392,7 +422,7 @@ def _respuesta_de_descarga() -> dict[int | str, dict[str, Any]]:
                 },
             },
         },
-        **respuestas_de_error_con_codigo(400, 404),
+        **RESPUESTAS_ERROR,
     }
 
 

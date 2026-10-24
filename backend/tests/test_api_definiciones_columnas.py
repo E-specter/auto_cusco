@@ -133,7 +133,7 @@ def test_la_segmentacion_se_devuelve_resuelta(cliente) -> None:
 
     assert segmentacion["politica"] == "excluir"
     assert segmentacion["criterio"]["tipo"] == "calculado"
-    assert segmentacion["criterio"]["variable_dias"] == "dias_atraso"
+    assert segmentacion["criterio"]["variable_dias"] == "dias_atraso_ajustados"
     assert segmentacion["criterio"]["tabla"][1] == {
         "clave": "1_a_8",
         "etiqueta": "1 a 8",

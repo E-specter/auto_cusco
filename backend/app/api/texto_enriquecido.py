@@ -26,7 +26,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.api.cartera import obtener_servicio_cartera
-from app.api.errores import DetalleError, ErrorConCodigo, respuestas_de_error_con_codigo
+from app.api.errores import DetalleError, ErrorConCodigo
+from app.api.fecha_envio import DetalleErrorFechaEnvio, error_de_fecha_envio
 from app.api.respuestas import ModeloRespuesta
 from app.api.selecciones import obtener_servicio_selecciones
 from app.core.entities.cartera import ConsultaInvalida, SinVersionVigente
@@ -40,6 +41,7 @@ from app.core.entities.segmentacion import RangoDias
 from app.core.entities.selecciones import SeleccionNoEncontrada
 from app.core.entities.texto_enriquecido import CodigoTexto, MotivoSinCota, Problema
 from app.core.services.contextos_texto import RegistroContextos, contexto_cartera
+from app.core.services.fecha_envio import FechaEnvioAnterior
 from app.core.services.mapeo_campos.serializacion import ProblemaDeDefinicion
 from app.core.services.plataformas.mowa_mes.contexto_texto import contexto_speech
 from app.core.services.previsualizar_texto import (
@@ -203,12 +205,17 @@ class MuestraEntrada(BaseModel):
     `primeros_de_seleccion`: la `fecha_corte` y una seleccion con la forma de `/cartera`
     (`filtros` y `orden`) o una guardada (`seleccion_id`), con `cantidad` de 1 a 5 (5 por
     defecto), el mismo orden y desempate que la carga. Solo lectura.
+
+    Las dos muestras de la cartera real aceptan `fecha_envio` (RF-55): por defecto, hoy en
+    America/Lima, y no puede ser anterior a la `fecha_corte`. Ajusta `dias_atraso_ajustados`; la
+    respuesta dice cual se uso. Una muestra de ejemplo no la admite.
     """
 
     tipo: Literal["ejemplo", "ejemplos_por_segmento", "producto_real", "primeros_de_seleccion"] = (
         "ejemplos_por_segmento"
     )
     fecha_corte: date | None = None
+    fecha_envio: date | None = None
     pagare: str | None = None
     filtros: list[str] | None = None
     orden: str | None = None
@@ -217,6 +224,11 @@ class MuestraEntrada(BaseModel):
 
     @model_validator(mode="after")
     def _la_muestra_se_identifica(self) -> "MuestraEntrada":
+        if self.fecha_envio is not None and self.tipo not in (
+            "producto_real",
+            "primeros_de_seleccion",
+        ):
+            raise ValueError("Solo la cartera real tiene fecha de envio: no va con un ejemplo")
         if self.tipo == "producto_real" and (self.fecha_corte is None or not self.pagare):
             raise ValueError("Un producto real se pide con `fecha_corte` y `pagare`")
         if self.tipo == "primeros_de_seleccion":
@@ -228,7 +240,11 @@ class MuestraEntrada(BaseModel):
 
     def a_muestra(self) -> Muestra:
         if self.tipo == "producto_real":
-            return MuestraProductoReal(self.fecha_corte, self.pagare)  # type: ignore[arg-type]
+            return MuestraProductoReal(
+                self.fecha_corte,  # type: ignore[arg-type]
+                self.pagare,  # type: ignore[arg-type]
+                self.fecha_envio,
+            )
         if self.tipo == "primeros_de_seleccion":
             return MuestraPrimerosDeSeleccion(
                 fecha_corte=self.fecha_corte,  # type: ignore[arg-type]
@@ -236,6 +252,7 @@ class MuestraEntrada(BaseModel):
                 orden=self.orden,
                 seleccion_id=self.seleccion_id,
                 cantidad=self.cantidad,
+                fecha_envio=self.fecha_envio,
             )
         if self.tipo == "ejemplo":
             return MuestraEjemplo()
@@ -461,6 +478,9 @@ class PrevisualizacionTextoRespuesta(ModeloRespuesta):
     limite_largo: int | None
     umbral_advertencia: int | None
     disponibles: int | None  # los productos de la seleccion, si la muestra es una seleccion
+    # La fecha de envio con la que se evaluo (la pedida u hoy en Lima, RF-55); nula si la muestra
+    # no es de la cartera real.
+    fecha_envio: date | None
 
 
 # --- Conversion ---------------------------------------------------------------------------------
@@ -676,7 +696,16 @@ def validar(
 @router.post(
     "/previsualizacion",
     response_model=PrevisualizacionTextoRespuesta,
-    responses={**RESPUESTAS_404, **respuestas_de_error_con_codigo(400)},
+    responses={
+        **RESPUESTAS_404,
+        400: {
+            "model": DetalleErrorFechaEnvio,
+            "description": (
+                "La peticion no se puede atender tal como viene; el motivo esta en detail. Con el "
+                "codigo fecha_envio_anterior trae ademas fecha_envio y fecha_corte"
+            ),
+        },
+    },
 )
 def previsualizar(
     peticion: PeticionPrevisualizacion,
@@ -700,6 +729,8 @@ def previsualizar(
         return _no_existe(CodigoTexto.PRODUCTO_NO_ENCONTRADO, str(error))
     except SeleccionNoEncontrada as error:
         return _no_existe(CodigoTexto.SELECCION_NO_ENCONTRADA, str(error))
+    except FechaEnvioAnterior as error:
+        raise error_de_fecha_envio(error) from error
     except ConsultaInvalida as error:
         raise ErrorConCodigo(400, str(error), None) from error
     except SinVersionVigente as error:
@@ -710,4 +741,5 @@ def previsualizar(
         limite_largo=resultado.limite_largo,
         umbral_advertencia=resultado.umbral_advertencia,
         disponibles=resultado.disponibles,
+        fecha_envio=resultado.fecha_envio,
     )

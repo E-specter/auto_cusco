@@ -6,6 +6,7 @@ el contrato que codigos puede recibir el frontend y con que forma, en vez de
 que lo descubra en produccion.
 """
 
+from collections.abc import Mapping
 from typing import Any
 
 from fastapi import Request
@@ -43,21 +44,30 @@ class DetalleErrorConCodigo(DetalleError):
 class ErrorConCodigo(Exception):
     """Se lanza desde un endpoint y el manejador de `main.py` lo responde con `codigo`.
 
-    `HTTPException` solo sabe enviar `{"detail": ...}`.
+    `HTTPException` solo sabe enviar `{"detail": ...}`. `extra` suma campos estructurados al
+    cuerpo (las dos fechas de un rechazo por fecha de envio), para no obligar a leer la prosa.
     """
 
-    def __init__(self, estado: int, detalle: str, codigo: CodigoTexto | None) -> None:
+    def __init__(
+        self,
+        estado: int,
+        detalle: str,
+        codigo: CodigoTexto | None,
+        extra: Mapping[str, Any] | None = None,
+    ) -> None:
         super().__init__(detalle)
         self.estado = estado
         self.detalle = detalle
         self.codigo = codigo
+        self.extra = dict(extra or {})
 
 
 def manejar_error_con_codigo(_: Request, error: Exception) -> JSONResponse:
     assert isinstance(error, ErrorConCodigo)
     codigo = None if error.codigo is None else error.codigo.value
     return JSONResponse(
-        status_code=error.estado, content={"detail": error.detalle, "codigo": codigo}
+        status_code=error.estado,
+        content={"detail": error.detalle, "codigo": codigo, **error.extra},
     )
 
 

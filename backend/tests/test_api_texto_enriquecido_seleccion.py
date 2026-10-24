@@ -362,7 +362,12 @@ def test_con_el_contexto_del_speech_cada_producto_pasa_por_su_registro(cliente) 
         json={
             "contexto": "mowa_mes.speech",
             "expresion": expresion,
-            "muestra": {"tipo": "primeros_de_seleccion", "fecha_corte": CORTE, "cantidad": 2},
+            "muestra": {
+                "tipo": "primeros_de_seleccion",
+                "fecha_corte": CORTE,
+                "fecha_envio": CORTE,
+                "cantidad": 2,
+            },
         },
     )
 

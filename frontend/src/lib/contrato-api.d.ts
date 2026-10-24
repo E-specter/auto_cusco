@@ -1200,7 +1200,7 @@ export interface components {
          *     producto que no existen, y por que una expresion no tiene largo maximo.
          * @enum {string}
          */
-        CodigoTexto: "expresion_invalida" | "definicion_invalida" | "sintaxis_invalida" | "referencia_vacia" | "variable_desconocida" | "funcion_desconocida" | "parametro_invalido" | "tipo_incompatible" | "limite_excedido" | "no_se_puede_escribir_como_texto" | "sin_segmento" | "variable_obligatoria_vacia" | "argumento_vacio" | "division_por_cero" | "no_es_numero" | "no_es_fecha" | "telefono_invalido" | "resultado_fuera_de_rango" | "valor_no_convertible" | "sin_cota_variable" | "sin_cota_funcion" | "contexto_desconocido" | "producto_no_encontrado" | "sin_version_vigente" | "definicion_no_encontrada" | "version_no_encontrada" | "nombre_repetido" | "seleccion_no_encontrada";
+        CodigoTexto: "expresion_invalida" | "definicion_invalida" | "sintaxis_invalida" | "referencia_vacia" | "variable_desconocida" | "funcion_desconocida" | "parametro_invalido" | "tipo_incompatible" | "limite_excedido" | "no_se_puede_escribir_como_texto" | "sin_segmento" | "variable_obligatoria_vacia" | "argumento_vacio" | "division_por_cero" | "no_es_numero" | "no_es_fecha" | "telefono_invalido" | "resultado_fuera_de_rango" | "valor_no_convertible" | "sin_cota_variable" | "sin_cota_funcion" | "contexto_desconocido" | "producto_no_encontrado" | "sin_version_vigente" | "definicion_no_encontrada" | "version_no_encontrada" | "nombre_repetido" | "seleccion_no_encontrada" | "fecha_envio_anterior";
         /**
          * ColumnaEntrada
          * @description Una columna de la definicion: la forma que guardara B4b. El contenido es solo expresion;
@@ -1647,6 +1647,20 @@ export interface components {
             codigo: components["schemas"]["CodigoTexto"];
             /** Problemas */
             problemas: components["schemas"]["ProblemaTextoRespuesta"][];
+        };
+        /**
+         * DetalleErrorFechaEnvio
+         * @description Un `400`: `fecha_envio` y `fecha_corte` solo viajan cuando el `codigo` es
+         *     `fecha_envio_anterior`; en cualquier otro `400` de estas entradas no vienen.
+         */
+        DetalleErrorFechaEnvio: {
+            /** Detail */
+            detail: string;
+            codigo: components["schemas"]["CodigoTexto"] | null;
+            /** Fecha Envio */
+            fecha_envio?: string | null;
+            /** Fecha Corte */
+            fecha_corte?: string | null;
         };
         /**
          * DetalleErrorSpeech
@@ -2154,6 +2168,10 @@ export interface components {
          *     `primeros_de_seleccion`: la `fecha_corte` y una seleccion con la forma de `/cartera`
          *     (`filtros` y `orden`) o una guardada (`seleccion_id`), con `cantidad` de 1 a 5 (5 por
          *     defecto), el mismo orden y desempate que la carga. Solo lectura.
+         *
+         *     Las dos muestras de la cartera real aceptan `fecha_envio` (RF-55): por defecto, hoy en
+         *     America/Lima, y no puede ser anterior a la `fecha_corte`. Ajusta `dias_atraso_ajustados`; la
+         *     respuesta dice cual se uso. Una muestra de ejemplo no la admite.
          */
         MuestraEntrada: {
             /**
@@ -2164,6 +2182,8 @@ export interface components {
             tipo: "ejemplo" | "ejemplos_por_segmento" | "producto_real" | "primeros_de_seleccion";
             /** Fecha Corte */
             fecha_corte?: string | null;
+            /** Fecha Envio */
+            fecha_envio?: string | null;
             /** Pagare */
             pagare?: string | null;
             /** Filtros */
@@ -2473,6 +2493,11 @@ export interface components {
              * Format: date
              */
             fecha_corte: string;
+            /**
+             * Fecha Envio
+             * @description Fecha en que se envia la carga (RF-55); por defecto, hoy en America/Lima. No puede ser anterior a fecha_corte. Ajusta dias_atraso_ajustados a los dias que pasaron
+             */
+            fecha_envio?: string | null;
             definicion?: components["schemas"]["DefinicionEntrada"] | null;
             definicion_guardada?: components["schemas"]["DefinicionGuardadaEntrada"] | null;
             /** @default xlsx */
@@ -2650,6 +2675,8 @@ export interface components {
             umbral_advertencia: number | null;
             /** Disponibles */
             disponibles: number | null;
+            /** Fecha Envio */
+            fecha_envio: string | null;
         };
         /** ProblemaRespuesta */
         ProblemaRespuesta: {
@@ -3226,6 +3253,11 @@ export interface components {
             suficiente: boolean;
             /** Completa */
             completa: boolean;
+            /**
+             * Fecha Envio
+             * Format: date
+             */
+            fecha_envio: string;
             /** Errores */
             errores: components["schemas"]["ErrorGeneracionRespuesta"][];
             /** Exclusiones */
@@ -3817,13 +3849,13 @@ export interface operations {
                     "application/json": components["schemas"]["app__api__archivos_carga__PrevisualizacionRespuesta"];
                 };
             };
-            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail. Con el codigo fecha_envio_anterior trae ademas fecha_envio y fecha_corte */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleErrorConCodigo"];
+                    "application/json": components["schemas"]["DetalleErrorFechaEnvio"];
                 };
             };
             /** @description No existe lo pedido */
@@ -3884,13 +3916,13 @@ export interface operations {
                     "application/json": string;
                 };
             };
-            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail. Con el codigo fecha_envio_anterior trae ademas fecha_envio y fecha_corte */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleErrorConCodigo"];
+                    "application/json": components["schemas"]["DetalleErrorFechaEnvio"];
                 };
             };
             /** @description No existe lo pedido */
@@ -5297,13 +5329,13 @@ export interface operations {
                     "application/json": components["schemas"]["PrevisualizacionTextoRespuesta"];
                 };
             };
-            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail. Con el codigo fecha_envio_anterior trae ademas fecha_envio y fecha_corte */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleErrorConCodigo"];
+                    "application/json": components["schemas"]["DetalleErrorFechaEnvio"];
                 };
             };
             /** @description No existe el contexto, el producto o la version de sabana pedidos */

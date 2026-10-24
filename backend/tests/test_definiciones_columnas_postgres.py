@@ -509,6 +509,7 @@ def test_generar_el_archivo_con_una_guardada_marca_usada_en_y_da_las_filas_de_la
     ]
     pedido = {
         "fecha_corte": FECHA.isoformat(),
+        "fecha_envio": FECHA.isoformat(),  # la sabana es de 2099: hoy seria anterior al corte
         "definicion_guardada": {"id": id_},
         "cantidad": 10,
     }
@@ -539,6 +540,7 @@ def test_la_muestra_de_los_primeros_de_una_seleccion_usa_la_cartera_real(cliente
             "muestra": {
                 "tipo": "primeros_de_seleccion",
                 "fecha_corte": FECHA.isoformat(),
+                "fecha_envio": FECHA.isoformat(),  # la sabana es de 2099
                 "orden": "-saldo_capital_pendiente",
                 "cantidad": 3,
             },

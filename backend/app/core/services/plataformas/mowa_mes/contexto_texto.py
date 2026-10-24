@@ -36,14 +36,14 @@ _CLAVES = {
 def _registro_de_producto(producto: Mapping[str, Any]) -> dict[str, Any]:
     """Titular y vencimiento salen del producto y el contacto es el de ejemplo.
 
-    Los dias ajustados parten de `dias_atraso` de la sabana, SIN el ajuste a la fecha de envio (lo
-    aporta la campana): el segmento sale de los dias de atraso a la fecha de corte, y en una
-    campana el mismo producto puede caer en otro segmento."""
+    Los dias ajustados los trae el producto: la previsualizacion los calcula con la fecha de envio
+    de la muestra (hoy en Lima, RF-55) antes de pedir el registro, con la misma formula que la
+    campana (RF-MM-15). Esta funcion no ajusta nada: la campana sigue aportando los suyos."""
     return {
         speech.VARIABLE_TITULAR: producto.get("titular"),
         speech.VARIABLE_VENCIMIENTO: producto.get("fecha_vencimiento_cuota"),
         speech.VARIABLE_CONTACTO: WHATSAPP_DE_EJEMPLO,
-        VARIABLE_DIAS: producto.get("dias_atraso"),
+        VARIABLE_DIAS: producto.get(VARIABLE_DIAS),
     }
 
 

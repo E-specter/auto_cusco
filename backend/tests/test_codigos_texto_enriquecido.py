@@ -116,7 +116,7 @@ def _pedir_a_la_api(cliente: TestClient, cartera: _CarteraVacia) -> set[CodigoTe
             respuesta = cliente.get(ruta)
         else:
             respuesta = cliente.post(ruta, json=json)
-        if respuesta.status_code in (404, 409):
+        if respuesta.status_code in (400, 404, 409) and "codigo" in respuesta.json():
             emitidos.add(CodigoTexto(respuesta.json()["codigo"]))
             return
         cuerpo(respuesta.json())
@@ -176,6 +176,15 @@ def _pedir_a_la_api(cliente: TestClient, cartera: _CarteraVacia) -> set[CodigoTe
                 "fecha_corte": "2026-09-10",
                 "seleccion_id": 99,
             },
+        },
+    )
+    buscar(  # fecha_envio_anterior
+        desde_problemas,
+        previa,
+        {
+            "contexto": "cartera",
+            "expresion": expresion,
+            "muestra": {**muestra, "fecha_envio": "2026-09-09"},
         },
     )
     guardada = {"nombre": "Una", "columnas": [{"nombre": "a", "orden": 0, "expresion": expresion}]}

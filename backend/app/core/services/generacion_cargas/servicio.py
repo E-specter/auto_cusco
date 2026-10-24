@@ -7,6 +7,10 @@ definicion pide.
 
 El resultado se entrega como `Tabla`, lista para que un exportador la escriba
 en XLSX, CSV o JSON (RF-13). Este servicio no elige el formato.
+
+La carga tiene una fecha de envio (RF-55): la pedida o, sin ella, hoy en Lima, nunca anterior a la
+fecha de corte. Con ella la cartera ofrece `fecha_envio` (una constante de la carga) y
+`dias_atraso_ajustados` (por producto), y una segmentacion calculada puede usarlos.
 """
 
 from collections.abc import Sequence
@@ -16,6 +20,13 @@ from datetime import date
 from app.core.entities.cartera import ConsultaInvalida, Filtro, Orden
 from app.core.entities.exportacion import Tabla
 from app.core.entities.mapeo import DefinicionCarga, ErrorGeneracion, FilaExcluida
+from app.core.services.fecha_envio import (
+    DIAS_AJUSTADOS,
+    VARIABLES_DE_ENVIO,
+    EnvioDeCarga,
+    Reloj,
+    hoy_en_lima,
+)
 from app.core.services.mapeo_campos.generador import GeneradorCargas
 from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA
 from app.core.services.seleccion_cartera.recorrido import SeleccionPaginada
@@ -42,6 +53,7 @@ class ResultadoGeneracion:
     disponibles: int
     solicitados: int
     errores: tuple[ErrorGeneracion, ...]
+    fecha_envio: date  # la que se uso: la pedida o, sin ella, hoy en Lima (RF-55)
     exclusiones: tuple[FilaExcluida, ...] = ()
 
     @property
@@ -63,8 +75,9 @@ class ResultadoGeneracion:
 
 
 class GeneracionCargasService:
-    def __init__(self, consulta: ConsultaCarteraService) -> None:
+    def __init__(self, consulta: ConsultaCarteraService, hoy: Reloj = hoy_en_lima) -> None:
         self._consulta = consulta
+        self._hoy = hoy
 
     def generar(
         self,
@@ -73,19 +86,29 @@ class GeneracionCargasService:
         filtros: Sequence[Filtro] = (),
         orden: Orden | None = None,
         cantidad: int = CANTIDAD_POR_DEFECTO,
+        fecha_envio: date | None = None,
     ) -> ResultadoGeneracion:
-        """Aplica la definicion a los primeros `cantidad` productos de la seleccion."""
+        """Aplica la definicion a los primeros `cantidad` productos de la seleccion.
+
+        `fecha_envio` por defecto es hoy en Lima; si es anterior a `fecha_corte` lanza
+        `FechaEnvioAnterior` (con las dos fechas) antes de tocar la base de datos.
+        """
         if not 1 <= cantidad <= CANTIDAD_MAXIMA:
             raise ConsultaInvalida(f"La cantidad debe estar entre 1 y {CANTIDAD_MAXIMA}")
+        envio = EnvioDeCarga.de(fecha_corte, fecha_envio, self._hoy)
         # Compilar antes de consultar: una plantilla mal escrita se rechaza sin
         # haber tocado la base de datos.
-        generador = GeneradorCargas(definicion, CAMPOS_CARTERA)
+        variables = {**CAMPOS_CARTERA, **VARIABLES_DE_ENVIO}
+        generador = GeneradorCargas(definicion, variables, envio.constantes(variables))
         seleccion = SeleccionPaginada(self._consulta, fecha_corte, filtros, orden, cantidad)
-        carga = generador.generar(seleccion)
+        # Los dias ajustados se calculan por producto, y solo si la definicion los usa.
+        usa_dias = DIAS_AJUSTADOS in generador.campos_de_origen()
+        carga = generador.generar(envio.ajustar_todos(seleccion) if usa_dias else seleccion)
         return ResultadoGeneracion(
             tabla=Tabla(nombre=definicion.nombre, cabeceras=carga.cabeceras, filas=carga.filas),
             disponibles=seleccion.disponibles,
             solicitados=cantidad,
             errores=carga.errores,
+            fecha_envio=envio.fecha_envio,
             exclusiones=carga.exclusiones,
         )
