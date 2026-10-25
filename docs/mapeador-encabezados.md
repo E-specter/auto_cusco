@@ -51,10 +51,16 @@ Decisiones del usuario del 2026-10-24:
 Precedencia por encabezado, en este orden:
 1. **Recordado:** si (normalizado, ocurrencia) está en `recordados`, el estado es `recordado` y se sugiere el campo recordado, que puede ser «No cargar».
 2. **Coincide:** el primer campo del catálogo, en su orden, cuyo alias coincide y que no esté tomado. Es la regla de hoy, que mantiene `pagare` antes que `pagare_duplicado`.
-3. **Parecido:** el campo de mayor similitud que no esté tomado, si supera el umbral y no hay empate.
+3. **Parecido:** el campo de mayor similitud que no esté tomado, si alcanza el umbral y no hay empate.
 4. **Sin coincidencia:** se sugiere «No cargar».
 
 Son **tres pasadas sobre todas las columnas**, de izquierda a derecha en cada una: primero todos los recordados, después las coincidencias sobre los campos libres y por último los parecidos sobre los que quedan. Así un recordado gana siempre a una coincidencia, aunque esta esté más a la izquierda (M-3). Un recordado que apunta a un campo ya tomado por otro recordado pasa a `sin_coincidencia`. Los encabezados vacíos no se listan.
+
+Decisiones de B1 sobre lo que el diseño no decía:
+- **Parecidos, «mejor primero» (no de izquierda a derecha).** Se arman todos los pares (columna sin decidir, campo libre) con similitud ≥ umbral, se ordenan de mayor a menor similitud (a igual similitud, por índice de columna y después por orden del catálogo) y se recorren saltando las columnas ya decididas y los campos ya tomados. Así la columna 9 con 0,95 a `monto_cuota` le gana a la 2 con 0,76, y la sugerencia no depende de cuántas columnas la precedan. Permutar las columnas no cambia qué campo recibe cada encabezado, salvo los empates exactos de similitud entre columnas, que desempata el índice.
+- **Empate y umbral.** El umbral es inclusivo (`similitud >= 0,75`). El empate es por columna y se mide en el momento de asignarla: si sus dos mejores campos **libres** (el segundo puede estar bajo el umbral) difieren en menos de 0,02, la columna queda sin sugerencia y no toma ningún campo.
+- **Un recordado hacia un campo que ya no está en el catálogo se ignora:** la columna sigue con la coincidencia o el parecido que le toque. Solo el «tomado por otro recordado» pasa a `sin_coincidencia`.
+- **Qué es vacío.** Por defecto, `None` o un texto en blanco (`es_vacio` del mapeador); `analizar` acepta un `vacio` opcional y la sábana le pasa el suyo (`ingesta_sabana.reglas.es_vacio`, que además toma el literal `NULL` por vacío), así que con ese criterio los dos caminos listan las mismas columnas. Sin él, el mapeador lista un encabezado «NULL» (como `sin_coincidencia`, «No cargar») que el camino viejo salta; con mapeo explícito esa columna va a `_extras` y en el camino viejo no está: diferencia conocida y menor que desaparece al pasar el criterio de la sábana.
 
 ### 3.4 Validación (`services/mapeador/validacion.py`)
 
@@ -74,6 +80,11 @@ La carga se confirma solo si la lista está vacía (RF-60). Las columnas en «No
 - El backend no confía en la etiqueta: si llega `parecido_aceptado` con un campo distinto del sugerido, lo guarda como `manual`. En una columna que no era `parecido`, el origen se recalcula desde el análisis (`recordado` o `coincide` si el campo no cambió, `manual` si cambió).
 
 Así, elegir en el `select` el mismo campo que ya estaba no cuenta como revisión: hace falta «Aceptar».
+
+Decisiones de B1 sobre lo que el diseño no decía:
+- **El origen de una `sin_coincidencia` que se confirma sin cambio («No cargar») es `manual`:** no tiene origen automático y la confirmó el usuario. Un `parecido` con otro campo (o «No cargar») es `manual` diga lo que diga la etiqueta; con el sugerido conserva su etiqueta, y solo `parecido_aceptado` o `manual` lo dan por revisado.
+- **`validar` devuelve solo los problemas;** el origen recalculado sale de `resolver_asignaciones`, que `validar` aplica por dentro y que el backend usa para guardar los orígenes (RF-62). Es idempotente.
+- **Orden de los problemas:** primero los de protección de la API (`indice_repetido`, `indice_fuera_de_rango`), después los de cada columna en el orden de las columnas y al final los `obligatorio_sin_columna`, en el orden del catálogo. Con dos asignaciones para una misma columna se valida la primera; un índice fuera de rango es el de una columna que no se listó (incluidos los encabezados vacíos).
 
 ### 3.5 Catálogo de la sábana
 

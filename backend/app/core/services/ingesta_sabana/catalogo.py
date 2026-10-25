@@ -10,6 +10,7 @@ cabecera "Pagare" toma la clave y la segunda ("PAGARE" o "PAGARE2") el
 duplicado.
 """
 
+from app.core.entities.mapeador import CampoDestino, CatalogoCampos
 from app.core.entities.sabana import ColumnaSabana, TipoCampo
 
 T = TipoCampo
@@ -67,4 +68,24 @@ CATALOGO_VENCIDA: tuple[ColumnaSabana, ...] = (
     _col("mora_impacto_proyectada", T.BOOLEANO, r"mora impacto proyectada"),
     _col("cantidad_paralelos", T.ENTERO, r"cant\.? ?paralelos"),
     _col("celular_analista", T.TELEFONO, r"celular analista"),
+)
+
+
+def campo_destino(columna: ColumnaSabana) -> CampoDestino:
+    """La columna de la sabana como campo del mapeador: `requerida` pasa a `obligatorio`, `patrones`
+    a `alias`, el tipo a su nombre (el mapeador no conoce `TipoCampo`) y la etiqueta es
+    `campo.<nombre>`."""
+    return CampoDestino(
+        nombre=columna.nombre,
+        clave_etiqueta=f"campo.{columna.nombre}",
+        tipo=columna.tipo.value,
+        obligatorio=columna.requerida,
+        alias=columna.patrones,
+    )
+
+
+# El catalogo de la sabana para el mapeador de encabezados (RF-63). Su `id` es la clave de los
+# mapeos recordados: no se cambia.
+CATALOGO_SABANA = CatalogoCampos(
+    "sabana_vencida", tuple(campo_destino(c) for c in CATALOGO_VENCIDA)
 )

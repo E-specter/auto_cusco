@@ -9,13 +9,17 @@ confirmadas por el usuario (DNI completado con ceros, decision D-1).
 
 import math
 import re
-import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any, Generic, TypeVar
 
 from app.core.entities.sabana import Aviso, Documento, Severidad, TipoDocumento
+
+# La normalizacion de cabeceras vive en el mapeador (RF-63): la ingesta la importa de ahi, sin
+# copia. `normalizar_cabecera` se reexporta para quien la pedia desde `reglas`.
+from app.core.services.mapeador.similitud import normalizar_cabecera as normalizar_cabecera
+from app.core.services.mapeador.similitud import sin_tildes
 
 T = TypeVar("T")
 
@@ -50,16 +54,6 @@ def es_vacio(valor: Any) -> bool:
     if valor is None:
         return True
     return isinstance(valor, str) and valor.strip().casefold() in _TEXTOS_NULOS
-
-
-def sin_tildes(texto: str) -> str:
-    descompuesto = unicodedata.normalize("NFKD", texto)
-    return "".join(c for c in descompuesto if not unicodedata.combining(c))
-
-
-def normalizar_cabecera(cabecera: str) -> str:
-    """Forma canonica de una cabecera para compararla con el catalogo (N-1)."""
-    return re.sub(r"\s+", " ", sin_tildes(cabecera)).strip().casefold()
 
 
 def _entero_como_texto(valor: Any) -> str | None:

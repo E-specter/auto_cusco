@@ -1,13 +1,13 @@
 """Mapeo de cabeceras por nombre y alias, no por posicion (regla N-1)."""
 
 import hashlib
-import re
 from collections.abc import Sequence
 from typing import Any
 
 from app.core.entities.sabana import ColumnaSabana, Incidencia, MapeoCabeceras, Severidad
-from app.core.services.ingesta_sabana.catalogo import CATALOGO_VENCIDA
-from app.core.services.ingesta_sabana.reglas import es_vacio, normalizar_cabecera
+from app.core.services.ingesta_sabana.catalogo import CATALOGO_VENCIDA, campo_destino
+from app.core.services.ingesta_sabana.reglas import es_vacio
+from app.core.services.mapeador.similitud import coincide, normalizar_cabecera
 
 
 def mapear_cabeceras(
@@ -15,15 +15,15 @@ def mapear_cabeceras(
 ) -> MapeoCabeceras:
     """Asigna cada cabecera del archivo a una columna del catalogo.
 
-    - Cada cabecera toma la primera columna del catalogo (en orden) cuyo patron
-      coincide y que aun no fue asignada.
+    - Cada cabecera toma la primera columna del catalogo (en orden) que coincide (un patron
+      o su nombre, con `_` como espacio: `mapeador.coincide`) y que aun no fue asignada.
     - Cabeceras sin coincidencia: `cabecera_desconocida` (advertencia); sus
       datos se conservan solo en el registro crudo.
     - Cabeceras que coinciden solo con columnas ya asignadas: `cabecera_duplicada`.
     - Columnas del catalogo sin cabecera: `columna_faltante`, con severidad
       error si la columna es requerida (archivo bloqueado) o advertencia si no.
     """
-    compilado = [(col, tuple(re.compile(p) for p in col.patrones)) for col in catalogo]
+    campos = [(col, campo_destino(col)) for col in catalogo]
     columnas: dict[int, ColumnaSabana] = {}
     desconocidas: dict[int, str] = {}
     incidencias: list[Incidencia] = []
@@ -34,7 +34,7 @@ def mapear_cabeceras(
             continue
         original = str(cabecera)
         normal = normalizar_cabecera(original)
-        candidatas = [col for col, pats in compilado if any(p.fullmatch(normal) for p in pats)]
+        candidatas = [col for col, campo in campos if coincide(normal, campo)]
         libre = next((col for col in candidatas if col.nombre not in asignadas), None)
         if libre is not None:
             columnas[indice] = libre
