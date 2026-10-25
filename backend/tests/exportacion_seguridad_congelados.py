@@ -12,12 +12,14 @@ comportamiento de hoy, no una funcion consigo misma.
   corrida. En B10 el largo pasa de comprimido (5110 y 4878) a sin comprimir (18331 y 17333): los
   exportadores no cambiaron (la huella sigue siendo la de HEAD 3e567d7) y el nuevo largo da lo
   mismo en CPython 3.13.14 (zlib) y 3.14.7 (zlib-ng).
-- 2026-10-20: las dos funciones deshacen el salto de linea del sistema en las hojas
-  (`_sin_saltos_del_sistema`). openpyxl escribe la hoja en un archivo temporal de texto, y en
-  Windows el LF de un valor salia CR LF: las constantes de B10 (18331 y 17333) eran las de
-  Windows, y en Linux, donde corre el CI, daban un byte menos por valor con salto de linea. Los
-  exportadores no cambiaron. Los valores de abajo dan lo mismo en Windows y en Linux (Ubuntu
-  26.04, CPython 3.13.14).
+- 2026-10-20 (a154df6): las dos funciones deshacian el salto de linea del sistema en las hojas.
+  openpyxl escribe la hoja en un archivo temporal de texto, y en Windows el LF de un valor salia
+  CR LF: las constantes de B10 (18331 y 17333) eran las de Windows, y en Linux, donde corre el CI,
+  daban un byte menos por valor con salto de linea. Los exportadores no cambiaron.
+- Desde B17 los exportadores escriben LF en la hoja en todos los sistemas (el XLSX deshace ese
+  CR LF al terminar) y las dos funciones YA NO NORMALIZAN NADA: comparan los bytes reales. Los
+  valores de abajo, los de a154df6, dan lo mismo en Windows y en Linux sin ninguna normalizacion
+  en la prueba; esa es la prueba de B17 en las huellas.
 - CSV y JSON: SHA-256 de los bytes, que son deterministas.
 """
 

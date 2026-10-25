@@ -78,6 +78,7 @@ Agregar un formato es agregar su adaptador en `backend/app/adapters/output/expor
 ### Tres detalles que evitan datos alterados
 
 - **Una celda vacía queda vacía** en los tres formatos: nunca un cero ni una fecha inventada.
+- **Un salto de línea dentro de un texto sale siempre como LF en el XLSX**, en Windows y en Linux (T-MTE-B17): la hoja es la misma en los dos sistemas. En Windows, openpyxl (modo `write_only`) escribe la hoja en un temporal de texto y cada LF sale CR LF; el exportador lo deshace al terminar, solo en las hojas y con la API pública del zip (un CR LF que ya traía el dato sale igual en los dos). Un lector XML lee el salto como LF en cualquier caso: lo que se fija es el contenido del archivo, que ya no depende del sistema.
 - **Los números decimales pierden los ceros a la derecha** tanto en JSON como en XLSX, porque ambos los guardan como número. Un importe que deba verse siempre con dos decimales corresponde declararlo `financiero`, que produce texto con el formato exacto.
 - **Si un carácter no cabe en la codificación pedida** (por ejemplo latin-1) o Excel no lo admite en una celda, la generación falla con un aviso claro en vez de entregar un archivo con el dato cambiado.
 
