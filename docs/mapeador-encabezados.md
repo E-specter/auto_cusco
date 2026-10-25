@@ -65,6 +65,13 @@ Un campo queda «tomado» por la primera columna que lo recibe en los pasos 1 y 
 
 La carga se confirma solo si la lista está vacía (RF-60). Las columnas en «No cargar» no generan problema.
 
+**El origen lo manda la pantalla y lo ajusta el backend.**
+- Aceptar un parecido sin cambiar el campo, con el botón «Aceptar» de la fila o con «Aceptar sugerencias», manda `origen = parecido_aceptado` con el mismo campo sugerido.
+- Elegir otro campo, o «No cargar», es `manual`.
+- El backend no confía en la etiqueta: si llega `parecido_aceptado` con un campo distinto del sugerido, lo guarda como `manual`. En una columna que no era `parecido`, el origen se recalcula desde el análisis (`recordado` o `coincide` si el campo no cambió, `manual` si cambió).
+
+Así, elegir en el `select` el mismo campo que ya estaba no cuenta como revisión: hace falta «Aceptar».
+
 ### 3.5 Catálogo de la sábana
 
 `ingesta_sabana/catalogo.py` expone `CATALOGO_SABANA = CatalogoCampos("sabana_vencida", ...)` derivado de `CATALOGO_VENCIDA`. `requerida` pasa a `obligatorio`, `patrones` pasa a `alias` y la etiqueta es `campo.<nombre>`. `mapear_cabeceras` de hoy se mantiene para `POST /cargas` con archivo y para el procesamiento sin borrador.
@@ -126,7 +133,14 @@ Los códigos (`EstadoEncabezado`, `OrigenAsignacion` y los de `ProblemaMapeo`) s
 - emite `mapeocambiado` con `{ asignaciones, problemas, listo }`;
 - `validar` es la función que llama a `/validacion`: el componente no conoce la sábana.
 
-**Experiencia (la fija `designer` antes de programar):**
+**Experiencia (la fija `designer` antes de programar; su especificación reemplaza esta lista).** Ajustes ya adelantados por `designer` (2026-10-24), y compatibles con este diseño:
+- «Aceptar» por fila (§3.4);
+- un `.segmented` «Por revisar (n) · Todas (n)» en lugar del resumen y el filtro;
+- sin nada que revisar, la tabla se recoge en «Las N columnas coinciden…» con «Ver columnas»;
+- los estados como `.tag` con texto, sin la similitud numérica (la API la sigue devolviendo para pruebas y orden);
+- en el `select`, los campos en uso no se deshabilitan: se marcan «· en uso», para poder intercambiar dos, y el repetido lo señala `campo_repetido`.
+
+Propuesta inicial:
 - una tabla con `Encabezado del archivo | Ejemplos | Estado | Campo`; el estado con texto e icono, sin depender solo del color;
 - el campo en un `select` con todos los campos por su nombre legible, agrupados («Obligatorios» y «Otros campos»), más «No cargar esta columna»;
 - un resumen arriba: «N coinciden · N recordados · N parecidos por revisar · N sin coincidencia»;
