@@ -58,6 +58,17 @@ Alcance:
 
 **La Fase 1 está cerrada.** El siguiente paso es la Fase 2 (selección, segmentación y métricas), que hereda de esta fase el sistema visual de `frontend/src/styles/` y el cliente de API de `frontend/src/lib/api.ts`.
 
+**Complemento de la Fase 1, en curso (2026-10-24):**
+
+- [ ] **Mapeador de encabezados reutilizable** (RF-57 a RF-63). Las sábanas fallaban cuando los encabezados cambiaban de nombre. El mapeador:
+  - acepta Excel, ODS, CSV y JSON;
+  - muestra cada encabezado con su estado (recordado, coincide, parecido o sin coincidencia);
+  - deja elegir el campo de una lista;
+  - no deja confirmar con problemas;
+  - recuerda lo confirmado por catálogo.
+
+  Es transversal: la sábana es su primer catálogo. Diseño en `docs/mapeador-encabezados.md`; tablero T-MAP-* en `docs/agents/tasks.md`; delegado a `coordinador_motor_texto_enriquecido`.
+
 ## Fase 2 — Selección, segmentación y métricas (RF-04 – RF-08, RF-25 – RF-28)
 
 Se agrupan porque las métricas dependen directamente de la selección/filtrado y deben evolucionar juntas en la UI.

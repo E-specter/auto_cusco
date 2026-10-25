@@ -20,6 +20,7 @@
 | /docs/versionado-sabanas.md | Doc | Versionado de sábanas por fecha de corte | architec (arquitectura) | 2026-09-11 |
 | /docs/consulta-cartera.md | Doc | Contrato de selección, filtros, métricas y resumen del top n | architec (arquitectura) | 2026-09-12 |
 | /docs/mapeo-campos.md | Doc | Motor de reglas de mapeo y expresión de campos (RF-12) | architec (arquitectura) | 2026-09-12 |
+| /docs/mapeador-encabezados.md | Doc | Diseño técnico del mapeador de encabezados reutilizable (RF-57 a RF-63): formatos, estados, similitud, validación, mapeos recordados, API, componente y cortes | architec (arquitectura) | 2026-10-24 |
 | /docs/generacion-cargas.md | Doc | Generación y exportación de archivos de carga (RF-09, RF-13, RF-15) | architec (arquitectura) | 2026-09-12 |
 | /docs/contrato-api.md | Doc | Contrato OpenAPI entre la API y el frontend | architec (arquitectura), designer (ui) | 2026-09-13 |
 | /docs/selecciones-guardadas.md | Doc | Selecciones de cartera guardadas y compartidas | architec (arquitectura) | 2026-09-12 |

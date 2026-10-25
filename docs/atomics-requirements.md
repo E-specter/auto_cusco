@@ -8,6 +8,26 @@
   * Validar números telefónicos según el formato establecido: **9 dígitos e inicio con 9**.
   * Detectar inconsistencias, datos inválidos y registros que no cumplan las reglas de validación.
 * **RF-03 — Gestión de cartera:** Permitir identificar, registrar, actualizar y omitir productos de la cartera en función de la información contenida en las sábanas cargadas.
+* **RF-57 — Formatos de archivo de la sábana:** Aceptar la sábana en Excel (`.xlsx`, `.xlsb`, `.xls`), ODS, CSV y JSON.
+  * Excel y ODS: si el libro tiene varias hojas, el usuario elige cuál cargar; por defecto, `VENCIDA` si existe y, si no, la primera.
+  * CSV: se detectan el separador (coma, punto y coma o tabulación) y la codificación (UTF-8, con o sin BOM, o Latin-1). El usuario puede cambiarlos, y el análisis de RF-58 se repite con lo elegido. La primera fila no vacía es la de encabezados.
+  * JSON: una lista de objetos; cada clave es un encabezado, en el orden en que aparece por primera vez. Si el archivo no es una lista de objetos, entonces se rechaza indicando el motivo. Si un valor es un objeto o una lista, entonces se guarda como texto y se registra una advertencia en esa fila.
+* **RF-58 — Análisis de encabezados antes de cargar:** Antes de procesar la sábana, mostrar cada encabezado del archivo con hasta 3 valores de ejemplo y su relación con los campos de carga, sin importar el orden de las columnas.
+  * Cada encabezado tiene uno de cuatro estados: **recordado** (RF-61), **coincide**, **parecido** o **sin coincidencia**.
+  * **Coincide:** el encabezado normalizado (sin tildes, en minúsculas y con los espacios colapsados) es igual al nombre de un campo o a uno de sus alias.
+  * **Parecido:** no coincide, pero su similitud con un campo supera un umbral configurable (RF-32); se sugiere el campo más parecido que no esté ya asignado. Si dos campos empatan, entonces no se sugiere ninguno.
+* **RF-59 — Asignación de campos:** Permitir elegir, para cada encabezado, el campo de carga al que corresponde, en una lista con todos los campos por su nombre legible y la opción «No cargar esta columna».
+  * Los encabezados recordados y los que coinciden llegan con su campo elegido. Los parecidos llegan con el campo sugerido elegido y marcados para revisar. Los que no tienen coincidencia llegan en «No cargar esta columna».
+  * Una acción acepta de una vez todas las sugerencias parecidas.
+* **RF-60 — Validación del mapeo:** No permitir confirmar la carga mientras haya un parecido sin revisar, un campo obligatorio sin columna (hoy, el pagaré) o dos encabezados asignados al mismo campo. Cada problema se muestra en el encabezado que lo causa.
+  * Las columnas en «No cargar esta columna» se conservan en el registro crudo de cada fila, como las columnas desconocidas de hoy.
+* **RF-61 — Mapeo recordado:** Guardar cada asignación confirmada (encabezado normalizado → campo, o «No cargar») y aplicarla en las cargas siguientes como **recordado**.
+  * Un mapeo recordado tiene prioridad sobre la coincidencia por nombre o alias.
+  * Si el usuario confirma una asignación distinta para ese encabezado, entonces se reemplaza la recordada.
+* **RF-62 — Trazabilidad del mapeo:** Guardar con cada versión de la sábana el mapeo con el que se procesó y el origen de cada asignación (recordado, coincide, parecido aceptado o manual).
+* **RF-63 — Mapeador reutilizable:** Implementar el mapeador de RF-57 a RF-62 como una capacidad transversal, que cualquier carga de archivos tabulares pueda usar con su propio catálogo de campos (nombre, nombre legible, alias, tipo y si es obligatorio), sin modificar el mapeador.
+  * Los mapeos recordados (RF-61) se guardan por catálogo: lo que se recuerda para la sábana no se aplica a otro catálogo.
+  * La sábana es el primer catálogo. Otros candidatos, cuando se decida usarlo en ellos: el reporte de enviados de MOWA MES y las fuentes de reportes de la Fase 5.
 
 ## 2. Selección y segmentación de productos
 
@@ -191,6 +211,6 @@ Capacidad transversal que amplía RF-12: la usan todas las cargas digitales y Vo
 
 ## Registro de cambios de esta versión
 
-- **RF nuevos incorporados:** RF-37, RF-38, RF-39, RF-40, RF-41 (sección 10, 2026-09-13); RF-42 a RF-54 (sección 11, motor de texto enriquecido y constructor de columnas, 2026-09-29); RF-55 (días de atraso ajustados a la fecha de envío) y RF-56 (renombrar una definición guardada), en la sección 11 (2026-10-19).
-- **RF existentes ampliados/modificados en su redacción:** RF-12 conserva su texto: RF-42 a RF-56 lo amplían, y RF-54 exige que lo que hoy cumple RF-12 siga produciendo el mismo resultado. **2026-10-19, decisiones del usuario:** RF-50 ampliado (el segmento calculado usa los días ajustados de RF-55, y la tabla por defecto es la de MOWA MES); RF-54 ampliado (el `mensaje` de MOWA MES normalizado a GSM-7, RF-MM-27, es un cambio decidido fuera de sus dos excepciones).
+- **RF nuevos incorporados:** RF-37, RF-38, RF-39, RF-40, RF-41 (sección 10, 2026-09-13); RF-42 a RF-54 (sección 11, motor de texto enriquecido y constructor de columnas, 2026-09-29); RF-55 (días de atraso ajustados a la fecha de envío) y RF-56 (renombrar una definición guardada), en la sección 11 (2026-10-19); RF-57 a RF-63 (formatos de la sábana y mapeador de encabezados reutilizable), en la sección 1 (2026-10-24).
+- **RF existentes ampliados/modificados en su redacción:** RF-12 conserva su texto: RF-42 a RF-56 lo amplían, y RF-54 exige que lo que hoy cumple RF-12 siga produciendo el mismo resultado. **2026-10-19, decisiones del usuario:** RF-50 ampliado (el segmento calculado usa los días ajustados de RF-55, y la tabla por defecto es la de MOWA MES); RF-54 ampliado (el `mensaje` de MOWA MES normalizado a GSM-7, RF-MM-27, es un cambio decidido fuera de sus dos excepciones). **2026-10-24, decisiones del usuario:** RF-57 a RF-63 complementan RF-01 y RF-02 sin cambiar su texto; los parecidos van preseleccionados y a confirmar, el mapeo se recuerda, la hoja de Excel se elige y CSV detecta separador y codificación con ajuste manual.
 - **Nota de numeración:** los RF-01 a RF-36 conservan su número y su texto. Los nuevos se agregaron como sección 10 al final, sin renumerar, por decisión del usuario: RF-16 a RF-36 se citan por número en el código y en la documentación, y renumerarlos rompería esas referencias. Los requerimientos específicos de cada plataforma se numeran en su propio documento de módulo (por ejemplo, `RF-MM-01` en `requerimientos-mowa-mes.md`) para no mezclar su secuencia con la global.
