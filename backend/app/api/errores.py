@@ -7,6 +7,7 @@ que lo descubra en produccion.
 """
 
 from collections.abc import Mapping
+from enum import StrEnum
 from typing import Any
 
 from fastapi import Request
@@ -52,7 +53,7 @@ class ErrorConCodigo(Exception):
         self,
         estado: int,
         detalle: str,
-        codigo: CodigoTexto | None,
+        codigo: StrEnum | None,
         extra: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(detalle)

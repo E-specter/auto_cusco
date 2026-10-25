@@ -19,7 +19,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from psycopg.errors import LockNotAvailable
-from sqlalchemy import delete, func, inspect, select, text
+from sqlalchemy import func, inspect, select, text
 from sqlalchemy.exc import OperationalError
 
 from app.adapters.input.lector_tabla import LectorTabla
@@ -27,7 +27,6 @@ from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.modelos import (
     BorradorCargaArchivo,
     Carga,
-    CargaAuditoria,
     CargaFila,
     MapeoRecordado,
 )
@@ -46,6 +45,7 @@ from app.core.entities.mapeador import Asignacion, EstadoEncabezado, OrigenAsign
 from app.core.services.borradores_carga.servicio import MapeadorService
 from app.core.services.ingesta_sabana.mapeable import CATALOGO_SABANA_MAPEABLE
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService
+from tests.mapeador_postgres_comun import asignar, sentencias_de_limpieza
 from tests.test_mapeador_ciclo import SABANA, aceptar_todo, csv_de
 
 pytestmark = [
@@ -58,23 +58,23 @@ pytestmark = [
 
 FECHA = date(2099, 8, 1)
 INICIO = datetime(2026, 10, 26, 9, 0, tzinfo=UTC)
-PREFIJO = "b3a-"  # los borradores de estas pruebas
+PREFIJO = "b3a-"  # los archivos y los encabezados de estas pruebas
 CATALOGO_DE_PRUEBA = "b3a_prueba"
+CATALOGO_OTRO = "b3a_otro"
 BACKEND = Path(__file__).resolve().parents[1]
 
 BORRADOR = BorradorCargaArchivo.__table__
 RECORDADO = MapeoRecordado.__table__
 CARGA = Carga.__table__
-AUDITORIA = CargaAuditoria.__table__
 FILA = CargaFila.__table__
 
 CSV = csv_de(
     [
-        ["Pagare", "Titular", "Teléfono", "Región", "Observación libre"],
+        [f"{PREFIJO}{h}" for h in ["Pagare", "Titular", "Teléfono", "Región", "Observación libre"]],
         [
             "000000000000000001",
             "APELLIDO/NOMBRE FICTICIO",
-            "987654321",
+            "900000001",
             "REGIÓN PRUEBA",
             "nota uno",
         ],
@@ -82,15 +82,19 @@ CSV = csv_de(
 )
 
 
+# Los encabezados llevan el prefijo, asi que ninguno coincide con un alias: la prueba dice el campo
+# de cada columna, y el origen lo recalcula el backend al confirmar.
+CAMPOS = ["pagare", "titular", "telefono", "region", None]
+
+
 def _limpiar(engine) -> None:
+    """Borra lo que crean estas pruebas: sus archivos, sus versiones y lo recordado de sus
+    encabezados con el prefijo (y de sus catalogos inventados). Lo demas no se toca."""
     with engine.begin() as cx:
-        cx.execute(delete(CARGA).where(CARGA.c.fecha_corte == FECHA))
-        cx.execute(delete(AUDITORIA).where(AUDITORIA.c.fecha_corte == FECHA))
-        cx.execute(delete(BORRADOR).where(BORRADOR.c.nombre_archivo.like(f"{PREFIJO}%")))
-        # La base es de pruebas: lo recordado de la sabana lo escriben estas pruebas.
-        cx.execute(
-            delete(RECORDADO).where(RECORDADO.c.catalogo_id.in_([CATALOGO_DE_PRUEBA, SABANA]))
-        )
+        for sentencia in sentencias_de_limpieza(
+            FECHA, PREFIJO, [CATALOGO_DE_PRUEBA, CATALOGO_OTRO]
+        ):
+            cx.execute(sentencia)
 
 
 @pytest.fixture
@@ -117,7 +121,7 @@ class Entorno:
             RepositorioCargasPostgres(engine), LectorTabla(), lambda: self.ahora
         )
 
-    def borrador(self, nombre: str = "datos.csv", contenido: bytes = CSV, **opciones):
+    def borrador(self, *, nombre: str = "datos.csv", contenido: bytes = CSV, **opciones):
         return self.mapeador.crear_borrador(
             SABANA, f"{PREFIJO}{nombre}", contenido, OpcionesLectura(**opciones)
         )
@@ -250,14 +254,14 @@ def test_los_borradores_vencidos_se_borran_y_los_vigentes_no(engine) -> None:
 
 def test_el_servicio_borra_los_vencidos_al_crear_y_al_arrancar(engine) -> None:
     pasado = Entorno(engine, INICIO - timedelta(hours=30))
-    viejo = pasado.borrador("viejo.csv")
+    viejo = pasado.borrador(nombre="viejo.csv")
     ahora = Entorno(engine, INICIO)
 
-    ahora.borrador("nuevo.csv")  # crear borra los vencidos
+    ahora.borrador(nombre="nuevo.csv")  # crear borra los vencidos
 
     with pytest.raises(BorradorNoEncontrado):
         ahora.mapeador.analisis_guardado(viejo.borrador.id)
-    pasado.borrador("otro-viejo.csv")
+    pasado.borrador(nombre="otro-viejo.csv")
     assert ahora.mapeador.descartar_vencidos() == 1  # al arrancar
 
 
@@ -289,7 +293,7 @@ def test_los_recordados_se_guardan_por_lote_se_actualizan_y_se_separan_por_catal
             {("pagare", 1): "pagare", ("pagare", 2): "duplicado", ("x", 1): None},
             INICIO,
         )
-        sesion.guardar_recordados("b3a_otro", {("pagare", 1): "otro_campo"}, INICIO)
+        sesion.guardar_recordados(CATALOGO_OTRO, {("pagare", 1): "otro_campo"}, INICIO)
     with repositorio.transaccion() as sesion:
         sesion.guardar_recordados(
             CATALOGO_DE_PRUEBA,
@@ -297,10 +301,8 @@ def test_los_recordados_se_guardan_por_lote_se_actualizan_y_se_separan_por_catal
             INICIO + timedelta(hours=1),
         )
         recordados = sesion.recordados(CATALOGO_DE_PRUEBA)
-        otro = sesion.recordados("b3a_otro")
-        sesion.guardar_recordados("b3a_otro", {}, INICIO)  # un lote vacio no hace nada
-    with engine.begin() as cx:
-        cx.execute(delete(RECORDADO).where(RECORDADO.c.catalogo_id == "b3a_otro"))
+        otro = sesion.recordados(CATALOGO_OTRO)
+        sesion.guardar_recordados(CATALOGO_OTRO, {}, INICIO)  # un lote vacio no hace nada
 
     assert recordados == {
         ("pagare", 1): "pagare",
@@ -326,24 +328,28 @@ def test_un_no_cargar_recordado_es_null_de_sql_y_no_un_texto(entorno) -> None:
 # --- Confirmar un borrador: una transaccion ------------------------------------------------------
 
 
-def _asignaciones(analizado) -> list[Asignacion]:
-    return aceptar_todo(analizado)
+def _asignaciones(analizado, campos=None) -> list[Asignacion]:
+    return asignar(analizado, CAMPOS if campos is None else campos)
 
 
 def test_el_ciclo_completo_en_postgres_incluidos_los_dos_pagare(entorno) -> None:
     contenido = csv_de(
-        [["Pagare", "Zona", "Pagare"], ["000000000000000001", "x", "000000000000000001"]]
+        [
+            [f"{PREFIJO}Pagare", f"{PREFIJO}Zona", f"{PREFIJO}Pagare"],
+            ["000000000000000001", "x", "000000000000000001"],
+        ]
     )
-    primero = entorno.borrador("pagare.csv", contenido)
+    campos = ["pagare", None, "pagare_duplicado"]
+    primero = entorno.borrador(nombre="pagare.csv", contenido=contenido)
 
     registrada = entorno.ingesta.registrar_desde_borrador(
-        primero.borrador.id, FECHA, _asignaciones(primero)
+        primero.borrador.id, FECHA, _asignaciones(primero, campos)
     )
-    segundo = entorno.borrador("pagare.csv", contenido)
+    segundo = entorno.borrador(nombre="pagare.csv", contenido=contenido)
 
     assert [c.estado for c in segundo.analisis.columnas] == [EstadoEncabezado.RECORDADO] * 3
-    assert [c.sugerido for c in segundo.analisis.columnas] == ["pagare", None, "pagare_duplicado"]
-    assert entorno.mapeador.validar(segundo.borrador.id, _asignaciones(segundo)) == ()
+    assert [c.sugerido for c in segundo.analisis.columnas] == campos
+    assert entorno.mapeador.validar(segundo.borrador.id, aceptar_todo(segundo)) == ()
     with entorno.engine.connect() as cx:
         carga = cx.execute(select(CARGA).where(CARGA.c.id == registrada.carga.id)).one()
     assert carga.estado == EstadoCarga.EN_COLA.value
@@ -408,8 +414,8 @@ def test_una_carga_confirmada_se_procesa_con_su_separador_y_su_codificacion(ento
         fila = cx.execute(select(FILA).where(FILA.c.carga_id == carga.id)).one()
         mapeo = cx.execute(select(CARGA.c.mapeo).where(CARGA.c.id == carga.id)).scalar_one()
     assert fila.region == "REGIÓN PRUEBA"
-    assert fila.extras == {"Observación libre": "nota uno"}  # «No cargar» va al registro crudo
-    assert mapeo["ignoradas"] == {"5": "Observación libre"}
+    assert fila.extras == {f"{PREFIJO}Observación libre": "nota uno"}  # «No cargar» va al crudo
+    assert mapeo["ignoradas"] == {"5": f"{PREFIJO}Observación libre"}
     assert set(mapeo) == {"columnas", "desconocidas", "faltantes", "origenes", "ignoradas"}
 
 

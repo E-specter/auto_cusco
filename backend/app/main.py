@@ -26,6 +26,7 @@ from app.api.definiciones_columnas import router as definiciones_columnas_router
 from app.api.errores import ErrorConCodigo, manejar_error_con_codigo
 from app.api.health import router as health_router
 from app.api.mapeador import crear_servicio_mapeador
+from app.api.mapeador import router as mapeador_router
 from app.api.mowa_mes import router as mowa_mes_router
 from app.api.mowa_mes_campanas import CABECERAS_ARCHIVO
 from app.api.mowa_mes_campanas import router as mowa_mes_campanas_router
@@ -101,6 +102,7 @@ configurar_cors(app, get_settings().origenes_cors)
 app.add_exception_handler(ErrorConCodigo, manejar_error_con_codigo)
 app.include_router(health_router)
 app.include_router(cargas_router)
+app.include_router(mapeador_router)
 app.include_router(cartera_router)
 app.include_router(archivos_carga_router)
 app.include_router(selecciones_router)

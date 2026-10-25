@@ -47,17 +47,17 @@ class LectorCalamine(LectorSabanaPort):
         no, la primera. Una hoja pedida que no existe es `HojaNoEncontrada`."""
         formato = formato or formato_de_hoja_de_calculo(contenido)
         if formato is None:
-            raise ArchivoIlegible("El archivo no es una hoja de calculo legible")
+            raise ArchivoIlegible("El archivo no es una hoja de cálculo legible")
         try:
             libro = CalamineWorkbook.from_filelike(io.BytesIO(contenido))
         except CalamineError as exc:
-            raise ArchivoIlegible("El archivo no es una hoja de calculo legible") from exc
+            raise ArchivoIlegible("El archivo no es una hoja de cálculo legible") from exc
         try:
             hojas = tuple(libro.sheet_names)
             hoja = opciones.hoja or _hoja_por_defecto(hojas)
             if hoja not in hojas:
                 if not hojas:
-                    raise ArchivoIlegible("La hoja de calculo no tiene hojas")
+                    raise ArchivoIlegible("La hoja de cálculo no tiene hojas")
                 raise HojaNoEncontrada(hoja, list(hojas))
             # skip_empty_area=False: la fila 0 de la lista es la fila 1 de la hoja,
             # asi los numeros de fila de las incidencias coinciden con Excel.

@@ -26,9 +26,14 @@ from app.core.entities.lectura_tabla import (
 )
 from app.core.entities.sabana import (
     ArchivoIlegible,
+    ArchivoVacio,
+    CodificacionInvalida,
+    CodificacionNoCoincide,
+    ExtensionNoCoincide,
     FilaCruda,
     HojaNoEncontrada,
     HojaVacia,
+    SeparadorInvalido,
 )
 from app.core.services.lectura_tabla import detectar_formato, formato_de_hoja_de_calculo
 
@@ -165,7 +170,7 @@ def test_una_extension_que_no_coincide_con_el_contenido_es_ilegible_con_el_motiv
 ) -> None:
     contenido = libro({"H": [["a"]]}) if contenido is None else contenido
 
-    with pytest.raises(ArchivoIlegible) as error:
+    with pytest.raises(ExtensionNoCoincide) as error:
         detectar_formato(contenido, nombre)
 
     assert "no coincide con el contenido" in str(error.value)
@@ -173,7 +178,7 @@ def test_una_extension_que_no_coincide_con_el_contenido_es_ilegible_con_el_motiv
 
 
 def test_un_archivo_vacio_sin_extension_es_ilegible_y_con_extension_csv_no_tiene_datos() -> None:
-    with pytest.raises(ArchivoIlegible, match="vacio"):
+    with pytest.raises(ArchivoVacio, match="vacío"):
         detectar_formato(b"  \n ", "")
     with pytest.raises(HojaVacia):
         leer(b"", "datos.csv")
@@ -456,9 +461,9 @@ def test_la_codificacion_elegida_gana_a_la_detectada() -> None:
 
 
 def test_una_codificacion_elegida_que_no_sirve_es_ilegible_con_el_motivo() -> None:
-    with pytest.raises(ArchivoIlegible, match="no se puede leer como utf-8"):
+    with pytest.raises(CodificacionNoCoincide, match="no se puede leer como utf-8"):
         leer("Región\n".encode("latin-1"), "datos.csv", codificacion="utf-8")
-    with pytest.raises(ArchivoIlegible, match="no existe"):
+    with pytest.raises(CodificacionInvalida, match="no existe"):
         leer(b"a\n", "datos.csv", codificacion="klingon")
 
 
@@ -477,7 +482,7 @@ def test_un_separador_elegido_invalido_es_ilegible(separador) -> None:
     if separador == "":  # vacio = no elegido: se detecta
         assert leer_csv(b"a,b\n", opciones).separador == ","
         return
-    with pytest.raises(ArchivoIlegible, match="un solo caracter"):
+    with pytest.raises(SeparadorInvalido, match="un solo carácter"):
         leer_csv(b"a,b\n", opciones)
 
 
@@ -784,7 +789,7 @@ def test_el_lector_de_json_pide_una_lista_de_objetos(valor) -> None:
 
 @pytest.mark.parametrize("valor", ["texto", 7, True, None])
 def test_un_json_escalar_con_extension_json_es_ilegible_con_el_motivo(valor) -> None:
-    with pytest.raises(ArchivoIlegible, match="no coincide con el contenido"):
+    with pytest.raises(ExtensionNoCoincide, match="no coincide con el contenido"):
         leer(json_de(valor), "datos.json")
 
 
@@ -796,7 +801,7 @@ def test_una_lista_de_algo_que_no_son_objetos_dice_cual_elemento() -> None:
 
 
 def test_un_json_mal_formado_dice_donde() -> None:
-    with pytest.raises(ArchivoIlegible, match=r"no es valido.*linea 2, columna"):
+    with pytest.raises(ArchivoIlegible, match=r"no es válido.*línea 2, columna"):
         leer(b'[\n{"a": 1,}]', "datos.json")
 
 

@@ -27,6 +27,7 @@ from app.core.entities.borrador import (
 from app.core.entities.lectura_tabla import (
     AdvertenciaLectura,
     FormatoTabla,
+    OpcionDetectable,
     OpcionesLectura,
     TablaLeida,
 )
@@ -70,6 +71,8 @@ class BorradorAnalizado:
     codificacion: str | None
     filas: int
     advertencias: tuple[AdvertenciaLectura, ...]
+    # Lo que el lector detecto porque el usuario no lo eligio, para decir «(detectado)».
+    detectados: tuple[OpcionDetectable, ...] = ()
 
 
 def opciones_usadas(tabla: TablaLeida) -> dict[str, Any]:
@@ -152,7 +155,7 @@ class MapeadorService:
                 ),
                 contenido,
             )
-        return _analizado(borrador, analisis, tabla)
+        return _analizado(borrador, analisis, tabla, opciones)
 
     @staticmethod
     def _analizar(tabla: TablaLeida, catalogo: CatalogoMapeable, recordados) -> AnalisisEncabezados:
@@ -182,7 +185,7 @@ class MapeadorService:
             actualizado = sesion.reemplazar_analisis(
                 borrador_id, opciones_usadas(tabla), analisis_a_dict(analisis)
             )
-        return _analizado(actualizado or borrador, analisis, tabla)
+        return _analizado(actualizado or borrador, analisis, tabla, opciones)
 
     # --- validar y descartar ---
 
@@ -217,8 +220,22 @@ class MapeadorService:
             return sesion.borrar_borradores_vencidos(self._reloj() - VIGENCIA_DEL_BORRADOR)
 
 
+def opciones_detectadas(
+    tabla: TablaLeida, elegidas: OpcionesLectura
+) -> tuple[OpcionDetectable, ...]:
+    """Las opciones que el lector reporto (no son nulas en la tabla) y el usuario no eligio."""
+    return tuple(
+        opcion
+        for opcion in OpcionDetectable
+        if getattr(tabla, opcion.value) is not None and not getattr(elegidas, opcion.value)
+    )
+
+
 def _analizado(
-    borrador: DatosBorrador, analisis: AnalisisEncabezados, tabla: TablaLeida
+    borrador: DatosBorrador,
+    analisis: AnalisisEncabezados,
+    tabla: TablaLeida,
+    elegidas: OpcionesLectura,
 ) -> BorradorAnalizado:
     return BorradorAnalizado(
         borrador=borrador,
@@ -230,4 +247,5 @@ def _analizado(
         codificacion=tabla.codificacion,
         filas=len(tabla.filas),
         advertencias=tabla.advertencias,
+        detectados=opciones_detectadas(tabla, elegidas),
     )

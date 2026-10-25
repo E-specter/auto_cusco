@@ -36,10 +36,10 @@ def leer_json(contenido: bytes, opciones: OpcionesLectura = OpcionesLectura()) -
     try:
         datos = json.loads(contenido.decode("utf-8-sig"))
     except UnicodeDecodeError as exc:
-        raise ArchivoIlegible("El JSON no esta en UTF-8") from exc
+        raise ArchivoIlegible("El JSON no está en UTF-8") from exc
     except json.JSONDecodeError as exc:
         raise ArchivoIlegible(
-            f"El JSON no es valido: {exc.msg} (linea {exc.lineno}, columna {exc.colno})"
+            f"El JSON no es válido: {exc.msg} (línea {exc.lineno}, columna {exc.colno})"
         ) from exc
     if not isinstance(datos, list):
         raise ArchivoIlegible("El JSON debe ser una lista de objetos")

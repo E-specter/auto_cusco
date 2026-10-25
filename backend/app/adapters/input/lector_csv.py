@@ -19,7 +19,14 @@ import io
 
 from app.adapters.input.celdas import recortar
 from app.core.entities.lectura_tabla import FormatoTabla, OpcionesLectura, TablaLeida
-from app.core.entities.sabana import ArchivoIlegible, FilaCruda, HojaVacia
+from app.core.entities.sabana import (
+    ArchivoIlegible,
+    CodificacionInvalida,
+    CodificacionNoCoincide,
+    FilaCruda,
+    HojaVacia,
+    SeparadorInvalido,
+)
 
 MUESTRA_PARA_SEPARADOR = 64 * 1024
 REGISTROS_PARA_SEPARADOR = 50
@@ -38,12 +45,12 @@ def _decodificar(contenido: bytes, elegida: str | None) -> tuple[str, str]:
         try:
             codecs.lookup(elegida)
         except LookupError as exc:
-            raise ArchivoIlegible(f"La codificacion {elegida!r} no existe") from exc
+            raise CodificacionInvalida(f"La codificación {elegida!r} no existe") from exc
         try:
             return contenido.decode(elegida).removeprefix(_BOM), elegida
         except UnicodeDecodeError as exc:
-            raise ArchivoIlegible(
-                f"El archivo no se puede leer como {elegida}: byte {exc.start} no es valido"
+            raise CodificacionNoCoincide(
+                f"El archivo no se puede leer como {elegida}: el byte {exc.start} no es válido"
             ) from exc
     if contenido.startswith(codecs.BOM_UTF8):
         return contenido.decode(CODIFICACION_CON_BOM), CODIFICACION_CON_BOM
@@ -98,8 +105,8 @@ def _detectar_separador(texto: str) -> str:
 
 def _validar_separador(separador: str) -> None:
     if len(separador) != 1 or separador in '\r\n"':
-        raise ArchivoIlegible(
-            "El separador debe ser un solo caracter (no un salto de linea ni comillas)"
+        raise SeparadorInvalido(
+            "El separador debe ser un solo carácter (no un salto de línea ni comillas)"
         )
 
 

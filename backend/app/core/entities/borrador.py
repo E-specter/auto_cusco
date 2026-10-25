@@ -23,7 +23,7 @@ class BorradorNoEncontrado(Exception):
 
 class CatalogoDesconocido(Exception):
     def __init__(self, catalogo_id: str) -> None:
-        super().__init__(f"No existe el catalogo de campos {catalogo_id!r}")
+        super().__init__(f"No existe el catálogo de campos {catalogo_id!r}")
         self.catalogo_id = catalogo_id
 
 

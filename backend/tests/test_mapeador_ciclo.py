@@ -50,7 +50,7 @@ class Reloj:
         self.ahora += timedelta(**delta)
 
 
-def csv_de(filas: list[list[str]], separador: str = ";", codificacion: str = "cp1252") -> bytes:
+def csv_de(filas: list[list[str]], *, separador: str = ";", codificacion: str = "cp1252") -> bytes:
     return "\n".join(separador.join(f) for f in filas).encode(codificacion) + b"\n"
 
 
@@ -60,11 +60,11 @@ CSV_SABANA = csv_de(
         [
             "000000000000000001",
             "APELLIDO/NOMBRE FICTICIO",
-            "987654321",
+            "900000001",
             "REGION PRUEBA",
             "nota uno",
         ],
-        ["000000000000000002", "OTRO/FICTICIO", "912345678", "REGION PRUEBA", "nota dos"],
+        ["000000000000000002", "OTRO/FICTICIO", "900000002", "REGION PRUEBA", "nota dos"],
     ]
 )
 

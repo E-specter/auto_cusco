@@ -165,6 +165,58 @@
         }
       }
     },
+    "/cargas/desde-borrador": {
+      "post": {
+        "tags": [
+          "cargas"
+        ],
+        "summary": "Confirmar Borrador",
+        "description": "Confirma un borrador del mapeador (RF-60 a RF-62) y lanza su procesamiento en segundo plano.\n\nVuelve a validar las asignaciones contra el analisis guardado con el borrador: con problemas\nresponde `422` con la lista y no crea nada. Sin problemas, en una sola transaccion crea la\nversion (con las asignaciones ya resueltas y las opciones de lectura), guarda lo recordado y\nborra el borrador; responde `202` como `POST /cargas`. Un borrador que no existe, vencio o ya\nse confirmo es un `404`.",
+        "operationId": "confirmar_borrador_cargas_desde_borrador_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmacionEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CargaCreadaRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el catalogo o el borrador (o venció, o ya se confirmó)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeador"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Las asignaciones tienen problemas (RF-60): vienen todos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/cargas/{carga_id}": {
       "get": {
         "tags": [
@@ -419,6 +471,324 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mapeador/catalogos/{catalogo_id}": {
+      "get": {
+        "tags": [
+          "mapeador de encabezados"
+        ],
+        "summary": "Obtener Catalogo",
+        "description": "Los campos del catalogo, con su nombre legible, su tipo y si son obligatorios (la lista del\ndesplegable), y las codificaciones de un CSV.",
+        "operationId": "obtener_catalogo_mapeador_catalogos__catalogo_id__get",
+        "parameters": [
+          {
+            "name": "catalogo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Catalogo Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogoMapeadorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el catalogo o el borrador (o venció, o ya se confirmó)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeador"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mapeador/{catalogo_id}/borradores": {
+      "post": {
+        "tags": [
+          "mapeador de encabezados"
+        ],
+        "summary": "Crear Borrador",
+        "description": "Sube el archivo, lo lee, lo analiza contra el catalogo (con lo recordado) y lo deja en un\nborrador que vence a las 24 horas. `400` si el archivo esta vacio o no se puede leer, `413` si\nsupera el tamano maximo y `404` si el catalogo no existe.",
+        "operationId": "crear_borrador_mapeador__catalogo_id__borradores_post",
+        "parameters": [
+          {
+            "name": "catalogo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Catalogo Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_crear_borrador_mapeador__catalogo_id__borradores_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalisisRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "El archivo o las opciones de lectura no sirven; `codigo` dice por que",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeador"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el catalogo o el borrador (o venció, o ya se confirmó)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeador"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "El archivo supera el tamano maximo (`maximo_mb`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeador"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mapeador/borradores/{borrador_id}/analisis": {
+      "post": {
+        "tags": [
+          "mapeador de encabezados"
+        ],
+        "summary": "Volver A Analizar",
+        "description": "Vuelve a analizar el MISMO borrador con otras opciones (hoja, separador, codificacion): no se\nsube el archivo otra vez. Reemplaza el analisis guardado. `404` si no existe o vencio y `400`\nsi el archivo no se puede leer con esas opciones.",
+        "operationId": "volver_a_analizar_mapeador_borradores__borrador_id__analisis_post",
+        "parameters": [
+          {
+            "name": "borrador_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Borrador Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpcionesLecturaEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalisisRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "El archivo o las opciones de lectura no sirven; `codigo` dice por que",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeador"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el catalogo o el borrador (o venció, o ya se confirmó)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeador"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mapeador/borradores/{borrador_id}/validacion": {
+      "post": {
+        "tags": [
+          "mapeador de encabezados"
+        ],
+        "summary": "Validar Asignaciones",
+        "description": "Los problemas de las asignaciones, validados contra el analisis que se le mostro al usuario\n(el guardado con el borrador), no contra uno nuevo. Vacio = se puede confirmar.",
+        "operationId": "validar_asignaciones_mapeador_borradores__borrador_id__validacion_post",
+        "parameters": [
+          {
+            "name": "borrador_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Borrador Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidacionEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidacionMapeoRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el catalogo o el borrador (o venció, o ya se confirmó)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeador"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mapeador/borradores/{borrador_id}": {
+      "delete": {
+        "tags": [
+          "mapeador de encabezados"
+        ],
+        "summary": "Descartar Borrador",
+        "description": "Cancelar: descarta el borrador.",
+        "operationId": "descartar_borrador_mapeador_borradores__borrador_id__delete",
+        "parameters": [
+          {
+            "name": "borrador_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Borrador Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No existe el catalogo o el borrador (o venció, o ya se confirmó)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeador"
                 }
               }
             }
@@ -3341,6 +3711,29 @@
   },
   "components": {
     "schemas": {
+      "AdvertenciaLecturaRespuesta": {
+        "properties": {
+          "numero_fila": {
+            "type": "integer",
+            "title": "Numero Fila"
+          },
+          "columna": {
+            "type": "string",
+            "title": "Columna"
+          },
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoAdvertenciaLectura"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero_fila",
+          "columna",
+          "codigo"
+        ],
+        "title": "AdvertenciaLecturaRespuesta",
+        "description": "Un aviso de la lectura en una fila (`numero_fila` en base 1, como Excel)."
+      },
       "AdvertenciaReporteRespuesta": {
         "properties": {
           "codigo": {
@@ -3366,6 +3759,110 @@
           "detalle"
         ],
         "title": "AdvertenciaReporteRespuesta"
+      },
+      "AnalisisRespuesta": {
+        "properties": {
+          "borrador_id": {
+            "type": "integer",
+            "title": "Borrador Id"
+          },
+          "catalogo_id": {
+            "type": "string",
+            "title": "Catalogo Id"
+          },
+          "formato": {
+            "$ref": "#/components/schemas/FormatoTabla"
+          },
+          "hojas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Hojas"
+          },
+          "hoja": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hoja"
+          },
+          "separador": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Separador"
+          },
+          "codificacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codificacion"
+          },
+          "filas": {
+            "type": "integer",
+            "title": "Filas"
+          },
+          "columnas": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnaAnalizadaRespuesta"
+            },
+            "type": "array",
+            "title": "Columnas"
+          },
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaMapeoRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
+          },
+          "advertencias": {
+            "items": {
+              "$ref": "#/components/schemas/AdvertenciaLecturaRespuesta"
+            },
+            "type": "array",
+            "title": "Advertencias"
+          },
+          "detectados": {
+            "items": {
+              "$ref": "#/components/schemas/OpcionDetectable"
+            },
+            "type": "array",
+            "title": "Detectados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "borrador_id",
+          "catalogo_id",
+          "formato",
+          "hojas",
+          "hoja",
+          "separador",
+          "codificacion",
+          "filas",
+          "columnas",
+          "problemas",
+          "advertencias",
+          "detectados"
+        ],
+        "title": "AnalisisRespuesta",
+        "description": "El borrador con su analisis y lo que se detecto al leer el archivo.\n\n`hojas` y `hoja` son de una hoja de calculo; `separador` y `codificacion`, de un CSV (nulos y\nvacios en los demas). `filas` son las de datos. `problemas` son los del mapeo sugerido tal como\nllega (RF-60). `detectados` son las opciones de lectura que el lector detecto porque no se\neligieron (`hoja`, `separador`, `codificacion`): la pantalla las marca «(detectado)»."
       },
       "ArchivoPrevistoRespuesta": {
         "properties": {
@@ -3437,6 +3934,36 @@
         ],
         "title": "ArgumentoVariableGuardadoRespuesta"
       },
+      "AsignacionEntrada": {
+        "properties": {
+          "indice": {
+            "type": "integer",
+            "title": "Indice"
+          },
+          "campo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campo"
+          },
+          "origen": {
+            "$ref": "#/components/schemas/OrigenAsignacion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "indice",
+          "campo",
+          "origen"
+        ],
+        "title": "AsignacionEntrada",
+        "description": "Lo que se hace con una columna: `campo` nulo es «No cargar esta columna». `origen` lo manda\nla pantalla y el backend lo ajusta (docs/mapeador-encabezados.md §3.4)."
+      },
       "AvisoCampanaRespuesta": {
         "properties": {
           "codigo": {
@@ -3480,6 +4007,57 @@
           "segmentacion"
         ],
         "title": "BloqueRespuesta"
+      },
+      "Body_crear_borrador_mapeador__catalogo_id__borradores_post": {
+        "properties": {
+          "archivo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "description": "Excel, ODS, CSV o JSON"
+          },
+          "hoja": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hoja",
+            "description": "La hoja de un Excel u ODS"
+          },
+          "separador": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Separador",
+            "description": "El separador de un CSV"
+          },
+          "codificacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codificacion",
+            "description": "La codificacion de un CSV"
+          }
+        },
+        "type": "object",
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_crear_borrador_mapeador__catalogo_id__borradores_post"
       },
       "Body_importar_reporte_mowa_mes_campanas__campana_id__reportes_post": {
         "properties": {
@@ -3802,6 +4380,35 @@
         "title": "CampoConfiguracion",
         "description": "El campo de la configuracion al que pertenece un error 400 (lo lee el frontend).\n\nUn catalogo aparte del texto del `detail`: el frontend ubica el error bajo su campo\npor este valor y no adivinando por las palabras del mensaje."
       },
+      "CampoDestinoRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "clave_etiqueta": {
+            "type": "string",
+            "title": "Clave Etiqueta"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "obligatorio": {
+            "type": "boolean",
+            "title": "Obligatorio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "clave_etiqueta",
+          "tipo",
+          "obligatorio"
+        ],
+        "title": "CampoDestinoRespuesta",
+        "description": "Un campo del catalogo; `clave_etiqueta` es la clave i18n de su nombre legible."
+      },
       "CampoEntrada": {
         "properties": {
           "nombre": {
@@ -3935,6 +4542,44 @@
         ],
         "title": "CargaCreadaRespuesta"
       },
+      "CatalogoMapeadorRespuesta": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "campos": {
+            "items": {
+              "$ref": "#/components/schemas/CampoDestinoRespuesta"
+            },
+            "type": "array",
+            "title": "Campos"
+          },
+          "codificaciones": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Codificaciones"
+          },
+          "separadores": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Separadores"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "campos",
+          "codificaciones",
+          "separadores"
+        ],
+        "title": "CatalogoMapeadorRespuesta",
+        "description": "Los campos del catalogo (la lista del desplegable) y lo que la pantalla ofrece para leer un\nCSV, en el orden en que se prueba al detectar: las `codificaciones` y los `separadores`."
+      },
       "CatalogoRespuesta": {
         "properties": {
           "contexto": {
@@ -4045,6 +4690,14 @@
         ],
         "title": "CifrasIdRespuesta"
       },
+      "CodigoAdvertenciaLectura": {
+        "type": "string",
+        "enum": [
+          "valor_no_escalar"
+        ],
+        "title": "CodigoAdvertenciaLectura",
+        "description": "Lo que un lector avisa de una fila sin impedir leerla."
+      },
       "CodigoConteoRespuesta": {
         "properties": {
           "codigo": {
@@ -4074,6 +4727,39 @@
         ],
         "title": "CodigoErrorCampana",
         "description": "Motivo del 409 de `POST /mowa-mes/campanas` (los unicos dos posibles).\n\nCatalogo propio, aparte de `CodigoMowaMes`: `LIMITE_EXCEDIDO` aqui es la\ncreacion rechazada por no traer `confirmar_limite`, distinto del codigo\n`limite_mensual_excedido` (advertencia) que ya devuelve la previsualizacion\npara el mismo caso. Mezclarlos en un solo catalogo haria que un mismo\nnombre significara \"advertencia\" en un endpoint y \"error\" en otro."
+      },
+      "CodigoErrorMapeador": {
+        "type": "string",
+        "enum": [
+          "archivo_vacio",
+          "archivo_ilegible",
+          "extension_no_coincide",
+          "archivo_sin_datos",
+          "archivo_demasiado_grande",
+          "hoja_inexistente",
+          "separador_invalido",
+          "codificacion_invalida",
+          "codificacion_no_coincide",
+          "catalogo_desconocido",
+          "borrador_no_encontrado",
+          "mapeo_con_problemas"
+        ],
+        "title": "CodigoErrorMapeador",
+        "description": "Por que el mapeador rechaza una peticion (`400`, `404` o `413`): el `codigo` del cuerpo de\nerror, que la pantalla traduce como `mapeador.error.<codigo>`.\n\nUn valor por linea: la prueba espejo del contrato y del frontend lee esta clase."
+      },
+      "CodigoMapeo": {
+        "type": "string",
+        "enum": [
+          "parecido_sin_revisar",
+          "obligatorio_sin_columna",
+          "campo_repetido",
+          "campo_desconocido",
+          "indice_fuera_de_rango",
+          "asignacion_faltante",
+          "indice_repetido"
+        ],
+        "title": "CodigoMapeo",
+        "description": "Los problemas de una asignacion (RF-60)."
       },
       "CodigoMowaMes": {
         "type": "string",
@@ -4131,6 +4817,61 @@
         ],
         "title": "CodigoTexto",
         "description": "Catalogo de codigos que el frontend traducira como `textoEnriquecido.codigo.<codigo>`.\n\nUn codigo por linea, con la forma `NOMBRE = \"codigo\"`: la prueba espejo del\nfrontend lee esta clase. Los primeros se detectan al compilar (una expresion\ninvalida no procesa ninguna fila); los siguientes, al evaluar una fila concreta; al final,\nlos que solo informa la API del motor (B4a): lo que no se puede leer, el contexto o el\nproducto que no existen, y por que una expresion no tiene largo maximo."
+      },
+      "ColumnaAnalizadaRespuesta": {
+        "properties": {
+          "indice": {
+            "type": "integer",
+            "title": "Indice"
+          },
+          "encabezado": {
+            "type": "string",
+            "title": "Encabezado"
+          },
+          "ejemplos": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ejemplos"
+          },
+          "estado": {
+            "$ref": "#/components/schemas/EstadoEncabezado"
+          },
+          "sugerido": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sugerido"
+          },
+          "similitud": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Similitud"
+          }
+        },
+        "type": "object",
+        "required": [
+          "indice",
+          "encabezado",
+          "ejemplos",
+          "estado",
+          "sugerido",
+          "similitud"
+        ],
+        "title": "ColumnaAnalizadaRespuesta",
+        "description": "Una columna del archivo. `indice` va en base 0 y es su posicion en el archivo (los\nencabezados vacios no se listan, pero el indice de las demas se conserva). `sugerido` es un\ncampo o nulo («No cargar»); `similitud` solo la tiene un `parecido`."
       },
       "ColumnaEntrada": {
         "properties": {
@@ -4622,6 +5363,34 @@
           "supervisores"
         ],
         "title": "ConfiguracionSupervisionRespuesta"
+      },
+      "ConfirmacionEntrada": {
+        "properties": {
+          "borrador_id": {
+            "type": "integer",
+            "title": "Borrador Id"
+          },
+          "fecha_corte": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Corte"
+          },
+          "asignaciones": {
+            "items": {
+              "$ref": "#/components/schemas/AsignacionEntrada"
+            },
+            "type": "array",
+            "title": "Asignaciones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "borrador_id",
+          "fecha_corte",
+          "asignaciones"
+        ],
+        "title": "ConfirmacionEntrada",
+        "description": "Confirmar un borrador del mapeador: la fecha de corte y una asignacion por cada columna."
       },
       "ConsumoLimiteRespuesta": {
         "properties": {
@@ -5339,6 +6108,86 @@
         "title": "DetalleErrorFechaEnvio",
         "description": "Un `400`: `fecha_envio` y `fecha_corte` solo viajan cuando el `codigo` es\n`fecha_envio_anterior`; en cualquier otro `400` de estas entradas no vienen."
       },
+      "DetalleErrorMapeador": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoErrorMapeador"
+          },
+          "hoja": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hoja"
+          },
+          "hojas": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hojas"
+          },
+          "maximo_mb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximo Mb"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "codigo"
+        ],
+        "title": "DetalleErrorMapeador",
+        "description": "El cuerpo de un `400`, `404` o `413` del mapeador: el motivo en `detail` (para el registro)\ny el `codigo` que la pantalla traduce. Los datos viajan solo con su codigo: `hoja` y `hojas`\ncon `hoja_inexistente`, `maximo_mb` con `archivo_demasiado_grande`."
+      },
+      "DetalleErrorMapeo": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoErrorMapeador"
+          },
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaMapeoRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "codigo",
+          "problemas"
+        ],
+        "title": "DetalleErrorMapeo",
+        "description": "Un `422` al confirmar: el motivo, el `codigo` (`mapeo_con_problemas`) y todos los problemas\nde las asignaciones (RF-60)."
+      },
       "DetalleErrorSpeech": {
         "properties": {
           "detail": {
@@ -5538,6 +6387,16 @@
         ],
         "title": "EstadoCostoEstimado",
         "description": "El costo estimado de una campana: con valor, o no disponible porque no tiene tarifa."
+      },
+      "EstadoEncabezado": {
+        "type": "string",
+        "enum": [
+          "recordado",
+          "coincide",
+          "parecido",
+          "sin_coincidencia"
+        ],
+        "title": "EstadoEncabezado"
       },
       "ExcepcionEntrada": {
         "properties": {
@@ -6086,6 +6945,18 @@
         ],
         "title": "FormatoSpeech",
         "description": "Como se guarda el contenido de una version del speech.\n\n`v1` es la estructura fija de siempre (dos partes por segmento, RF-MM-14), incluido el Speech\noriginal. `v2` es una expresion del motor de texto enriquecido por segmento (RF-42 a RF-48)."
+      },
+      "FormatoTabla": {
+        "type": "string",
+        "enum": [
+          "xlsx",
+          "xlsb",
+          "xls",
+          "ods",
+          "csv",
+          "json"
+        ],
+        "title": "FormatoTabla"
       },
       "FuncionEntrada": {
         "properties": {
@@ -6884,6 +7755,16 @@
         ],
         "title": "NodoVariableGuardadoRespuesta"
       },
+      "OpcionDetectable": {
+        "type": "string",
+        "enum": [
+          "hoja",
+          "separador",
+          "codificacion"
+        ],
+        "title": "OpcionDetectable",
+        "description": "Una opcion de lectura que se puede elegir y, si no, se detecta (los campos de\n`OpcionesLectura`)."
+      },
       "OpcionFormatoRespuesta": {
         "properties": {
           "nombre": {
@@ -7031,6 +7912,57 @@
         "type": "object",
         "title": "OpcionesEntrada",
         "description": "Los defectos y los limites salen de `OpcionesArchivo` y de las constantes de la entidad: es\nlo mismo que anuncia `GET /formatos`."
+      },
+      "OpcionesLecturaEntrada": {
+        "properties": {
+          "hoja": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hoja"
+          },
+          "separador": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Separador"
+          },
+          "codificacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codificacion"
+          }
+        },
+        "type": "object",
+        "title": "OpcionesLecturaEntrada",
+        "description": "Lo que el usuario elige para leer el archivo; lo que falte se detecta (RF-57)."
+      },
+      "OrigenAsignacion": {
+        "type": "string",
+        "enum": [
+          "recordado",
+          "coincide",
+          "parecido_aceptado",
+          "manual"
+        ],
+        "title": "OrigenAsignacion",
+        "description": "De donde sale la asignacion de una columna (RF-62)."
       },
       "OrigenDia": {
         "type": "string",
@@ -7973,6 +8905,48 @@
         ],
         "title": "PrevisualizacionTextoRespuesta",
         "description": "O `problemas` (no compila: sin filas) o `filas`."
+      },
+      "ProblemaMapeoRespuesta": {
+        "properties": {
+          "indice": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indice"
+          },
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoMapeo"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          },
+          "campo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "indice",
+          "codigo",
+          "detalle",
+          "campo"
+        ],
+        "title": "ProblemaMapeoRespuesta",
+        "description": "Un problema de las asignaciones; `indice` es nulo si es de todo el mapeo (un obligatorio)."
       },
       "ProblemaRespuesta": {
         "properties": {
@@ -9019,6 +9993,39 @@
           "parametro"
         ],
         "title": "UbicacionRespuesta"
+      },
+      "ValidacionEntrada": {
+        "properties": {
+          "asignaciones": {
+            "items": {
+              "$ref": "#/components/schemas/AsignacionEntrada"
+            },
+            "type": "array",
+            "title": "Asignaciones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asignaciones"
+        ],
+        "title": "ValidacionEntrada",
+        "description": "Una asignacion por cada columna listada (M-5)."
+      },
+      "ValidacionMapeoRespuesta": {
+        "properties": {
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaMapeoRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "problemas"
+        ],
+        "title": "ValidacionMapeoRespuesta"
       },
       "ValidacionRespuesta": {
         "properties": {

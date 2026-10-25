@@ -19,6 +19,30 @@ class ArchivoIlegible(ArchivoSabanaError):
     """El contenido no es una hoja de calculo legible (corrupto, otro formato, etc.)."""
 
 
+# Las causas que la pantalla distingue (docs/mapeador-encabezados.md §6) son subclases: quien ya
+# captura `ArchivoIlegible` sigue funcionando.
+
+
+class ArchivoVacio(ArchivoIlegible):
+    """El archivo no tiene ni un caracter que no sea un espacio."""
+
+
+class ExtensionNoCoincide(ArchivoIlegible):
+    """La extension del nombre dice un formato y el contenido es otro."""
+
+
+class SeparadorInvalido(ArchivoIlegible):
+    """El separador elegido para un CSV no sirve: debe ser un solo caracter."""
+
+
+class CodificacionInvalida(ArchivoIlegible):
+    """La codificacion elegida para un CSV no existe."""
+
+
+class CodificacionNoCoincide(ArchivoIlegible):
+    """El archivo no se puede decodificar con la codificacion elegida."""
+
+
 class HojaNoEncontrada(ArchivoSabanaError):
     def __init__(self, hoja: str, disponibles: list[str]) -> None:
         super().__init__(f"No existe la hoja {hoja!r}; hojas disponibles: {disponibles}")

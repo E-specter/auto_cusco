@@ -6,7 +6,7 @@ B4b y de B6). Las pruebas con la base real estan en `test_mapeador_postgres.py`.
 """
 
 import io
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from alembic import command
@@ -24,6 +24,7 @@ from app.adapters.persistence.repositorio_mapeador_postgres import (
     sentencia_de_recordados,
 )
 from app.core.entities.borrador import NuevoBorrador
+from tests.mapeador_postgres_comun import sentencias_de_limpieza
 
 DIALECTO = postgresql.dialect()
 AHORA = datetime(2026, 10, 26, 9, 0, tzinfo=UTC)
@@ -294,3 +295,55 @@ def test_el_modelo_declara_la_clave_y_los_chequeos_del_recordado() -> None:
         "pk_mapeo_recordado",
         "ck_mapeo_recordado_ocurrencia_positiva",
     }
+
+
+# --- La limpieza de las pruebas con base -------------------------------------------------------
+# Un `date` comparado con un texto lo rechaza PostgreSQL (`date = character varying`) y solo se ve
+# al correr contra la base: aqui se compila lo que ejecutan los ayudantes de `test_*_postgres.py`.
+
+FECHA_DE_PRUEBA = date(2099, 8, 2)
+
+
+def _limpieza(**opciones):
+    return [compilar(s) for s in sentencias_de_limpieza(FECHA_DE_PRUEBA, "b3b-", **opciones)]
+
+
+def test_la_limpieza_compara_la_fecha_de_corte_como_fecha() -> None:
+    compiladas = _limpieza()
+
+    por_fecha = [c for c in compiladas if "fecha_corte" in str(c)]
+    assert len(por_fecha) == 2  # las versiones y su auditoria
+    for compilada in por_fecha:
+        valores = [v for v in compilada.params.values() if isinstance(v, (date, str))]
+        assert valores == [FECHA_DE_PRUEBA] and type(valores[0]) is date
+        assert "fecha_corte = %(fecha_corte_1)s" in str(compilada)
+
+
+def test_toda_sentencia_de_limpieza_tiene_un_where() -> None:
+    for compilada in _limpieza(catalogos_de_prueba=["b3b_prueba"]):
+        assert str(compilada).startswith("DELETE FROM ") and " WHERE " in str(compilada)
+
+
+def test_la_limpieza_borra_de_lo_recordado_solo_los_encabezados_con_el_prefijo() -> None:
+    sabana = next(c for c in _limpieza() if "mapeo_recordado" in str(c))
+
+    assert "encabezado_normalizado LIKE" in str(sabana) and "ESCAPE" in str(sabana)
+    assert "catalogo_id = %(catalogo_id_1)s" in str(sabana)
+    assert sabana.params["catalogo_id_1"] == "sabana_vencida"
+    assert "|| '%%'" in str(sabana)  # empieza por el prefijo (%% es el % de psycopg)
+    assert sabana.params["encabezado_normalizado_1"] == "b3b-"  # y el prefijo es solo ese
+
+
+def test_los_borradores_se_borran_por_el_prefijo_del_archivo() -> None:
+    borradores = next(c for c in _limpieza() if "borrador_carga_archivo" in str(c))
+
+    assert "nombre_archivo LIKE" in str(borradores)
+    assert borradores.params["nombre_archivo_1"] == "b3b-"
+
+
+def test_el_catalogo_inventado_por_la_prueba_se_borra_entero_y_solo_ese() -> None:
+    sentencias = _limpieza(catalogos_de_prueba=["b3b_prueba"])
+
+    propias = [c for c in sentencias if "catalogo_id IN" in str(c)]
+    assert len(propias) == 1 and propias[0].params["catalogo_id_1"] == ["b3b_prueba"]
+    assert len(sentencias) == 5 and len(_limpieza()) == 4

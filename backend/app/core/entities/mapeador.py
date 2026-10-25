@@ -63,6 +63,27 @@ class CodigoMapeo(StrEnum):
     INDICE_REPETIDO = "indice_repetido"  # dos asignaciones para la misma columna
 
 
+class CodigoErrorMapeador(StrEnum):
+    """Por que el mapeador rechaza una peticion (`400`, `404` o `413`): el `codigo` del cuerpo de
+    error, que la pantalla traduce como `mapeador.error.<codigo>`.
+
+    Un valor por linea: la prueba espejo del contrato y del frontend lee esta clase.
+    """
+
+    ARCHIVO_VACIO = "archivo_vacio"  # sin contenido
+    ARCHIVO_ILEGIBLE = "archivo_ilegible"  # corrupto, o no es del formato que parece
+    EXTENSION_NO_COINCIDE = "extension_no_coincide"  # la extension dice un formato y es otro
+    ARCHIVO_SIN_DATOS = "archivo_sin_datos"  # sin cabecera ni datos
+    ARCHIVO_DEMASIADO_GRANDE = "archivo_demasiado_grande"  # trae `maximo_mb`
+    HOJA_INEXISTENTE = "hoja_inexistente"  # trae `hoja` (la pedida) y `hojas` (las que hay)
+    SEPARADOR_INVALIDO = "separador_invalido"  # no es un solo caracter
+    CODIFICACION_INVALIDA = "codificacion_invalida"  # esa codificacion no existe
+    CODIFICACION_NO_COINCIDE = "codificacion_no_coincide"  # no decodifica el archivo
+    CATALOGO_DESCONOCIDO = "catalogo_desconocido"
+    BORRADOR_NO_ENCONTRADO = "borrador_no_encontrado"  # no existe, venció o ya se confirmó
+    MAPEO_CON_PROBLEMAS = "mapeo_con_problemas"  # el `422` de confirmar: trae `problemas`
+
+
 @dataclass(frozen=True)
 class ColumnaAnalizada:
     """Una columna del archivo con lo que el mapeador sugiere para ella.

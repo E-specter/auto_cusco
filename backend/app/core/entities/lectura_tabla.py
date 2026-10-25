@@ -38,6 +38,15 @@ class CodigoAdvertenciaLectura(StrEnum):
     VALOR_NO_ESCALAR = "valor_no_escalar"  # un objeto o una lista JSON, guardado como texto JSON
 
 
+class OpcionDetectable(StrEnum):
+    """Una opcion de lectura que se puede elegir y, si no, se detecta (los campos de
+    `OpcionesLectura`)."""
+
+    HOJA = "hoja"
+    SEPARADOR = "separador"
+    CODIFICACION = "codificacion"
+
+
 @dataclass(frozen=True)
 class OpcionesLectura:
     """Lo que el usuario elige; todo opcional, y lo que falte se detecta.

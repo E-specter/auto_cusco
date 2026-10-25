@@ -51,7 +51,7 @@ class Entorno:
         )
         self.ingesta = IngestaSabanaService(self.repo, self.lector, lambda: INICIO)
 
-    def confirmar(self, nombre, contenido, fecha=FECHA, cambios=None, **opciones):
+    def confirmar(self, nombre, contenido, *, fecha=FECHA, cambios=None, **opciones):
         analizado = self.mapeador.crear_borrador(
             SABANA, nombre, contenido, OpcionesLectura(**opciones)
         )
@@ -71,7 +71,7 @@ def entorno() -> Entorno:
     return Entorno()
 
 
-def xlsx(filas: list[list], hoja: str = "VENCIDA") -> bytes:
+def xlsx(filas: list[list], *, hoja: str = "VENCIDA") -> bytes:
     libro = openpyxl.Workbook()
     libro.active.title = hoja
     for fila in filas:
@@ -87,11 +87,11 @@ CSV = csv_de(
         [
             "000000000000000001",
             "APELLIDO/NOMBRE FICTICIO",
-            "987654321",
+            "900000001",
             "REGIÓN PRUEBA",
             "nota uno",
         ],
-        ["000000000000000002", "OTRO/FICTICIO", "912345678", "REGIÓN PRUEBA", "nota dos"],
+        ["000000000000000002", "OTRO/FICTICIO", "900000002", "REGIÓN PRUEBA", "nota dos"],
     ]
 )
 
@@ -336,7 +336,7 @@ def test_una_columna_nueva_sin_asignacion_falla(entorno) -> None:
         csv_de(
             [
                 ["Pagare", "Titular", "Teléfono", "Región", "Observación libre", "Columna nueva"],
-                ["000000000000000001", "UNO", "987654321", "R", "n", "x"],
+                ["000000000000000001", "UNO", "900000001", "R", "n", "x"],
             ]
         ),
     )
@@ -359,7 +359,7 @@ def test_el_mismo_numero_de_columnas_no_basta(entorno) -> None:
     intercambiado = csv_de(
         [
             ["Pagare", "Teléfono", "Titular", "Región", "Observación libre"],
-            ["000000000000000001", "987654321", "UNO", "REGIÓN PRUEBA", "nota"],
+            ["000000000000000001", "900000001", "UNO", "REGIÓN PRUEBA", "nota"],
         ]
     )
     _cambiar_archivo(entorno, carga.id, intercambiado)

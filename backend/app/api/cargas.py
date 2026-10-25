@@ -19,21 +19,32 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.concurrency import run_in_threadpool
-from pydantic import ConfigDict
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict
 
 from app.adapters.input.lector_tabla import LectorTabla
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_cargas_postgres import RepositorioCargasPostgres
 from app.api.errores import respuestas_de_error
+from app.api.mapeador import (
+    AsignacionEntrada,
+    DetalleErrorMapeo,
+    error_no_encontrado,
+    problema_respuesta,
+    respuestas_de_error_mapeador,
+)
 from app.api.respuestas import ModeloRespuesta
+from app.core.entities.borrador import BorradorNoEncontrado, MapeoConProblemas
 from app.core.entities.carga import (
     CargaDetalle,
     CargaNoEncontrada,
     CargaNoProcesable,
+    CargaRegistrada,
     EliminacionNoPermitida,
     EstadoCarga,
     VigenciaNoPermitida,
 )
+from app.core.entities.mapeador import CodigoErrorMapeador
 from app.core.entities.sabana import HOJA_DATOS_POR_DEFECTO, Incidencia, Severidad
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService
 
@@ -110,6 +121,31 @@ def _a_incidencia(incidencia: Incidencia) -> IncidenciaRespuesta:
     )
 
 
+class ConfirmacionEntrada(BaseModel):
+    """Confirmar un borrador del mapeador: la fecha de corte y una asignacion por cada columna."""
+
+    borrador_id: int
+    fecha_corte: date
+    asignaciones: list[AsignacionEntrada]
+
+
+def _respuesta_de_registro(registro: CargaRegistrada) -> CargaCreadaRespuesta:
+    aviso = None
+    if registro.versiones_identicas:
+        aviso = (
+            "Este archivo es identico al de las versiones "
+            f"{registro.versiones_identicas} de la misma fecha"
+        )
+    return CargaCreadaRespuesta(
+        id=registro.carga.id,
+        fecha_corte=registro.carga.fecha_corte,
+        version=registro.carga.version,
+        estado=registro.carga.estado,
+        versiones_identicas=registro.versiones_identicas,
+        aviso=aviso,
+    )
+
+
 def _procesar_en_segundo_plano(servicio: IngestaSabanaService, carga_id: int) -> None:
     try:
         resultado = servicio.procesar_carga(carga_id)
@@ -151,21 +187,52 @@ async def subir_sabana(
         servicio.registrar_carga, fecha_corte, archivo.filename or "sabana", contenido, hoja
     )
     tareas.add_task(_procesar_en_segundo_plano, servicio, registro.carga.id)
+    return _respuesta_de_registro(registro)
 
-    aviso = None
-    if registro.versiones_identicas:
-        aviso = (
-            "Este archivo es identico al de las versiones "
-            f"{registro.versiones_identicas} de la misma fecha"
+
+@router.post(
+    "/desde-borrador",
+    status_code=202,
+    response_model=CargaCreadaRespuesta,
+    responses={
+        **respuestas_de_error_mapeador(404),
+        422: {
+            "model": DetalleErrorMapeo,
+            "description": "Las asignaciones tienen problemas (RF-60): vienen todos",
+        },
+    },
+)
+async def confirmar_borrador(
+    entrada: ConfirmacionEntrada,
+    tareas: BackgroundTasks,
+    servicio: IngestaSabanaService = Depends(obtener_servicio),
+) -> CargaCreadaRespuesta | JSONResponse:
+    """Confirma un borrador del mapeador (RF-60 a RF-62) y lanza su procesamiento en segundo plano.
+
+    Vuelve a validar las asignaciones contra el analisis guardado con el borrador: con problemas
+    responde `422` con la lista y no crea nada. Sin problemas, en una sola transaccion crea la
+    version (con las asignaciones ya resueltas y las opciones de lectura), guarda lo recordado y
+    borra el borrador; responde `202` como `POST /cargas`. Un borrador que no existe, vencio o ya
+    se confirmo es un `404`.
+    """
+    try:
+        registro = await run_in_threadpool(
+            servicio.registrar_desde_borrador,
+            entrada.borrador_id,
+            entrada.fecha_corte,
+            [a.a_asignacion() for a in entrada.asignaciones],
         )
-    return CargaCreadaRespuesta(
-        id=registro.carga.id,
-        fecha_corte=registro.carga.fecha_corte,
-        version=registro.carga.version,
-        estado=registro.carga.estado,
-        versiones_identicas=registro.versiones_identicas,
-        aviso=aviso,
-    )
+    except BorradorNoEncontrado as exc:
+        raise error_no_encontrado(exc) from exc
+    except MapeoConProblemas as exc:
+        cuerpo = DetalleErrorMapeo(
+            detail=str(exc),
+            codigo=CodigoErrorMapeador.MAPEO_CON_PROBLEMAS,
+            problemas=[problema_respuesta(p) for p in exc.problemas],
+        )
+        return JSONResponse(status_code=422, content=cuerpo.model_dump(mode="json"))
+    tareas.add_task(_procesar_en_segundo_plano, servicio, registro.carga.id)
+    return _respuesta_de_registro(registro)
 
 
 @router.get("", response_model=list[VersionRespuesta])

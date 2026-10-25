@@ -9,7 +9,7 @@ import io
 import zipfile
 
 from app.core.entities.lectura_tabla import HOJAS_DE_CALCULO, FormatoTabla
-from app.core.entities.sabana import ArchivoIlegible
+from app.core.entities.sabana import ArchivoVacio, ExtensionNoCoincide
 
 _FIRMA_ZIP = b"PK\x03\x04"
 _FIRMA_OLE = bytes.fromhex("d0cf11e0a1b11ae1")
@@ -67,24 +67,24 @@ def detectar_formato(contenido: bytes, nombre_archivo: str | None) -> FormatoTab
     hoja_de_calculo = formato_de_hoja_de_calculo(contenido)
     if por_extension is None:
         if not contenido.strip():
-            raise ArchivoIlegible("El archivo esta vacio")
+            raise ArchivoVacio("El archivo está vacío")
         if hoja_de_calculo is not None:
             return hoja_de_calculo
         return FormatoTabla.JSON if _parece_json(contenido) else FormatoTabla.CSV
     extension = _extension(nombre_archivo)
     if por_extension in HOJAS_DE_CALCULO:
         if hoja_de_calculo is None:
-            raise ArchivoIlegible(
-                f"La extension .{extension} no coincide con el contenido: no es una hoja de calculo"
+            raise ExtensionNoCoincide(
+                f"La extensión .{extension} no coincide con el contenido: no es una hoja de cálculo"
             )
         return hoja_de_calculo
     if hoja_de_calculo is not None:
-        raise ArchivoIlegible(
-            f"La extension .{extension} no coincide con el contenido: es una hoja de calculo"
+        raise ExtensionNoCoincide(
+            f"La extensión .{extension} no coincide con el contenido: es una hoja de cálculo"
         )
     if por_extension is FormatoTabla.JSON and not _parece_json(contenido):
-        raise ArchivoIlegible(
-            f"La extension .{extension} no coincide con el contenido: "
+        raise ExtensionNoCoincide(
+            f"La extensión .{extension} no coincide con el contenido: "
             "un JSON debe empezar con [ o {"
         )
     return por_extension

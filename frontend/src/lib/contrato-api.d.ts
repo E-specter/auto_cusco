@@ -45,6 +45,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cargas/desde-borrador": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirmar Borrador
+         * @description Confirma un borrador del mapeador (RF-60 a RF-62) y lanza su procesamiento en segundo plano.
+         *
+         *     Vuelve a validar las asignaciones contra el analisis guardado con el borrador: con problemas
+         *     responde `422` con la lista y no crea nada. Sin problemas, en una sola transaccion crea la
+         *     version (con las asignaciones ya resueltas y las opciones de lectura), guarda lo recordado y
+         *     borra el borrador; responde `202` como `POST /cargas`. Un borrador que no existe, vencio o ya
+         *     se confirmo es un `404`.
+         */
+        post: operations["confirmar_borrador_cargas_desde_borrador_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cargas/{carga_id}": {
         parameters: {
             query?: never;
@@ -95,6 +121,112 @@ export interface paths {
          */
         post: operations["asignar_vigente_cargas__carga_id__vigente_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapeador/catalogos/{catalogo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obtener Catalogo
+         * @description Los campos del catalogo, con su nombre legible, su tipo y si son obligatorios (la lista del
+         *     desplegable), y las codificaciones de un CSV.
+         */
+        get: operations["obtener_catalogo_mapeador_catalogos__catalogo_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapeador/{catalogo_id}/borradores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Crear Borrador
+         * @description Sube el archivo, lo lee, lo analiza contra el catalogo (con lo recordado) y lo deja en un
+         *     borrador que vence a las 24 horas. `400` si el archivo esta vacio o no se puede leer, `413` si
+         *     supera el tamano maximo y `404` si el catalogo no existe.
+         */
+        post: operations["crear_borrador_mapeador__catalogo_id__borradores_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapeador/borradores/{borrador_id}/analisis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Volver A Analizar
+         * @description Vuelve a analizar el MISMO borrador con otras opciones (hoja, separador, codificacion): no se
+         *     sube el archivo otra vez. Reemplaza el analisis guardado. `404` si no existe o vencio y `400`
+         *     si el archivo no se puede leer con esas opciones.
+         */
+        post: operations["volver_a_analizar_mapeador_borradores__borrador_id__analisis_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapeador/borradores/{borrador_id}/validacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validar Asignaciones
+         * @description Los problemas de las asignaciones, validados contra el analisis que se le mostro al usuario
+         *     (el guardado con el borrador), no contra uno nuevo. Vacio = se puede confirmar.
+         */
+        post: operations["validar_asignaciones_mapeador_borradores__borrador_id__validacion_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapeador/borradores/{borrador_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Descartar Borrador
+         * @description Cancelar: descarta el borrador.
+         */
+        delete: operations["descartar_borrador_mapeador_borradores__borrador_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -899,6 +1031,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AdvertenciaLecturaRespuesta
+         * @description Un aviso de la lectura en una fila (`numero_fila` en base 1, como Excel).
+         */
+        AdvertenciaLecturaRespuesta: {
+            /** Numero Fila */
+            numero_fila: number;
+            /** Columna */
+            columna: string;
+            codigo: components["schemas"]["CodigoAdvertenciaLectura"];
+        };
         /** AdvertenciaReporteRespuesta */
         AdvertenciaReporteRespuesta: {
             codigo: components["schemas"]["CodigoMowaMes"];
@@ -907,6 +1050,40 @@ export interface components {
             mes_id: number;
             /** Detalle */
             detalle: string;
+        };
+        /**
+         * AnalisisRespuesta
+         * @description El borrador con su analisis y lo que se detecto al leer el archivo.
+         *
+         *     `hojas` y `hoja` son de una hoja de calculo; `separador` y `codificacion`, de un CSV (nulos y
+         *     vacios en los demas). `filas` son las de datos. `problemas` son los del mapeo sugerido tal como
+         *     llega (RF-60). `detectados` son las opciones de lectura que el lector detecto porque no se
+         *     eligieron (`hoja`, `separador`, `codificacion`): la pantalla las marca «(detectado)».
+         */
+        AnalisisRespuesta: {
+            /** Borrador Id */
+            borrador_id: number;
+            /** Catalogo Id */
+            catalogo_id: string;
+            formato: components["schemas"]["FormatoTabla"];
+            /** Hojas */
+            hojas: string[];
+            /** Hoja */
+            hoja: string | null;
+            /** Separador */
+            separador: string | null;
+            /** Codificacion */
+            codificacion: string | null;
+            /** Filas */
+            filas: number;
+            /** Columnas */
+            columnas: components["schemas"]["ColumnaAnalizadaRespuesta"][];
+            /** Problemas */
+            problemas: components["schemas"]["ProblemaMapeoRespuesta"][];
+            /** Advertencias */
+            advertencias: components["schemas"]["AdvertenciaLecturaRespuesta"][];
+            /** Detectados */
+            detectados: components["schemas"]["OpcionDetectable"][];
         };
         /** ArchivoPrevistoRespuesta */
         ArchivoPrevistoRespuesta: {
@@ -938,6 +1115,18 @@ export interface components {
             /** Variable */
             variable: string;
         };
+        /**
+         * AsignacionEntrada
+         * @description Lo que se hace con una columna: `campo` nulo es «No cargar esta columna». `origen` lo manda
+         *     la pantalla y el backend lo ajusta (docs/mapeador-encabezados.md §3.4).
+         */
+        AsignacionEntrada: {
+            /** Indice */
+            indice: number;
+            /** Campo */
+            campo: string | null;
+            origen: components["schemas"]["OrigenAsignacion"];
+        };
         /** AvisoCampanaRespuesta */
         AvisoCampanaRespuesta: {
             codigo: components["schemas"]["CodigoMowaMes"];
@@ -949,6 +1138,29 @@ export interface components {
         BloqueRespuesta: {
             metricas: components["schemas"]["MetricasRespuesta"];
             segmentacion: components["schemas"]["SegmentacionRespuesta"] | null;
+        };
+        /** Body_crear_borrador_mapeador__catalogo_id__borradores_post */
+        Body_crear_borrador_mapeador__catalogo_id__borradores_post: {
+            /**
+             * Archivo
+             * @description Excel, ODS, CSV o JSON
+             */
+            archivo: string;
+            /**
+             * Hoja
+             * @description La hoja de un Excel u ODS
+             */
+            hoja?: string | null;
+            /**
+             * Separador
+             * @description El separador de un CSV
+             */
+            separador?: string | null;
+            /**
+             * Codificacion
+             * @description La codificacion de un CSV
+             */
+            codificacion?: string | null;
         };
         /** Body_importar_reporte_mowa_mes_campanas__campana_id__reportes_post */
         Body_importar_reporte_mowa_mes_campanas__campana_id__reportes_post: {
@@ -1089,6 +1301,20 @@ export interface components {
          * @enum {string}
          */
         CampoConfiguracion: "limite_mensual" | "whatsapp_contacto" | "registros_por_archivo" | "bytes_por_archivo" | "tarifa_sms" | "plantilla_nombre_archivo";
+        /**
+         * CampoDestinoRespuesta
+         * @description Un campo del catalogo; `clave_etiqueta` es la clave i18n de su nombre legible.
+         */
+        CampoDestinoRespuesta: {
+            /** Nombre */
+            nombre: string;
+            /** Clave Etiqueta */
+            clave_etiqueta: string;
+            /** Tipo */
+            tipo: string;
+            /** Obligatorio */
+            obligatorio: boolean;
+        };
         /** CampoEntrada */
         CampoEntrada: {
             /** Nombre */
@@ -1141,6 +1367,21 @@ export interface components {
             /** Aviso */
             aviso: string | null;
         };
+        /**
+         * CatalogoMapeadorRespuesta
+         * @description Los campos del catalogo (la lista del desplegable) y lo que la pantalla ofrece para leer un
+         *     CSV, en el orden en que se prueba al detectar: las `codificaciones` y los `separadores`.
+         */
+        CatalogoMapeadorRespuesta: {
+            /** Id */
+            id: string;
+            /** Campos */
+            campos: components["schemas"]["CampoDestinoRespuesta"][];
+            /** Codificaciones */
+            codificaciones: string[];
+            /** Separadores */
+            separadores: string[];
+        };
         /** CatalogoRespuesta */
         CatalogoRespuesta: {
             contexto: components["schemas"]["ContextoRespuesta"];
@@ -1176,6 +1417,12 @@ export interface components {
             /** Con Correspondencia */
             con_correspondencia: number;
         };
+        /**
+         * CodigoAdvertenciaLectura
+         * @description Lo que un lector avisa de una fila sin impedir leerla.
+         * @enum {string}
+         */
+        CodigoAdvertenciaLectura: "valor_no_escalar";
         /** CodigoConteoRespuesta */
         CodigoConteoRespuesta: {
             codigo: components["schemas"]["CodigoMowaMes"];
@@ -1195,6 +1442,21 @@ export interface components {
          * @enum {string}
          */
         CodigoErrorCampana: "huella_cambiada" | "limite_excedido";
+        /**
+         * CodigoErrorMapeador
+         * @description Por que el mapeador rechaza una peticion (`400`, `404` o `413`): el `codigo` del cuerpo de
+         *     error, que la pantalla traduce como `mapeador.error.<codigo>`.
+         *
+         *     Un valor por linea: la prueba espejo del contrato y del frontend lee esta clase.
+         * @enum {string}
+         */
+        CodigoErrorMapeador: "archivo_vacio" | "archivo_ilegible" | "extension_no_coincide" | "archivo_sin_datos" | "archivo_demasiado_grande" | "hoja_inexistente" | "separador_invalido" | "codificacion_invalida" | "codificacion_no_coincide" | "catalogo_desconocido" | "borrador_no_encontrado" | "mapeo_con_problemas";
+        /**
+         * CodigoMapeo
+         * @description Los problemas de una asignacion (RF-60).
+         * @enum {string}
+         */
+        CodigoMapeo: "parecido_sin_revisar" | "obligatorio_sin_columna" | "campo_repetido" | "campo_desconocido" | "indice_fuera_de_rango" | "asignacion_faltante" | "indice_repetido";
         /**
          * CodigoMowaMes
          * @description Catalogo de codigos que el frontend traduce como `mowaMes.codigo.<codigo>`.
@@ -1217,6 +1479,25 @@ export interface components {
          * @enum {string}
          */
         CodigoTexto: "expresion_invalida" | "definicion_invalida" | "sintaxis_invalida" | "referencia_vacia" | "variable_desconocida" | "funcion_desconocida" | "parametro_invalido" | "tipo_incompatible" | "limite_excedido" | "no_se_puede_escribir_como_texto" | "sin_segmento" | "variable_obligatoria_vacia" | "argumento_vacio" | "division_por_cero" | "no_es_numero" | "no_es_fecha" | "telefono_invalido" | "resultado_fuera_de_rango" | "valor_no_convertible" | "sin_cota_variable" | "sin_cota_funcion" | "contexto_desconocido" | "producto_no_encontrado" | "sin_version_vigente" | "definicion_no_encontrada" | "version_no_encontrada" | "nombre_repetido" | "seleccion_no_encontrada" | "fecha_envio_anterior";
+        /**
+         * ColumnaAnalizadaRespuesta
+         * @description Una columna del archivo. `indice` va en base 0 y es su posicion en el archivo (los
+         *     encabezados vacios no se listan, pero el indice de las demas se conserva). `sugerido` es un
+         *     campo o nulo («No cargar»); `similitud` solo la tiene un `parecido`.
+         */
+        ColumnaAnalizadaRespuesta: {
+            /** Indice */
+            indice: number;
+            /** Encabezado */
+            encabezado: string;
+            /** Ejemplos */
+            ejemplos: string[];
+            estado: components["schemas"]["EstadoEncabezado"];
+            /** Sugerido */
+            sugerido: string | null;
+            /** Similitud */
+            similitud: number | null;
+        };
         /**
          * ColumnaEntrada
          * @description Una columna de la definicion: la forma que guardara B4b. El contenido es solo expresion;
@@ -1380,6 +1661,21 @@ export interface components {
             procedencias: string[];
             /** Supervisores */
             supervisores: components["schemas"]["SupervisorRespuesta"][];
+        };
+        /**
+         * ConfirmacionEntrada
+         * @description Confirmar un borrador del mapeador: la fecha de corte y una asignacion por cada columna.
+         */
+        ConfirmacionEntrada: {
+            /** Borrador Id */
+            borrador_id: number;
+            /**
+             * Fecha Corte
+             * Format: date
+             */
+            fecha_corte: string;
+            /** Asignaciones */
+            asignaciones: components["schemas"]["AsignacionEntrada"][];
         };
         /** ConsumoLimiteRespuesta */
         ConsumoLimiteRespuesta: {
@@ -1679,6 +1975,35 @@ export interface components {
             fecha_corte?: string | null;
         };
         /**
+         * DetalleErrorMapeador
+         * @description El cuerpo de un `400`, `404` o `413` del mapeador: el motivo en `detail` (para el registro)
+         *     y el `codigo` que la pantalla traduce. Los datos viajan solo con su codigo: `hoja` y `hojas`
+         *     con `hoja_inexistente`, `maximo_mb` con `archivo_demasiado_grande`.
+         */
+        DetalleErrorMapeador: {
+            /** Detail */
+            detail: string;
+            codigo: components["schemas"]["CodigoErrorMapeador"];
+            /** Hoja */
+            hoja?: string | null;
+            /** Hojas */
+            hojas?: string[] | null;
+            /** Maximo Mb */
+            maximo_mb?: number | null;
+        };
+        /**
+         * DetalleErrorMapeo
+         * @description Un `422` al confirmar: el motivo, el `codigo` (`mapeo_con_problemas`) y todos los problemas
+         *     de las asignaciones (RF-60).
+         */
+        DetalleErrorMapeo: {
+            /** Detail */
+            detail: string;
+            codigo: components["schemas"]["CodigoErrorMapeador"];
+            /** Problemas */
+            problemas: components["schemas"]["ProblemaMapeoRespuesta"][];
+        };
+        /**
          * DetalleErrorSpeech
          * @description Un 400 de speech: el motivo y los problemas, cada uno con su ubicacion.
          */
@@ -1780,6 +2105,11 @@ export interface components {
          * @enum {string}
          */
         EstadoCostoEstimado: "calculado" | "no_disponible";
+        /**
+         * EstadoEncabezado
+         * @enum {string}
+         */
+        EstadoEncabezado: "recordado" | "coincide" | "parecido" | "sin_coincidencia";
         /** ExcepcionEntrada */
         ExcepcionEntrada: {
             /**
@@ -1979,6 +2309,11 @@ export interface components {
          * @enum {string}
          */
         FormatoSpeech: "v1" | "v2";
+        /**
+         * FormatoTabla
+         * @enum {string}
+         */
+        FormatoTabla: "xlsx" | "xlsb" | "xls" | "ods" | "csv" | "json";
         /** FuncionEntrada */
         FuncionEntrada: {
             /** Nombre */
@@ -2276,6 +2611,13 @@ export interface components {
             obligatoria: boolean;
         };
         /**
+         * OpcionDetectable
+         * @description Una opcion de lectura que se puede elegir y, si no, se detecta (los campos de
+         *     `OpcionesLectura`).
+         * @enum {string}
+         */
+        OpcionDetectable: "hoja" | "separador" | "codificacion";
+        /**
          * OpcionFormatoRespuesta
          * @description Una opcion del archivo con lo que la pantalla necesita para pintarla sin repetir reglas.
          *
@@ -2337,6 +2679,24 @@ export interface components {
             /** Sangria */
             sangria?: number | null;
         };
+        /**
+         * OpcionesLecturaEntrada
+         * @description Lo que el usuario elige para leer el archivo; lo que falte se detecta (RF-57).
+         */
+        OpcionesLecturaEntrada: {
+            /** Hoja */
+            hoja?: string | null;
+            /** Separador */
+            separador?: string | null;
+            /** Codificacion */
+            codificacion?: string | null;
+        };
+        /**
+         * OrigenAsignacion
+         * @description De donde sale la asignacion de una columna (RF-62).
+         * @enum {string}
+         */
+        OrigenAsignacion: "recordado" | "coincide" | "parecido_aceptado" | "manual";
         /**
          * OrigenDia
          * @enum {string}
@@ -2701,6 +3061,19 @@ export interface components {
             disponibles: number | null;
             /** Fecha Envio */
             fecha_envio: string | null;
+        };
+        /**
+         * ProblemaMapeoRespuesta
+         * @description Un problema de las asignaciones; `indice` es nulo si es de todo el mapeo (un obligatorio).
+         */
+        ProblemaMapeoRespuesta: {
+            /** Indice */
+            indice: number | null;
+            codigo: components["schemas"]["CodigoMapeo"];
+            /** Detalle */
+            detalle: string;
+            /** Campo */
+            campo: string | null;
         };
         /** ProblemaRespuesta */
         ProblemaRespuesta: {
@@ -3075,6 +3448,19 @@ export interface components {
             parametro: string | null;
         };
         /**
+         * ValidacionEntrada
+         * @description Una asignacion por cada columna listada (M-5).
+         */
+        ValidacionEntrada: {
+            /** Asignaciones */
+            asignaciones: components["schemas"]["AsignacionEntrada"][];
+        };
+        /** ValidacionMapeoRespuesta */
+        ValidacionMapeoRespuesta: {
+            /** Problemas */
+            problemas: components["schemas"]["ProblemaMapeoRespuesta"][];
+        };
+        /**
          * ValidacionRespuesta
          * @description `tipo`, `cota` y `variables` solo tienen valor si la expresion es valida; `sin_cota` explica
          *     por que no hay largo maximo cuando es valida y `cota` es nula.
@@ -3413,6 +3799,48 @@ export interface operations {
             };
         };
     };
+    confirmar_borrador_cargas_desde_borrador_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmacionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CargaCreadaRespuesta"];
+                };
+            };
+            /** @description No existe el catalogo o el borrador (o venció, o ya se confirmó) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorMapeador"];
+                };
+            };
+            /** @description Las asignaciones tienen problemas (RF-60): vienen todos */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorMapeo"];
+                };
+            };
+        };
+    };
     obtener_version_cargas__carga_id__get: {
         parameters: {
             query?: never;
@@ -3583,6 +4011,243 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtener_catalogo_mapeador_catalogos__catalogo_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalogo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogoMapeadorRespuesta"];
+                };
+            };
+            /** @description No existe el catalogo o el borrador (o venció, o ya se confirmó) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorMapeador"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    crear_borrador_mapeador__catalogo_id__borradores_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalogo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_crear_borrador_mapeador__catalogo_id__borradores_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalisisRespuesta"];
+                };
+            };
+            /** @description El archivo o las opciones de lectura no sirven; `codigo` dice por que */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorMapeador"];
+                };
+            };
+            /** @description No existe el catalogo o el borrador (o venció, o ya se confirmó) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorMapeador"];
+                };
+            };
+            /** @description El archivo supera el tamano maximo (`maximo_mb`) */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorMapeador"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    volver_a_analizar_mapeador_borradores__borrador_id__analisis_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                borrador_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpcionesLecturaEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalisisRespuesta"];
+                };
+            };
+            /** @description El archivo o las opciones de lectura no sirven; `codigo` dice por que */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorMapeador"];
+                };
+            };
+            /** @description No existe el catalogo o el borrador (o venció, o ya se confirmó) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorMapeador"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validar_asignaciones_mapeador_borradores__borrador_id__validacion_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                borrador_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValidacionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidacionMapeoRespuesta"];
+                };
+            };
+            /** @description No existe el catalogo o el borrador (o venció, o ya se confirmó) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorMapeador"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    descartar_borrador_mapeador_borradores__borrador_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                borrador_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No existe el catalogo o el borrador (o venció, o ya se confirmó) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorMapeador"];
                 };
             };
             /** @description Validation Error */

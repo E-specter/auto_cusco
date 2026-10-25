@@ -137,19 +137,19 @@ La versión de la sábana (`carga`) guarda en `formato.mapeo` lo de hoy, **sin c
 ## 6. API
 
 Genérica del mapeador, prefijo `/mapeador`:
-- **`GET /mapeador/catalogos/{catalogo_id}`:** los campos con nombre, clave de etiqueta, tipo y obligatorio. Es la lista del desplegable.
+- **`GET /mapeador/catalogos/{catalogo_id}`:** los campos con nombre, clave de etiqueta, tipo y obligatorio (la lista del desplegable) `codificaciones` y `separadores`, los que ofrece el selector de un CSV, en el orden en que el lector los prueba al detectar (`CODIFICACIONES` y `CANDIDATOS_DE_SEPARADOR`). 404 si el catálogo no existe.
 - **`POST /mapeador/{catalogo_id}/borradores`** (multipart: `archivo`, y opcionales `hoja`, `separador` y `codificacion`): crea el borrador y devuelve el análisis:
-  - lo general: `borrador_id`, `formato`, `hojas`, `hoja`, `separador`, `codificacion`, `filas` (cuántas);
-  - las columnas: indice, encabezado, ejemplos, estado, sugerido y similitud;
-  - `problemas` iniciales, calculados con las asignaciones sugeridas.
+  - lo general: `borrador_id`, `catalogo_id`, `formato`, `hojas`, `hoja`, `separador`, `codificacion`, `filas` (cuántas);
+  - las columnas: `indice` (base 0), `encabezado`, `ejemplos`, `estado`, `sugerido` y `similitud` (nula si no hay sugerido);
+  - `problemas` iniciales, calculados con las asignaciones sugeridas, `advertencias` de lectura (`numero_fila`, `columna`, `codigo`) y `detectados`: las opciones de lectura (`hoja`, `separador`, `codificacion`) que el lector detectó porque no se eligieron, para que la pantalla diga «(detectado)». Se calcula al responder, comparando lo elegido con lo que reportó el lector; no se guarda.
 
-  Devuelve 400 si el archivo es ilegible o está vacío, y 413 si supera el tamaño.
-- **`POST /mapeador/borradores/{id}/analisis`** (JSON con `hoja`, `separador` y `codificacion`): vuelve a analizar el mismo borrador con otras opciones. 404 si no existe o venció.
-- **`POST /mapeador/borradores/{id}/validacion`** (JSON con `asignaciones`, una por columna): devuelve los `problemas`, validados contra el análisis guardado en el borrador. La pantalla lo llama al cambiar una asignación, con espera corta y cancelación, como el motor de texto.
-- **`DELETE /mapeador/borradores/{id}`:** descarta el borrador (cancelar).
+  Responde 201. Un campo en blanco del formulario vale «no elegido». Devuelve 400 si el archivo está vacío o no se puede leer, 413 si supera el tamaño (64 MB) y 404 si el catálogo no existe.
+- **`POST /mapeador/borradores/{id}/analisis`** (JSON con `hoja`, `separador` y `codificacion`, todos opcionales; en blanco = detectar): vuelve a analizar el mismo borrador con otras opciones, sin volver a subir el archivo. 400 si no se puede leer con esas opciones; 404 si no existe o venció.
+- **`POST /mapeador/borradores/{id}/validacion`** (JSON con `asignaciones`, una por columna: `indice`, `campo` o nulo para «No cargar», `origen`): devuelve los `problemas`, validados contra el análisis guardado en el borrador. La pantalla lo llama al cambiar una asignación, con espera corta y cancelación, como el motor de texto. 404 si no existe o venció.
+- **`DELETE /mapeador/borradores/{id}`:** descarta el borrador (cancelar). 204; 404 si no existe.
 
 La confirmación es del consumidor, porque sabe qué hacer con el archivo:
-- **`POST /cargas/desde-borrador`** (JSON: `borrador_id`, `fecha_corte`, `asignaciones`): vuelve a validar en el backend. Con problemas responde 422 con la lista, y sin problemas:
+- **`POST /cargas/desde-borrador`** (JSON: `borrador_id`, `fecha_corte`, `asignaciones`): vuelve a validar en el backend. Con problemas responde 422 con `{ detail, problemas }` (todos, y no crea nada; la validación de FastAPI, p. ej. una fecha mal escrita, sigue siendo otro 422 sin `problemas`, así que la pantalla distingue por esa clave). Un borrador que no existe, venció o ya se confirmó es 404. Sin problemas:
   1. crea la versión, como `registrar_carga`;
   2. guarda los recordados;
   3. borra el borrador;
@@ -158,7 +158,26 @@ La confirmación es del consumidor, porque sabe qué hacer con el archivo:
   Responde 202, como `POST /cargas`.
 - `procesar_carga` lee el archivo con `carga.opciones_lectura` y usa el mapeo guardado con la carga si lo tiene; si no, `mapear_cabeceras` como hoy. Las columnas en «No cargar» van al registro crudo de cada fila (`_extras`), como las desconocidas.
 
-Los códigos (`EstadoEncabezado`, `OrigenAsignacion` y los de `ProblemaMapeo`) se publican como enums en el contrato, como `CodigoTexto` (B9 del motor), para que el frontend no los escriba a mano. `contratos/openapi.json` se regenera en el mismo corte.
+**Errores (`400`, `404`, `413`).** Cada uno trae `detail` (el motivo, en español, para el registro) y `codigo` (`CodigoErrorMapeador`, el que la pantalla traduce como `mapeador.error.<codigo>`); los datos viajan como campos aparte, solo con su código, y la pantalla no los lee del texto:
+
+| `codigo` | Estado | Cuándo | Datos |
+|---|---|---|---|
+| `archivo_vacio` | 400 | sin contenido, o solo espacios y sin extensión conocida | |
+| `archivo_ilegible` | 400 | corrupto, o JSON/Excel que no se puede leer | |
+| `extension_no_coincide` | 400 | la extensión dice un formato y el contenido es otro | |
+| `archivo_sin_datos` | 400 | sin cabecera ni datos | |
+| `hoja_inexistente` | 400 | la hoja pedida no existe | `hoja` (la pedida), `hojas` (las que hay) |
+| `separador_invalido` | 400 | el separador no es un solo carácter | |
+| `codificacion_invalida` | 400 | esa codificación no existe | |
+| `codificacion_no_coincide` | 400 | el archivo no se decodifica con ella | |
+| `archivo_demasiado_grande` | 413 | supera el máximo | `maximo_mb` |
+| `catalogo_desconocido` | 404 | el catálogo no existe | |
+| `borrador_no_encontrado` | 404 | no existe, venció o ya se confirmó | |
+| `mapeo_con_problemas` | 422 | solo en `POST /cargas/desde-borrador`, junto a `problemas` | |
+
+No hay `formato_no_admitido`: un archivo sin extensión conocida se reconoce por su contenido, y si la extensión contradice el contenido es `extension_no_coincide`. La validación propia de FastAPI (un campo mal escrito) sigue siendo un `422` sin `codigo`.
+
+Los códigos (`EstadoEncabezado`, `OrigenAsignacion`, `CodigoMapeo`, `CodigoAdvertenciaLectura`, `CodigoErrorMapeador`, `OpcionDetectable` y `FormatoTabla`) se publican como enums en el contrato, como `CodigoTexto` (B9 del motor), para que el frontend no los escriba a mano; `test_contrato_mapeador.py` exige que coincidan con las entidades y que cada uno tenga su texto `mapeador.estado.*`, `mapeador.origen.*`, `mapeador.problema.*`, `mapeador.advertencia.*` y `mapeador.error.*` en `es.json` y `en.json` (borrador de `dev_backend`, para que `designer` lo afine). Los esquemas del mapeador llevan nombre propio (`ColumnaAnalizadaRespuesta`, `CatalogoMapeadorRespuesta`, …) para no chocar con los del motor de texto. `contratos/openapi.json` y `frontend/src/lib/contrato-api.d.ts` se regeneran en el mismo corte.
 
 ## 7. Frontend
 
