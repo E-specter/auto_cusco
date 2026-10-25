@@ -26,34 +26,35 @@ Decisiones del usuario del 2026-10-24:
 
 ### 3.1 Entidades (`entities/mapeador.py`)
 
-- `CampoDestino(nombre, clave_etiqueta, tipo, obligatorio, alias)`. `alias` son expresiones regulares sobre el encabezado normalizado, como los `patrones` de hoy. `clave_etiqueta` es la clave i18n del nombre legible (`campo.<nombre>`).
+- `CampoDestino(nombre, clave_etiqueta, tipo, obligatorio, alias)`. `alias` son expresiones regulares sobre el encabezado normalizado, como los `patrones` de hoy. `clave_etiqueta` es la clave i18n del nombre legible (`campo.<nombre>`). `tipo` es un texto descriptivo (en la sábana, el nombre de su `TipoCampo`): el mapeador no convierte valores ni importa `entities/sabana.py`, y una prueba de arquitectura lo fija.
 - `CatalogoCampos(id, campos)`. `id` es estable, como `sabana_vencida`, y es la clave de los mapeos recordados (RF-63).
 - `EstadoEncabezado`: `recordado`, `coincide`, `parecido`, `sin_coincidencia`.
 - `OrigenAsignacion`: `recordado`, `coincide`, `parecido_aceptado`, `manual` (RF-62).
-- `ColumnaAnalizada(indice, encabezado, normalizado, ejemplos, estado, sugerido, similitud)`. `indice` en base 0, `ejemplos` hasta 3 valores no vacíos como texto, `sugerido` un campo o `None` (`None` también significa «No cargar»).
+- `ColumnaAnalizada(indice, encabezado, normalizado, ocurrencia, ejemplos, estado, sugerido, similitud)`. `indice` en base 0 (en la API también; en `formato.mapeo` las posiciones siguen en base 1, como hoy). `ocurrencia` cuenta desde 1 entre los encabezados con el mismo normalizado, de izquierda a derecha: los dos «Pagare» de la sábana son las ocurrencias 1 y 2. `ejemplos` hasta 3 valores no vacíos como texto, `sugerido` un campo o `None` (`None` también significa «No cargar»).
 - `Asignacion(indice, campo | None, origen)`. `campo = None` es «No cargar esta columna».
-- `ProblemaMapeo(indice | None, codigo, detalle, campo | None)`. Códigos: `parecido_sin_revisar`, `obligatorio_sin_columna` (`indice = None`, con el campo), `campo_repetido` (uno por cada encabezado que repite), `campo_desconocido` e `indice_fuera_de_rango`.
+- `ProblemaMapeo(indice | None, codigo, detalle, campo | None)`. Códigos: `parecido_sin_revisar`, `obligatorio_sin_columna` (`indice = None`, con el campo), `campo_repetido` (uno por cada encabezado que repite), `campo_desconocido`, `indice_fuera_de_rango`, `asignacion_faltante` e `indice_repetido`.
 - `AnalisisEncabezados(catalogo_id, columnas, campos, problemas_iniciales)`.
 
 ### 3.2 Normalización y similitud (`services/mapeador/similitud.py`)
 
 - **Normalización:** la de hoy (`reglas.normalizar_cabecera`): sin tildes, en minúsculas, espacios recortados y colapsados. Se mueve al mapeador y la ingesta la importa de ahí, sin copiarla.
-- **Coincide:** el normalizado cumple un alias del campo (`fullmatch`) o es igual a su `nombre` con `_` como espacio.
+- **Coincide:** el normalizado cumple un alias del campo (`fullmatch`) o es igual a su `nombre` con `_` como espacio. Hay **una sola función `coincide(normalizado, campo)`**, que usan `analizar` y también `mapear_cabeceras`, el camino viejo de `POST /cargas`. Así, un encabezado que es igual al nombre de un campo coincide en los dos caminos: por ejemplo, «DIAS ATRASO» ahora coincide con `dias_atraso` (decisión de architec del 2026-10-24, M-6 (a); ver `sabana-schema.md` N-1).
 - **Similitud:** el máximo entre `difflib.SequenceMatcher.ratio` de los dos textos y la proporción de palabras en común (Jaccard de tokens). Se compara contra el nombre del campo y contra cada alias que sea un texto literal; un alias con metacaracteres de expresión regular no participa.
+  - **Límite conocido:** un campo cuyos alias tienen todos metacaracteres (`documento`, `pagare_duplicado`, `cod_tipo_basilea`…) se compara solo contra su nombre. Si hace falta, más adelante se agrega a `CampoDestino` una lista de nombres literales para la similitud, sin tocar `alias`.
 - **Umbral:** `UMBRAL_PARECIDO = 0.75`, una constante de configuración (RF-32) en un solo lugar.
 - **Empates:** si los dos mejores candidatos difieren en menos de `0.02`, no se sugiere ninguno (RF-58).
 
 ### 3.3 Análisis (`services/mapeador/analisis.py`)
 
-`analizar(cabeceras, filas_muestra, catalogo, recordados) -> AnalisisEncabezados`, una función pura. `recordados` es un `dict` de encabezado normalizado a campo o `None`.
+`analizar(cabeceras, filas_muestra, catalogo, recordados) -> AnalisisEncabezados`, una función pura. `recordados` es un `dict` de (encabezado normalizado, ocurrencia) a campo o `None`. La ocurrencia evita que dos encabezados iguales compartan un recordado: si fuera solo por el normalizado, confirmar los dos «Pagare» dejaría «pagare» → `pagare_duplicado`, y en la carga siguiente faltaría el pagaré (M-1).
 
 Precedencia por encabezado, en este orden:
-1. **Recordado:** si el normalizado está en `recordados`, el estado es `recordado` y se sugiere el campo recordado, que puede ser «No cargar».
+1. **Recordado:** si (normalizado, ocurrencia) está en `recordados`, el estado es `recordado` y se sugiere el campo recordado, que puede ser «No cargar».
 2. **Coincide:** el primer campo del catálogo, en su orden, cuyo alias coincide y que no esté tomado. Es la regla de hoy, que mantiene `pagare` antes que `pagare_duplicado`.
 3. **Parecido:** el campo de mayor similitud que no esté tomado, si supera el umbral y no hay empate.
 4. **Sin coincidencia:** se sugiere «No cargar».
 
-Un campo queda «tomado» por la primera columna que lo recibe en los pasos 1 y 2, recorriendo de izquierda a derecha. Los parecidos se resuelven después, sobre los campos que quedaron libres. Un recordado que apunta a un campo ya tomado por otro recordado pasa a `sin_coincidencia`. Los encabezados vacíos no se listan.
+Son **tres pasadas sobre todas las columnas**, de izquierda a derecha en cada una: primero todos los recordados, después las coincidencias sobre los campos libres y por último los parecidos sobre los que quedan. Así un recordado gana siempre a una coincidencia, aunque esta esté más a la izquierda (M-3). Un recordado que apunta a un campo ya tomado por otro recordado pasa a `sin_coincidencia`. Los encabezados vacíos no se listan.
 
 ### 3.4 Validación (`services/mapeador/validacion.py`)
 
@@ -61,7 +62,9 @@ Un campo queda «tomado» por la primera columna que lo recibe en los pasos 1 y 
 - `parecido_sin_revisar`: una columna en estado `parecido` cuya asignación no trae origen `parecido_aceptado` ni `manual`;
 - `obligatorio_sin_columna`: un campo obligatorio sin ninguna columna asignada;
 - `campo_repetido`: dos o más columnas con el mismo campo; se informa en cada una;
-- `campo_desconocido` e `indice_fuera_de_rango`: protegen la API; la pantalla no los produce.
+- `campo_desconocido`, `indice_fuera_de_rango`, `asignacion_faltante` (una columna listada sin asignación) e `indice_repetido` (dos asignaciones para la misma columna): protegen la API; la pantalla no los produce. Se exige una asignación por cada columna listada (M-5).
+
+`analisis` es el que se mostró al usuario, guardado con el borrador (§5), no uno nuevo: si otro usuario recordó algo en el medio, un análisis nuevo daría otros estados (M-4). Re-analizar con otras opciones lo reemplaza.
 
 La carga se confirma solo si la lista está vacía (RF-60). Las columnas en «No cargar» no generan problema.
 
@@ -74,7 +77,7 @@ Así, elegir en el `select` el mismo campo que ya estaba no cuenta como revisió
 
 ### 3.5 Catálogo de la sábana
 
-`ingesta_sabana/catalogo.py` expone `CATALOGO_SABANA = CatalogoCampos("sabana_vencida", ...)` derivado de `CATALOGO_VENCIDA`. `requerida` pasa a `obligatorio`, `patrones` pasa a `alias` y la etiqueta es `campo.<nombre>`. `mapear_cabeceras` de hoy se mantiene para `POST /cargas` con archivo y para el procesamiento sin borrador.
+`ingesta_sabana/catalogo.py` expone `CATALOGO_SABANA = CatalogoCampos("sabana_vencida", ...)` derivado de `CATALOGO_VENCIDA`. `requerida` pasa a `obligatorio`, `patrones` pasa a `alias` y la etiqueta es `campo.<nombre>`. `mapear_cabeceras` de hoy se mantiene para `POST /cargas` con archivo y para el procesamiento sin borrador, y usa la misma `coincide` (§3.2).
 
 ## 4. Lectores (`adapters/input/`)
 
@@ -94,11 +97,14 @@ El formato se decide por la extensión del nombre, y si falta, por el contenido.
 
 ## 5. Persistencia
 
-Una migración con dos tablas:
-- **`borrador_carga_archivo`:** `id`, `catalogo_id`, `nombre_archivo`, `contenido` (bytea), `huella`, `tamano_bytes`, `opciones` (JSONB: hoja, separador y codificación elegidos) y `creado_en`. Un borrador vence a las 24 horas. Los vencidos se borran al iniciar la aplicación (junto a `recuperar_interrumpidas`) y al crear uno nuevo. Confirmar un borrador lo borra en la misma transacción que crea la carga.
-- **`mapeo_recordado`:** `catalogo_id`, `encabezado_normalizado`, `campo` (nulo = «No cargar») y `actualizado_en`, con único (`catalogo_id`, `encabezado_normalizado`). Al confirmar se hace *upsert* de todas las asignaciones confirmadas (RF-61).
+Una migración con dos tablas y una columna:
+- **`borrador_carga_archivo`:** `id`, `catalogo_id`, `nombre_archivo`, `contenido` (bytea), `huella`, `tamano_bytes`, `opciones` (JSONB: hoja, separador y codificación elegidos), `analisis` (JSONB: el análisis que se mostró, contra el que se valida al confirmar, M-4) y `creado_en`. Un borrador vence a las 24 horas. Los vencidos se borran al iniciar la aplicación (junto a `recuperar_interrumpidas`) y al crear uno nuevo. Confirmar un borrador lo borra en la misma transacción que crea la carga.
+- **`mapeo_recordado`:** `catalogo_id`, `encabezado_normalizado`, `ocurrencia`, `campo` (nulo = «No cargar») y `actualizado_en`, con único (`catalogo_id`, `encabezado_normalizado`, `ocurrencia`) (M-1). Al confirmar se hace *upsert* de todas las asignaciones confirmadas (RF-61).
+- **`carga.opciones_lectura`** (JSONB: formato, hoja, separador y codificación): `procesar_carga` relee el archivo con esto, porque un CSV necesita el separador y la codificación elegidos (M-2). Las versiones existentes quedan con `{hoja}`, y `carga.hoja` se mantiene por compatibilidad.
 
-La versión de la sábana (`carga`) guarda en `formato.mapeo` lo que guarda hoy más el origen de cada asignación: `{"columnas": {campo: posición}, "origenes": {campo: origen}, "ignoradas": {posición: encabezado}}` (RF-62).
+La versión de la sábana (`carga`) guarda en `formato.mapeo` lo de hoy, **sin cambios** (`columnas`, `desconocidas` y `faltantes`, con posiciones en base 1), **más** `origenes` (`{campo: origen}`) e `ignoradas` (`{posición: encabezado}`) (RF-62). El cambio es aditivo: el camino viejo y las versiones viejas se leen igual (M-7).
+
+**Concurrencia:** confirmar bloquea el borrador (`SELECT … FOR UPDATE`); un segundo confirmar del mismo borrador responde 404.
 
 ## 6. API
 
@@ -111,7 +117,7 @@ Genérica del mapeador, prefijo `/mapeador`:
 
   Devuelve 400 si el archivo es ilegible o está vacío, y 413 si supera el tamaño.
 - **`POST /mapeador/borradores/{id}/analisis`** (JSON con `hoja`, `separador` y `codificacion`): vuelve a analizar el mismo borrador con otras opciones. 404 si no existe o venció.
-- **`POST /mapeador/borradores/{id}/validacion`** (JSON con `asignaciones`): devuelve los `problemas`. La pantalla lo llama al cambiar una asignación, con espera corta y cancelación, como el motor de texto.
+- **`POST /mapeador/borradores/{id}/validacion`** (JSON con `asignaciones`, una por columna): devuelve los `problemas`, validados contra el análisis guardado en el borrador. La pantalla lo llama al cambiar una asignación, con espera corta y cancelación, como el motor de texto.
 - **`DELETE /mapeador/borradores/{id}`:** descarta el borrador (cancelar).
 
 La confirmación es del consumidor, porque sabe qué hacer con el archivo:
@@ -122,7 +128,7 @@ La confirmación es del consumidor, porque sabe qué hacer con el archivo:
   4. encola el procesamiento con el mapeo explícito.
 
   Responde 202, como `POST /cargas`.
-- `procesar_carga` usa el mapeo guardado con la carga si lo tiene, y si no, `mapear_cabeceras` como hoy. Las columnas en «No cargar» van al registro crudo de cada fila (`_extras`), como las desconocidas.
+- `procesar_carga` lee el archivo con `carga.opciones_lectura` y usa el mapeo guardado con la carga si lo tiene; si no, `mapear_cabeceras` como hoy. Las columnas en «No cargar» van al registro crudo de cada fila (`_extras`), como las desconocidas.
 
 Los códigos (`EstadoEncabezado`, `OrigenAsignacion` y los de `ProblemaMapeo`) se publican como enums en el contrato, como `CodigoTexto` (B9 del motor), para que el frontend no los escriba a mano. `contratos/openapi.json` se regenera en el mismo corte.
 
@@ -176,8 +182,10 @@ Como siempre, `architec` corre `-ConBase`, el backend en Linux y Playwright comp
   - el orden de las columnas no cambia el resultado;
   - empate sin sugerencia;
   - un recordado contra un campo ya tomado;
-  - `pagare` antes que `pagare_duplicado`.
-- **Validación:** cada código; propiedad: si no hay problemas, toda columna asignada tiene un campo distinto y todos los obligatorios están.
+  - `pagare` antes que `pagare_duplicado`;
+  - dos «Pagare»: confirmar y volver a analizar da `pagare` y `pagare_duplicado` como recordados, y se puede confirmar (M-1);
+  - un recordado a la derecha gana el campo a una coincidencia a la izquierda (M-3).
+- **Validación:** cada código, incluidos `asignacion_faltante` e `indice_repetido`; validar contra el análisis guardado aunque los recordados hayan cambiado (M-4); propiedad: si no hay problemas, toda columna asignada tiene un campo distinto y todos los obligatorios están.
 - **Lectores:**
   - CSV con coma, punto y coma y tabulación;
   - UTF-8, UTF-8 con BOM y Latin-1 con tildes;
@@ -188,6 +196,8 @@ Como siempre, `architec` corre `-ConBase`, el backend en Linux y Playwright comp
   - re-análisis sin volver a subir;
   - confirmación con problemas (422);
   - confirmación que guarda los recordados y borra el borrador;
-  - el siguiente análisis llega «recordado».
-- **Paridad:** un archivo que hoy carga bien por alias produce la misma versión por los dos caminos, con archivo y con borrador confirmado sin cambios.
+  - el siguiente análisis llega «recordado»;
+  - un CSV confirmado se procesa con su separador y su codificación (`opciones_lectura`, M-2);
+  - dos confirmaciones del mismo borrador: la segunda da 404 (`@postgres` y su doble sin base).
+- **Paridad:** un archivo cuyas cabeceras ya coincidían por alias produce la misma versión por los dos caminos, con archivo y con borrador confirmado sin cambios. Caso nuevo del camino viejo: «DIAS ATRASO» ahora coincide con `dias_atraso` (M-6). `formato.mapeo` conserva sus claves de hoy (M-7).
 - **Datos sintéticos siempre:** ningún encabezado ni valor real en pruebas ni en documentación.

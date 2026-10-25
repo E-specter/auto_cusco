@@ -631,3 +631,46 @@ Hay que acordarlo antes de que lo programen.
 ### Cierre de C3 (2026-10-24)
 
 Todos los cortes del motor de C3 están en `main`: B14 (`3cdb54f`), F7 (`eb97a55`), B16 (`535a61b`), B15 (`32bfebf`), F8 (`3fe79af`), B13 (`5ce9834`) y F6 (`19adb4c`). La revisión de cierre está en `revision-c3.md`. De MOWA MES quedan `b9b`, que mide el editor en GSM-7 (las líneas del motor ya revisadas), y T-MM-F7. Los dos son de `coordinador_modulo_mowa_mes`.
+
+## 27. Plan del mapeador de encabezados (T-MAP-C1), para aprobación de architec
+
+Sobre `90fec9e`. El diseño es `docs/mapeador-encabezados.md` (RF-57 a RF-63). Abajo va lo que el código confirma, lo que no encaja (con una propuesta para cada caso) y los cortes.
+
+### Contraste con el código
+
+- `ingesta_sabana/cabeceras.py`: `mapear_cabeceras` asigna, de izquierda a derecha, el primer campo libre cuyo patrón cumple `fullmatch` sobre `normalizar_cabecera`. `describir_mapeo` guarda `columnas`, `desconocidas` y `faltantes`, con posiciones en base 1. `formato.mapeo` no sale en el contrato: solo se guarda.
+- `LectorCalamine.leer_hoja(contenido, hoja)` lee una hoja fija. `carga.hoja` se guarda con la versión, y `procesar_carga` vuelve a leer el archivo guardado (`obtener_archivo`) con esa hoja.
+- `POST /cargas` recibe `hoja` como campo del formulario (por defecto `VENCIDA`). El límite es `TAMANO_MAXIMO_BYTES` = 64 MB, en `api/cargas.py`.
+- Las etiquetas `campo.<nombre>` existen en `es.json` para 40 de los 45 campos. **Faltan:** `documento`, `vencimiento_operativo`, `pagare_duplicado`, `validador` y `cod_tipo_basilea`.
+- La mayoría de los alias son literales. Varios tienen metacaracteres: `dni ?/ ?ruc`, `pagare2?`, `saldosoles(...)?`, `cuotas apro(badas)?`, `cod\.? ?tipo basilea`, `tipo ?basilea`, `segmento fina?n?ciero` y `cant\.? ?paralelos`. Según §3.2, esos alias no entran en la similitud.
+
+### Lo que no encaja, con una propuesta para cada caso
+
+- **M-1 (defecto del diseño): encabezados repetidos y mapeo recordado.** La sábana trae dos «Pagare», que se normalizan igual: el primero va a `pagare` y el segundo a `pagare_duplicado`. Si se recuerda por `encabezado_normalizado`, el *upsert* deja una sola fila, la última (`pagare` → `pagare_duplicado`). En la carga siguiente, la columna 1 llega como recordada en `pagare_duplicado` y la 2, como `sin_coincidencia`. Falta entonces el obligatorio y **no se puede confirmar**. **Propuesta:** la clave del recordado es (`encabezado_normalizado`, `ocurrencia`), donde `ocurrencia` es 1, 2… entre los encabezados con el mismo normalizado, de izquierda a derecha. `mapeo_recordado` gana esa columna, y el único es (`catalogo_id`, `encabezado_normalizado`, `ocurrencia`). Se prueba con dos «Pagare» confirmados dos veces seguidas.
+- **M-2: CSV y JSON al procesar.** `procesar_carga` vuelve a leer el archivo con `carga.hoja`. Para un CSV necesita también el separador y la codificación elegidos, y hoy la versión no los guarda. **Propuesta:** la carga gana `opciones_lectura` (JSONB: formato, hoja, separador y codificación) en la misma migración, y `procesar_carga` lee con eso. `carga.hoja` se mantiene por compatibilidad.
+- **M-3: precedencia entre recordado y coincide.** §3.3 dice que un recordado gana a una coincidencia. Pero si el campo «queda tomado por la primera columna en los pasos 1 y 2, de izquierda a derecha», una coincidencia en la columna 2 tomaría el campo antes que un recordado en la columna 5. **Propuesta:** son tres pasadas sobre todas las columnas: primero todos los recordados, después las coincidencias en los campos libres y por último los parecidos. Con una prueba.
+- **M-4: contra qué se valida al confirmar.** `POST /cargas/desde-borrador` vuelve a validar, pero el estado de cada columna (por ejemplo, `parecido`) depende de los recordados. Si otro usuario confirma algo en el medio, un análisis nuevo daría otros estados y la validación no coincidiría con lo que se vio. **Propuesta:** el borrador guarda el análisis que se mostró (JSONB `analisis`), y la validación y el recálculo del origen de §3.4 (`90fec9e`) se hacen contra ese análisis, no contra uno nuevo. Re-analizar con otras opciones lo reemplaza.
+- **M-5: asignaciones incompletas.** El diseño no dice qué pasa si una columna listada no trae asignación, o si un índice se repite. **Propuesta:** se exige una asignación por cada columna listada, con dos códigos de protección más, `asignacion_faltante` e `indice_repetido`, que la pantalla no produce. Se publican en el enum.
+- **M-6: el «coincide» por nombre cambia el camino viejo.** §3.2 suma «es igual a su `nombre` con `_` como espacio». Hoy un encabezado «DIAS ATRASO» queda desconocido (el alias es `dias atraso hoy`), y con la regla nueva coincidiría con `dias_atraso`. Si solo lo hace `analizar`, la prueba de paridad de §9 falla para esos archivos. **Propuesta:** una sola función `coincide(normalizado, campo)` en el mapeador, que usan `analizar` y `mapear_cabeceras`. Hay que decidir entre dos opciones:
+  - **(a)** El camino viejo también gana la coincidencia por nombre: es un cambio de comportamiento chico y favorable, y queda un solo criterio. Es la que recomiendo.
+  - **(b)** Solo la usa el mapeador, y la paridad se limita a archivos sin esos casos.
+- **M-7: forma de `formato.mapeo`.** §5 la reemplaza por `{columnas, origenes, ignoradas}`. **Propuesta:** que el cambio sea aditivo. Se mantienen `columnas`, `desconocidas` y `faltantes` (posiciones en base 1, como hoy) y se agregan `origenes` e `ignoradas`. El camino viejo no cambia, y las versiones viejas se siguen leyendo igual. En la API, `indice` va en base 0, como dice §3.1, y el contrato lo documenta.
+- **M-8: `CampoDestino.tipo`.** El mapeador no convierte valores. **Propuesta:** `tipo` es un texto descriptivo (en la sábana, el nombre del `TipoCampo`), así el núcleo del mapeador no importa `entities/sabana.py`. Una prueba de arquitectura lo fija.
+- **M-9: las etiquetas que faltan.** Las cinco claves `campo.*` van en F1 o F2. Mientras tanto, la prueba espejo de i18n del catálogo del mapeador las marca.
+- **Límite conocido (sin cambio):** los campos cuyos únicos alias tienen metacaracteres se comparan en la similitud solo contra su nombre (`documento`, `pagare_duplicado`, `cod_tipo_basilea`…). Si hace falta, más adelante se agrega a `CampoDestino` una lista de nombres literales para la similitud, sin tocar `alias`.
+- **Concurrencia:** confirmar bloquea el borrador (`SELECT … FOR UPDATE`), y un segundo confirmar responde 404. El *upsert* de los recordados usa el único de M-1. Las dos cosas llevan prueba `@postgres` y su doble sin base.
+
+### Cortes
+
+| Corte | Qué | Depende | Revisión |
+|---|---|---|---|
+| **B1** | Núcleo: `entities/mapeador.py`, `services/mapeador/` (normalización movida, `coincide` único según M-6, similitud, `analizar` en tres pasadas y con ocurrencia, `validar` con los códigos de M-5) y `CATALOGO_SABANA`. Sin infraestructura, con propiedades y prueba de arquitectura | C1 | coordinador |
+| **B2** | Lectores: `LectorTablaPort` y `TablaLeida`, CSV (BOM, UTF-8, Latin-1 y Sniffer restringido), JSON y hojas en `LectorCalamine`; `leer_hoja` delega | C1 | coordinador |
+| **B3** | Persistencia y API: migración (`borrador_carga_archivo` con `analisis`, `mapeo_recordado` con `ocurrencia` y `carga.opciones_lectura`), vencimiento y limpieza, `/mapeador`, `POST /cargas/desde-borrador` (FOR UPDATE, 422 y 202), `procesar_carga` con mapeo explícito y opciones, `formato.mapeo` aditivo y los enums en el contrato | B1, B2 | coordinador; dev_frontend y designer como consumidores |
+| **F1** | Experiencia y `MapeadorEncabezados` (designer), con las cinco etiquetas que faltan. Pasa por el usuario | contrato de B3 | usuario |
+| **F2** | `/cargas` en dos pasos | F1 | designer |
+| **C2** | Cierre contra RF-57 a RF-63 | todos | architec |
+
+**Orden:** B17 (en curso) → B1 → B2 → B3 → F1 → F2. Hay un solo dev backend. B2 no depende de B1 y se puede revisar aparte. architec corre `-ConBase`, la migración de ida y vuelta, Linux, Playwright y la medición de ingesta con 120 000 filas antes y después de B3.
+
+**Aprobado por architec (2026-10-24).** Aprobó M-1 a M-5 y M-7 a M-9 tal como están, el FOR UPDATE y el límite de los alias. **M-6 = (a)**, decidido por architec por ser técnico y favorable: una sola `coincide` en los dos caminos, y la paridad se reformula para archivos cuyas cabeceras ya coincidían por alias. M-9 va en F1. Los ajustes ya están en `mapeador-encabezados.md` y en `sabana-schema.md` N-1.
