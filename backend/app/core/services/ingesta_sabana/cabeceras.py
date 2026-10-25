@@ -1,7 +1,7 @@
 """Mapeo de cabeceras por nombre y alias, no por posicion (regla N-1)."""
 
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from app.core.entities.sabana import ColumnaSabana, Incidencia, MapeoCabeceras, Severidad
@@ -86,13 +86,21 @@ def huella_formato(cabeceras: Sequence[Any]) -> str:
     return hashlib.sha256("\x1f".join(normalizadas).encode("utf-8")).hexdigest()
 
 
-def describir_mapeo(mapeo: MapeoCabeceras) -> dict[str, Any]:
+def describir_mapeo(
+    mapeo: MapeoCabeceras, origenes: Mapping[str, str] | None = None
+) -> dict[str, Any]:
     """Resumen serializable del mapeo, para guardarlo con la version (V-9).
 
-    Posiciones en base 1, como las columnas de la hoja.
+    Posiciones en base 1, como las columnas de la hoja. Con `origenes` (el mapeo lo confirmo el
+    usuario, RF-62) suma, sin cambiar lo demas: `origenes` (`{campo: origen}`) e `ignoradas`
+    (`{posicion: encabezado}`, las columnas en «No cargar»). Sin `origenes` queda como siempre.
     """
-    return {
+    descrito: dict[str, Any] = {
         "columnas": {col.nombre: indice + 1 for indice, col in sorted(mapeo.columnas.items())},
         "desconocidas": {str(i + 1): cab for i, cab in sorted(mapeo.desconocidas.items())},
         "faltantes": [col.nombre for col in mapeo.faltantes],
     }
+    if origenes is not None:
+        descrito["origenes"] = dict(origenes)
+        descrito["ignoradas"] = dict(descrito["desconocidas"])
+    return descrito

@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import delete, insert, select
 from sqlalchemy.exc import IntegrityError
 
-from app.adapters.input.lector_calamine import LectorCalamine
+from app.adapters.input.lector_tabla import LectorTabla
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.modelos import (
     Carga,
@@ -432,7 +432,7 @@ def cliente(repositorio):
     """Cliente HTTP sobre la base real, con la sabana sintetica de 2099-05-01 ingestada."""
     engine = get_engine()
     _limpiar_cargas(engine)
-    ingesta = IngestaSabanaService(RepositorioCargasPostgres(engine), LectorCalamine())
+    ingesta = IngestaSabanaService(RepositorioCargasPostgres(engine), LectorTabla())
     carga = ingesta.registrar_carga(FECHA, "sintetica.xlsx", _sabana(PRODUCTOS)).carga
     assert ingesta.procesar_carga(carga.id).vigente
     try:

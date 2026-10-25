@@ -14,7 +14,7 @@ import openpyxl
 import pytest
 from sqlalchemy import delete, select
 
-from app.adapters.input.lector_calamine import LectorCalamine
+from app.adapters.input.lector_tabla import LectorTabla
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.modelos import Carga, CargaAuditoria
 from app.adapters.persistence.repositorio_cargas_postgres import RepositorioCargasPostgres
@@ -92,7 +92,7 @@ def _limpiar(engine) -> None:
 def cartera():
     engine = get_engine()
     _limpiar(engine)
-    ingesta = IngestaSabanaService(RepositorioCargasPostgres(engine), LectorCalamine())
+    ingesta = IngestaSabanaService(RepositorioCargasPostgres(engine), LectorTabla())
     carga = ingesta.registrar_carga(FECHA, "sintetica.xlsx", _sabana()).carga
     resultado = ingesta.procesar_carga(carga.id)
     assert resultado.vigente, "la primera version de la fecha debe quedar vigente"
@@ -180,7 +180,7 @@ def test_una_fecha_sin_sabana_no_tiene_cartera(cartera) -> None:
 
 def test_la_cartera_sigue_a_la_version_vigente(cartera) -> None:
     servicio, engine = cartera
-    ingesta = IngestaSabanaService(RepositorioCargasPostgres(engine), LectorCalamine())
+    ingesta = IngestaSabanaService(RepositorioCargasPostgres(engine), LectorTabla())
     solo_uno = [PRODUCTOS[0]]
     libro = openpyxl.Workbook()
     hoja = libro.active

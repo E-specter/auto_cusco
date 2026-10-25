@@ -21,7 +21,7 @@ from fastapi import (
 from fastapi.concurrency import run_in_threadpool
 from pydantic import ConfigDict
 
-from app.adapters.input.lector_calamine import LectorCalamine
+from app.adapters.input.lector_tabla import LectorTabla
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_cargas_postgres import RepositorioCargasPostgres
 from app.api.errores import respuestas_de_error
@@ -45,7 +45,7 @@ TAMANO_MAXIMO_BYTES = 64 * 1024 * 1024
 
 
 def crear_servicio_ingesta() -> IngestaSabanaService:
-    return IngestaSabanaService(RepositorioCargasPostgres(get_engine()), LectorCalamine())
+    return IngestaSabanaService(RepositorioCargasPostgres(get_engine()), LectorTabla())
 
 
 def obtener_servicio() -> IngestaSabanaService:

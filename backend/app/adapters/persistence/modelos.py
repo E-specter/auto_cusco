@@ -31,6 +31,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -79,6 +80,13 @@ class Carga(Base):
     fila_cabecera: Mapped[int | None] = mapped_column(Integer)
     cabeceras_originales: Mapped[list[Any] | None] = mapped_column(JSONB)
     mapeo: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    # Como se lee el archivo al procesarlo: formato, hoja, separador y codificacion (RF-57, M-2).
+    opciones_lectura: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, server_default=text("'{}'::jsonb")
+    )
+    # El mapeo de encabezados confirmado (RF-60): una asignacion por columna, ya resuelta. NULL =
+    # mapear por nombre y alias, como siempre. `none_as_null`: un None es NULL de SQL, no `null`.
+    asignaciones: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB(none_as_null=True))
     filas_total: Mapped[int | None] = mapped_column(Integer)
     filas_ingestadas: Mapped[int | None] = mapped_column(Integer)
     incidencias_error: Mapped[int] = mapped_column(Integer, server_default="0")
@@ -105,6 +113,51 @@ class Carga(Base):
         ),
         Index(None, "fecha_corte", "huella_archivo"),
     )
+
+
+class BorradorCargaArchivo(Base):
+    """Archivo subido y analizado por el mapeador, a la espera de que se confirme (RF-57 a RF-60).
+
+    Guarda el analisis que se le mostro al usuario: se valida contra ese al confirmar (M-4). Vence a
+    las 24 horas; confirmarlo lo borra en la misma transaccion que crea la carga.
+    """
+
+    __tablename__ = "borrador_carga_archivo"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    catalogo_id: Mapped[str] = mapped_column(Text)
+    nombre_archivo: Mapped[str] = mapped_column(Text)
+    contenido: Mapped[bytes] = mapped_column(LargeBinary)
+    huella: Mapped[str] = mapped_column(String(64))  # SHA-256 hex
+    tamano_bytes: Mapped[int] = mapped_column(BigInteger)
+    opciones: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    analisis: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("tamano_bytes >= 0", name="tamano_no_negativo"),
+        Index(None, "creado_en"),
+    )
+
+
+class MapeoRecordado(Base):
+    """Lo que se confirmo para un encabezado (RF-61): se aplica en las cargas siguientes.
+
+    La clave incluye la ocurrencia entre los encabezados iguales del archivo (M-1): los dos «Pagare»
+    de la sabana son las ocurrencias 1 y 2 y se recuerdan por separado. `campo` nulo es «No cargar».
+    """
+
+    __tablename__ = "mapeo_recordado"
+
+    catalogo_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    encabezado_normalizado: Mapped[str] = mapped_column(Text, primary_key=True)
+    ocurrencia: Mapped[int] = mapped_column(Integer, primary_key=True)
+    campo: Mapped[str | None] = mapped_column(Text)
+    actualizado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (CheckConstraint("ocurrencia >= 1", name="ocurrencia_positiva"),)
 
 
 class CargaArchivo(Base):

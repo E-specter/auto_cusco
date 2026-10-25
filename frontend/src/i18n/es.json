@@ -156,6 +156,7 @@
   "incidencia.cabecera_desconocida": "Cabecera no reconocida; la columna no se catalogó",
   "incidencia.cabecera_duplicada": "La cabecera aparece más de una vez",
   "incidencia.columna_faltante": "Columna esperada ausente del archivo",
+  "incidencia.valor_no_escalar": "El valor era un objeto o una lista; se guardó como texto JSON",
   "incidencia.clave_vacia": "El pagaré está vacío",
   "incidencia.clave_no_texto": "El pagaré no es un texto válido",
   "incidencia.pagare_repetido": "Pagaré repetido en el archivo; se guardó la primera aparición",

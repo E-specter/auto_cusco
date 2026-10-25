@@ -3,7 +3,7 @@
 Diseno y reglas V-1 a V-10 en docs/versionado-sabanas.md.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
@@ -67,6 +67,11 @@ class NuevaCarga:
     huella_archivo: str  # SHA-256 hex del archivo (V-6)
     tamano_bytes: int
     hoja: str
+    # Como se lee el archivo al procesarlo (formato, hoja, separador y codificacion).
+    opciones_lectura: dict[str, Any] = field(default_factory=dict)
+    # El mapeo de encabezados confirmado (RF-60): una asignacion por columna; `None` = mapear por
+    # nombre y alias, como siempre.
+    asignaciones: list[dict[str, Any]] | None = None
 
 
 @dataclass(frozen=True)
@@ -81,6 +86,8 @@ class DatosCarga:
     nombre_archivo: str
     huella_archivo: str
     hoja: str
+    opciones_lectura: dict[str, Any] = field(default_factory=dict)
+    asignaciones: list[dict[str, Any]] | None = None
 
 
 @dataclass(frozen=True)

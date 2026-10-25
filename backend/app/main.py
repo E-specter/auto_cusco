@@ -25,6 +25,7 @@ from app.api.cartera import router as cartera_router
 from app.api.definiciones_columnas import router as definiciones_columnas_router
 from app.api.errores import ErrorConCodigo, manejar_error_con_codigo
 from app.api.health import router as health_router
+from app.api.mapeador import crear_servicio_mapeador
 from app.api.mowa_mes import router as mowa_mes_router
 from app.api.mowa_mes_campanas import CABECERAS_ARCHIVO
 from app.api.mowa_mes_campanas import router as mowa_mes_campanas_router
@@ -38,7 +39,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Al arrancar, devuelve a la cola las versiones que quedaron a medio procesar.
+    """Al arrancar, devuelve a la cola las versiones que quedaron a medio procesar y borra los
+    borradores de carga vencidos (mas de 24 horas).
 
     Asume un solo proceso de la aplicacion: si mas adelante corren varios, esto
     debe moverse a un sistema de colas (ver docs/versionado-sabanas.md).
@@ -48,6 +50,14 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     except Exception as exc:
         logger.warning(
             "No se pudo revisar las versiones interrumpidas al arrancar (%s)", type(exc).__name__
+        )
+    try:
+        borrados = crear_servicio_mapeador().descartar_vencidos()
+        if borrados:
+            logger.info("Borradores de carga vencidos borrados al arrancar: %s", borrados)
+    except Exception as exc:
+        logger.warning(
+            "No se pudo limpiar los borradores vencidos al arrancar (%s)", type(exc).__name__
         )
     yield
 

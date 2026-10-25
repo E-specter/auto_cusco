@@ -19,6 +19,7 @@ from dataclasses import replace
 from datetime import date
 from typing import Any
 
+from app.core.entities.borrador import BorradorNoEncontrado, MapeoConProblemas
 from app.core.entities.carga import (
     CargaDetalle,
     CargaNoEncontrada,
@@ -35,22 +36,35 @@ from app.core.entities.carga import (
     ResumenProcesamiento,
     VigenciaNoPermitida,
 )
+from app.core.entities.lectura_tabla import CodigoAdvertenciaLectura, TablaLeida
+from app.core.entities.mapeador import Asignacion
 from app.core.entities.sabana import (
     HOJA_DATOS_POR_DEFECTO,
     ArchivoSabanaError,
-    HojaSabana,
     Incidencia,
     MapeoCabeceras,
     Severidad,
 )
-from app.core.ports.lector_sabana_port import LectorSabanaPort
+from app.core.ports.lector_tabla_port import LectorTablaPort
 from app.core.ports.repositorio_cargas_port import RepositorioCargasPort
+from app.core.services.borradores_carga.servicio import Reloj, ahora_utc, opciones_de_lectura
 from app.core.services.ingesta_sabana.cabeceras import (
     describir_mapeo,
     huella_formato,
     mapear_cabeceras,
 )
+from app.core.services.ingesta_sabana.catalogo import CATALOGO_SABANA
+from app.core.services.ingesta_sabana.mapeo_explicito import (
+    MapeoGuardadoInvalido,
+    mapeo_desde_asignaciones,
+)
 from app.core.services.ingesta_sabana.normalizador import normalizar_fila
+from app.core.services.mapeador.serializacion import (
+    analisis_desde_dict,
+    asignaciones_a_dict,
+    recordados_de,
+)
+from app.core.services.mapeador.validacion import resolver_asignaciones, validar
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +105,7 @@ def _contar_incidencias(incidencias: Iterable[Incidencia], resumen: ResumenProce
 
 
 def _filas_para_guardar(
-    hoja: HojaSabana,
+    hoja: TablaLeida,
     mapeo: MapeoCabeceras,
     incidencias: list[Incidencia],
     resumen: ResumenProcesamiento,
@@ -129,10 +143,33 @@ def _filas_para_guardar(
         )
 
 
+def _incidencias_de_lectura(tabla: TablaLeida) -> list[Incidencia]:
+    """Lo que el lector aviso de una fila (un JSON con un valor objeto o lista) como incidencias."""
+    incidencias = []
+    for aviso in tabla.advertencias:
+        if aviso.codigo is CodigoAdvertenciaLectura.VALOR_NO_ESCALAR:
+            incidencias.append(
+                Incidencia(
+                    aviso.numero_fila,
+                    aviso.columna,
+                    "valor_no_escalar",
+                    Severidad.ADVERTENCIA,
+                    "El valor es un objeto o una lista; se guardo como texto JSON",
+                )
+            )
+    return incidencias
+
+
 class IngestaSabanaService:
-    def __init__(self, repositorio: RepositorioCargasPort, lector: LectorSabanaPort) -> None:
+    def __init__(
+        self,
+        repositorio: RepositorioCargasPort,
+        lector: LectorTablaPort,
+        reloj: Reloj = ahora_utc,
+    ) -> None:
         self._repositorio = repositorio
         self._lector = lector
+        self._reloj = reloj
 
     # ---------- 1. registrar ----------
 
@@ -160,6 +197,7 @@ class IngestaSabanaService:
                     huella_archivo=huella,
                     tamano_bytes=len(contenido),
                     hoja=hoja,
+                    opciones_lectura={"hoja": hoja},
                 )
             )
             sesion.guardar_archivo(carga.id, contenido)
@@ -167,6 +205,60 @@ class IngestaSabanaService:
                 carga,
                 EventoAuditoria.CARGA_CREADA,
                 detalle={"tamano_bytes": len(contenido), "versiones_identicas": identicas},
+            )
+        return CargaRegistrada(carga=carga, versiones_identicas=identicas)
+
+    def registrar_desde_borrador(
+        self, borrador_id: int, fecha_corte: date, asignaciones: Sequence[Asignacion]
+    ) -> CargaRegistrada:
+        """Confirma un borrador del mapeador (RF-60, RF-61): UNA transaccion que lo bloquea, valida
+        las asignaciones contra el analisis que se mostro, crea la carga (con las asignaciones ya
+        resueltas y las opciones de lectura), guarda lo recordado y borra el borrador.
+
+        `BorradorNoEncontrado` si no existe, venció o ya se confirmo (la segunda confirmacion no lo
+        encuentra) y `MapeoConProblemas`, con la lista, si las asignaciones no se pueden confirmar.
+        """
+        with self._repositorio.transaccion() as sesion:
+            sesion.bloquear_fecha(fecha_corte)
+            borrador = sesion.obtener_borrador(borrador_id, bloquear=True)
+            vence = None if borrador is None else borrador.vence_en()
+            if borrador is None or vence is None or self._reloj() >= vence:
+                raise BorradorNoEncontrado(borrador_id)
+            if borrador.catalogo_id != CATALOGO_SABANA.id:
+                raise BorradorNoEncontrado(borrador_id)
+            analisis = analisis_desde_dict(borrador.analisis)
+            problemas = validar(asignaciones, analisis)
+            if problemas:
+                raise MapeoConProblemas(problemas)
+            resueltas = resolver_asignaciones(asignaciones, analisis)
+            contenido = sesion.contenido_de_borrador(borrador_id)
+            identicas = sesion.versiones_con_huella(fecha_corte, borrador.huella)
+            hoja = borrador.opciones.get("hoja") or ""
+            carga = sesion.crear_carga(
+                NuevaCarga(
+                    fecha_corte=fecha_corte,
+                    version=sesion.siguiente_version(fecha_corte),
+                    nombre_archivo=borrador.nombre_archivo,
+                    huella_archivo=borrador.huella,
+                    tamano_bytes=borrador.tamano_bytes,
+                    hoja=hoja,
+                    opciones_lectura=dict(borrador.opciones),
+                    asignaciones=asignaciones_a_dict(resueltas, analisis),
+                )
+            )
+            sesion.guardar_archivo(carga.id, contenido)
+            sesion.guardar_recordados(
+                borrador.catalogo_id, recordados_de(resueltas, analisis), self._reloj()
+            )
+            sesion.borrar_borrador(borrador_id)
+            sesion.auditar(
+                carga,
+                EventoAuditoria.CARGA_CREADA,
+                detalle={
+                    "tamano_bytes": borrador.tamano_bytes,
+                    "versiones_identicas": identicas,
+                    "desde_borrador": True,
+                },
             )
         return CargaRegistrada(carga=carga, versiones_identicas=identicas)
 
@@ -182,17 +274,34 @@ class IngestaSabanaService:
             contenido = sesion.obtener_archivo(carga_id)
 
         try:
-            hoja = self._lector.leer_hoja(contenido, carga.hoja)
+            opciones = opciones_de_lectura(carga.opciones_lectura, carga.hoja)
+            hoja = self._lector.leer(contenido, carga.nombre_archivo, opciones)
         except ArchivoSabanaError as exc:
             return self._fallar(carga, str(exc))
         del contenido
 
-        mapeo = mapear_cabeceras(hoja.cabeceras)
+        if carga.asignaciones is None:
+            mapeo, origenes = mapear_cabeceras(hoja.cabeceras), None
+        else:
+            try:
+                mapeo, origenes, _ = mapeo_desde_asignaciones(hoja.cabeceras, carga.asignaciones)
+            except MapeoGuardadoInvalido as exc:
+                return self._fallar(
+                    carga,
+                    str(exc),
+                    formato=FormatoCarga(
+                        fila_cabecera=hoja.fila_cabecera,
+                        cabeceras_originales=[str(c) for c in hoja.cabeceras],
+                        huella_formato=huella_formato(hoja.cabeceras),
+                        mapeo={},
+                    ),
+                    resumen=ResumenProcesamiento(filas_total=len(hoja.filas)),
+                )
         formato = FormatoCarga(
             fila_cabecera=hoja.fila_cabecera,
             cabeceras_originales=[str(c) for c in hoja.cabeceras],
             huella_formato=huella_formato(hoja.cabeceras),
-            mapeo=describir_mapeo(mapeo),
+            mapeo=describir_mapeo(mapeo, origenes),
         )
         if mapeo.bloqueante:
             return self._fallar(
@@ -203,7 +312,7 @@ class IngestaSabanaService:
                 resumen=ResumenProcesamiento(filas_total=len(hoja.filas)),
             )
 
-        incidencias = list(mapeo.incidencias)
+        incidencias = [*mapeo.incidencias, *_incidencias_de_lectura(hoja)]
         resumen = ResumenProcesamiento(filas_total=len(hoja.filas))
         try:
             with self._repositorio.transaccion() as sesion:

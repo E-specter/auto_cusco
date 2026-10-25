@@ -26,19 +26,22 @@ from app.core.entities.carga import (
     ResumenProcesamiento,
     VigenciaNoPermitida,
 )
+from app.core.entities.lectura_tabla import FormatoTabla, OpcionesLectura, TablaLeida
 from app.core.entities.sabana import ArchivoIlegible, FilaCruda, HojaSabana, Incidencia, Severidad
 from app.core.services.ingesta_sabana.cabeceras import huella_formato
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService
+from tests.mapeador_memoria import SesionMapeadorEnMemoria
 from tests.test_sabana_cabeceras import CABECERAS_10_09
 from tests.test_sabana_normalizador import _fila_sintetica
 
 FECHA = date(2026, 9, 10)
 
 
-class RepositorioEnMemoria:
+class RepositorioEnMemoria(SesionMapeadorEnMemoria):
     """Repositorio y sesion a la vez; `transaccion` revierte todo ante una excepcion."""
 
     def __init__(self) -> None:
+        self._iniciar_mapeador()
         self.cargas: dict[int, dict[str, Any]] = {}
         self.archivos: dict[int, bytes] = {}
         self.filas: dict[int, list[FilaParaGuardar]] = {}
@@ -65,6 +68,7 @@ class RepositorioEnMemoria:
         return DatosCarga(
             c["id"], c["fecha_corte"], c["version"], c["estado"], c["vigente"],
             c["nombre_archivo"], c["huella_archivo"], c["hoja"],
+            c.get("opciones_lectura", {}), c.get("asignaciones"),
         )  # fmt: skip
 
     def bloquear_fecha(self, fecha_corte: date) -> None:
@@ -227,10 +231,22 @@ class LectorFalso:
         self.hoja = hoja
         self.error = error
 
-    def leer_hoja(self, contenido: bytes, hoja: str = "VENCIDA") -> HojaSabana:
+    def leer(
+        self, contenido: bytes, nombre_archivo: str, opciones: OpcionesLectura = OpcionesLectura()
+    ) -> TablaLeida:
+        self.opciones_recibidas = opciones
         if self.error is not None:
             raise self.error
-        return self.hoja
+        return TablaLeida(
+            formato=FormatoTabla.XLSX,
+            hojas=(self.hoja.nombre,),
+            hoja=self.hoja.nombre,
+            separador=None,
+            codificacion=None,
+            fila_cabecera=self.hoja.fila_cabecera,
+            cabeceras=self.hoja.cabeceras,
+            filas=self.hoja.filas,
+        )
 
 
 def _hoja(*filas: list, cabeceras: list | None = None) -> HojaSabana:

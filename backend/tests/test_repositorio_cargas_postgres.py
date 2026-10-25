@@ -16,7 +16,7 @@ import openpyxl
 import pytest
 from sqlalchemy import delete, func, select
 
-from app.adapters.input.lector_calamine import LectorCalamine
+from app.adapters.input.lector_tabla import LectorTabla
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.modelos import Carga, CargaAuditoria, CargaFila, CargaIncidencia
 from app.adapters.persistence.repositorio_cargas_postgres import RepositorioCargasPostgres
@@ -64,7 +64,7 @@ def entorno():
     engine = get_engine()
     _limpiar(engine)
     try:
-        yield IngestaSabanaService(RepositorioCargasPostgres(engine), LectorCalamine()), engine
+        yield IngestaSabanaService(RepositorioCargasPostgres(engine), LectorTabla()), engine
     finally:
         _limpiar(engine)
 

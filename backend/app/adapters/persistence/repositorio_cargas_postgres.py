@@ -25,6 +25,7 @@ from app.adapters.persistence.modelos import (
     CargaFila,
     CargaIncidencia,
 )
+from app.adapters.persistence.repositorio_mapeador_postgres import SesionMapeadorPostgres
 from app.core.entities.carga import (
     CargaDetalle,
     DatosCarga,
@@ -55,6 +56,8 @@ _COLUMNAS_DATOS = (
     _CARGA.c.nombre_archivo,
     _CARGA.c.huella_archivo,
     _CARGA.c.hoja,
+    _CARGA.c.opciones_lectura,
+    _CARGA.c.asignaciones,
 )
 _COLUMNAS_VALORES = [
     c.name
@@ -86,6 +89,8 @@ def _datos(fila: Row) -> DatosCarga:
         nombre_archivo=fila.nombre_archivo,
         huella_archivo=fila.huella_archivo,
         hoja=fila.hoja,
+        opciones_lectura=fila.opciones_lectura,
+        asignaciones=fila.asignaciones,
     )
 
 
@@ -124,9 +129,9 @@ def _texto(valor: Any) -> str | None:
     return str(valor)
 
 
-class SesionCargasPostgres(SesionCargasPort):
+class SesionCargasPostgres(SesionMapeadorPostgres, SesionCargasPort):
     def __init__(self, conexion: Connection) -> None:
-        self._cx = conexion
+        super().__init__(conexion)
 
     def _driver(self):
         """Conexion psycopg subyacente, dentro de la misma transaccion de SQLAlchemy."""
@@ -166,6 +171,8 @@ class SesionCargasPostgres(SesionCargasPort):
                 huella_archivo=nueva.huella_archivo,
                 tamano_bytes=nueva.tamano_bytes,
                 hoja=nueva.hoja,
+                opciones_lectura=nueva.opciones_lectura,
+                asignaciones=nueva.asignaciones,
             )
             .returning(*_COLUMNAS_DATOS)
         ).one()

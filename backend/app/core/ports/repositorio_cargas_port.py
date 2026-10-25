@@ -16,13 +16,15 @@ from app.core.entities.carga import (
     ResumenProcesamiento,
 )
 from app.core.entities.sabana import Incidencia, Severidad
+from app.core.ports.repositorio_mapeador_port import SesionMapeadorPort
 
 
-class SesionCargasPort(Protocol):
+class SesionCargasPort(SesionMapeadorPort, Protocol):
     """Operaciones dentro de una transaccion.
 
     Todo lo hecho en una sesion se confirma junto al salir sin error, o se
-    revierte completo si ocurre cualquier excepcion.
+    revierte completo si ocurre cualquier excepcion. Incluye las del mapeador (borradores y
+    recordados) para confirmar un borrador en una sola transaccion.
     """
 
     def bloquear_fecha(self, fecha_corte: date) -> None:

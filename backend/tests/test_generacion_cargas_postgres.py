@@ -22,7 +22,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import delete
 
-from app.adapters.input.lector_calamine import LectorCalamine
+from app.adapters.input.lector_tabla import LectorTabla
 from app.adapters.output import exportadores
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.modelos import Carga, CargaAuditoria
@@ -122,7 +122,7 @@ def generador():
     """Servicio de generacion apoyado en la cartera real de una sabana ingestada."""
     engine = get_engine()
     _limpiar(engine)
-    ingesta = IngestaSabanaService(RepositorioCargasPostgres(engine), LectorCalamine())
+    ingesta = IngestaSabanaService(RepositorioCargasPostgres(engine), LectorTabla())
     carga = ingesta.registrar_carga(FECHA, "sintetica.xlsx", _sabana()).carga
     assert ingesta.procesar_carga(carga.id).vigente
     consulta = ConsultaCarteraService(RepositorioCarteraPostgres(engine))
@@ -223,7 +223,7 @@ def test_pedir_mas_de_los_que_hay_avisa_y_genera_lo_disponible(generador) -> Non
 
 def test_la_generacion_sigue_a_la_version_vigente(generador) -> None:
     servicio, engine = generador
-    ingesta = IngestaSabanaService(RepositorioCargasPostgres(engine), LectorCalamine())
+    ingesta = IngestaSabanaService(RepositorioCargasPostgres(engine), LectorTabla())
     correccion = ingesta.registrar_carga(FECHA, "correccion.xlsx", _sabana(PRODUCTOS[:2])).carga
     ingesta.procesar_carga(correccion.id)
 

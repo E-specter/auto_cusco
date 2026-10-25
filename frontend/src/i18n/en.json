@@ -156,6 +156,7 @@
   "incidencia.cabecera_desconocida": "Unrecognised header; the column was not catalogued",
   "incidencia.cabecera_duplicada": "The header appears more than once",
   "incidencia.columna_faltante": "Expected column missing from the file",
+  "incidencia.valor_no_escalar": "The value was an object or a list; it was saved as JSON text",
   "incidencia.clave_vacia": "The promissory-note key is empty",
   "incidencia.clave_no_texto": "The promissory-note key is not valid text",
   "incidencia.pagare_repetido": "Key repeated in the file; the first occurrence was kept",

@@ -19,6 +19,8 @@ CODIGOS_INCIDENCIA: Final[frozenset[str]] = frozenset(
         "cabecera_desconocida",
         "cabecera_duplicada",
         "columna_faltante",
+        # Lectura del archivo (RF-57)
+        "valor_no_escalar",
         # Clave del producto
         "clave_vacia",
         "clave_no_texto",
