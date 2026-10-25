@@ -60,7 +60,7 @@ def _producto(**cambios) -> dict:
     datos = {
         "pagare": "P1",
         "titular": "Ana Quispe",
-        "telefono": "987654321",
+        "telefono": "900000001",
         "saldo": Decimal("1500.5"),
         "vence": date(2026, 9, 18),
         "dias_atraso": 4,
@@ -163,7 +163,7 @@ def test_una_variable_obligatoria_vacia_se_informa_por_fila() -> None:
 
     assert [e.fila for e in carga.errores] == [2, 3]
     assert {e.codigo for e in carga.errores} == {CodigoTexto.VARIABLE_OBLIGATORIA_VACIA.value}
-    assert carga.filas[0]["numero"] == "987654321"
+    assert carga.filas[0]["numero"] == "900000001"
     assert carga.filas[1]["numero"] is None
 
 

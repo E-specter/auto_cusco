@@ -21,10 +21,16 @@ comportamiento de hoy, no una funcion consigo misma.
   valores de abajo, los de a154df6, dan lo mismo en Windows y en Linux sin ninguna normalizacion
   en la prueba; esa es la prueba de B17 en las huellas.
 - CSV y JSON: SHA-256 de los bytes, que son deterministas.
+- 2026-10-24 (T-MTE-B18): los datos de prueba traian un telefono que podia ser real y pasaron al
+  rango sintetico 900000xxx. Cambiaron SOLO las huellas de las salidas que llevan ese
+  telefono (el XLSX generico, los cuatro CSV y los dos JSON); `XLSX_MOWA_SIN_IGUAL` y los largos
+  no cambian. Se recalcularon con los exportadores de main SIN tocarlos, y para cada una se
+  comprobo que devolver el telefono viejo en los bytes de la salida (en cada parte del zip, en el
+  XLSX) reproduce EXACTAMENTE la huella anterior: lo unico que se movio es el telefono.
 """
 
 XLSX_GENERICO_SIN_IGUAL = (
-    "5664ff029719e92decffc9763dcf552db7a2d70398e5c6f05cb390f7a6c4b16b",
+    "5ad35c5176548d90ac8ec74d1078daf2347b5697cbd4301c65da826244b143a7",
     18330,
 )
 XLSX_MOWA_SIN_IGUAL = (
@@ -33,14 +39,14 @@ XLSX_MOWA_SIN_IGUAL = (
 )
 
 # CSV con las opciones por defecto, y con `;` y `utf-8-sig`.
-CSV_SIN_IGUAL = "d8dbb429c27ddd9439a316dc6e3a1e5b29aac92c4fb2def9a91b3ab510f92a84"
+CSV_SIN_IGUAL = "343d47272bd6c6dd2347e00eec8b33414b8b2b54b23b8e1704eb4a87f89d5d64"
 CSV_SIN_IGUAL_PUNTO_Y_COMA_CON_BOM = (
-    "645a98b00b69b9e6ae1a9bdb7a04c2deb8eab808ba6312ad9a8527dc98e0b4e7"
+    "33d5d7df7d02f86842a9d2e67931ee5269ce29046083df559ef17d06da728b11"
 )
-CSV_PELIGROSA = "375bc476d335da003e35bf6a9e8cb7bbf4e5f7234a97394a54ac320b7d09c6d2"
+CSV_PELIGROSA = "a9c31b1a58528732e2aa25ab2175c39fb92250adcd19a71bdd58d04fd79d3970"
 CSV_PELIGROSA_PUNTO_Y_COMA_CON_BOM = (
-    "6863ab75bb9fb3a3112e1503a5f0054c060cf6dd477269b057d3079e3c48c4db"
+    "fcb73d4e26c89b997f2624a3f5d7815a733f79e5840bbfe0725473f5a6e2165d"
 )
 
-JSON_SIN_IGUAL = "b15717f080710ace032dbc3a83f954526c1f85f801f5c713876dae25e56ecd77"
-JSON_PELIGROSA = "b2a09be9da82dd3308ea6e687e62199414185c57ba45cc1539aa84f7fa20fd5a"
+JSON_SIN_IGUAL = "296bfddf785874ad9957d199f9e0a94aef891b83723c18c30837bd75dcd90964"
+JSON_PELIGROSA = "a926232f24f60453b5e990494dc5232bf2f6422ccaa43f1e0e96881900cb0b12"

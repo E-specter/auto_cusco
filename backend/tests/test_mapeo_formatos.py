@@ -41,7 +41,7 @@ def _campo(tipo: TipoSalida, **kwargs) -> CampoSalida:
 def test_texto_deja_el_valor_tal_cual() -> None:
     campo = _campo(TipoSalida.TEXTO)
 
-    assert formatos.convertir(campo, "51987654321", None) == "51987654321"
+    assert formatos.convertir(campo, "51900000001", None) == "51900000001"
     assert formatos.convertir(campo, "", None) == ""
 
 

@@ -96,7 +96,7 @@ def _convertida(version) -> DatosSpeech:
 def _producto(**cambios) -> dict:
     producto = {
         "pagare": "000000000000000001",
-        "telefono": "987654321",
+        "telefono": "900000001",
         "documento_numero": "12345678",
         "documento_tipo": "dni",
         "dias_atraso": 4,  # corte = envio: los dias ajustados son los de atraso (4: 1 a 8)
@@ -371,17 +371,17 @@ def test_el_orden_de_las_exclusiones_de_una_v2_es_el_de_siempre() -> None:
 
     orden = [
         (sin_todo, CodigoMowaMes.TELEFONO_INVALIDO),
-        ({**sin_todo, "telefono": "987654321"}, CodigoMowaMes.FALTA_DOCUMENTO),
+        ({**sin_todo, "telefono": "900000001"}, CodigoMowaMes.FALTA_DOCUMENTO),
         (
-            {**sin_todo, "telefono": "987654321", "documento_numero": "1", "dias_atraso": 500},
+            {**sin_todo, "telefono": "900000001", "documento_numero": "1", "dias_atraso": 500},
             CodigoMowaMes.SIN_SPEECH,
         ),
         (
-            {**sin_todo, "telefono": "987654321", "documento_numero": "1"},
+            {**sin_todo, "telefono": "900000001", "documento_numero": "1"},
             CodigoMowaMes.FALTA_TITULAR,
         ),
         (
-            {**sin_todo, "telefono": "987654321", "documento_numero": "1", "titular": "Z"},
+            {**sin_todo, "telefono": "900000001", "documento_numero": "1", "titular": "Z"},
             CodigoMowaMes.FALTA_VENCIMIENTO,
         ),
     ]

@@ -73,7 +73,7 @@ CSV_ESPERADO = [
     "'-",
     "'+",
     "-1,234.56",  # un importe con formato: no es una formula
-    "+51987654321",  # un telefono con prefijo: tampoco
+    "+51900000001",  # un telefono con prefijo: tampoco
     "-5",
     "3.5",
     "1.234,56",
@@ -353,7 +353,7 @@ def test_las_cabeceras_del_csv_se_protegen_con_el_mismo_criterio() -> None:
         chr(9) + "e",
         chr(13) + "f",
         "-5",
-        "+51987654321",
+        "+51900000001",
         "normal",
     )
     tabla = Tabla("f", cabeceras, ({c: "x" for c in cabeceras},))
@@ -368,7 +368,7 @@ def test_las_cabeceras_del_csv_se_protegen_con_el_mismo_criterio() -> None:
         "'" + chr(9) + "e",
         "'" + chr(13) + "f",
         "-5",
-        "+51987654321",
+        "+51900000001",
         "normal",
     ]
     assert filas[1] == ["x"] * len(cabeceras)  # los valores "x" no se tocan

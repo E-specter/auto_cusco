@@ -235,7 +235,7 @@ VALORES = {
     "n": [None, Decimal(0), Decimal("2.5"), 3, "7", "abc", Decimal(-1)],
     "m": [None, Decimal(0), Decimal("2.5"), 3, Decimal("1E+2"), "no es numero"],
     "f": [None, date(2026, 9, 5), date(9999, 12, 31), "2026-01-02", "no es fecha"],
-    "tel": [None, "987654321", "12", "  ", "900000123"],
+    "tel": [None, "900000001", "12", "  ", "900000123"],
 }
 # Por tipo de entrada: (funcion, tipo que devuelve). Los argumentos @u, @m y @n usan variables de
 # la fila, que a veces son constantes y a veces no.

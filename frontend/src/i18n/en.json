@@ -913,7 +913,7 @@
   "columnas.version.lineaUsada": "Version {numero} · used in a load",
   "columnas.version.sinGuardar": "Not saved yet",
   "columnas.proteger": "Protect formulas in CSV",
-  "columnas.proteger.hint": "Adds an apostrophe to texts that start with =, +, - or @, except those that are just a number, such as -1,234.56 or +51987654321. Clear it only if the target platform does not accept it.",
+  "columnas.proteger.hint": "Adds an apostrophe to texts that start with =, +, - or @, except those that are just a number, such as -1,234.56 or +51900000001. Clear it only if the target platform does not accept it.",
   "columnas.columnas.title": "Columns",
   "columnas.col.orden": "No.",
   "columnas.col.nombre": "Name",

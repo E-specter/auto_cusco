@@ -347,17 +347,17 @@ def test_si_vacio_exige_que_el_alternativo_sea_del_mismo_tipo() -> None:
 
 
 def test_enlace_whatsapp_usa_el_prefijo_por_defecto() -> None:
-    assert _texto("[@tel | enlace_whatsapp]", tel="987654321") == "https://wa.me/+51987654321"
+    assert _texto("[@tel | enlace_whatsapp]", tel="900000001") == "https://wa.me/+51900000001"
 
 
 def test_enlace_whatsapp_con_prefijo_propio() -> None:
-    assert _texto('[@tel | enlace_whatsapp("https://x.test/")]', tel="987654321") == (
-        "https://x.test/987654321"
+    assert _texto('[@tel | enlace_whatsapp("https://x.test/")]', tel="900000001") == (
+        "https://x.test/900000001"
     )
 
 
 @pytest.mark.parametrize(
-    "telefono", ["12345678", "887654321", "9876543210", "98765432a", " 987654321"]
+    "telefono", ["12345678", "887654321", "9876543210", "98765432a", " 900000001"]
 )
 def test_enlace_whatsapp_valida_el_telefono_con_la_regla_rf_02(telefono) -> None:
     assert (

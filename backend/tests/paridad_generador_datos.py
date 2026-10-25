@@ -137,7 +137,7 @@ CAMPOS_DISPONIBLES = (
 PRODUCTOS: tuple[dict[str, Any], ...] = (
     {
         "pagare": "000000000000000001",
-        "telefono": "987654321",
+        "telefono": "900000001",
         "titular": "APELLIDO/APELLIDO,NOMBRE",
         "saldo_capital_pendiente": Decimal("1500.50"),
         "fecha_vencimiento_cuota": date(2026, 9, 18),
@@ -161,7 +161,7 @@ PRODUCTOS: tuple[dict[str, Any], ...] = (
     },
     {
         "pagare": "",
-        "telefono": 987654321,
+        "telefono": 900000001,
         "titular": "Ñandú Pérez",
         "saldo_capital_pendiente": 7,
         "fecha_vencimiento_cuota": "2026-09-18",
@@ -185,7 +185,7 @@ PRODUCTOS: tuple[dict[str, Any], ...] = (
     },
     {
         "pagare": "000000000000000007",
-        "telefono": " 987654321 ",
+        "telefono": " 900000001 ",
         "titular": "42",
         "saldo_capital_pendiente": Decimal("0"),
         "fecha_vencimiento_cuota": date(2027, 1, 31),

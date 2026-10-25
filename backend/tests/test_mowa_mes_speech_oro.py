@@ -381,7 +381,7 @@ def test_los_bordes_de_150_y_160_por_previsualizar_y_por_el_mensaje(largo, codig
 def _producto(**cambios) -> dict:
     producto = {
         "pagare": "000000000000000001",
-        "telefono": "987654321",
+        "telefono": "900000001",
         "documento_numero": "12345678",
         "documento_tipo": "dni",
         "dias_atraso": 4,

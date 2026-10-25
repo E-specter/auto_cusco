@@ -29,7 +29,7 @@ TABLA = Tabla(
     filas=(
         {
             "pagare": "000000000000000001",
-            "numero": "51987654321",
+            "numero": "51900000001",
             "deuda": Decimal("1500.50"),
             "vence": date(2026, 9, 18),
             "titular": "APELLIDO, NOMBRE",
@@ -57,14 +57,14 @@ def test_csv_escribe_cabeceras_y_filas() -> None:
     lineas = _texto("csv").split("\r\n")
 
     assert lineas[0] == "pagare,numero,deuda,vence,titular"
-    assert lineas[1] == '000000000000000001,51987654321,1500.50,2026-09-18,"APELLIDO, NOMBRE"'
+    assert lineas[1] == '000000000000000001,51900000001,1500.50,2026-09-18,"APELLIDO, NOMBRE"'
     assert lineas[2] == "000000000000000002,51,,,SEÑOR AÑAÑOS"  # los vacios quedan vacios
 
 
 def test_csv_respeta_el_delimitador_y_puede_ir_sin_cabeceras() -> None:
     texto = _texto("csv", OpcionesArchivo(delimitador=";", con_cabeceras=False))
 
-    assert texto.startswith("000000000000000001;51987654321;1500.50")
+    assert texto.startswith("000000000000000001;51900000001;1500.50")
     assert "pagare;numero" not in texto
 
 
@@ -97,7 +97,7 @@ def test_json_es_una_lista_de_objetos_con_los_vacios_en_null() -> None:
     assert list(filas[0]) == list(TABLA.cabeceras)  # orden de las cabeceras
     assert filas[0] == {
         "pagare": "000000000000000001",
-        "numero": "51987654321",
+        "numero": "51900000001",
         "deuda": 1500.5,
         "vence": "2026-09-18",
         "titular": "APELLIDO, NOMBRE",

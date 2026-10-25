@@ -386,7 +386,7 @@ def test_por_fila_no_se_compilan_expresiones_regulares(monkeypatch) -> None:
         "vence": date(2026, 9, 29),
         "monto": Decimal("10.005"),
         "dias": 2,
-        "telefono": "987654321",
+        "telefono": "900000001",
     }
 
     resultado = compilada.evaluar(producto)

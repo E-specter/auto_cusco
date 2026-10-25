@@ -27,8 +27,8 @@ __all__ = ["ContextoDesconocido", "RegistroContextos", "contexto_cartera"]
 # Datos sinteticos: nunca de un producto real.
 _EJEMPLO_POR_CAMPO: dict[str, Any] = {
     "pagare": "000000000000000001",
-    "telefono": "987654321",
-    "celular_analista": "912345678",
+    "telefono": "900000001",
+    "celular_analista": "900000002",
     "titular": "TITULAR/SINTETICO,UNO",
     "documento_tipo": "dni",
     "documento_numero": "12345678",

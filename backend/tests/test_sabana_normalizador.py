@@ -17,7 +17,7 @@ def _fila_sintetica(**cambios) -> list:
         "Analista": "PEREZ/PRUEBA,ANALISTA",
         "Titular": "APELLIDO/APELLIDO,NOMBRE FICTICIO",
         "DniRuc": 1234567.0,
-        "Teléfono": 987654321.0,
+        "Teléfono": 900000001.0,
         "Pagare": "000000000000000001",
         "SaldoSoles 03/09": 1500.5,
         "TIPO DE REPROGRAMACIÓN": "NULL",
@@ -56,7 +56,7 @@ def _fila_sintetica(**cambios) -> list:
         "Provisión Proyectada": "2. Provisión CPP",
         "Mora Impacto Proyectada": "SI",
         "Cant.Paralelos": 1.0,
-        "Celular Analista": 912345678.0,
+        "Celular Analista": 900000002.0,
     }
     base.update(cambios)
     return [base[c] for c in CABECERAS_10_09]
@@ -72,7 +72,7 @@ def test_fila_valida_se_normaliza_con_tipos_de_dominio() -> None:
     assert fila.ingestable and fila.clave == "000000000000000001"
     assert v["documento_tipo"] is TipoDocumento.DNI
     assert v["documento_numero"] == "01234567"
-    assert v["telefono"] == "987654321"
+    assert v["telefono"] == "900000001"
     assert v["saldo_capital_pendiente"] == Decimal("1500.50")
     assert v["tipo_reprogramacion"] is None
     assert v["vencimiento_operativo_aplica"] is True
@@ -134,7 +134,7 @@ def test_tipos_de_python_calamine_dan_el_mismo_resultado_que_pyxlsb() -> None:
             "Vencimiento Cuota": date(2026, 9, 13),
             "Vencimientos Operativo": date(2026, 9, 17),
             "DniRuc": 1234567,
-            "Teléfono": 987654321,
+            "Teléfono": 900000001,
             " Días Cierre Mes Anterior": 1520,
             "Cod.Tipo Basilea": "",
             "TIPO DE REPROGRAMACIÓN": "",

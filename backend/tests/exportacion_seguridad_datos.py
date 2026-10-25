@@ -46,7 +46,7 @@ TABLA_SIN_IGUAL = Tabla(
             "otro": "línea 1\nlínea 2",
         },
         {
-            "texto": "+51987654321",
+            "texto": "+51900000001",
             "importe": Decimal("0"),
             "entero": 0,
             "fecha": None,
@@ -143,7 +143,7 @@ TABLA_PELIGROSA = Tabla(
             "-",
             "+",
             "-1,234.56",
-            "+51987654321",
+            "+51900000001",
             "-5",
             "3.5",
             "1.234,56",

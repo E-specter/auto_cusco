@@ -791,7 +791,7 @@ test.describe('la muestra del editor es el producto del segmento elegido', () =>
     definiciones.definiciones.push(definicionFalsa({ id: 1, nombre: 'SMS preventivo' }));
     const motor = motorConDefiniciones();
     // Every product the editor may ask for by pagaré (rows 1 to 3 of the preview), so none is a 404.
-    for (const numero of [1, 2, 3]) motor.productos[String(99 + numero).padStart(18, '0')] = { telefono: '987654321', titular: 'ZZPRUEBA UNO' };
+    for (const numero of [1, 2, 3]) motor.productos[String(99 + numero).padStart(18, '0')] = { telefono: '900000001', titular: 'ZZPRUEBA UNO' };
     ajustar?.(motor);
     const base = apiVacia();
     base.versiones = [version({ fecha_corte: '2026-09-10', vigente: true })];

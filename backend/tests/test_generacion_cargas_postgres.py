@@ -57,7 +57,7 @@ PRODUCTOS = [
         "Pagare": f"{i:018d}",
         "PAGARE": f"{i:018d}",
         "Región": "CUSCO SUR" if i % 2 else "TACNA",
-        "Teléfono": 987654320.0 + i if i != 3 else 12345.0,  # el tercero es invalido
+        "Teléfono": 900000000.0 + i if i != 3 else 12345.0,  # el tercero es invalido
         "Saldo Capital Pendiente": 1000.0 * i + 0.5,
         "Vencimiento Cuota": 46278.0 + i,
     }
@@ -160,7 +160,7 @@ def test_genera_la_carga_desde_la_cartera_real(generador) -> None:
     por_pagare = {fila["pagare"]: fila for fila in resultado.tabla.filas}
     assert por_pagare["000000000000000001"]["deuda"] == "1,000.50"
     assert por_pagare["000000000000000001"]["vence"] == "14/09/2026"
-    assert por_pagare["000000000000000001"]["numero"] == "51987654321"
+    assert por_pagare["000000000000000001"]["numero"] == "51900000001"
     # El tercer producto trae un telefono invalido: la ingesta lo deja vacio y
     # en la carga queda solo el prefijo, sin detener nada.
     assert por_pagare["000000000000000003"]["numero"] == "51"
@@ -269,7 +269,7 @@ def test_descargar_el_csv_por_http(cliente) -> None:
     assert respuesta.headers["x-carga-generados"] == "3"
     assert respuesta.headers["x-carga-errores"] == "0"
     assert lineas[0] == "anexo;numero;pagare;deuda;vence"
-    assert lineas[1] == "1010;51987654325;000000000000000005;5,000.50;18/09/2026"
+    assert lineas[1] == "1010;51900000005;000000000000000005;5,000.50;18/09/2026"
 
 
 def test_descargar_el_xlsx_por_http(cliente) -> None:

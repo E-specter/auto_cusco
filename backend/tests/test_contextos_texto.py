@@ -121,7 +121,7 @@ def test_el_registro_de_ejemplo_de_la_cartera_tiene_un_valor_del_tipo_de_cada_va
 
 
 def test_el_ejemplo_de_la_cartera_usa_datos_sinteticos_conocidos() -> None:
-    assert CARTERA.ejemplo["telefono"] == "987654321"
+    assert CARTERA.ejemplo["telefono"] == "900000001"
     assert CARTERA.ejemplo["pagare"] == "000000000000000001"
     assert CARTERA.ejemplo["fecha_vencimiento_cuota"] == date(2026, 10, 5)
     assert CARTERA.ejemplo["titular"] == "TITULAR/SINTETICO,UNO"
@@ -134,7 +134,7 @@ def test_el_registro_de_ejemplo_se_puede_evaluar_con_las_variables_del_contexto(
         "[@titular | primeros(4)] [@telefono | enlace_whatsapp]", variables
     )
 
-    assert compilada.evaluar(CARTERA.ejemplo).texto == "TITU https://wa.me/+51987654321"
+    assert compilada.evaluar(CARTERA.ejemplo).texto == "TITU https://wa.me/+51900000001"
 
 
 def test_la_segmentacion_por_defecto_de_la_cartera_usa_los_dias_ajustados() -> None:
@@ -204,7 +204,7 @@ def test_el_producto_se_convierte_al_registro_del_speech() -> None:
         "fecha_vencimiento_cuota": date(2026, 9, 5),
         "dias_atraso": 40,
         "dias_atraso_ajustados": 45,  # los calcula la previsualizacion con la fecha de envio
-        "telefono": "987654321",
+        "telefono": "900000001",
     }
 
     registro = SPEECH.registro_de_producto(producto)

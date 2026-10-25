@@ -22,7 +22,11 @@ from tests.paridad_generador_datos import (
 
 # SHA-256 de la matriz completa, calculado en HEAD b8b9025 con el generador original y sin tocar
 # app/ (git diff vacio), antes de escribir una sola linea de B2.
-HUELLA_CONGELADA = "882908f222530cfffda6443cbe5081d7d043b42cf0414b590bcd4b1b34e2ca50"
+# (2026-10-24, T-MTE-B18: los telefonos de PRODUCTOS pasaron al rango sintetico 900000xxx; la huella
+# se recalculo con el generador de main sin tocarlo y se comprobo que devolver los telefonos viejos
+# a la matriz serializada da exactamente la huella anterior,
+# 882908f222530cfffda6443cbe5081d7d043b42cf0414b590bcd4b1b34e2ca50.)
+HUELLA_CONGELADA = "b4b61b10e030cce8e8be65b43da579f8385c0d1d13f4f5f5b991180e541fe4b2"
 
 
 def _de_antes(definicion: DefinicionCarga, disponibles, productos) -> CargaGenerada:

@@ -185,7 +185,7 @@ Capacidad transversal que amplía RF-12: la usan todas las cargas digitales y Vo
 * **RF-53 — Protección contra fórmulas en la exportación:** Evitar que un valor exportado se ejecute como fórmula al abrir el archivo.
   * XLSX: los textos se escriben siempre como texto literal, sin cambiar su contenido.
   * CSV: un texto que empieza con `=`, `+`, `-`, `@`, tabulación o retorno de carro lleva un apóstrofo delante. La protección está activa por defecto y cada definición puede desactivarla si la plataforma de destino no la tolera.
-  * No se protegen los valores que no son texto ni los textos que son solo un número, con o sin signo (por ejemplo, `-1,234.56` o `+51987654321`): no son fórmulas y el apóstrofo rompería la plataforma.
+  * No se protegen los valores que no son texto ni los textos que son solo un número, con o sin signo (por ejemplo, `-1,234.56` o `+51900000001`): no son fórmulas y el apóstrofo rompería la plataforma.
   * JSON: sin cambios.
 * **RF-54 — Compatibilidad con lo existente:** Incorporar el motor sin cambiar el resultado de las cargas actuales.
   * Las definiciones con `[@campo]` de `/archivos-carga` generan lo mismo que antes.

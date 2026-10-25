@@ -83,7 +83,7 @@ _CARACTERES_DE_NUMERO = frozenset("0123456789.,")
 
 
 def es_numero_con_signo(texto: str) -> bool:
-    """`[+-]?` un digito y luego solo digitos, puntos y comas: `-1,234.56`, `+51987654321`, `3.5`.
+    """`[+-]?` un digito y luego solo digitos, puntos y comas: `-1,234.56`, `+51900000001`, `3.5`.
 
     Un texto asi no es una formula y un apostrofo delante lo rompe en la plataforma. Equivale a
     la expresion regular `^[+-]?\\d[\\d.,]*$`, pero sin expresiones regulares, con digitos ASCII

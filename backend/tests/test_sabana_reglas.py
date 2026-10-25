@@ -93,7 +93,7 @@ def test_ruc_prefijos_validos_se_aceptan(prefijo) -> None:
 # ---------- N-4: telefonos ----------
 
 
-@pytest.mark.parametrize("valor", [987654321.0, "987654321", 987654321, " 912345678 "])
+@pytest.mark.parametrize("valor", [900000001.0, "900000001", 900000001, " 900000002 "])
 def test_telefono_valido(valor) -> None:
     resultado = reglas.normalizar_telefono(valor)
 

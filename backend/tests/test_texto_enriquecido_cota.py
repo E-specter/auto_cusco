@@ -108,7 +108,7 @@ def test_una_fecha_calculada_mide_10() -> None:
         ('[@t | primeros(5) | reemplazar("a", "xyz")]', {"t": "aaaaaaaa"}),
         ('[@f | formato_fecha("dd de nombre_mes de aaaa")]', {"f": date(2026, 9, 29)}),
         ('[@f | formato_fecha("dd de nombre_mes de aaaa")]', {"f": date(2026, 5, 1)}),
-        ("[@tel | enlace_whatsapp]", {"tel": "999999999"}),
+        ("[@tel | enlace_whatsapp]", {"tel": "900000009"}),
         ('[@t | primeros(3) | si_vacio("sin dato")]', {"t": None}),
         ("[@f | sumar_dias(3)]", {"f": date(999, 1, 1)}),
     ],

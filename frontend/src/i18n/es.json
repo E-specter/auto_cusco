@@ -913,7 +913,7 @@
   "columnas.version.lineaUsada": "Versión {numero} · usada en una carga",
   "columnas.version.sinGuardar": "Todavía sin guardar",
   "columnas.proteger": "Proteger fórmulas en CSV",
-  "columnas.proteger.hint": "Agrega un apóstrofo a los textos que empiezan con =, +, - o @, salvo los que son solo un número, como -1,234.56 o +51987654321. Desmárcala solo si la plataforma de destino no lo acepta.",
+  "columnas.proteger.hint": "Agrega un apóstrofo a los textos que empiezan con =, +, - o @, salvo los que son solo un número, como -1,234.56 o +51900000001. Desmárcala solo si la plataforma de destino no lo acepta.",
   "columnas.columnas.title": "Columnas",
   "columnas.col.orden": "N.º",
   "columnas.col.nombre": "Nombre",

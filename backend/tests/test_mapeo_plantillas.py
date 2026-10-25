@@ -13,7 +13,7 @@ DISPONIBLES = tuple(CAMPOS_CARTERA)
 
 PRODUCTO = {
     "pagare": "000000000000000001",
-    "telefono": "987654321",
+    "telefono": "900000001",
     "documento_numero": "01234567",
     "titular": "APELLIDO/APELLIDO,NOMBRE",
     "saldo_capital_pendiente": Decimal("1500.50"),
@@ -39,14 +39,14 @@ def test_referencia_simple_copia_el_campo() -> None:
 
     assert compilada.es_referencia_simple
     assert compilada.campos == ("telefono",)
-    assert plantillas.aplicar(compilada, PRODUCTO) == "987654321"
+    assert plantillas.aplicar(compilada, PRODUCTO) == "900000001"
 
 
 def test_prefijo_mas_campo() -> None:
     compilada = _compilar("51[@telefono]")
 
     assert not compilada.es_referencia_simple
-    assert plantillas.aplicar(compilada, PRODUCTO) == "51987654321"
+    assert plantillas.aplicar(compilada, PRODUCTO) == "51900000001"
 
 
 def test_concatenacion_de_texto_y_varios_campos() -> None:

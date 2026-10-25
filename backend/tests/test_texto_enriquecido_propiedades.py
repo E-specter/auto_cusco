@@ -316,7 +316,7 @@ def test_la_cota_es_siempre_un_tope_verdadero() -> None:
         "f": lambda: azar.choice(
             [None, date(2026, 1, 1) + timedelta(days=azar.randint(-700_000, 700_000))]
         ),
-        "tel": lambda: azar.choice([None, "987654321", "12"]),
+        "tel": lambda: azar.choice([None, "900000001", "12"]),
     }
     con_cota = 0
 

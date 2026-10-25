@@ -37,7 +37,7 @@ PRODUCTO = {
     "fecha_vencimiento_cuota": date(2026, 9, 18),
     "dias_atraso": 45,
     "saldo_capital_pendiente": Decimal("1500.50"),
-    "telefono": "987654321",
+    "telefono": "900000001",
 }
 
 
@@ -412,7 +412,7 @@ def test_la_muestra_de_ejemplo_es_una_sola_fila_con_el_registro_del_contexto(cli
     )
 
     assert len(cuerpo["filas"]) == 1
-    assert cuerpo["filas"][0]["columnas"][0]["texto"] == "987654321"
+    assert cuerpo["filas"][0]["columnas"][0]["texto"] == "900000001"
     assert cuerpo["filas"][0]["etiqueta"] is None
 
 

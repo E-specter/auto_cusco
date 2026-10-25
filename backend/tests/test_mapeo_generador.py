@@ -20,7 +20,7 @@ DISPONIBLES = tuple(CAMPOS_CARTERA)
 PRODUCTOS = [
     {
         "pagare": "000000000000000001",
-        "telefono": "987654321",
+        "telefono": "900000001",
         "titular": "APELLIDO/APELLIDO,NOMBRE",
         "saldo_capital_pendiente": Decimal("1500.50"),
         "fecha_vencimiento_cuota": date(2026, 9, 18),
@@ -77,7 +77,7 @@ def test_genera_las_filas_con_sus_cabeceras() -> None:
     assert carga.completa
     assert carga.filas[0] == {
         "anexo_agente": 1010,
-        "numero": "51987654321",
+        "numero": "51900000001",
         "cliente": "APELLIDO/APELLIDO,NOMBRE",
         "deuda": "1,500.50",
         "vence": "18/09/2026",

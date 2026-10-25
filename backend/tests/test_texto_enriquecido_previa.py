@@ -135,7 +135,7 @@ def test_la_suma_de_los_nodos_es_siempre_el_resultado_de_evaluar() -> None:
         "n": [None, Decimal(0), Decimal("2.5"), 3, "abc"],
         "m": [None, Decimal(0), 2],
         "f": [None, date(2026, 9, 5), date(9999, 12, 31)],
-        "tel": [None, "987654321", "12"],
+        "tel": [None, "900000001", "12"],
     }
 
     for _ in range(2000):

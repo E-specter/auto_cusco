@@ -147,7 +147,7 @@ El backend devuelve cada problema con su `codigo` (catálogo `CodigoTexto`, trad
   - **Criterio:** `select` con «Segmento financiero calculado por días de atraso» (por defecto, RF-50) y «Valor de un campo de la cartera». Con el segundo aparece el `select` del campo.
   - **Tabla de rangos:** solo lectura en esta pantalla, con etiqueta, desde y hasta, tal como la devuelve el backend.
   - **Sin segmento:** dos opciones de radio, «Excluir el producto e informar el motivo» (por defecto) y «Usar el contenido por defecto».
-- **Protección contra fórmulas en CSV:** una casilla marcada por defecto, con el hint «Agrega un apóstrofo a los textos que empiezan con =, +, - o @, salvo los que son solo un número, como -1,234.56 o +51987654321. Desmárcala solo si la plataforma de destino no lo acepta» (RF-53).
+- **Protección contra fórmulas en CSV:** una casilla marcada por defecto, con el hint «Agrega un apóstrofo a los textos que empiezan con =, +, - o @, salvo los que son solo un número, como -1,234.56 o +51900000001. Desmárcala solo si la plataforma de destino no lo acepta» (RF-53).
 
 ### 5.2 Lista de columnas
 
