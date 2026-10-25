@@ -10,7 +10,7 @@
 * **RF-03 — Gestión de cartera:** Permitir identificar, registrar, actualizar y omitir productos de la cartera en función de la información contenida en las sábanas cargadas.
 * **RF-57 — Formatos de archivo de la sábana:** Aceptar la sábana en Excel (`.xlsx`, `.xlsb`, `.xls`), ODS, CSV y JSON.
   * Excel y ODS: si el libro tiene varias hojas, el usuario elige cuál cargar; por defecto, `VENCIDA` si existe y, si no, la primera.
-  * CSV: se detectan el separador (coma, punto y coma o tabulación) y la codificación (UTF-8, con o sin BOM, o Latin-1). El usuario puede cambiarlos, y el análisis de RF-58 se repite con lo elegido. La primera fila no vacía es la de encabezados.
+  * CSV: se detectan el separador (coma, punto y coma o tabulación) y la codificación (UTF-8, con o sin BOM; Windows-1252, la del Excel en español; o Latin-1 si Windows-1252 no la decodifica). El usuario puede cambiarlos, y el análisis de RF-58 se repite con lo elegido. La primera fila no vacía es la de encabezados.
   * JSON: una lista de objetos; cada clave es un encabezado, en el orden en que aparece por primera vez. Si el archivo no es una lista de objetos, entonces se rechaza indicando el motivo. Si un valor es un objeto o una lista, entonces se guarda como texto y se registra una advertencia en esa fila.
 * **RF-58 — Análisis de encabezados antes de cargar:** Antes de procesar la sábana, mostrar cada encabezado del archivo con hasta 3 valores de ejemplo y su relación con los campos de carga, sin importar el orden de las columnas.
   * Cada encabezado tiene uno de cuatro estados: **recordado** (RF-61), **coincide**, **parecido** o **sin coincidencia**.
