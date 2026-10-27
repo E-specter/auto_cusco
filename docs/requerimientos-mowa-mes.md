@@ -45,6 +45,7 @@ Los requerimientos de este documento se numeran `RF-MM-XX` dentro del módulo, p
   * Largo máximo: 100 caracteres, el que acepta el campo «Descripción de Campaña» de MES (confirmado por el usuario el 2026-10-27, cierra S-MM-3). La API rechaza una descripción más larga, y la pantalla no deja escribir más de 100 y muestra cuántos van.
   * Si la sugerida pasa de 100, se acorta quitando filtros enteros desde el final y se cierra con `...`, sin pasar de 100 en total. Si ni el primer filtro cabe, se corta en 97 caracteres y se agrega `...`.
   * Un botón «Copiar» al costado del campo copia la descripción tal como se registrará, sin espacios en los extremos, para pegarla en el formulario de MES (pedido del usuario, 2026-10-27). Confirma con un aviso breve que se lee en pantalla y con lector de pantalla. Si el navegador no deja copiar, lo dice y selecciona el texto para copiarlo a mano.
+  * Es de una sola línea, como el campo de MES (confirmado por el usuario el 2026-10-27). La pantalla no deja crear saltos de línea. Al pegar un texto con saltos, cada salto (`\r\n`, `\r`, `\n`, U+2028 o U+2029) se cambia por un espacio. La API hace lo mismo antes de quitar los espacios de los extremos y de medir los 100, así que una descripción guardada nunca lleva saltos.
 * **RF-MM-05 — Salida:** Registrar el tipo de número de salida: `Número largo` (por defecto y única opción habilitada), `Número corto` y `Número corto flash` (visibles y deshabilitadas).
 * **RF-MM-06 — Herramientas:** Registrar las herramientas elegidas para la campaña:
   * `Keyword` (casilla).
@@ -236,7 +237,7 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Codificación del SMS (GSM-7 o UCS-2) | Se fuerza GSM-7 al generar: se quitan los diacríticos, se transliteran los signos tipográficos con equivalente simple (comillas, puntos suspensivos, guiones, `°`, `º`, `ª`) y los de la tabla extendida (`€`, corchetes, llaves, barras, `~`), y se borran los caracteres sin equivalente; la versión se guarda como se escribió (RF-MM-27) | Usuario (2026-10-19), consultado por architec; la transliteración, a pregunta de coordinador_modulo_mowa_mes; la de los extendidos, el 2026-10-26 (cierra S-MM-9) |
 | Retiro del editor de dos partes (fase M3) | Ahora: las versiones nuevas son solo v2; las v1 siguen usándose en solo lectura y se convierten a v2 para personalizarlas (RF-MM-17) | Usuario (2026-10-19), consultado por architec |
 | Feriados (S-MM-4) | La regla registra de por sí los 16 feriados nacionales de ley (contrastados con los calendarios de 2026 y 2027); los días no laborables adicionales se registran a mano, quedan guardados y los ven todos (RF-MM-08). Si se aprueba un feriado nuevo o el traslado a lunes, se ajusta la regla | Usuario (2026-10-26), consultado por architec |
-| Largo de la descripción (S-MM-3) y botón «Copiar» | 100 caracteres, el límite del formulario de MES; la sugerida se acorta por filtros enteros; un botón copia la descripción para pegarla en MES (RF-MM-04) | Usuario (2026-10-27), consultado por architec |
+| Largo de la descripción (S-MM-3) y botón «Copiar» | 100 caracteres, el límite del formulario de MES; la sugerida se acorta por filtros enteros; un botón copia la descripción para pegarla en MES; una sola línea, con los saltos cambiados por un espacio (RF-MM-04) | Usuario (2026-10-27), consultado por architec; la línea única, a pregunta de coordinador_modulo_mowa_mes |
 
 ## 7. Evidencia de los ejemplos
 
@@ -289,3 +290,4 @@ Queda abierto S-MM-1: depende de información externa (qué ofrece MES), no de u
 
 **2026-10-27**
 - **RF existentes ampliados:** RF-MM-04 (descripción de campaña): largo máximo de 100 caracteres, la sugerida se acorta por filtros enteros, y un botón «Copiar» al costado del campo. Decisión y pedido del usuario; cierra el supuesto S-MM-3.
+- **RF existentes ampliados:** RF-MM-04: la descripción es de una sola línea, como el campo de MES; los saltos de línea se cambian por un espacio en la pantalla y en la API. Decisión del usuario.
