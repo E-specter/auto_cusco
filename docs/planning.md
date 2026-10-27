@@ -69,6 +69,8 @@ Alcance:
 
   Es transversal: la sábana es su primer catálogo. Diseño en `docs/mapeador-encabezados.md`; tablero T-MAP-* en `docs/agents/tasks.md`; delegado a `coordinador_motor_texto_enriquecido`.
 
+  **2026-10-27:** el componente (`171025e`) y `/cargas` en dos pasos (`ed9a847`) están en `main`. Pedidos del usuario al revisarlo: búsqueda dentro de la lista de campos (RF-59 ampliado) y **campos adicionales** creados desde el mapeo, que quedan en el catálogo y se usan en filtros, indicadores, textos y columnas de carga (RF-64 a RF-66). Tablero: T-MAP-F3, T-CA-*, T-SAB-1.
+
 ## Fase 2 — Selección, segmentación y métricas (RF-04 – RF-08, RF-25 – RF-28)
 
 Se agrupan porque las métricas dependen directamente de la selección/filtrado y deben evolucionar juntas en la UI.
