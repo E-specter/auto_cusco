@@ -8,6 +8,7 @@
  */
 import Shell from '../layouts/Shell.astro';
 import Icon from '../components/Icon.astro';
+import MapeadorEncabezados from '../components/MapeadorEncabezados.astro';
 import '../styles/console.css';
 ---
 
@@ -173,70 +174,117 @@ import '../styles/console.css';
         </button>
       </div>
 
-      <div class="dialog__body upload__grid">
-        <div class="field upload__file">
-          <span class="field__label" id="upload-file-label" data-i18n="console.upload.file">
-            Archivo de la sábana
-          </span>
-          <!--
-            The native control's button text comes from the browser's locale,
-            not the page's, so a Spanish dialog can read "Choose File". The
-            input stays a real focusable <input type="file"> for the keyboard
-            and assistive tech; the label is its visible, translated trigger.
-          -->
-          <div class="filepick">
-            <input
-              class="filepick__input"
-              id="upload-file"
-              name="archivo"
-              type="file"
-              accept=".xlsb,.xlsx,.xls"
-              aria-labelledby="upload-file-label"
-            />
-            <label class="filepick__button" for="upload-file" data-i18n="console.upload.choose">
-              Elegir archivo
-            </label>
-            <span class="filepick__name mono" data-file-name data-i18n="console.upload.noFile">
-              Ningún archivo elegido
+      <ol class="pasos" data-pasos data-i18n-attr="aria-label:console.mapeo.pasos">
+        <li class="pasos__item" data-paso-marca="1" aria-current="step" data-i18n="console.mapeo.paso1">1. Elegir archivo</li>
+        <li class="pasos__item" data-paso-marca="2" data-i18n="console.mapeo.paso2">2. Revisar columnas</li>
+      </ol>
+
+      <div data-paso="1">
+        <div class="dialog__body upload__grid">
+          <div class="field upload__file">
+            <span class="field__label" id="upload-file-label" data-i18n="console.upload.file">
+              Archivo de la sábana
             </span>
-            <span class="filepick__drop mono" data-i18n="console.upload.drop">
-              o arrastra el archivo aquí
-            </span>
+            <!--
+              The native control's button text comes from the browser's locale,
+              not the page's, so a Spanish dialog can read "Choose File". The
+              input stays a real focusable <input type="file"> for the keyboard
+              and assistive tech; the label is its visible, translated trigger.
+            -->
+            <div class="filepick">
+              <input
+                class="filepick__input"
+                id="upload-file"
+                name="archivo"
+                type="file"
+                accept=".xlsx,.xlsb,.xls,.ods,.csv,.tsv,.txt,.json"
+                aria-labelledby="upload-file-label"
+              />
+              <label class="filepick__button" for="upload-file" data-i18n="console.upload.choose">
+                Elegir archivo
+              </label>
+              <span class="filepick__name mono" data-file-name data-i18n="console.upload.noFile">
+                Ningún archivo elegido
+              </span>
+              <span class="filepick__drop mono" data-i18n="console.upload.drop">
+                o arrastra el archivo aquí
+              </span>
+            </div>
+            <p class="field__hint" data-i18n="console.upload.file.hint">
+              Formato .xlsb o .xlsx, hasta 64 MB.
+            </p>
+            <p class="field__error" id="upload-file-error" data-error-for="archivo" role="alert"></p>
           </div>
-          <p class="field__hint" data-i18n="console.upload.file.hint">
-            Formato .xlsb o .xlsx, hasta 64 MB.
-          </p>
-          <p class="field__error" id="upload-file-error" data-error-for="archivo" role="alert"></p>
+
+          <div class="field">
+            <label class="field__label" for="upload-date" data-i18n="console.upload.date">
+              Fecha de corte
+            </label>
+            <input class="input" id="upload-date" name="fecha_corte" type="date" required />
+            <p class="field__hint" data-date-hint data-i18n="console.upload.date.plain">
+              Es la fecha que representa esta sábana.
+            </p>
+            <p class="field__error" id="upload-date-error" data-error-for="fecha" role="alert"></p>
+          </div>
+
+          <p class="field__error upload__error" data-upload-error role="alert"></p>
         </div>
 
-        <div class="field">
-          <label class="field__label" for="upload-date" data-i18n="console.upload.date">
-            Fecha de corte
-          </label>
-          <input class="input" id="upload-date" name="fecha_corte" type="date" required />
-          <p class="field__hint" data-date-hint data-i18n="console.upload.date.plain">
-            Es la fecha que representa esta sábana.
-          </p>
-          <p class="field__error" id="upload-date-error" data-error-for="fecha" role="alert"></p>
+        <div class="dialog__foot">
+          <button type="button" class="btn" data-close data-i18n="console.upload.cancel">Cancelar</button>
+          <button type="submit" class="btn btn--primary" data-upload-submit>
+            <span class="btn__spinner" aria-hidden="true"></span>
+            <span class="btn__label" data-i18n="console.mapeo.continuar">Continuar</span>
+          </button>
         </div>
-
-        <div class="field">
-          <label class="field__label" for="upload-sheet" data-i18n="console.upload.sheet">Hoja</label>
-          <input class="input" id="upload-sheet" name="hoja" type="text" value="VENCIDA" />
-          <p class="field__hint" data-i18n="console.upload.sheet.hint">
-            La hoja con los datos del corte.
-          </p>
-        </div>
-
-        <p class="field__error upload__error" data-upload-error role="alert"></p>
       </div>
 
-      <div class="dialog__foot">
-        <button type="button" class="btn" data-close data-i18n="console.upload.cancel">Cancelar</button>
-        <button type="submit" class="btn btn--primary" data-upload-submit>
-          <span class="btn__spinner" aria-hidden="true"></span>
-          <span class="btn__label" data-i18n="console.upload.submit">Registrar versión</span>
-        </button>
+      <div data-paso="2" hidden>
+        <div class="dialog__body upload__mapeo">
+          <p class="mono muted" data-mapeo-resumen tabindex="-1"></p>
+
+          <div class="upload__opciones" data-opciones-lectura>
+            <div class="field" data-opcion="hoja" hidden>
+              <label class="field__label" for="opcion-hoja" data-i18n="console.mapeo.hoja">Hoja</label>
+              <select class="input" id="opcion-hoja" data-opcion-select="hoja" aria-describedby="opcion-hoja-error"></select>
+              <p class="field__error" id="opcion-hoja-error" data-opcion-error="hoja" role="alert"></p>
+            </div>
+            <div class="field" data-opcion="separador" hidden>
+              <label class="field__label" for="opcion-separador" data-i18n="console.mapeo.separador">Separador</label>
+              <select class="input" id="opcion-separador" data-opcion-select="separador" aria-describedby="opcion-separador-error"></select>
+              <p class="field__error" id="opcion-separador-error" data-opcion-error="separador" role="alert"></p>
+            </div>
+            <div class="field" data-opcion="codificacion" hidden>
+              <label class="field__label" for="opcion-codificacion" data-i18n="console.mapeo.codificacion">Codificación</label>
+              <select class="input" id="opcion-codificacion" data-opcion-select="codificacion" aria-describedby="opcion-codificacion-error"></select>
+              <p class="field__error" id="opcion-codificacion-error" data-opcion-error="codificacion" role="alert"></p>
+            </div>
+          </div>
+
+          <div class="notice notice--warning" data-reanalizar hidden>
+            <Icon name="triangle-alert" size={20} />
+            <div class="upload__reanalizar">
+              <p id="reanalizar-texto" data-reanalizar-texto></p>
+              <span class="upload__reanalizar-acciones">
+                <button type="button" class="btn btn--sm btn--primary" data-reanalizar-si aria-describedby="reanalizar-texto" data-i18n="console.mapeo.reanalizar.si">Volver a leer</button>
+                <button type="button" class="btn btn--sm" data-reanalizar-no aria-describedby="reanalizar-texto" data-i18n="console.mapeo.reanalizar.no">Mantener lo elegido</button>
+              </span>
+            </div>
+          </div>
+
+          <MapeadorEncabezados id="mapeador" />
+
+          <p class="field__error upload__error" data-confirmar-error role="alert"></p>
+        </div>
+
+        <div class="dialog__foot">
+          <p class="field__hint upload__motivo" id="mapeo-motivo" data-motivo></p>
+          <button type="button" class="btn" data-mapeo-cancelar data-i18n="console.upload.cancel">Cancelar</button>
+          <button type="button" class="btn btn--primary" data-confirmar aria-describedby="mapeo-motivo">
+            <span class="btn__spinner" aria-hidden="true"></span>
+            <span class="btn__label" data-i18n="console.mapeo.confirmar">Confirmar y cargar</span>
+          </button>
+        </div>
       </div>
     </form>
   </dialog>
@@ -408,13 +456,35 @@ import '../styles/console.css';
     listarIncidencias,
     listarVersiones,
     obtenerVersion,
-    subirSabana,
     type Incidencia,
     type Severidad,
     type Version,
   } from '../lib/api';
   import { applyTranslations, t } from '../lib/i18n';
   import { openWhenFree } from '../lib/dialogs';
+  import {
+    confirmarCarga,
+    crearBorrador,
+    descartarBorrador,
+    obtenerCatalogoMapeador,
+    reanalizarBorrador,
+    validarMapeo,
+    type AnalisisBorrador,
+    type CatalogoMapeador,
+    type OpcionesLectura,
+  } from '../lib/api-mapeador';
+  import {
+    conMarcaDeDetectado,
+    esBorradorPerdido,
+    hojasDelError,
+    motivoDeConfirmar,
+    nombreDeSeparador,
+    opcionesQueAplican,
+    problemasDeLaConfirmacion,
+    textoDeError,
+  } from '../lib/carga-mapeada';
+  import { etiquetaCampo } from '../lib/campos';
+  import { EVENTO_MAPEO, montarMapeador, type ControladorMapeador, type EstadoMapeo } from '../scripts/mapeador-encabezados';
   import {
     formatBytes,
     formatDate,
@@ -1095,6 +1165,7 @@ import '../styles/console.css';
   document.querySelectorAll<HTMLButtonElement>('[data-open-upload]').forEach((trigger) => {
   trigger.addEventListener('click', () => {
     uploadForm.reset();
+    irAPaso(1);
     const name = $<HTMLElement>('[data-file-name]')!;
     name.dataset.i18n = 'console.upload.noFile';
     name.textContent = t('console.upload.noFile');
@@ -1122,9 +1193,9 @@ import '../styles/console.css';
    * it concerns, marked on the control, announced to assistive tech, and with
    * the focus moved there so the recovery needs no hunting.
    */
-  function failField(field: 'archivo' | 'fecha', key: string): void {
+  function failField(field: 'archivo' | 'fecha', key: string, text: string = t(key)): void {
     const slot = $<HTMLElement>(`[data-error-for="${field}"]`)!;
-    slot.textContent = t(key);
+    slot.textContent = text;
 
     const control = field === 'archivo' ? filePick : dateInput;
     control.setAttribute('aria-invalid', 'true');
@@ -1164,40 +1235,278 @@ import '../styles/console.css';
 
     setLoading(uploadForm, true);
     try {
-      const hoja = $<HTMLInputElement>('#upload-sheet')!.value.trim();
-      const creada = await subirSabana({
-        archivo: file,
-        fechaCorte: dateInput.value,
-        hoja: hoja || undefined,
-      });
-
-      dialogs.upload.close();
-      state.fechaActiva = creada.fecha_corte;
-      state.seleccionId = creada.id;
-      state.offset = 0;
-      await refresh();
-      void renderIncidencias();
-
-      if (creada.versiones_identicas.length > 0) {
-        $<HTMLElement>('[data-duplicate-body]')!.textContent = t('console.duplicate.body', {
-          versiones: creada.versiones_identicas.join(', '),
-        });
-        dialogs.duplicate.showModal();
-      }
-
-      follow(creada.id);
+      const [analisis, catalogo] = await Promise.all([
+        crearBorrador(file),
+        mapeo.catalogo ? Promise.resolve(mapeo.catalogo) : obtenerCatalogoMapeador(),
+      ]);
+      entrarAlPaso2(file, dateInput.value, analisis, catalogo);
     } catch (caught) {
-      if (caught instanceof ApiError && caught.status === 413) {
-        failField('archivo', 'console.upload.error.tooBig');
-      } else if (caught instanceof ApiError && caught.status === 400) {
-        failField('archivo', 'console.upload.error.empty');
-      } else if (caught instanceof NetworkError) {
+      if (caught instanceof NetworkError) {
         error.textContent = t('console.upload.error.network');
+      } else if (caught instanceof ApiError) {
+        // Each refusal says its own `codigo`; the text is the interface's, in its language.
+        failField('archivo', '', textoDeError(caught, t('console.upload.error.network'), t('common.errorBody')));
       } else {
         error.textContent = t('common.errorBody');
       }
     } finally {
       setLoading(uploadForm, false);
+    }
+  });
+
+  // ---- Step 2: review the columns (T-MAP-F2) ----------------------------------------------------
+
+  const mapeo = {
+    analisis: null as AnalisisBorrador | null,
+    catalogo: null as CatalogoMapeador | null,
+    controlador: null as ControladorMapeador | null,
+    archivo: null as File | null,
+    fecha: '',
+    estado: null as EstadoMapeo | null,
+    confirmando: false,
+    /** What the analyst chose for the reading, and only that: the rest is detected again each time. */
+    elegidas: {} as OpcionesLectura,
+    pendiente: null as { opcion: 'hoja' | 'separador' | 'codificacion'; valor: string } | null,
+  };
+
+  const raizMapeador = $<HTMLElement>('#mapeador')!;
+  const botonConfirmar = $<HTMLButtonElement>('[data-confirmar]')!;
+
+  function irAPaso(paso: 1 | 2): void {
+    document.querySelectorAll<HTMLElement>('[data-paso]').forEach((nodo) => {
+      nodo.hidden = nodo.dataset.paso !== String(paso);
+    });
+    document.querySelectorAll<HTMLElement>('[data-paso-marca]').forEach((marca) => {
+      if (marca.dataset.pasoMarca === String(paso)) marca.setAttribute('aria-current', 'step');
+      else marca.removeAttribute('aria-current');
+    });
+    dialogs.upload.classList.toggle('dialog--mapeo', paso === 2);
+  }
+
+  /** The visible name of a field of the catalogue, never its technical name. */
+  function etiquetaDeCampo(nombre: string): string {
+    const campo = mapeo.catalogo?.campos.find((c) => c.nombre === nombre);
+    const texto = campo ? t(campo.clave_etiqueta) : '';
+    return campo && texto !== campo.clave_etiqueta ? texto : etiquetaCampo(nombre);
+  }
+
+  function pintarConfirmar(): void {
+    const motivo = mapeo.estado ? motivoDeConfirmar(mapeo.estado, etiquetaDeCampo) : t('console.mapeo.motivo.revisando');
+    $<HTMLElement>('[data-motivo]')!.textContent = motivo ?? '';
+    botonConfirmar.disabled = motivo !== null || mapeo.confirmando;
+    botonConfirmar.dataset.loading = String(mapeo.confirmando);
+  }
+
+  // Subscribed before mounting, so the first `mapeocambiado` is never missed.
+  raizMapeador.addEventListener(EVENTO_MAPEO, (event) => {
+    mapeo.estado = (event as CustomEvent<EstadoMapeo>).detail;
+    pintarConfirmar();
+  });
+
+  /** One option of the reading: its values, the chosen one and «(detectado)» when the reader picked it. */
+  function pintarOpcion(opcion: 'hoja' | 'separador' | 'codificacion', valores: readonly string[], actual: string | null): void {
+    const analisis = mapeo.analisis!;
+    const select = $<HTMLSelectElement>(`[data-opcion-select="${opcion}"]`)!;
+    const lista = actual !== null && !valores.includes(actual) ? [...valores, actual] : valores;
+    select.replaceChildren(
+      ...lista.map((valor) => {
+        const o = document.createElement('option');
+        o.value = valor;
+        const nombre = opcion === 'separador' ? nombreDeSeparador(valor) : valor;
+        o.textContent = valor === actual ? conMarcaDeDetectado(nombre, opcion, analisis.detectados) : nombre;
+        return o;
+      }),
+    );
+    select.value = actual ?? '';
+  }
+
+  function pintarOpciones(): void {
+    const analisis = mapeo.analisis!;
+    const aplican = opcionesQueAplican(analisis);
+    document.querySelectorAll<HTMLElement>('[data-opcion]').forEach((nodo) => {
+      nodo.hidden = !aplican[nodo.dataset.opcion as 'hoja' | 'separador' | 'codificacion'];
+    });
+    // Without a single option to show, the empty box would only add a gap.
+    $<HTMLElement>('[data-opciones-lectura]')!.hidden = !(aplican.hoja || aplican.separador || aplican.codificacion);
+    document.querySelectorAll<HTMLElement>('[data-opcion-error]').forEach((nodo) => (nodo.textContent = ''));
+    if (aplican.hoja) pintarOpcion('hoja', analisis.hojas, analisis.hoja);
+    if (aplican.separador) pintarOpcion('separador', mapeo.catalogo!.separadores, analisis.separador);
+    if (aplican.codificacion) pintarOpcion('codificacion', mapeo.catalogo!.codificaciones, analisis.codificacion);
+  }
+
+  function entrarAlPaso2(archivo: File, fecha: string, analisis: AnalisisBorrador, catalogo: CatalogoMapeador): void {
+    mapeo.archivo = archivo;
+    mapeo.fecha = fecha;
+    mapeo.analisis = analisis;
+    mapeo.catalogo = catalogo;
+    mapeo.elegidas = {};
+    mapeo.estado = null;
+    mapeo.pendiente = null;
+    $<HTMLElement>('[data-reanalizar]')!.hidden = true;
+    $<HTMLElement>('[data-confirmar-error]')!.textContent = '';
+    $<HTMLElement>('[data-mapeo-resumen]')!.textContent = t('console.mapeo.resumen', {
+      archivo: archivo.name,
+      fecha: formatDate(fecha),
+    });
+    pintarOpciones();
+    irAPaso(2);
+    mapeo.controlador?.destruir();
+    mapeo.controlador = montarMapeador(raizMapeador, {
+      analisis,
+      campos: catalogo.campos,
+      // A draft that expired is only found out here or on confirming: the screen starts over.
+      validar: async (asignaciones, signal) => {
+        try {
+          return await validarMapeo(analisis.borrador_id, asignaciones, signal);
+        } catch (caught) {
+          if (esBorradorPerdido(caught)) volverAlPaso1(t('mapeador.error.borrador_no_encontrado'));
+          throw caught;
+        }
+      },
+    });
+    pintarConfirmar();
+    $<HTMLElement>('[data-mapeo-resumen]')!.focus();
+  }
+
+  /** Drops the draft (best effort: it expires by itself) and the component. */
+  function soltarBorrador(): void {
+    const analisis = mapeo.analisis;
+    mapeo.controlador?.destruir();
+    mapeo.controlador = null;
+    mapeo.analisis = null;
+    mapeo.estado = null;
+    if (analisis) void descartarBorrador(analisis.borrador_id).catch(() => undefined);
+  }
+
+  function volverAlPaso1(mensaje?: string): void {
+    soltarBorrador();
+    irAPaso(1);
+    if (mensaje) $<HTMLElement>('[data-upload-error]')!.textContent = mensaje;
+    // The button that had the focus is hidden now: it goes to the step's own action.
+    $<HTMLButtonElement>('[data-upload-submit]')!.focus();
+  }
+
+  $<HTMLButtonElement>('[data-mapeo-cancelar]')!.addEventListener('click', () => volverAlPaso1());
+  // Closing the dialog any other way (the cross, Escape) leaves no draft behind either.
+  dialogs.upload.addEventListener('close', soltarBorrador);
+
+  // Changing how the file is read reads it again; if the analyst already chose something, that goes away: ask first.
+  type OpcionDeLectura = 'hoja' | 'separador' | 'codificacion';
+
+  async function reanalizar(opcion: OpcionDeLectura, valor: string): Promise<void> {
+    const analisis = mapeo.analisis!;
+    const opciones = { ...mapeo.elegidas, [opcion]: valor };
+    try {
+      const nuevo = await reanalizarBorrador(analisis.borrador_id, opciones);
+      mapeo.analisis = nuevo;
+      mapeo.elegidas = opciones;
+      pintarOpciones();
+      mapeo.controlador?.fijarAnalisis(nuevo);
+    } catch (caught) {
+      if (esBorradorPerdido(caught)) return volverAlPaso1(t('mapeador.error.borrador_no_encontrado'));
+      // The select goes back to what is read; a sheet that does not exist offers the file's own.
+      pintarOpciones();
+      const hojas = hojasDelError(caught);
+      if (opcion === 'hoja' && hojas.length > 0) pintarOpcion('hoja', hojas, analisis.hoja);
+      $<HTMLElement>(`[data-opcion-error="${opcion}"]`)!.textContent = textoDeError(
+        caught,
+        t('console.upload.error.network'),
+        t('common.errorBody'),
+      );
+    }
+  }
+
+  document.querySelectorAll<HTMLSelectElement>('[data-opcion-select]').forEach((select) => {
+    select.addEventListener('change', () => {
+      const opcion = select.dataset.opcionSelect as OpcionDeLectura;
+      if (!(mapeo.controlador?.estado().modificado ?? false)) {
+        void reanalizar(opcion, select.value);
+        return;
+      }
+      mapeo.pendiente = { opcion, valor: select.value };
+      pintarOpciones();
+      $<HTMLElement>('[data-reanalizar-texto]')!.textContent = t('console.mapeo.reanalizar.aviso', {
+        opcion: t(`console.mapeo.opcion.${opcion}`),
+      });
+      $<HTMLElement>('[data-reanalizar]')!.hidden = false;
+      $<HTMLButtonElement>('[data-reanalizar-no]')!.focus();
+    });
+  });
+
+  $<HTMLButtonElement>('[data-reanalizar-si]')!.addEventListener('click', () => {
+    const pendiente = mapeo.pendiente;
+    $<HTMLElement>('[data-reanalizar]')!.hidden = true;
+    mapeo.pendiente = null;
+    if (pendiente) void reanalizar(pendiente.opcion, pendiente.valor);
+  });
+
+  $<HTMLButtonElement>('[data-reanalizar-no]')!.addEventListener('click', () => {
+    const pendiente = mapeo.pendiente;
+    $<HTMLElement>('[data-reanalizar]')!.hidden = true;
+    mapeo.pendiente = null;
+    if (pendiente) $<HTMLSelectElement>(`[data-opcion-select="${pendiente.opcion}"]`)?.focus();
+  });
+
+  // ---- Confirm -----------------------------------------------------------------------------------
+
+  /** What follows a registered version, as it always did: select its date, refresh, warn of an identical file, follow it. */
+  async function alRegistrar(creada: { id: number; fecha_corte: string; versiones_identicas: number[] }): Promise<void> {
+    dialogs.upload.close();
+    state.fechaActiva = creada.fecha_corte;
+    state.seleccionId = creada.id;
+    state.offset = 0;
+    await refresh();
+    void renderIncidencias();
+
+    if (creada.versiones_identicas.length > 0) {
+      $<HTMLElement>('[data-duplicate-body]')!.textContent = t('console.duplicate.body', {
+        versiones: creada.versiones_identicas.join(', '),
+      });
+      dialogs.duplicate.showModal();
+    }
+
+    follow(creada.id);
+  }
+
+  botonConfirmar.addEventListener('click', async () => {
+    const analisis = mapeo.analisis;
+    const estado = mapeo.estado;
+    if (!analisis || !estado || !estado.listo || estado.pendiente || mapeo.confirmando) return;
+    const error = $<HTMLElement>('[data-confirmar-error]')!;
+    error.textContent = '';
+    mapeo.confirmando = true;
+    pintarConfirmar();
+    try {
+      // The assignments go as the component made them: the backend settles each origin.
+      const creada = await confirmarCarga({
+        borrador_id: analisis.borrador_id,
+        fecha_corte: mapeo.fecha,
+        asignaciones: estado.asignaciones,
+      });
+      // The draft is gone with the confirmation: closing the dialog must not delete it again.
+      mapeo.controlador?.destruir();
+      mapeo.controlador = null;
+      mapeo.analisis = null;
+      await alRegistrar(creada);
+    } catch (caught) {
+      const problemas = problemasDeLaConfirmacion(caught);
+      if (problemas) {
+        // Back to the same step, with what was chosen intact and the problems on their rows.
+        mapeo.controlador?.fijarProblemas(problemas);
+        // The button was off while confirming, so the focus is lost: to the first marked field, or the summary.
+        const marcado = raizMapeador.querySelector<HTMLElement>('select[aria-invalid="true"]');
+        marcado?.focus();
+        if (document.activeElement !== marcado) $<HTMLElement>('[data-mapeo-resumen]')!.focus();
+      } else if (esBorradorPerdido(caught)) {
+        volverAlPaso1(t('mapeador.error.borrador_no_encontrado'));
+      } else {
+        error.textContent = textoDeError(caught, t('console.upload.error.network'), t('common.errorBody'));
+      }
+    } finally {
+      mapeo.confirmando = false;
+      pintarConfirmar();
+      // Any other refusal leaves the step as it was: the action that was pressed gets the focus back.
+      if (document.activeElement === document.body && !botonConfirmar.disabled) botonConfirmar.focus();
     }
   });
 

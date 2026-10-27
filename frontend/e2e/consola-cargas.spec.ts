@@ -8,6 +8,7 @@
 import { expect, test } from '@playwright/test';
 
 import { ARCHIVO_SINTETICO, apiVacia, montarApi, version } from './api-falsa';
+import { confirmarCarga, conCargaMapeada } from './api-falsa-carga-mapeada';
 
 test.describe('camino feliz: subir una sábana y leer el resumen', () => {
   test('sugiere la fecha, sigue el procesamiento y muestra las cifras', async ({ page }) => {
@@ -33,6 +34,7 @@ test.describe('camino feliz: subir una sábana y leer el resumen', () => {
       { fila: 8, columna: 'pagare', codigo: 'pagare_repetido', severidad: 'error', detalle: 'Pagare ya presente', valor_original: '000000000000000006' },
       { fila: null, columna: 'bpo', codigo: 'columna_faltante', severidad: 'advertencia', detalle: 'Columna esperada ausente', valor_original: null },
     ];
+    conCargaMapeada(api);
     await montarApi(page, api);
 
     await page.goto('/cargas');
@@ -47,7 +49,7 @@ test.describe('camino feliz: subir una sábana y leer el resumen', () => {
     await expect(page.getByText('Sugerida desde el nombre del archivo.')).toBeVisible();
 
     api.versiones = [terminada];
-    await page.getByRole('button', { name: 'Registrar versión' }).click();
+    await confirmarCarga(page);
 
     await expect(page.locator('[data-progress]')).toBeVisible();
 
@@ -182,13 +184,14 @@ test.describe('V-4: qué versión se considera', () => {
       },
     ];
     api.seguimiento = [nueva];
+    conCargaMapeada(api);
     await montarApi(page, api);
 
     await page.goto('/cargas');
     await page.getByRole('button', { name: 'Subir sábana' }).click();
     await page.locator('#upload-file').setInputFiles(ARCHIVO_SINTETICO);
     api.versiones = [nueva, vigenteActual];
-    await page.getByRole('button', { name: 'Registrar versión' }).click();
+    await confirmarCarga(page);
 
     const dialogo = page.locator('dialog[data-dialog="vigente"]');
     await expect(dialogo).toBeVisible();
@@ -222,13 +225,14 @@ test.describe('V-4: qué versión se considera', () => {
       },
     ];
     api.seguimiento = [nueva];
+    conCargaMapeada(api);
     await montarApi(page, api);
 
     await page.goto('/cargas');
     await page.getByRole('button', { name: 'Subir sábana' }).click();
     await page.locator('#upload-file').setInputFiles(ARCHIVO_SINTETICO);
     api.versiones = [nueva, vigenteActual];
-    await page.getByRole('button', { name: 'Registrar versión' }).click();
+    await confirmarCarga(page);
 
     const duplicado = page.locator('dialog[data-dialog="duplicate"]');
     const vigente = page.locator('dialog[data-dialog="vigente"]');

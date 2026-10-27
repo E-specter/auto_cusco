@@ -10,7 +10,9 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 import type { Campos, SeleccionGuardada, Version } from '../src/lib/api';
-import { apiVacia, camposSinteticos, montarApi, seleccionGuardada, version } from './api-falsa';
+import { ARCHIVO_SINTETICO, apiVacia, camposSinteticos, montarApi, seleccionGuardada, version } from './api-falsa';
+import { codigoDeRechazo, conCargaMapeada, type ApiFalsaCargaMapeada } from './api-falsa-carga-mapeada';
+import { analisisSintetico, columna } from './api-falsa-mapeador';
 import {
   apiMowaMes,
   campanaSintetica,
@@ -753,5 +755,99 @@ test('generar carga a 360 px: el campo de la fecha de envío y su error', async 
 test('generar carga a 360 px: la tabla de la muestra y la de problemas se alcanzan con teclado', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await abrirGenerarCarga(page, conProblemas);
+  await sinViolaciones(page);
+});
+
+// The upload dialog in two steps (T-MAP-F2): the file step, the column step with the reading options, the
+// notice that asks before re-reading, a refusal under an option and the problems the 422 brings back.
+async function abrirCargaEnDosPasos(page: Page, parcial: Partial<ApiFalsaCargaMapeada> = {}) {
+  const api = apiVacia();
+  const carga = conCargaMapeada(api, parcial);
+  await montarApi(page, api);
+  await page.goto('/cargas');
+  await page.getByRole('button', { name: 'Subir sábana' }).click();
+  await expect(page.getByRole('dialog', { name: 'Subir una sábana' })).toBeVisible();
+  return { api, carga };
+}
+
+async function alSegundoPaso(page: Page) {
+  await page.locator('#upload-file').setInputFiles(ARCHIVO_SINTETICO);
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await expect(page.getByRole('button', { name: 'Confirmar y cargar' })).toBeVisible();
+}
+
+const VARIAS_HOJAS_Y_PARECIDOS = analisisSintetico(
+  [
+    columna(0, 'Pagare', 'coincide', 'pagare'),
+    columna(1, 'Saldo Capital', 'parecido', 'saldo_capital_pendiente'),
+    columna(2, 'Titular', 'coincide', 'titular'),
+  ],
+  { hojas: ['VENCIDA', 'MORA'], hoja: 'VENCIDA', detectados: ['hoja'] },
+);
+
+for (const tema of ['light', 'dark'] as const) {
+  test.describe(`subir sábana en dos pasos, tema ${tema === 'light' ? 'claro' : 'oscuro'}`, () => {
+    test.beforeEach(async ({ page }) => {
+      await page.addInitScript((elegido) => {
+        localStorage.setItem('app:appearance', JSON.stringify({ theme: elegido, language: 'es' }));
+      }, tema);
+    });
+
+    test('paso 1: el archivo y la fecha de corte', async ({ page }) => {
+      await abrirCargaEnDosPasos(page);
+      await page.locator('#upload-file').setInputFiles(ARCHIVO_SINTETICO);
+      await expect(page.locator('#upload-date')).toHaveValue('2026-09-10');
+      await sinViolaciones(page);
+    });
+
+    test('paso 1: el rechazo de un archivo bajo el campo', async ({ page }) => {
+      await abrirCargaEnDosPasos(page, { erroresBorrador: [codigoDeRechazo(400, 'archivo_vacio')] });
+      await page.locator('#upload-file').setInputFiles(ARCHIVO_SINTETICO);
+      await page.getByRole('button', { name: 'Continuar' }).click();
+      await expect(page.getByText('El archivo está vacío.')).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('paso 2: las columnas por revisar, las hojas y el motivo de «Confirmar y cargar»', async ({ page }) => {
+      await abrirCargaEnDosPasos(page, { analisis: VARIAS_HOJAS_Y_PARECIDOS });
+      await alSegundoPaso(page);
+      await expect(page.getByText('Revisa 1 columna para poder cargar.')).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('paso 2: el aviso que pregunta antes de volver a leer y el rechazo de una hoja', async ({ page }) => {
+      await abrirCargaEnDosPasos(page, { analisis: VARIAS_HOJAS_Y_PARECIDOS });
+      await alSegundoPaso(page);
+      await page.getByRole('button', { name: 'Aceptar sugerencias (1)' }).click();
+      await page.getByLabel('Hoja').selectOption('MORA');
+      await expect(page.locator('[data-reanalizar]')).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('paso 2: un CSV con separador y codificación', async ({ page }) => {
+      const csv = analisisSintetico([columna(0, 'Pagare', 'coincide', 'pagare')], {
+        formato: 'csv', hojas: ['datos'], hoja: 'datos', separador: ';', codificacion: 'utf-8', detectados: ['separador', 'codificacion'],
+      });
+      await abrirCargaEnDosPasos(page, { analisis: csv });
+      await alSegundoPaso(page);
+      await expect(page.getByLabel('Separador')).toBeVisible();
+      await sinViolaciones(page);
+    });
+  });
+}
+
+test('subir sábana a 360 px: el paso 2 cabe y la acción se alcanza con teclado', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  await abrirCargaEnDosPasos(page, { analisis: VARIAS_HOJAS_Y_PARECIDOS });
+  await alSegundoPaso(page);
+
+  const desborde = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(desborde).toBeLessThanOrEqual(0);
+  await page.getByRole('button', { name: 'Aceptar sugerencias (1)' }).click();
+  const confirmar = page.getByRole('button', { name: 'Confirmar y cargar' });
+  await expect(confirmar).toBeEnabled();
+  await confirmar.focus();
+  await expect(confirmar).toBeFocused();
+  await expect(confirmar).toBeInViewport();
   await sinViolaciones(page);
 });

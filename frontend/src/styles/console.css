@@ -465,6 +465,63 @@
   grid-column: 1 / -1;
 }
 
+/* The upload in two steps (T-MAP-F2): the second one holds the header mapper, so the dialog widens. */
+.dialog--mapeo {
+  inline-size: min(72rem, calc(100vw - var(--space-5)));
+  overflow-y: auto;
+}
+
+.pasos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: var(--space-3) var(--space-4) 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.pasos__item[aria-current='step'] {
+  color: var(--color-text);
+  font-weight: 600;
+  border-block-end: 2px solid var(--color-accent);
+}
+
+/* The action of step 2 stays in view however many columns the sheet has. */
+.dialog--mapeo [data-paso='2'] .dialog__foot {
+  position: sticky;
+  inset-block-end: 0;
+}
+
+.upload__mapeo {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.upload__opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.upload__opciones .field {
+  min-inline-size: 12rem;
+}
+
+.upload__reanalizar-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
+
+.upload__motivo {
+  margin: 0;
+  margin-inline-end: auto;
+  align-self: center;
+}
+
 .choices {
   display: grid;
   gap: var(--space-3);
