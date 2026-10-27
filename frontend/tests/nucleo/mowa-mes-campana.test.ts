@@ -16,7 +16,9 @@ import {
   copiarConRespaldo,
   descripcionARegistrar,
   descripcionSigueSugerida,
-  pegadoExcede,
+  normalizarSaltos,
+  recortarSinPartirPares,
+  textoDePegado,
   entradaCampana,
   entradaCreacion,
   etiquetaArchivoPrevisto,
@@ -401,16 +403,58 @@ describe('la descripción de la campaña (RF-MM-04)', () => {
     expect(descripcionARegistrar('  ', '')).toBe('');
   });
 
-  it('un pegado que no cabe se detecta contra el espacio que queda, descontando lo seleccionado', () => {
-    expect(pegadoExcede('', 0, 'a'.repeat(100))).toBe(false);
-    expect(pegadoExcede('', 0, 'a'.repeat(101))).toBe(true);
-    expect(pegadoExcede('a'.repeat(90), 0, 'b'.repeat(11))).toBe(true);
-    expect(pegadoExcede('a'.repeat(90), 0, 'b'.repeat(10))).toBe(false);
+  it('los cinco saltos de línea pasan a un espacio, y el par CRLF cuenta como uno', () => {
+    expect(normalizarSaltos('a\r\nb')).toBe('a b');
+    expect(normalizarSaltos('a\rb')).toBe('a b');
+    expect(normalizarSaltos('a\nb')).toBe('a b');
+    expect(normalizarSaltos('a\u2028b')).toBe('a b');
+    expect(normalizarSaltos('a\u2029b')).toBe('a b');
+    expect(normalizarSaltos('uno\r\ndos\nTres')).toBe('uno dos Tres');
+    // Dos saltos seguidos son dos espacios: ni se juntan ni se pierden.
+    expect(normalizarSaltos('a\r\n\r\nb')).toBe('a  b');
+    expect(normalizarSaltos('a\n\nb')).toBe('a  b');
+  });
+
+  it('no junta los espacios que ya había ni toca la tabulación vertical', () => {
+    expect(normalizarSaltos('a \n b')).toBe('a   b');
+    expect(normalizarSaltos('a\vb')).toBe('a\vb');
+    expect(normalizarSaltos('sin saltos')).toBe('sin saltos');
+    expect(normalizarSaltos('')).toBe('');
+  });
+
+  it('el recorte no parte un par sustituto', () => {
+    expect(recortarSinPartirPares('abc', 2)).toBe('ab');
+    expect(recortarSinPartirPares('abc', 5)).toBe('abc');
+    expect(recortarSinPartirPares('a😀', 3)).toBe('a😀');
+    // Cortar en 2 dejaría solo la mitad del emoji: se queda sin él.
+    expect(recortarSinPartirPares('a😀', 2)).toBe('a');
+    expect(recortarSinPartirPares('😀', 1)).toBe('');
+    expect(recortarSinPartirPares('abc', 0)).toBe('');
+    expect(recortarSinPartirPares('abc', -3)).toBe('');
+  });
+
+  it('un pegado se normaliza y se corta contra el espacio que queda, descontando lo seleccionado', () => {
+    expect(textoDePegado('', 0, 0, 'a'.repeat(100))).toEqual({ texto: 'a'.repeat(100), cortado: false });
+    expect(textoDePegado('', 0, 0, 'a'.repeat(101))).toEqual({ texto: 'a'.repeat(100), cortado: true });
+    expect(textoDePegado('a'.repeat(90), 90, 90, 'b'.repeat(11))).toEqual({ texto: 'b'.repeat(10), cortado: true });
+    expect(textoDePegado('a'.repeat(90), 90, 90, 'b'.repeat(10))).toEqual({ texto: 'b'.repeat(10), cortado: false });
     // Lo seleccionado se reemplaza: libera espacio.
-    expect(pegadoExcede('a'.repeat(100), 20, 'b'.repeat(20))).toBe(false);
-    expect(pegadoExcede('a'.repeat(100), 20, 'b'.repeat(21))).toBe(true);
-    // Un emoji cuenta 2.
-    expect(pegadoExcede('a'.repeat(99), 0, '😀')).toBe(true);
+    expect(textoDePegado('a'.repeat(100), 10, 30, 'b'.repeat(20)).cortado).toBe(false);
+    expect(textoDePegado('a'.repeat(100), 10, 30, 'b'.repeat(21))).toEqual({ texto: 'b'.repeat(20), cortado: true });
+  });
+
+  it('el aviso de pegado cortado se mide ya normalizado: un CRLF cuenta uno', () => {
+    // Quedan 2 unidades. Dos CRLF son dos espacios y caben; medidos sin normalizar serían 4 y se cortarían.
+    expect(textoDePegado('a'.repeat(98), 98, 98, '\r\n\r\n')).toEqual({ texto: '  ', cortado: false });
+    expect(textoDePegado('a'.repeat(98), 98, 98, 'x\r\ny')).toEqual({ texto: 'x ', cortado: true });
+    expect(textoDePegado('', 0, 0, 'uno\r\ndos\nTres').texto).toBe('uno dos Tres');
+  });
+
+  it('un pegado que corta justo en un emoji lo deja fuera entero', () => {
+    // Queda 1 unidad: el emoji (2) no cabe y no se parte.
+    expect(textoDePegado('a'.repeat(99), 99, 99, '😀')).toEqual({ texto: '', cortado: true });
+    expect(textoDePegado('a'.repeat(98), 98, 98, '😀')).toEqual({ texto: '😀', cortado: false });
+    expect(textoDePegado('a'.repeat(98), 98, 98, 'x😀')).toEqual({ texto: 'x', cortado: true });
   });
 });
 

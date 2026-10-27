@@ -121,13 +121,15 @@ import '../../styles/mowa-mes.css';
             <div class="field">
               <label class="field__label" for="mm-descripcion" data-i18n="mowaMes.campana.descripcion">Descripción de la campaña</label>
               <div class="mm-descripcion">
-                <textarea
+                <input
+                  type="text"
                   class="input"
                   id="mm-descripcion"
-                  rows="2"
                   maxlength="100"
+                  autocomplete="off"
                   data-descripcion
-                  aria-describedby="mm-descripcion-hint mm-descripcion-contador"></textarea>
+                  aria-describedby="mm-descripcion-hint mm-descripcion-contador"
+                />
                 <!-- aria-disabled, not disabled: it stays in the tab order and can be found (T-MM-F9). -->
                 <button
                   type="button"
@@ -458,10 +460,11 @@ import '../../styles/mowa-mes.css';
     entradaCreacion,
     etiquetaArchivoPrevisto,
     mensajeLimiteExcedido,
-    pegadoExcede,
+    normalizarSaltos,
     problemasCampana,
     textoDeProblemaCampana,
     resumenProblemasCampana,
+    textoDePegado,
     type CampanaBorrador,
     type ProgramacionBorrador,
     type SupervisorBorrador,
@@ -668,7 +671,7 @@ import '../../styles/mowa-mes.css';
         cantidad: sel.consulta.cantidad!,
         seleccionId: sel.guardada?.id ?? null,
       },
-      descripcion: $<HTMLTextAreaElement>('#mm-descripcion').value,
+      descripcion: $<HTMLInputElement>('#mm-descripcion').value,
       plantillaNombreArchivo: plantillaElegida(),
       herramientas: {
         keyword: $<HTMLInputElement>('[data-herramienta-keyword]').checked,
@@ -1132,7 +1135,7 @@ import '../../styles/mowa-mes.css';
     pintarEstadoCrear();
 
     if (!estado.descripcionEditada) {
-      $<HTMLTextAreaElement>('#mm-descripcion').value = previa.descripcion_sugerida;
+      $<HTMLInputElement>('#mm-descripcion').value = previa.descripcion_sugerida;
     }
     // Setting `value` fires no `input`: the counter and «Copiar» follow the suggestion by hand.
     pintarDescripcion();
@@ -1359,7 +1362,7 @@ import '../../styles/mowa-mes.css';
   $<HTMLInputElement>('#mm-fecha-unica').addEventListener('input', () => programarPrevisualizacion());
   // ---- The description field (RF-MM-04): counter and «Copiar» -----------------------------
 
-  const campoDescripcion = $<HTMLTextAreaElement>('#mm-descripcion');
+  const campoDescripcion = $<HTMLInputElement>('#mm-descripcion');
   const botonCopiar = $<HTMLButtonElement>('[data-descripcion-copiar]');
   const estadoDescripcion = $<HTMLElement>('[data-descripcion-estado]');
   /** A paste that did not fit has just been announced: the `input` that follows must not clear it. */
@@ -1439,16 +1442,66 @@ import '../../styles/mowa-mes.css';
     botonCopiar.focus();
   });
 
+  /**
+   * Puts `pegado` where the selection is, as a paste would, already normalized and cut to what fits by
+   * `textoDePegado`. If something was left out, say it once, so the end is not lost unnoticed.
+   *
+   * It goes in with `execCommand('insertText')`: that leaves an entry in the field's undo history (a paste
+   * wrong by one key must be undone with Ctrl+Z) and fires `input` by itself. It needs no `maxlength`
+   * care, the text arrives cut.
+   * shortcut: if the browser refuses (`false` or an exception) it falls back to `setRangeText` and a
+   * synthetic `input`, which leaves no undo entry; upgrade if a browser needs it.
+   */
+  function insertarEnElCampo(pegado: string): void {
+    const inicio = campoDescripcion.selectionStart ?? campoDescripcion.value.length;
+    const fin = campoDescripcion.selectionEnd ?? inicio;
+    const { texto, cortado } = textoDePegado(campoDescripcion.value, inicio, fin, pegado);
+    if (texto !== '') {
+      // The `input` that follows must not clear the notice about what was left out.
+      avisoDePegado = cortado;
+      campoDescripcion.focus();
+      campoDescripcion.setSelectionRange(inicio, fin);
+      let insertado = false;
+      try {
+        insertado = document.execCommand('insertText', false, texto);
+      } catch {
+        // Falls through to `setRangeText`.
+      }
+      if (!insertado) {
+        campoDescripcion.setRangeText(texto, inicio, fin, 'end');
+        campoDescripcion.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+    if (cortado) avisar(t('mowaMes.campana.descripcion.pegadoCortado', { max: DESCRIPCION_MAXIMA }));
+  }
+
+  // The field of MES is one line. An `<input type="text">` deletes `\r` and `\n` when pasting, which glues
+  // the words, and leaves U+2028 and U+2029: so the paste is done by hand, with the breaks as spaces.
   campoDescripcion.addEventListener('paste', (evento) => {
-    const pegado = evento.clipboardData?.getData('text') ?? '';
-    const seleccionado = campoDescripcion.selectionEnd - campoDescripcion.selectionStart;
-    if (!pegadoExcede(campoDescripcion.value, seleccionado, pegado)) return;
-    // The browser cuts it off in silence at `maxlength`: say it once, so the end is not lost unnoticed.
-    avisoDePegado = true;
-    avisar(t('mowaMes.campana.descripcion.pegadoCortado', { max: DESCRIPCION_MAXIMA }));
+    evento.preventDefault();
+    insertarEnElCampo(evento.clipboardData?.getData('text') ?? '');
+  });
+
+  campoDescripcion.addEventListener('drop', (evento) => {
+    const soltado = evento.dataTransfer?.getData('text') ?? '';
+    // shortcut: only a drop that carries a line break is done by hand, and it goes where the selection is,
+    // not under the pointer (an input gives no point-to-caret); any other drop is the browser's.
+    if (normalizarSaltos(soltado) === soltado) return;
+    evento.preventDefault();
+    insertarEnElCampo(soltado);
   });
 
   campoDescripcion.addEventListener('input', () => {
+    // U+2028 and U+2029 can still arrive (a keyboard, an IME): they become a space, the cursor stays put.
+    const limpio = normalizarSaltos(campoDescripcion.value);
+    if (limpio !== campoDescripcion.value) {
+      const { selectionStart: desde, selectionEnd: hasta } = campoDescripcion;
+      // shortcut: assigning `value` clears the field's undo history in Chrome; it only happens when a U+2028 or
+      // U+2029 is typed, which is rare. Upgrade: select the offending range and `execCommand('insertText', false, ' ')`,
+      // which keeps the undo history (`setRangeText` does not either), if that gets reported.
+      campoDescripcion.value = limpio;
+      campoDescripcion.setSelectionRange(desde, hasta);
+    }
     estado.descripcionEditada = true;
     // A message about the text that was there (copied, failed) is stale once it changes.
     if (avisoDePegado) avisoDePegado = false;

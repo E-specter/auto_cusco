@@ -69,6 +69,8 @@ interface Espias {
   clipboard?: 'normal' | 'ausente' | 'rechaza';
   /** `document.execCommand('copy')`: answers true, false or throws; every call records what was selected. */
   exec?: 'verdadero' | 'falso' | 'lanza';
+  /** `document.execCommand('insertText')`, which the paste of the field uses: `'falso'` makes the browser refuse it. */
+  insertText?: 'falso' | 'lanza';
 }
 
 /** Spies installed before the page loads, so the script of the page sees them from its first line. */
@@ -76,13 +78,17 @@ async function instalarEspias(page: Page, espias: Espias): Promise<void> {
   await page.addInitScript((cfg) => {
     const w = window as unknown as { __exec: string[] };
     w.__exec = [];
-    if (cfg.exec) {
+    if (cfg.exec || cfg.insertText) {
       const original = document.execCommand.bind(document);
       document.execCommand = (orden: string, ...resto: [boolean?, string?]) => {
-        if (orden !== 'copy') return original(orden, ...resto);
-        // What is selected at this moment, in whichever textarea holds a selection (the field or the temporary one).
-        const texto = [...document.querySelectorAll('textarea')]
-          .map((t) => t.value.slice(t.selectionStart, t.selectionEnd))
+        if (orden === 'insertText' && cfg.insertText) {
+          if (cfg.insertText === 'lanza') throw new Error('insertText no disponible');
+          return false;
+        }
+        if (orden !== 'copy' || !cfg.exec) return original(orden, ...resto);
+        // What is selected at this moment, in whichever text field holds a selection (the field or the temporary textarea).
+        const texto = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('textarea, input')]
+          .map((t) => (t.selectionStart === null ? '' : t.value.slice(t.selectionStart, t.selectionEnd ?? t.selectionStart)))
           .find(Boolean);
         w.__exec.push(texto ?? '');
         if (cfg.exec === 'lanza') throw new Error('execCommand no disponible');
@@ -164,7 +170,7 @@ test.describe('el tope de 100 y el contador', () => {
 
     // Ni el contador marcó 99 ni el campo aceptó la «b»: miden igual.
     await expect(contador(page)).toHaveText('100/100');
-    expect(await campo(page).evaluate((e: HTMLTextAreaElement) => e.value.length)).toBe(100);
+    expect(await campo(page).evaluate((e: HTMLInputElement) => e.value.length)).toBe(100);
     await expect(campo(page)).not.toHaveValue(/b$/);
   });
 
@@ -195,7 +201,7 @@ test.describe('el tope de 100 y el contador', () => {
     await expect(contador(page)).toHaveText(`${larga.length}/100`);
   });
 
-  test('un pegado largo lo corta el navegador y se avisa una sola vez, con la cifra', async ({ page }) => {
+  test('un pegado largo se corta al espacio que queda y se avisa una sola vez, con la cifra', async ({ page }) => {
     await permisosDePortapapeles(page);
     await abrir(page);
     await conSugerida(page);
@@ -222,6 +228,220 @@ test.describe('el tope de 100 y el contador', () => {
 
     await expect(campo(page)).toHaveValue('abc');
     await expect(estado(page)).toHaveText('');
+  });
+});
+
+/** A paste the way the browser dispatches it, with the text on the event: no dependence on the system clipboard. */
+async function pegarEvento(page: Page, texto: string): Promise<boolean> {
+  return campo(page).evaluate((el, pegado) => {
+    const datos = new DataTransfer();
+    datos.setData('text/plain', pegado);
+    // `dispatchEvent` is false when a handler called `preventDefault()`: the page took the paste.
+    return !el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: datos, bubbles: true, cancelable: true }));
+  }, texto);
+}
+
+test.describe('el campo es de una sola línea (T-MM-F10, RF-MM-04)', () => {
+  test('es un input de texto fuera de cualquier formulario: Enter no agrega nada ni envía', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+    await conSugerida(page);
+    await expect(campo(page)).toHaveJSProperty('tagName', 'INPUT');
+    await expect(campo(page)).toHaveAttribute('type', 'text');
+    // Sin <form> alrededor, Enter no envía nada; con uno, enviaría con el primer botón sin querer.
+    expect(await campo(page).evaluate((e: HTMLInputElement) => e.form)).toBeNull();
+    const antes = api.pedidos.length;
+    const url = page.url();
+
+    await campo(page).press('End');
+    await campo(page).press('Enter');
+
+    await expect(campo(page)).toHaveValue(SUGERIDA);
+    expect(page.url()).toBe(url);
+    expect(api.pedidos.length).toBe(antes);
+  });
+
+  test('pegar «uno\r\ndos\nTres» da «uno dos Tres» y el contador cuenta así', async ({ page }) => {
+    await abrir(page);
+    await conSugerida(page);
+    await campo(page).fill('');
+
+    expect(await pegarEvento(page, 'uno\r\ndos\nTres')).toBe(true);
+
+    await expect(campo(page)).toHaveValue('uno dos Tres');
+    await expect(contador(page)).toHaveText('12/100');
+    await expect(estado(page)).toHaveText('');
+  });
+
+  test('cada tipo de salto pasa a un espacio, también U+2028 y U+2029', async ({ page }) => {
+    await abrir(page);
+    await conSugerida(page);
+    await campo(page).fill('');
+
+    await pegarEvento(page, 'a\rb\nc\u2028d\u2029e');
+
+    await expect(campo(page)).toHaveValue('a b c d e');
+  });
+
+  test('pegar en medio de un texto, con una selección: reemplaza lo seleccionado y deja el cursor al final', async ({ page }) => {
+    await abrir(page);
+    await conSugerida(page);
+    await campo(page).fill('abcdef');
+    await campo(page).evaluate((e: HTMLInputElement) => e.setSelectionRange(2, 4));
+
+    await pegarEvento(page, 'X\nY');
+
+    await expect(campo(page)).toHaveValue('abX Yef');
+    const cursor = await campo(page).evaluate((e: HTMLInputElement) => [e.selectionStart, e.selectionEnd]);
+    expect(cursor).toEqual([5, 5]);
+    await expect(contador(page)).toHaveText('7/100');
+  });
+
+  test('un pegado que no cabe, ya normalizado, se corta y avisa; uno que cabe gracias al CRLF, no', async ({ page }) => {
+    await abrir(page);
+    await conSugerida(page);
+
+    // Quedan 2 unidades: dos CRLF son dos espacios y caben (medidos sin normalizar serían 4).
+    await campo(page).fill('a'.repeat(98));
+    await pegarEvento(page, '\r\n\r\n');
+    await expect(campo(page)).toHaveValue('a'.repeat(98) + '  ');
+    await expect(contador(page)).toHaveText('100/100');
+    await expect(estado(page)).toHaveText('');
+
+    // Con el mismo espacio, «x CRLF y» da «x » y el resto se pierde: se dice.
+    await campo(page).fill('a'.repeat(98));
+    await pegarEvento(page, 'x\r\ny');
+    await expect(campo(page)).toHaveValue('a'.repeat(98) + 'x ');
+    await expect(estado(page)).toHaveText(PEGADO_CORTADO);
+  });
+
+  test('un emoji que no cabe se queda fuera entero y se avisa', async ({ page }) => {
+    await abrir(page);
+    await conSugerida(page);
+    await campo(page).fill('a'.repeat(99));
+
+    await pegarEvento(page, '😀');
+
+    await expect(campo(page)).toHaveValue('a'.repeat(99));
+    await expect(contador(page)).toHaveText('99/100');
+    await expect(estado(page)).toHaveText(PEGADO_CORTADO);
+  });
+
+  test('un pegado con saltos se deshace con Ctrl+Z: deja el valor anterior', async ({ page }) => {
+    await abrir(page);
+    await conSugerida(page);
+    await campo(page).fill('hola');
+    // Mover el cursor cierra lo escrito: el pegado es un paso aparte del historial.
+    await campo(page).press('End');
+
+    await pegarEvento(page, ' uno\r\ndos');
+    await expect(campo(page)).toHaveValue('hola uno dos');
+
+    await campo(page).press('ControlOrMeta+Z');
+
+    await expect(campo(page)).toHaveValue('hola');
+    await expect(contador(page)).toHaveText('4/100');
+    // Y rehacer lo devuelve normalizado.
+    await campo(page).press('ControlOrMeta+Shift+Z');
+    await expect(campo(page)).toHaveValue('hola uno dos');
+  });
+
+  test('un pegado que no cabe también se deshace, y el aviso sale igual', async ({ page }) => {
+    await abrir(page);
+    await conSugerida(page);
+    await campo(page).fill('a'.repeat(95));
+    await campo(page).press('End');
+
+    await pegarEvento(page, 'x'.repeat(10));
+    await expect(campo(page)).toHaveValue('a'.repeat(95) + 'x'.repeat(5));
+    await expect(estado(page)).toHaveText(PEGADO_CORTADO);
+
+    await campo(page).press('ControlOrMeta+Z');
+    await expect(campo(page)).toHaveValue('a'.repeat(95));
+  });
+
+  for (const insertText of ['falso', 'lanza'] as const) {
+    test(`si el navegador no deja insertText (${insertText}), cae a setRangeText: normaliza, corta y avisa igual`, async ({ page }) => {
+      await instalarEspias(page, { insertText });
+      await abrir(page);
+      await conSugerida(page);
+
+      await campo(page).fill('a'.repeat(95));
+      await campo(page).press('End');
+      await pegarEvento(page, 'x\r\ny\nzzzzzzzz');
+
+      // 5 unidades de espacio: «x y z», sin partir nada.
+      await expect(campo(page)).toHaveValue('a'.repeat(95) + 'x y z');
+      await expect(contador(page)).toHaveText('100/100');
+      await expect(estado(page)).toHaveText(PEGADO_CORTADO);
+      // El `input` sintético hizo andar el contador y quitó el aviso viejo de copia, como el real.
+      await campo(page).fill('');
+      await pegarEvento(page, 'uno\u2028dos');
+      await expect(campo(page)).toHaveValue('uno dos');
+      await expect(estado(page)).toHaveText('');
+    });
+  }
+
+  test('un U+2028 que llega por el teclado o un IME pasa a espacio y el cursor no se mueve', async ({ page }) => {
+    await abrir(page);
+    await conSugerida(page);
+    await campo(page).fill('');
+
+    await campo(page).focus();
+    await page.keyboard.insertText('ab\u2028cd');
+
+    await expect(campo(page)).toHaveValue('ab cd');
+    const cursor = await campo(page).evaluate((e: HTMLInputElement) => [e.selectionStart, e.selectionEnd]);
+    expect(cursor).toEqual([5, 5]);
+  });
+
+  test('soltar un texto con un salto lo normaliza; soltar uno sin saltos lo deja al navegador', async ({ page }) => {
+    await abrir(page);
+    await conSugerida(page);
+    await campo(page).fill('');
+    const soltar = (texto: string) =>
+      campo(page).evaluate((el, soltado) => {
+        const datos = new DataTransfer();
+        datos.setData('text/plain', soltado);
+        return !el.dispatchEvent(new DragEvent('drop', { dataTransfer: datos, bubbles: true, cancelable: true }));
+      }, texto);
+
+    expect(await soltar('x\ny')).toBe(true);
+    await expect(campo(page)).toHaveValue('x y');
+    // Sin saltos no hay nada que arreglar: el navegador hace lo suyo.
+    expect(await soltar('abc')).toBe(false);
+  });
+
+  test('los demás campos no cambian: un pegado en el WhatsApp no lo toma la descripción', async ({ page }) => {
+    await abrir(page);
+    await conSugerida(page);
+    const tomado = await page.locator('#mm-whatsapp').evaluate((el) => {
+      const datos = new DataTransfer();
+      datos.setData('text/plain', '900000999');
+      return !el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: datos, bubbles: true, cancelable: true }));
+    });
+
+    expect(tomado).toBe(false);
+    await expect(campo(page)).toHaveValue(SUGERIDA);
+  });
+
+  test('con 100 caracteres a 360 px el campo y el botón caben sin desbordar', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 900 });
+    await abrir(page);
+    await conSugerida(page);
+    await campo(page).fill('a'.repeat(100));
+
+    await expect(contador(page)).toHaveText('100/100');
+    const desborde = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(desborde).toBeLessThanOrEqual(0);
+    const cajaCampo = await campo(page).boundingBox();
+    const cajaBoton = await copiar(page).boundingBox();
+    // The text does not fit whole in one line, and that is fine: the counter gives the limit. «Copiar» is
+    // under the field, which keeps the width, and nothing leaves the screen.
+    expect(cajaBoton!.y).toBeGreaterThanOrEqual(cajaCampo!.y + cajaCampo!.height - 1);
+    expect(cajaBoton!.x + cajaBoton!.width).toBeLessThanOrEqual(361);
+    expect(cajaCampo!.x + cajaCampo!.width).toBeLessThanOrEqual(361);
+    expect(cajaCampo!.width).toBeGreaterThan(250);
   });
 });
 
@@ -412,7 +632,7 @@ test.describe('«Copiar» cuando el navegador no deja (respaldo clásico)', () =
 
     await expect(estado(page)).toHaveText(FALLO);
     await expect(campo(page)).toBeFocused();
-    const seleccion = await campo(page).evaluate((e: HTMLTextAreaElement) => [e.selectionStart, e.selectionEnd]);
+    const seleccion = await campo(page).evaluate((e: HTMLInputElement) => [e.selectionStart, e.selectionEnd]);
     expect(seleccion).toEqual([2, 2 + 'CajaCusco 9 a 30'.length]);
   });
 
@@ -425,7 +645,7 @@ test.describe('«Copiar» cuando el navegador no deja (respaldo clásico)', () =
     await copiar(page).click();
 
     await expect(estado(page)).toHaveText(FALLO);
-    const seleccion = await campo(page).evaluate((e: HTMLTextAreaElement) => [e.selectionStart, e.selectionEnd]);
+    const seleccion = await campo(page).evaluate((e: HTMLInputElement) => [e.selectionStart, e.selectionEnd]);
     expect(seleccion).toEqual([0, 'CajaCusco 9 a 30'.length]);
   });
 
@@ -524,9 +744,20 @@ test.describe('teclado, foco y anchos', () => {
     const cajaCampo = await campo(page).boundingBox();
     expect(caja!.x).toBeGreaterThanOrEqual(0);
     expect(caja!.x + caja!.width).toBeLessThanOrEqual(361);
-    expect(cajaCampo!.width).toBeGreaterThan(150);
-    // Side by side, aligned at the top.
+    // A narrow row: «Copiar» drops under the field, which keeps the whole width.
+    expect(caja!.y).toBeGreaterThanOrEqual(cajaCampo!.y + cajaCampo!.height - 1);
+    expect(cajaCampo!.width).toBeGreaterThan(250);
+  });
+
+  test('a 800 px el campo y el botón quedan en una fila, alineados arriba', async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 900 });
+    await abrir(page);
+    await conSugerida(page);
+
+    const caja = await copiar(page).boundingBox();
+    const cajaCampo = await campo(page).boundingBox();
     expect(Math.abs(caja!.y - cajaCampo!.y)).toBeLessThan(8);
+    expect(cajaCampo!.x + cajaCampo!.width).toBeLessThanOrEqual(caja!.x + 1);
   });
 });
 

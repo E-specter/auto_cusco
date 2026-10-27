@@ -461,6 +461,14 @@ export function exclusionesSinteticas(n: number): Exclusion[] {
 // ---- Campaign preview and creation (T-MM-F2, part A) --------------------------------
 
 /**
+ * The description of a request as the backend takes it (T-MM-B11): every line break is a space (`\r\n` as
+ * one, plus `\r`, `\n`, U+2028 and U+2029), then the spaces at the ends go.
+ */
+export function normalizarDescripcion(texto: string): string {
+  return texto.replace(/\r\n|[\r\n\u2028\u2029]/g, ' ').trim();
+}
+
+/**
  * The suggested description as the backend shortens it (RF-MM-04, T-MM-B10): the prefix and the filters
  * joined; if it does not fit in 100 (UTF-16 units, like `.length`), whole filters are dropped from the
  * end and it closes with `...`; if not even the first one fits, the text is cut at 97 and `...` is added.
@@ -506,7 +514,7 @@ export function previsualizacionCampanaSintetica(
   const nombres = (parcial.archivos_previstos_por_filas ?? [{ numero: 1 }]).length;
 
   return {
-    descripcion: entrada.descripcion?.trim() || descripcionSugerida,
+    descripcion: normalizarDescripcion(entrada.descripcion ?? '') || descripcionSugerida,
     descripcion_sugerida: descripcionSugerida,
     fecha_generacion: '2026-09-16',
     fecha_envio: '2026-09-17',
@@ -590,7 +598,7 @@ export function campanaDesdeEntrada(
     cantidad: entrada.cantidad,
     seleccion_id: entrada.seleccion_id ?? null,
     tipo_carga: entrada.tipo_carga ?? 'masiva',
-    descripcion: entrada.descripcion?.trim() || previa.descripcion_sugerida,
+    descripcion: normalizarDescripcion(entrada.descripcion ?? '') || previa.descripcion_sugerida,
     salida: entrada.salida ?? 'numero_largo',
     herramientas: {
       keyword: entrada.herramientas?.keyword ?? false,

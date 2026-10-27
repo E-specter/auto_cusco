@@ -236,11 +236,43 @@ export function descripcionARegistrar(valor: string, sugerida: string): string {
 }
 
 /**
- * Whether a paste into the field does not fit and the browser will cut it off in silence (`maxlength`):
- * what is pasted against the room left once the selection it replaces is gone.
+ * Every kind of line break the field must not keep: the field of MES is one line. `\r\n` is ONE break,
+ * so it goes first in the alternation, before `\r` and `\n` on their own.
  */
-export function pegadoExcede(valor: string, largoSeleccionado: number, pegado: string): boolean {
-  return pegado.length > DESCRIPCION_MAXIMA - (valor.length - largoSeleccionado);
+const SALTOS_DE_LINEA = /\r\n|[\r\n\u2028\u2029]/g;
+
+/**
+ * Every line break becomes a space (RF-MM-04), the same rule the backend applies (T-MM-B11): `\r\n` as one,
+ * plus `\r`, `\n`, U+2028 and U+2029. Spaces already there are not merged and a vertical tab is left alone.
+ */
+export function normalizarSaltos(texto: string): string {
+  return texto.replace(SALTOS_DE_LINEA, ' ');
+}
+
+/** The first `espacio` UTF-16 units of `texto`, without splitting a surrogate pair (an emoji is two units). */
+export function recortarSinPartirPares(texto: string, espacio: number): string {
+  if (espacio <= 0) return '';
+  if (texto.length <= espacio) return texto;
+  const ultima = texto.charCodeAt(espacio - 1);
+  const alta = ultima >= 0xd800 && ultima <= 0xdbff;
+  return texto.slice(0, alta ? espacio - 1 : espacio);
+}
+
+export interface TextoDePegado {
+  /** What to insert: line breaks as spaces, and no more than fits. */
+  texto: string;
+  /** Something was left out for lack of room, measured on the normalized text (a `\r\n` counts 1). */
+  cortado: boolean;
+}
+
+/**
+ * What goes into the field when `pegado` replaces the selection `[inicio, fin)` of `valor`. `setRangeText`
+ * does not respect `maxlength`, so the cut is made here, at the room left once the selection is gone.
+ */
+export function textoDePegado(valor: string, inicio: number, fin: number, pegado: string): TextoDePegado {
+  const normalizado = normalizarSaltos(pegado);
+  const texto = recortarSinPartirPares(normalizado, DESCRIPCION_MAXIMA - (valor.length - (fin - inicio)));
+  return { texto, cortado: texto.length < normalizado.length };
 }
 
 /** How a copy ended: with the async clipboard, with the classic fallback, or not at all. */

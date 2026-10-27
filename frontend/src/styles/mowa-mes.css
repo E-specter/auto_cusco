@@ -426,15 +426,19 @@
   gap: var(--space-3);
 }
 
-/* The description field: the textarea and «Copiar» side by side, aligned at the top (T-MM-F9). */
+/* The description field: a one-line input and «Copiar», side by side and aligned at the top; when they do not fit in
+   a row, «Copiar» drops under the input (T-MM-F9, T-MM-F10). */
 .mm-descripcion {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-2);
 }
 
+/* One line of text: it takes what is left in the row and, below ~480 px, «Copiar» drops under it
+   instead of taking width from it (decision of designer, T-MM-F10). */
 .mm-descripcion .input {
-  flex: 1 1 auto;
+  flex: 1 1 16rem;
   min-inline-size: 0;
 }
 
