@@ -176,10 +176,10 @@ Formato confirmado con el ejemplo de carga (sección 7).
   * Primero se quitan los signos diacríticos (`á`→`a`, `é`→`e`, `ñ`→`n`, `ü`→`u`), igual que la normalización de la conciliación (RF-MM-22) y que lo que MES hace al enviar.
   * Después se transliteran los signos tipográficos que tienen un equivalente simple (decisión del usuario, 2026-10-19): comillas `“ ” « »` → `"`, `‘ ’` → `'`, `…` → `...`, `– —` → `-`, `° º` → `o` y `ª` → `a`. Por ejemplo, `N°` sale `No` y `don’t` sale `don't`.
   * Los espacios especiales (espacio duro, espacio fino y los demás espacios de Unicode) y la tabulación se cambian por un espacio normal, para que las palabras no queden pegadas (decisión del usuario, 2026-10-20).
-  * Por último se borran los caracteres que siguen fuera del alfabeto GSM-7 (por ejemplo, un emoji).
+  * Los caracteres de la tabla extendida de GSM-7 también se transliteran, para que el mensaje quede solo en el alfabeto básico y no dependa de cómo los cobre MES (decisión del usuario, 2026-10-26, que cierra el supuesto S-MM-9): `€` → `EUR`, `[ {` → `(`, `] }` → `)`, `\ |` → `/`, `~` → `-` y el salto de página → un espacio normal. `^` no tiene equivalente y se borra.
+  * Por último se borran los caracteres que siguen fuera del alfabeto básico de GSM-7 (por ejemplo, un emoji o `^`).
   * La versión de speech se guarda tal como se escribió; la normalización se aplica al generar, y la previsualización muestra el texto que saldrá.
   * Cambia el `mensaje` de las versiones con tildes, incluido el Speech original (`venció` sale `vencio`): es un cambio decidido, registrado en RF-54.
-  * Supuesto S-MM-9: los caracteres de la tabla extendida de GSM-7 (`€`, `[`, `]`, `{`, `}`, `\`, `~`, `^`, `|`) se conservan y cuentan 2 en el largo, como en el estándar.
 
 ## 5. Reporte de enviados (descargado de MES)
 
@@ -231,7 +231,7 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Dónde se define el nombre de los archivos | Plantilla por defecto en la configuración, editable al crear cada campaña (RF-MM-25) | Usuario (2026-09-28) |
 | Qué se pagina en la previsualización | Las 20 filas de muestra y las 100 exclusiones que ya devuelve, sin recalcular; la lista completa sigue en el seguimiento (RF-MM-26) | Usuario (2026-09-28) |
 | Falta de titular o de fecha en un speech v2 | Se excluye solo si la expresión del segmento usa esa variable, según la expresión compilada; el orden de exclusiones no cambia; una v2 convertida desde una v1 usa esas variables (y además las marca obligatorias) y excluye igual (RF-MM-13) | Usuario (2026-10-03), consultado por coordinador_modulo_mowa_mes |
-| Codificación del SMS (GSM-7 o UCS-2) | Se fuerza GSM-7 al generar: se quitan los diacríticos, se transliteran los signos tipográficos con equivalente simple (comillas, puntos suspensivos, guiones, `°`, `º`, `ª`) y se borran los caracteres sin equivalente; la versión se guarda como se escribió (RF-MM-27) | Usuario (2026-10-19), consultado por architec; la transliteración, a pregunta de coordinador_modulo_mowa_mes |
+| Codificación del SMS (GSM-7 o UCS-2) | Se fuerza GSM-7 al generar: se quitan los diacríticos, se transliteran los signos tipográficos con equivalente simple (comillas, puntos suspensivos, guiones, `°`, `º`, `ª`) y los de la tabla extendida (`€`, corchetes, llaves, barras, `~`), y se borran los caracteres sin equivalente; la versión se guarda como se escribió (RF-MM-27) | Usuario (2026-10-19), consultado por architec; la transliteración, a pregunta de coordinador_modulo_mowa_mes; la de los extendidos, el 2026-10-26 (cierra S-MM-9) |
 | Retiro del editor de dos partes (fase M3) | Ahora: las versiones nuevas son solo v2; las v1 siguen usándose en solo lectura y se convierten a v2 para personalizarlas (RF-MM-17) | Usuario (2026-10-19), consultado por architec |
 
 ## 7. Evidencia de los ejemplos
@@ -261,9 +261,11 @@ Los ejemplos están en `archivos_anexo_chat/`, con prefijo `MOWA_MES_Ejemplo_`: 
 | S-MM-1 | Sin integración por API: se generan archivos y se importa el reporte a mano | Todo el módulo |
 | S-MM-3 | La descripción de campaña no tiene largo máximo mientras no se confirme el de MES | RF-MM-04 |
 | S-MM-4 | Feriados nacionales de Perú vigentes al 2026, calculados por regla para cualquier año; decretos y cambios de ley por configuración | RF-MM-08 |
-| S-MM-9 | Los caracteres de la tabla extendida de GSM-7 se conservan y cuentan 2 en el largo, como en el estándar; falta confirmar con MES cómo los cobra | RF-MM-27, RF-MM-19 |
 
-Quedan abiertos S-MM-1, S-MM-3, S-MM-4 y S-MM-9: los cuatro dependen de información externa (qué ofrece MES y qué dice la ley), no de una preferencia del usuario. S-MM-2, S-MM-5 y S-MM-6 se confirmaron el 2026-09-21, y S-MM-7 y S-MM-8 el 2026-09-14; los cinco pasaron a la sección 6.
+Quedan abiertos S-MM-1, S-MM-3 y S-MM-4: los tres dependen de información externa (qué ofrece MES y qué dice la ley), no de una preferencia del usuario. S-MM-2, S-MM-5 y S-MM-6 se confirmaron el 2026-09-21, y S-MM-7 y S-MM-8 el 2026-09-14; los cinco pasaron a la sección 6. S-MM-9 (los extendidos de GSM-7 se conservaban y contaban 2) se cerró el 2026-10-26 sin esperar a MES: el usuario decidió transliterarlos (RF-MM-27).
+
+- **S-MM-3:** el usuario mira el largo máximo en el formulario de la web de MES (2026-10-26).
+- **S-MM-4:** architec contrastó la regla el 2026-10-26 con los calendarios publicados para 2026 y 2027: coinciden los 16 feriados, y no hay ley nueva que agregue uno. Siguen en trámite, sin aprobar, un feriado el 13 de octubre y el traslado de algunos feriados a lunes; si se aprueban, se ajusta la regla. Los descansos compensables por la visita del papa (D. S. 020-2026-TR, del 11 al 16 de noviembre de 2026) son regionales y no son feriados: se cargan, si corresponde, como excepción del calendario.
 
 ## 9. Registro de cambios
 
@@ -282,3 +284,7 @@ Quedan abiertos S-MM-1, S-MM-3, S-MM-4 y S-MM-9: los cuatro dependen de informac
 
 **2026-10-20**
 - **RF existentes ampliados:** RF-MM-27 (mensaje en GSM-7): los espacios especiales y la tabulación se cambian por un espacio normal en lugar de borrarse. Decisión del usuario.
+
+**2026-10-26**
+- **RF existentes ampliados:** RF-MM-27 (mensaje en GSM-7): los caracteres de la tabla extendida se transliteran (`^` se borra) y el mensaje queda en el alfabeto básico. Decisión del usuario; cierra el supuesto S-MM-9.
+- **Supuestos:** S-MM-4 contrastado con los calendarios de 2026 y 2027, sin diferencias; sigue abierto hasta que el usuario lo confirme (sección 8).
