@@ -27,13 +27,16 @@ const mapeador = montarMapeador(raiz, {
   validar,         // (asignaciones, signal) => Promise<ProblemaMapeoRespuesta[]>, llama a /validacion
 });
 
-mapeador.estado();             // { asignaciones, problemas, listo, pendiente }
+mapeador.estado();             // { asignaciones, problemas, listo, pendiente, modificado }
 mapeador.fijarAnalisis(nuevo); // tras cambiar hoja, separador o codificación
+mapeador.fijarProblemas(p);    // el 422 de confirmar: los muestra sin tocar lo elegido
 mapeador.destruir();
 ```
 
 - **Evento `mapeocambiado`,** con `bubbles`: `{ asignaciones, problemas, listo, pendiente }`. `asignaciones` va con una por columna listada, con su `origen`; `listo` es «sin problemas en la última validación terminada»; `pendiente`, que hay una validación en curso. Confirmar solo se permite con `listo && !pendiente`.
 - **Validación en vivo:** cada cambio llama a `validar` con 300 ms de espera y cancela el pedido anterior, como el editor de texto. Los problemas iniciales del análisis se muestran desde el primer momento, sin esperar.
+- **`modificado`:** el analista eligió o aceptó algo, así que cambiar una opción de lectura lo descartaría (§4).
+- **`fijarProblemas(problemas)`:** toma los problemas como una validación terminada, los muestra en su lugar (los de fila bajo su fila, los sin columna arriba, y la tabla vuelve si estaba recogida) y emite, sin tocar las asignaciones. F2 lo usa con el 422 de confirmar (§5).
 - **`destruir()`:** quita los listeners de `document`, aborta la validación en curso y deja de emitir.
 
 ## 3. Estructura

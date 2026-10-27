@@ -1,0 +1,54 @@
+---
+/**
+ * Test-only page: mounts MapeadorEncabezados on its own for the e2e suite.
+ * Injected by astro.config.mjs only when AUTO_CUSCO_RUTAS_PRUEBA=1, like
+ * /pruebas/editor-texto. The test hands the synthetic case in
+ * `window.casoMapeador` ({ analisis, campos }) before the page loads, and the
+ * controller is left on `window.controladorPrueba`.
+ */
+import Shell from '../layouts/Shell.astro';
+import MapeadorEncabezados from '../components/MapeadorEncabezados.astro';
+---
+
+<Shell title="Prueba del mapeador — auto_cusco" noindex>
+  <div class="prueba" data-ruta-prueba>
+    <h1>Prueba del mapeador</h1>
+    <MapeadorEncabezados id="mapeador-prueba" />
+    <output class="mono" data-estado-prueba></output>
+  </div>
+</Shell>
+
+<style>
+  .prueba {
+    display: grid;
+    gap: var(--space-5);
+    padding: var(--space-5) var(--shell-gutter);
+  }
+  .prueba h1 {
+    margin: 0;
+    font-size: var(--text-xl);
+  }
+</style>
+
+<script>
+  import { validarMapeo } from '../lib/api-mapeador';
+  import { EVENTO_MAPEO, montarMapeador, type EstadoMapeo, type OpcionesMapeador } from '../scripts/mapeador-encabezados';
+
+  const ventana = window as unknown as {
+    casoMapeador: Pick<OpcionesMapeador, 'analisis' | 'campos'>;
+    controladorPrueba?: unknown;
+  };
+  const raiz = document.getElementById('mapeador-prueba')!;
+  const salida = document.querySelector<HTMLOutputElement>('[data-estado-prueba]')!;
+  raiz.addEventListener(EVENTO_MAPEO, (evento) => {
+    const { listo, pendiente } = (evento as CustomEvent<EstadoMapeo>).detail;
+    salida.value = listo && !pendiente ? 'listo' : 'no listo';
+  });
+  const { analisis, campos } = ventana.casoMapeador;
+  ventana.controladorPrueba = montarMapeador(raiz, {
+    analisis,
+    campos,
+    validar: (asignaciones, signal) => validarMapeo(analisis.borrador_id, asignaciones, signal),
+  });
+  document.body.dataset.montado = 'true';
+</script>

@@ -1,0 +1,80 @@
+---
+/**
+ * Markup for the header mapper (docs/mapeador-encabezados-interfaz.md §3).
+ * Behaviour lives in `scripts/mapeador-encabezados.ts`: the page renders this,
+ * listens for `mapeocambiado` on the root and then calls `montarMapeador`.
+ * Every id inside carries the root's `id`.
+ */
+import Icon from './Icon.astro';
+import '../styles/mapeador.css';
+
+interface Props {
+  id: string;
+}
+
+const { id } = Astro.props;
+---
+
+<div class="mapeador" id={id} data-mapeador>
+  <p class="mono muted mapeador__contexto" data-contexto></p>
+
+  <div class="notice notice--success" data-listo hidden>
+    <Icon name="circle-check" size={20} />
+    <div class="mapeador__listo">
+      <p data-listo-texto></p>
+      <button
+        type="button"
+        class="btn btn--sm btn--quiet"
+        aria-expanded="false"
+        aria-controls={`${id}-cuerpo`}
+        data-ver-columnas
+        data-i18n="mapeador.vista.verColumnas"
+      >
+        Ver columnas
+      </button>
+    </div>
+  </div>
+
+  <div class="notice notice--danger" data-resumen hidden>
+    <Icon name="triangle-alert" size={20} />
+    <ul class="mapeador__resumen" data-resumen-lista></ul>
+  </div>
+
+  <div class="mapeador__cuerpo" id={`${id}-cuerpo`} data-cuerpo>
+    <div class="mapeador__barra">
+      <div class="segmented" role="group" aria-label="Mostrar" data-i18n-attr="aria-label:mapeador.vista.mostrar" data-filtro>
+        <button type="button" class="segmented__item" aria-pressed="true" data-filtro-opcion="revisar"></button>
+        <button type="button" class="segmented__item" aria-pressed="false" data-filtro-opcion="todas"></button>
+      </div>
+      <button type="button" class="btn btn--sm" data-aceptar-todas hidden></button>
+    </div>
+    <p class="field__hint" data-i18n="mapeador.vista.hintUso">
+      Un campo se usa en una sola columna. Para pasarlo a otra, primero deja la suya en «No cargar».
+    </p>
+    <p class="visually-hidden" aria-live="polite" data-anuncio></p>
+
+    <div class="table-scroll">
+      <table class="table table--apilable mapeador__tabla">
+        <caption class="visually-hidden" data-i18n="mapeador.vista.caption">Columnas del archivo</caption>
+        <thead>
+          <tr>
+            <th scope="col" data-i18n="mapeador.vista.col.columna">Col.</th>
+            <th scope="col" data-i18n="mapeador.vista.col.encabezado">Encabezado del archivo</th>
+            <th scope="col" data-i18n="mapeador.vista.col.ejemplos">Ejemplos</th>
+            <th scope="col" data-i18n="mapeador.vista.col.estado">Estado</th>
+            <th scope="col" data-i18n="mapeador.vista.col.campo">Campo de carga</th>
+          </tr>
+        </thead>
+        <tbody data-filas></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="notice notice--info" data-advertencias hidden>
+    <Icon name="info" size={20} />
+    <details class="mapeador__advertencias">
+      <summary data-advertencias-titulo></summary>
+      <ul data-advertencias-lista></ul>
+    </details>
+  </div>
+</div>

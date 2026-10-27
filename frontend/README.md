@@ -43,6 +43,7 @@ src/
 ├── layouts/      Shell.astro — cabecera adhesiva, pulso de la API, idioma y tema
 ├── components/   Icon.astro · Navegacion.astro · SelectorSeleccion.astro (fecha + selección, reutilizable)
 │                 EditorTexto.astro · VariantesSegmento.astro (motor de texto, reutilizables)
+│                 MapeadorEncabezados.astro (encabezados de un archivo contra un catálogo, reutilizable)
 ├── scripts/      selector-seleccion.ts · editor-texto.ts · variantes-segmento.ts — comportamiento; la página monta
 │                 selector-variable.ts · selector-patron-fecha.ts — selectores que el editor y el constructor arman en ejecución
 ├── styles/       tokens.css · base.css · ui.css · console.css · selector.css · cartera.css · editor-texto.css · variantes-segmento.css

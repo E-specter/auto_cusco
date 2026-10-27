@@ -1,0 +1,90 @@
+/* Header mapper (docs/mapeador-encabezados-interfaz.md §3). Everything comes from the tokens. */
+
+.mapeador {
+  display: grid;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+.mapeador__contexto,
+.mapeador__listo p {
+  margin: 0;
+}
+
+.mapeador__listo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.mapeador__resumen {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mapeador__cuerpo {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.mapeador__barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.mapeador__cuerpo > .field__hint {
+  margin: 0;
+}
+
+.mapeador__tabla td,
+.mapeador__tabla th {
+  vertical-align: top;
+}
+
+.mapeador__col {
+  white-space: nowrap;
+}
+
+/* Up to three examples, each cut with an ellipsis; the whole value is in its title. */
+.mapeador__ejemplos {
+  display: block;
+  max-inline-size: 22rem;
+}
+.mapeador__ejemplo {
+  display: inline-block;
+  max-inline-size: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.mapeador__nota {
+  display: block;
+  margin-block-start: var(--space-1);
+}
+.mapeador__nota:empty {
+  display: none;
+}
+
+.mapeador__control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.mapeador__control .input {
+  flex: 1 1 14rem;
+  inline-size: auto;
+}
+
+.mapeador__advertencias ul {
+  margin: var(--space-2) 0 0;
+  padding-inline-start: var(--space-4);
+}

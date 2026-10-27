@@ -32,12 +32,17 @@ const PREFIJO = 'campo.';
  * value and the discarded duplicate key are left out; a document splits into
  * type and number; an operational maturity into "applies" and date.
  */
-function camposDelCatalogo(): string[] {
+function columnasDelCatalogo(): Array<{ nombre: string; tipo: string }> {
   const fuente = readFileSync(CATALOGO, 'utf8');
   const columnas = [...fuente.matchAll(/^\s*_col\("([a-z_]+)",\s*T\.([A-Z_]+)/gm)].map(([, nombre, tipo]) => ({ nombre, tipo }));
   if (columnas.length < 20) {
     throw new Error(`Solo se leyeron ${columnas.length} columnas de ${CATALOGO}: ¿cambió su forma?`);
   }
+  return columnas;
+}
+
+function camposDelCatalogo(): string[] {
+  const columnas = columnasDelCatalogo();
 
   // The rules live in campos.py; if they stop matching what is applied here,
   // the test must be updated rather than silently trusted.
@@ -61,6 +66,17 @@ const etiquetasDe = (diccionario: Record<string, string>) =>
 
 describe('etiquetas de los campos de la cartera', () => {
   const campos = camposDelCatalogo();
+  // The header mapper lists every sheet column as it comes (CATALOGO_SABANA), split or not (M-9).
+  const columnas = columnasDelCatalogo().map((c) => c.nombre);
+
+  it.each([
+    ['español', es],
+    ['inglés', en],
+  ])('cada columna de la sábana, la que lista el mapeador, tiene su etiqueta en %s', (_idioma, diccionario) => {
+    const faltan = columnas.filter((columna) => !(`${PREFIJO}${columna}` in diccionario));
+
+    expect(faltan).toEqual([]);
+  });
 
   it.each([
     ['español', es],
@@ -75,7 +91,7 @@ describe('etiquetas de los campos de la cartera', () => {
     ['español', es],
     ['inglés', en],
   ])('no sobran etiquetas de campos que ya no existen en %s', (_idioma, diccionario) => {
-    const sobran = etiquetasDe(diccionario).filter((campo) => !campos.includes(campo));
+    const sobran = etiquetasDe(diccionario).filter((campo) => !campos.includes(campo) && !columnas.includes(campo));
 
     expect(sobran).toEqual([]);
   });

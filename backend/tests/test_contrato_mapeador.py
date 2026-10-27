@@ -57,14 +57,6 @@ PREFIJOS = {
     "mapeador.advertencia.": CodigoAdvertenciaLectura,
     "mapeador.error.": CodigoErrorMapeador,
 }
-# M-9: las etiquetas `campo.<nombre>` que todavia no estan en los diccionarios (las suma F1).
-ETIQUETAS_PENDIENTES = {
-    "campo.documento",
-    "campo.vencimiento_operativo",
-    "campo.pagare_duplicado",
-    "campo.validador",
-    "campo.cod_tipo_basilea",
-}
 
 
 def _esquemas(origen: str) -> dict:
@@ -219,15 +211,14 @@ def test_los_marcadores_de_los_problemas_son_los_mismos_en_los_dos_idiomas() -> 
 
 
 @pytest.mark.parametrize("idioma", IDIOMAS)
-def test_las_etiquetas_de_los_campos_estan_salvo_las_cinco_pendientes_de_f1(idioma) -> None:
+def test_cada_campo_del_catalogo_tiene_su_etiqueta(idioma) -> None:
     diccionario = _diccionario(idioma)
 
     faltan = {
         c.clave_etiqueta for c in CATALOGO_SABANA.campos if c.clave_etiqueta not in diccionario
     }
 
-    # M-9: cuando F1 sume las cinco, esta lista se vacia y la prueba pide quitarla.
-    assert faltan == ETIQUETAS_PENDIENTES
+    assert faltan == set()
 
 
 # Los datos que la API envia con cada codigo de error (`DetalleErrorMapeador`): el texto solo puede

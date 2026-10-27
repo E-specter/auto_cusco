@@ -25,6 +25,10 @@ const rutasDePrueba = {
         pattern: '/pruebas/editor-texto',
         entrypoint: './src/pruebas/editor-texto.astro',
       });
+      injectRoute({
+        pattern: '/pruebas/mapeador',
+        entrypoint: './src/pruebas/mapeador.astro',
+      });
     },
   },
 };
