@@ -288,3 +288,123 @@ Decisión del usuario del 2026-10-19 (b12d384). Plan para aprobación de `archit
 - **T-MM-B9c, atajo para el texto ya simple: probado y descartado.** El ahorro (~1 µs por mensaje, ~0,05 s por campaña) queda dentro del ruido de ±0,3 s. Las corridas del dev con y sin atajo (3 alternadas) lo confirman: 6,5 a 7,8 µs por fila con el atajo y 5,9 a 7,5 sin él. Si algún día interesa recuperar los ~9 µs restantes, el paso es una tarea de diagnóstico sin código: un perfil con cProfile de crear campaña con unas 5 000 filas, antes y después de B9. Hoy no es prioridad.
 - **T-MM-F7** entró en `97ebfe0` (Playwright 442/442).
 - **T-MM-C4 cerrada:** `revision-c4.md`.
+
+## 7. Campos adicionales en el speech (D-CA-0 a D-CA-2; T-MM-B12, T-MM-F11, T-MM-C8), 2026-10-27
+
+Decisiones del usuario del 2026-10-27, en `d999698`, en la §28 del plan del motor y en el registro de cambios de RF-65. Plan sobre `fb1d72b` (T-CA-B1), para aprobación de `architec`. Se escribe antes de T-CA-B2: cuando B2 entre, ajusto lo que cambie su contrato y arranco.
+
+### 7.1 Lo que ya da el motor y no se repite
+
+- **El catálogo:** `CatalogoCartera.campos()` trae cada adicional con su tipo, su `etiqueta` y `archivado`, archivados incluidos para que lo que ya los usa resuelva. `archivados_entre(nombres)` dice cuáles de los usados están archivados.
+- **Los valores:** las filas de la consulta traen cada adicional rotulado con su nombre técnico y ya tipado (`str`, `Decimal` o `date`; `repositorio_cartera_postgres._columnas_producto`). La campaña y la previsualización lo leen de `producto["ad_x"]`, sin código de lectura propio.
+- **La cota:** el código `sin_cota_variable` ya existe en `CodigoTexto`, con su texto es/en: «Limítala con “Primeros caracteres”». Es exactamente lo que pide D-CA-1, así que no hay código ni traducción nuevos para eso.
+- **GSM-7:** se aplica al texto final y no a la variable (RF-MM-27). Sin cambio.
+- **D-CA-3:** el .xlsx de MES no gana columnas. RF-54 byte a byte, sin cambio.
+
+### 7.2 D-CA-0: el speech v2 ofrece los adicionales (T-MM-B12)
+
+- **`speech.py`.** `VARIABLES_V2` sigue siendo la constante de hoy. Una función, `adicionales_de(catalogo) -> dict[str, TipoValor]`, lee `campos()` una sola vez y devuelve los adicionales, archivados incluidos. Las v2 se compilan con `{**VARIABLES_V2, **adicionales}`. Las variables de la fila no chocan nunca con un adicional, porque los nombres reservados y el prefijo `ad_` lo impiden desde T-CA-B1.
+- **Firmas.** Reciben `adicionales: Mapping[str, TipoValor]` como argumento de palabra clave, con valor por defecto vacío: `problemas_de`, `compilar_expresion`, `previsualizar_v2`, `ConstructorMensajes` y `mensaje_de`, que recibe además los valores de la fila. Así una v1, y cada llamada que existe hoy, compila igual, y **las pruebas de oro no se tocan** (7.6). Si falta pasar los adicionales en un camino de producción, la v2 que los usa da `variable_desconocida`, y lo atrapan las pruebas de punta a punta de 7.6.
+- **Quién pasa el catálogo:**
+  - `configuracion.py`, al guardar, convertir y previsualizar el speech. El servicio recibe el catálogo de la API (`crear_catalogo_cartera`).
+  - `campana.py`, que arma el constructor con `self._consulta.catalogo`. `evaluar_producto` pasa los valores de los adicionales que usa el segmento.
+  - `contexto_texto.py`, con `contexto_speech(catalogo)`: sus variables son las v2 más los adicionales, con origen `cartera`, y con la etiqueta y la marca de archivado que B2 le agregue a `VariableContexto`, igual que el contexto `cartera`.
+  - `api/texto_enriquecido.py`, una línea de composición.
+- **Ejemplos sintéticos.** Una tabla con un valor por tipo: texto `ZONA SINTETICA`, número `Decimal("1250.50")` y fecha `date(2026, 10, 5)`. La usan el `_EJEMPLO` del contexto y la muestra de `previsualizar_v2`. `_registro_de_producto` toma el valor del producto de la muestra. Un segmento que no usa adicionales da el mismo ejemplo que hoy, porque las claves de más no cambian el texto.
+
+### 7.3 D-CA-1: el tope obligatorio en un adicional de texto o de número (T-MM-B12)
+
+- **Al validar una v2** (`_problemas_de_v2`, que se usa al guardar y al previsualizar): cada nodo variable que lee un adicional de texto o de número, como base o como argumento, se compila solo, como `Expresion((nodo,))`. Si su `cota` es `None`, sale este problema:
+
+      ProblemaSpeech(segmento, "expresion", detalle, Problema(SIN_COTA_VARIABLE, detalle, nodo=i, nombre="ad_x"))
+
+  Queda ubicado en ese nodo, y el editor ya ubica los problemas del motor por nodo.
+- **Se usa la cota del motor, no se busca la palabra `primeros`.** Vale cualquier cadena que el motor acote: `ad_texto | primeros(12)`, o `ad_numero | a_texto | primeros(6)` para un número «después de pasarlo a texto». La regla es por nodo: si el mismo nodo lee también el titular sin tope, el usuario acota el nodo entero (un `primeros(n)` al final lo resuelve). Lo digo porque es la generalización fiel de D-CA-1 y no hace falta decidir nada aparte.
+- **No aplica a una fecha:** D-CA-1 nombra solo texto y número, y la fecha con `formato_fecha` ya tiene cota. El titular, la fecha de vencimiento y los días siguen como hoy, sin tope obligatorio.
+- **Al guardar,** `_validos` ya lanza `SpeechInvalido` con los problemas: la versión no se guarda hasta que se corrija.
+
+### 7.4 D-CA-2: `falta_campo_adicional` (T-MM-B12)
+
+- **`entities/mowa_mes.py`:** `FALTA_CAMPO_ADICIONAL = "falta_campo_adicional"`, de tipo `EXCLUSION`, va justo después de `FALTA_VENCIMIENTO`, porque el orden de la clase es el orden de evaluación.
+- **`ConstructorMensajes.adicionales_usados(segmento) -> tuple[str, ...]`:** son los adicionales que lee la expresión del segmento, en el orden de sus nodos (`variables_usadas` ∩ adicionales). En una v1 no hay ninguno.
+- **`evaluar_producto`,** después de `falta_vencimiento` y antes del WhatsApp y de los 160:
+
+      faltan = tuple(n for n in constructor.adicionales_usados(seg) if _vacio(producto.get(n)))
+
+  Si falta alguno, devuelve `Exclusion(pagare, FALTA_CAMPO_ADICIONAL, campos=faltan)`. Se usa el mismo `_vacio` del titular (`None` o un texto en blanco). También aplica a un archivado, porque sigue en `campos()`. Un adicional vacío que el segmento no usa no excluye nada.
+- **`Exclusion`** gana `campos: tuple[str, ...] = ()`, con los nombres técnicos: puede ser más de uno.
+- **Persistencia.** Una migración: `mowa_mes_exclusion.campos` como `text[] NULL`, encadenada después de la de B2. La escribe el dev y la aplica `architec`. El repositorio la escribe y la lee, y una fila antigua da `()`.
+- **API y contrato.** `ExclusionRespuesta` gana `campos: [{nombre, etiqueta}]`. El nombre legible se resuelve al leer, con el catálogo: si el usuario renombra el campo, cambia lo que se muestra pero no lo guardado. Se regenera `contratos/openapi.json`.
+- **Textos.** El texto es/en de `mowaMes.codigo.falta_campo_adicional` lo pone F11 (7.7). La prueba espejo del frontend lee la clase de códigos.
+
+### 7.5 El aviso de campo archivado (T-MM-B12)
+
+- `previsualizar_speech_v2` devuelve además `campos_archivados`, que es `catalogo.archivados_entre(...)` de las variables que usan las expresiones. Va en la respuesta de la API. Es un aviso, nunca bloquea y nunca da un 500 (restricción 8). Guardar una versión que use un archivado se permite, porque el campo sigue resolviendo, y el editor no lo ofrece.
+- No lo pongo en la previsualización de la campaña: la campaña genera bien con un archivado, y el lugar para corregirlo es el speech. Es la pregunta P-2 de 7.9.
+
+### 7.6 Pruebas
+
+**Pruebas de oro que no cambian.** No aparecen en el diff, y lo compruebo con `git diff --stat` y corriéndolas:
+- `test_mowa_mes_speech_oro.py`, `oro_mowa_mes_congelados.py` y `oro_mowa_mes_datos.py`, que son las huellas y la matriz GSM-7;
+- `test_speech_original.py`, `test_mowa_mes_speech.py`, `test_mowa_mes_speech_v2.py`, `test_mowa_mes_speech_gsm7.py` y `test_mowa_mes_speech_constantes.py`;
+- `test_mowa_mes_campana.py`, `test_mowa_mes_division.py` (RF-54 y D-CA-3) y los dos `test_mowa_mes_descripcion*.py`;
+- `test_api_mowa_mes_speech_v2.py` y `test_api_mowa_mes_campanas.py`.
+
+**Lo que cambia a propósito:**
+- `test_codigos_mowa_mes.py`: el código nuevo entra en el orden;
+- el contrato: `ExclusionRespuesta` y la previsualización v2;
+- la prueba del contexto `mowa_mes.speech`: sus variables suman los adicionales.
+
+**Pruebas nuevas.** Usan los cuatro adicionales sintéticos de `tests/campos_adicionales_memoria.py`, de modo que no hacen falta datos nuevos:
+- **D-CA-0:**
+  - una v2 con un adicional de cada tipo, acotado, genera el mensaje con el valor de la fila (el texto con `primeros`, el número con `a_texto | primeros` y la fecha con `formato_fecha`);
+  - el ejemplo de la previsualización usa el valor sintético del tipo;
+  - el producto de la muestra trae su propio valor;
+  - el contexto ofrece los adicionales con su tipo.
+- **D-CA-1:**
+  - un texto sin tope da `sin_cota_variable` en su nodo, con su nombre, y un número sin tope también;
+  - un número con `a_texto | primeros(n)` no da problema;
+  - un nodo con el adicional como argumento y sin tope da el problema;
+  - una fecha sin `formato_fecha` no da el problema de D-CA-1;
+  - el titular sin `primeros` sigue igual que hoy;
+  - guardar con el problema da 422, y no se guarda.
+- **D-CA-2:**
+  - `None`, `""` y `"  "` excluyen, y el detalle trae el campo;
+  - con dos vacíos salen los dos, en el orden de los nodos;
+  - el orden de evaluación: `falta_vencimiento` gana a este código, y este código gana al WhatsApp y a los 160;
+  - un adicional vacío que el segmento no usa no excluye nada;
+  - un archivado vacío excluye igual;
+  - la API devuelve el nombre técnico y el legible, y renombrar cambia el legible.
+- **Persistencia** (`@postgres`, la corre `architec`): `campos` de ida y vuelta, y una exclusión anterior a la migración se lee como `()`.
+- **Aviso:** con un archivado en la expresión sale el nombre, y sin archivados sale vacío.
+- **Mutación,** en una copia, nunca en el árbol compartido:
+  - quitar la exigencia de cota, o aplicarla también a la fecha;
+  - cambiar `_vacio` por `is None`;
+  - mover el código después del WhatsApp;
+  - no pasar los adicionales al constructor de la campaña;
+  - perder `campos` al guardar.
+
+### 7.7 Frontend (T-MM-F11), espera el contrato de B12
+
+- **`mowaMes.codigo.falta_campo_adicional`** en es y en. Los textos los propone designer; un borrador: «Falta un campo adicional que el mensaje necesita: {campos}.».
+- **El detalle de la exclusión** muestra los nombres legibles en `mowa-mes/campana.astro` y en la sección Exclusiones de `seguimiento.astro`.
+- **El aviso de campo archivado** va en la previsualización del editor v2.
+- **La lista de variables del editor** sale del contexto. Para que el nombre legible de un adicional se vea hay que esperar T-CA-F1 del motor, que es quien agrega la etiqueta literal. Si F11 llega antes, el editor muestra el nombre técnico hasta que entre F1. Se dice al entregar y no bloquea.
+- **Pruebas:** Vitest del formato del detalle, y Playwright de la exclusión con el detalle y del aviso.
+
+### 7.8 Cortes
+
+| Corte | Qué | Depende | Revisión |
+|---|---|---|---|
+| **T-MM-B12** | 7.2 a 7.6: variables v2, tope, exclusión, aviso, migración y contrato | T-CA-B2 en main | yo; `coordinador_motor_texto_enriquecido` mira el contexto y el uso de la cota; `architec` corre `-ConBase` y la migración de ida y vuelta |
+| **T-MM-F11** | 7.7 | el contrato de B12; las etiquetas, T-CA-F1 | yo; designer los textos |
+| **T-MM-C8** | El cierre contra D-CA-0 a D-CA-2 y RF-64 a RF-66 en lo que toca a MOWA MES | B12 y F11 | `architec` |
+
+Va en un solo corte de backend: D-CA-0 sin D-CA-2 dejaría salir un SMS con un hueco.
+
+### 7.9 Preguntas para `architec`
+
+- **P-1. ¿Se guardan los campos de la exclusión (la migración de 7.4)?** La alternativa es no migrar y mostrar los nombres solo en la previsualización, que se arma en memoria, de modo que una campaña ya guardada diría solo «falta un campo adicional». **Recomiendo migrar:** la §28 aprobó el nombre técnico y el legible en la pantalla, y es una sola columna nula.
+- **P-2. ¿El aviso de archivado también va en la previsualización de la campaña?** **Recomiendo que no** por ahora (7.5).
+
+**Respuestas de `architec` (2026-10-27): plan aprobado.** P-1: sí, la columna `mowa_mes_exclusion.campos text[] NULL`, con la migración encadenada a la de T-CA-B2. La escribe el dev y la aplica `architec`: en `auto_cusco_test` al verificar y, con permiso del usuario, en `auto_cusco`. P-2: no por ahora. La exclusión ya nombra el campo, y se revisa en T-MM-C8 si en uso real hace falta el aviso en la campaña. B12 arranca cuando T-CA-B2 esté en `main`.
