@@ -94,3 +94,11 @@ Cadena de delegación: `architec` → `coordinador_motor_texto_enriquecido` → 
 | T-MAP-F1 | Experiencia y componente reutilizable `MapeadorEncabezados` | ui | designer | §7 del diseño | pendiente | Espera el contrato de B3. Las reglas de experiencia van antes de programar y pasan por el usuario |
 | T-MAP-F2 | `/cargas` en dos pasos sobre el componente (RF-57 a RF-60) | ui | dev_frontend_motor_texto_enriquecido | §7 del diseño | pendiente | Espera F1 |
 | T-MAP-C2 | Revisión de cierre contra RF-57 a RF-63 y entrega a `architec` | qa | coordinador_motor_texto_enriquecido | todos los anteriores | pendiente | |
+
+## Robustez de la API (2026-10-27)
+
+Cadena de delegación: `architec` → `coordinador_motor_texto_enriquecido` → `dev_backend_motor_texto_enriquecido`. Hallazgo de `coordinador_modulo_mowa_mes` en T-MM-B10.
+
+| ID | Descripción | Rol requerido | Agente asignado | Documentos relacionados | Estado | Notas de continuidad |
+|---|---|---|---|---|---|---|
+| T-API-B1 | Una mitad de par sustituto suelta (U+D800 a U+DFFF) en un pedido nunca da 500: en cualquier ruta, un texto con una mitad suelta se rechaza con 422 y el mensaje nombra el campo. Se resuelve en un solo lugar para toda la API, no ruta por ruta. Un emoji bien formado sigue pasando. Pruebas de regresión: la descripción de campaña de MOWA MES, al menos otra ruta de otro router y un recorrido que lo compruebe en todas las rutas con cuerpo JSON | backend | dev_backend_motor_texto_enriquecido | `contrato-api.md` | pendiente | Decisión del usuario del 2026-10-27. Hoy pydantic deja pasar `"\ud800"` y la respuesta revienta con 500 (`surrogates not allowed`); ya pasaba antes de B10. Si cambia el contrato (por ejemplo, un código de error nuevo), se regenera en el mismo corte |
