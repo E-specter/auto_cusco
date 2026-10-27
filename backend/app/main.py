@@ -14,6 +14,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.archivos_carga import CABECERAS_RESUMEN
@@ -33,6 +34,7 @@ from app.api.mowa_mes_campanas import router as mowa_mes_campanas_router
 from app.api.selecciones import router as selecciones_router
 from app.api.supervisores import router as supervisores_router
 from app.api.texto_enriquecido import router as texto_enriquecido_router
+from app.api.texto_valido import RechazaMitadesSueltas, manejar_validacion
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -97,9 +99,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Primero el filtro y despues CORS: CORS queda por fuera y tambien pone sus cabeceras a un 422.
+app.add_middleware(RechazaMitadesSueltas)
 configurar_cors(app, get_settings().origenes_cors)
 
 app.add_exception_handler(ErrorConCodigo, manejar_error_con_codigo)
+app.add_exception_handler(RequestValidationError, manejar_validacion)
 app.include_router(health_router)
 app.include_router(cargas_router)
 app.include_router(mapeador_router)

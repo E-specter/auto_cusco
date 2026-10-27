@@ -281,6 +281,43 @@ def test_un_archivo_que_no_se_lee_es_400_con_su_codigo_y_sin_datos_de_mas(
     assert api.repo.borradores == {}
 
 
+def test_un_json_con_una_mitad_suelta_de_un_par_sustituto_es_400_y_no_500(api) -> None:
+    # T-API-B1: el escape de la mitad alta, escrito en el archivo (no en la peticion)
+    escape = "".join(["\\", "ud800"])
+    contenido = ('[{"Pagare": "1", "Nombre": "a' + escape + 'b"}]').encode("ascii")
+
+    respuesta = api.subir(contenido=contenido, nombre="datos.json")
+
+    assert respuesta.status_code == 400
+    assert (
+        respuesta.json()["codigo"] == "archivo_ilegible" and "U+D800" in respuesta.json()["detail"]
+    )
+    assert api.repo.borradores == {}
+
+
+@pytest.mark.parametrize(
+    ("contenido", "nombre"),
+    [
+        ('"xALTA"', "datos.json"),  # la raiz es un texto con una mitad suelta
+        ('{"a": "ALTA"}', "datos.json"),  # un objeto con una mitad suelta en un valor
+        ('{"aBAJA": 1}', "datos.json"),  # y en una clave
+        ('{"a": "ALTA"}', "datos"),  # sin extension: se reconoce por el contenido
+        ("5", "datos.json"),
+        ("null", "datos.json"),
+    ],
+)
+def test_un_json_cuya_raiz_no_es_una_lista_es_400_y_nunca_500(api, contenido, nombre) -> None:
+    barra = chr(92)  # los escapes se arman aqui: no se escriben en el codigo
+    contenido = contenido.replace("ALTA", barra + "ud800").replace("BAJA", barra + "udc00")
+    contenido = contenido.encode("ascii")
+
+    respuesta = api.subir(contenido=contenido, nombre=nombre)
+
+    assert respuesta.status_code == 400, respuesta.text
+    assert respuesta.json()["codigo"] in ("archivo_ilegible", "extension_no_coincide")
+    assert api.repo.borradores == {}
+
+
 def test_una_hoja_que_no_existe_es_400_con_la_lista_como_dato(api) -> None:
     contenido = xlsx([["Pagare"], ["1"]], hoja="Septiembre")
 

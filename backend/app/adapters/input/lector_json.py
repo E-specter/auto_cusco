@@ -19,6 +19,7 @@ from app.core.entities.lectura_tabla import (
     TablaLeida,
 )
 from app.core.entities.sabana import ArchivoIlegible, FilaCruda, HojaVacia
+from app.core.services.texto_valido import SOSPECHA_EN_TEXTO, a_texto_seguro, buscar_mitad_suelta
 
 FILA_DE_CABECERA = 1
 
@@ -32,9 +33,27 @@ def _texto(valor: Any) -> Any:
     return valor
 
 
+def _rechazar_mitad_suelta(datos: Any) -> None:
+    r"""`json.loads` acepta `"\ud800"` y deja una mitad suelta de un par sustituto, que despues
+    no se puede guardar ni escribir (un 500 mas adelante). Un archivo asi no es legible."""
+    hallazgo = buscar_mitad_suelta(datos)
+    if hallazgo is None:
+        return
+    # El mensaje no repite la mitad: iria a la respuesta. `datos` es una lista, asi que la ruta
+    # empieza por la posicion del elemento (base 1, como en «El elemento N del JSON»).
+    ruta = [hallazgo.ruta[0] + 1]
+    ruta += [str(parte) for parte in hallazgo.ruta[1:]]
+    donde = "un nombre de campo" if hallazgo.en_clave else "un texto"
+    raise ArchivoIlegible(
+        f"El JSON tiene {donde} con una mitad suelta de un par sustituto ({hallazgo.codigo}) "
+        f"en {a_texto_seguro(' > '.join(map(str, ruta)))}"
+    )
+
+
 def leer_json(contenido: bytes, opciones: OpcionesLectura = OpcionesLectura()) -> TablaLeida:  # noqa: B008
     try:
-        datos = json.loads(contenido.decode("utf-8-sig"))
+        texto = contenido.decode("utf-8-sig")
+        datos = json.loads(texto)
     except UnicodeDecodeError as exc:
         raise ArchivoIlegible("El JSON no está en UTF-8") from exc
     except json.JSONDecodeError as exc:
@@ -43,6 +62,8 @@ def leer_json(contenido: bytes, opciones: OpcionesLectura = OpcionesLectura()) -
         ) from exc
     if not isinstance(datos, list):
         raise ArchivoIlegible("El JSON debe ser una lista de objetos")
+    if SOSPECHA_EN_TEXTO.search(texto):  # un escape \uD800: solo entonces se recorre
+        _rechazar_mitad_suelta(datos)
     for posicion, objeto in enumerate(datos, 1):
         if not isinstance(objeto, dict):
             raise ArchivoIlegible(f"El elemento {posicion} del JSON no es un objeto")

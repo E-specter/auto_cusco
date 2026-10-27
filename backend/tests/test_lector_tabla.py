@@ -1005,3 +1005,66 @@ def test_el_registro_partido_por_el_corte_no_vuelve_inconsistente_al_punto_y_com
 
     assert len(contenido) > lector_csv.MUESTRA_PARA_SEPARADOR
     assert leer(contenido, "datos.csv").separador == ";"
+
+
+# --- Una mitad suelta de un par sustituto no es texto (T-API-B1) -----
+# `json.loads` acepta un escape D800 a DFFF suelto y deja un `str` que despues no se puede guardar
+# ni escribir: un archivo asi no es legible y el motivo no repite la mitad.
+
+_ALTA = "".join(["\\", "ud800"])  # el escape de la mitad alta, escrito en el archivo
+_BAJA = "".join(["\\", "udc00"])
+
+
+@pytest.mark.parametrize(
+    ("archivo", "dice"),
+    [
+        ('[{"a": 1, "b": "x' + _ALTA + 'y"}]', "un texto"),
+        ('[{"a": 1}, {"a": "' + _BAJA + '"}]', "un texto"),
+        ('[{"a": 1, "no' + _ALTA + 'mbre": "x"}]', "un nombre de campo"),
+        ('[{"a": {"b": ["' + _ALTA + '"]}}]', "un texto"),  # dentro de un valor anidado
+    ],
+)
+def test_un_json_con_una_mitad_suelta_no_es_legible_y_el_motivo_no_la_repite(archivo, dice) -> None:
+    with pytest.raises(ArchivoIlegible) as error:
+        leer(archivo.encode("utf-8"), "datos.json")
+
+    assert dice in str(error.value) and "U+D" in str(error.value)
+    assert not any(0xD800 <= ord(c) <= 0xDFFF for c in str(error.value))  # se puede mostrar
+
+
+def test_el_motivo_de_la_mitad_suelta_dice_el_elemento_en_base_1() -> None:
+    archivo = ('[{"a": 1}, {"a": 2}, {"a": "x' + _BAJA + '"}]').encode()
+
+    with pytest.raises(ArchivoIlegible, match=r"en 3 > a"):
+        leer(archivo, "datos.json")
+
+
+def test_un_json_con_un_par_completo_escapado_o_con_otros_escapes_se_lee() -> None:
+    par = "".join(["\\", "ud83d", "\\", "ude00"])
+    eñe = "".join(["\\", "u00f1"])
+    archivo = ('[{"a": "' + par + '", "n' + eñe + '": "' + eñe + '"}]').encode()
+
+    tabla = leer(archivo, "datos.json")
+
+    assert tabla.cabeceras == ["a", "n\u00f1"]
+    assert tabla.filas[0].celdas == ["\U0001f600", "\u00f1"]
+
+
+@pytest.mark.parametrize(
+    "raiz",
+    [
+        '"x' + _ALTA + '"',  # un texto con una mitad suelta: la raiz no es una lista
+        '{"a": "' + _ALTA + '"}',  # un objeto con una mitad suelta en un valor
+        '{"a' + _BAJA + '": 1}',  # y en una clave
+        "5",
+        "null",
+        '"texto"',
+    ],
+)
+def test_un_json_que_no_es_una_lista_es_ilegible_con_o_sin_mitad_suelta_y_nunca_revienta(
+    raiz,
+) -> None:
+    # `leer_json` directo: la raiz que no es lista se rechaza ANTES de buscar la mitad suelta
+    # (la ruta del hallazgo empieza por la posicion de un elemento, que solo hay en una lista).
+    with pytest.raises(ArchivoIlegible, match="lista de objetos"):
+        leer_json(raiz.encode("utf-8"))
