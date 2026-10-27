@@ -51,6 +51,7 @@ from app.core.entities.mowa_mes_campana import (
     SupervisorAsignado,
     TipoCarga,
     largo_utf16,
+    una_linea,
 )
 from app.core.entities.mowa_mes_costo import PlantillaInvalida
 from app.core.ports.repositorio_campanas_mowa_mes_port import RepositorioCampanasMowaMesPort
@@ -152,7 +153,8 @@ def descripcion_sugerida(filtros: Sequence[Filtro]) -> str:
     Cabe en `LARGO_MAXIMO_DESCRIPCION` (unidades UTF-16): si el resumen completo no cabe, sale el
     prefijo con los filtros ENTEROS que quepan desde el principio, cerrado con `...`; y si ni el
     primero cabe, las primeras unidades del texto completo y `...`."""
-    resumenes = [resumen_filtro(f) for f in filtros]
+    # Un valor de filtro de texto puede traer un salto adentro: la descripcion es de una linea.
+    resumenes = [una_linea(resumen_filtro(f)) for f in filtros]
     completa = f"{PREFIJO_DESCRIPCION} {', '.join(resumenes)}" if resumenes else PREFIJO_DESCRIPCION
     if largo_utf16(completa) <= LARGO_MAXIMO_DESCRIPCION:
         return completa

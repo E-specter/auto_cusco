@@ -1781,7 +1781,7 @@ export interface components {
             tipo_carga: components["schemas"]["TipoCarga"];
             /**
              * Descripcion
-             * @description Sin descripcion (o en blanco) se usa la sugerida. Admite hasta 100 unidades UTF-16, las que cuenta `.length` en el navegador (un emoji son 2), sin contar los espacios de los extremos (RF-MM-04)
+             * @description Sin descripcion (o en blanco) se usa la sugerida. Admite hasta 100 unidades UTF-16, las que cuenta `.length` en el navegador (un emoji son 2), sin contar los espacios de los extremos. Es de una sola linea: cada salto de linea (CRLF cuenta como uno, y CR, LF, U+2028 y U+2029) se cambia por un espacio antes de medir y de registrar (RF-MM-04)
              */
             descripcion?: string | null;
             /** @default numero_largo */
@@ -2822,7 +2822,7 @@ export interface components {
             tipo_carga: components["schemas"]["TipoCarga"];
             /**
              * Descripcion
-             * @description Sin descripcion (o en blanco) se usa la sugerida. Admite hasta 100 unidades UTF-16, las que cuenta `.length` en el navegador (un emoji son 2), sin contar los espacios de los extremos (RF-MM-04)
+             * @description Sin descripcion (o en blanco) se usa la sugerida. Admite hasta 100 unidades UTF-16, las que cuenta `.length` en el navegador (un emoji son 2), sin contar los espacios de los extremos. Es de una sola linea: cada salto de linea (CRLF cuenta como uno, y CR, LF, U+2028 y U+2029) se cambia por un espacio antes de medir y de registrar (RF-MM-04)
              */
             descripcion?: string | null;
             /** @default numero_largo */

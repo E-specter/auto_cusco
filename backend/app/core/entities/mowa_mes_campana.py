@@ -7,6 +7,7 @@ campana guarda la copia de todo con lo que se genero, porque la seleccion
 guardada, el speech y los supervisores por defecto pueden cambiar despues.
 """
 
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
@@ -25,6 +26,16 @@ CABECERAS_CARGA = ("numero", "mensaje", "dni")  # RF-MM-10
 HOJA_CARGA = "Hoja1"
 PREFIJO_DESCRIPCION = "CajaCusco"  # RF-MM-04
 LARGO_MAXIMO_DESCRIPCION = 100  # RF-MM-04 (S-MM-3): el campo «Descripción de Campaña» de MES
+
+
+_SALTO_DE_LINEA = re.compile("\r\n|[\r\n\N{LINE SEPARATOR}\N{PARAGRAPH SEPARATOR}]")
+
+
+def una_linea(texto: str) -> str:
+    """RF-MM-04: el campo de MES es de una sola linea. Cada salto pasa a UN espacio (CRLF cuenta
+    como uno; tambien CR, LF, U+2028 y U+2029) y los espacios seguidos no se juntan. VT, FF y U+0085
+    no se tocan: no se decidieron."""
+    return _SALTO_DE_LINEA.sub(" ", texto)
 
 
 def largo_utf16(texto: str) -> int:

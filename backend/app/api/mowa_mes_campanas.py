@@ -67,6 +67,7 @@ from app.core.entities.mowa_mes_campana import (
     SpeechCambiado,
     TipoCarga,
     largo_utf16,
+    una_linea,
 )
 from app.core.entities.mowa_mes_costo import EstadoCosto, EstadoCostoEstimado
 from app.core.entities.mowa_mes_reporte import CifrasGrupo, ReporteInvalido, ReporteYaImportado
@@ -149,7 +150,9 @@ class PeticionCampanaEntrada(BaseModel):
         description=(
             "Sin descripcion (o en blanco) se usa la sugerida. Admite hasta "
             f"{LARGO_MAXIMO_DESCRIPCION} unidades UTF-16, las que cuenta `.length` en el "
-            "navegador (un emoji son 2), sin contar los espacios de los extremos (RF-MM-04)"
+            "navegador (un emoji son 2), sin contar los espacios de los extremos. Es de una sola "
+            "linea: cada salto de linea (CRLF cuenta como uno, y CR, LF, U+2028 y U+2029) se "
+            "cambia por un espacio antes de medir y de registrar (RF-MM-04)"
         ),
     )
     salida: Salida = Salida.NUMERO_LARGO
@@ -179,8 +182,12 @@ class PeticionCampanaEntrada(BaseModel):
     @field_validator("descripcion")
     @classmethod
     def _descripcion_cabe_en_mes(cls, descripcion: str | None) -> str | None:
-        # Se mide lo que se registra (la campana la guarda sin los espacios de los extremos).
-        if descripcion is not None and largo_utf16(descripcion.strip()) > LARGO_MAXIMO_DESCRIPCION:
+        if descripcion is None:
+            return None
+        # Primero los saltos pasan a un espacio (el campo de MES es de una linea) y despues se mide
+        # lo que se registra (la campana la guarda sin los espacios de los extremos).
+        descripcion = una_linea(descripcion)
+        if largo_utf16(descripcion.strip()) > LARGO_MAXIMO_DESCRIPCION:
             raise ValueError(f"La descripcion admite hasta {LARGO_MAXIMO_DESCRIPCION} caracteres")
         return descripcion
 
