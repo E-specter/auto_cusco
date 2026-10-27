@@ -674,3 +674,109 @@ Sobre `90fec9e`. El diseño es `docs/mapeador-encabezados.md` (RF-57 a RF-63). A
 **Orden:** B17 (en curso) → B1 → B2 → B3 → F1 → F2. Hay un solo dev backend. B2 no depende de B1 y se puede revisar aparte. architec corre `-ConBase`, la migración de ida y vuelta, Linux, Playwright y la medición de ingesta con 120 000 filas antes y después de B3.
 
 **Aprobado por architec (2026-10-24).** Aprobó M-1 a M-5 y M-7 a M-9 tal como están, el FOR UPDATE y el límite de los alias. **M-6 = (a)**, decidido por architec por ser técnico y favorable: una sola `coincide` en los dos caminos, y la paridad se reformula para archivos cuyas cabeceras ya coincidían por alias. M-9 va en F1. Los ajustes ya están en `mapeador-encabezados.md` y en `sabana-schema.md` N-1.
+
+**Cierre (2026-10-27):** RF-57 a RF-63 cumplidos, en `revision-map-c2.md`. Hay tres hallazgos de la pasada real, que corrige T-MAP-B5.
+
+## 28. Plan de los campos adicionales (T-CA-C1), para aprobación de architec
+
+Sobre `d4dafb6` (RF-59 ampliado, RF-64 a RF-66). Incluye las restricciones que adelantó `coordinador_modulo_mowa_mes`.
+
+### Contraste con el código
+
+- **El catálogo de la cartera es una constante de módulo:** `seleccion_cartera/campos.py: CAMPOS_CARTERA`, derivada de `CATALOGO_VENCIDA` al importar. La usan, como dato fijo:
+  - `campos.tipo_de` y `convertir`, y `expresiones` (filtros y segmentación de la selección, también los de la campaña de MOWA MES);
+  - `selecciones/servicio.py`;
+  - `contextos_texto.py` (las variables del contexto `cartera` del motor);
+  - `generacion_cargas/servicio.py` (las columnas de carga);
+  - `texto_enriquecido/tipos.py`.
+
+  RF-66 pide que esos lugares reciban los adicionales «sin código específico»: la constante tiene que pasar a ser un **catálogo que se pide** y que suma lo de la base.
+- **Valores por producto:** `carga_fila` tiene una columna tipada por campo base y un JSONB `extras` con las columnas desconocidas. El repositorio de cartera arma los filtros y agregados sobre `_FILA.c[campo]`.
+- **El catálogo del mapeador:** `CATALOGO_SABANA` también es fijo, y `CampoDestino` lleva `clave_etiqueta` (i18n), que un adicional no puede tener porque su nombre lo escribe el usuario.
+- **El análisis guardado del borrador (M-4)** congela `campos`. Un campo creado mientras se mapea no estaría en ese análisis, y validar daría `campo_desconocido`.
+
+### Propuesta
+
+- **P-1, definiciones.** Una tabla `campo_adicional`:
+  - `nombre`: el técnico, único y estable, nunca reutilizado;
+  - `catalogo_id`: «sabana_vencida»;
+  - `nombre_legible`: único, comparado normalizado como RF-58, también contra nombres y alias base;
+  - `tipo`: `texto`, `numero` o `fecha`;
+  - `encabezado_origen`: el normalizado, que es su alias literal (T-MAP-B4 lo publica);
+  - `archivado` y las marcas de tiempo.
+
+  **Nombre técnico:** `ad_` + un *slug* ASCII del nombre legible y, si choca, `_2`, `_3`… El prefijo lo separa de los campos base, de los que vengan después y de las variables que pone un conector en cada fila (`titular`, `fecha_vencimiento_cuota`, `whatsapp_contacto`, `fecha_envio`, `dias_atraso_ajustados`…). Igual se valida contra una lista de nombres reservados de todos los contextos (restricción 6 de MOWA MES).
+- **P-2, valores.** Una columna nueva `carga_fila.adicionales JSONB NULL` (`{nombre: valor}`), escrita SOLO por la ingesta y ya normalizada por tipo:
+  - texto: tal cual;
+  - número: un texto decimal canónico, nunca float;
+  - fecha: ISO.
+
+  Los filtros y agregados leen `(adicionales->>'ad_x')`, con un *cast* según el tipo (`::numeric` o `::date`), que es seguro porque el formato lo garantiza la ingesta. Un valor que no se convierte queda vacío, con la advertencia `valor_no_convertible` en su fila (RF-64). No hace falta índice: las consultas van por una versión, unas 46 000 filas. architec lo mide antes y después.
+
+  Elijo esto frente a una tabla de valores (EAV, una fila por valor), que obliga a uniones en cada filtro y en cada fila generada. La versión que no tiene la columna queda en NULL y se lee vacía (RF-65).
+- **P-3, una sola fuente.** `CatalogoCartera` en el núcleo:
+  - `campos() -> dict[str, CampoCartera(nombre, tipo, etiqueta | clave_etiqueta, adicional: bool, archivado: bool)]`, que suma los campos base (fijos, como hoy) y los adicionales (desde un puerto, `RepositorioCamposAdicionalesPort`);
+  - `tipo_de`, `convertir`, `expresiones`, los contextos del motor, la generación y el repositorio de cartera reciben el catálogo, en lugar de importar `CAMPOS_CARTERA`;
+  - una prueba de arquitectura impide volver a importar la constante fuera de `campos.py`;
+  - una prueba de «capacidad nueva» comprueba que lo que reciba el catálogo ve los adicionales sin código propio (RF-66).
+
+  `CATALOGO_SABANA` del mapeador se arma igual, como base + adicionales activos. `CampoDestino` gana una `etiqueta` literal opcional, junto a `clave_etiqueta`, y la marca `adicional`.
+- **P-4, crear desde el mapeo.** `POST /mapeador/borradores/{id}/campos-adicionales {indice, nombre_legible, tipo}`, en una transacción:
+  - crea el campo (409 `nombre_repetido` con el campo con que choca, y 422 si el tipo no es válido);
+  - lo agrega a los `campos` del análisis guardado del borrador (así M-4 sigue valiendo);
+  - devuelve el análisis y el campo.
+
+  La pantalla asigna esa columna al campo nuevo con origen `manual` y, al confirmar, se recuerda como cualquier asignación (RF-61). Un adicional nunca es obligatorio (RF-64).
+- **P-5, el resto del ciclo.**
+  - `GET /cartera/campos`, o el catálogo que ya tiene la cartera, con `adicional` y `etiqueta`;
+  - `PATCH /campos-adicionales/{nombre}`, para renombrar (RF-65), que no toca el técnico;
+  - `POST …/archivar` y `POST …/reactivar`.
+
+  El contrato se regenera con cada corte.
+- **P-6, el supuesto de RF-65, que se le propone al usuario:**
+  - el **tipo es fijo**: cambiarlo reinterpretaría los valores de versiones ya cargadas. Para otro tipo se crea otro campo;
+  - **archivar en lugar de borrar**: deja de ofrecerse en las listas y en el mapeador, ningún dato se borra, el técnico no se reutiliza y se puede reactivar;
+  - lo que ya lo referencia sigue funcionando: una selección, una definición guardada o un speech compilan igual, porque el catálogo sigue resolviendo los archivados para leer, y solo no los ofrece. La previsualización avisa «usa un campo archivado», nunca un 500 (restricción 8 de MOWA MES);
+  - un recordado hacia un archivado se ignora (B1: un campo fuera del catálogo que se ofrece pasa a la siguiente pasada).
+
+### MOWA MES (restricciones de `coordinador_modulo_mowa_mes`)
+
+**Corrección del alcance, de la §13 de MOWA MES:** el speech de MOWA MES NO sale del catálogo de la cartera. `contexto_texto.py` usa un conjunto fijo, `speech.VARIABLES_V2`: titular, fecha_vencimiento_cuota, whatsapp_contacto y dias_atraso_ajustados. Por eso T-CA-B1 no agrega adicionales al speech, y con RF-66 al pie de la letra NO se ofrecerían, igual que los demás campos base. Ofrecerlos es una decisión del usuario (D-CA-0). D-CA-1 y D-CA-2 solo aplican si la respuesta es sí.
+
+**Lo que ya queda resuelto en el plan:**
+- **GSM-7 (2):** se aplica al texto final, nunca a la variable. No hace falta nada propio.
+- **Fecha (4):** `formato_fecha` tiene cota. Un **número** NO tiene una función con cota: `formato_numero` y `a_texto` de un número la pierden (cota.py), así que entra en D-CA-1 igual que el texto.
+- **Nombres reservados (6):** P-1.
+- **El resumen de los filtros (7):** muestra el nombre legible, con `una_linea` y el límite de 100 UTF-16. La campaña guarda los filtros con el técnico, así que renombrar no la cambia. `descripcion_sugerida` y `resumen_filtro` pasan a recibir el catálogo en **T-CA-B1**, con la §13 de MOWA MES. El resumen de los campos base sale igual que hoy.
+- **Archivar (8):** P-6.
+- **Proceso (9):** como siempre.
+
+**Lo que decide el usuario. Lo llevo con una recomendación, vía architec:**
+- **D-CA-0, el speech de MOWA MES ofrece los adicionales:** hoy el speech solo ofrece cuatro variables fijas, y ningún otro campo de la cartera. **Recomiendo SÍ:** RF-64 nace de «una columna en la que quiere enfocar la gestión», y el SMS es donde se gestiona. Con un sí, el corte de MOWA MES arma las variables v2 con los adicionales del catálogo, los lee de `carga_fila.adicionales` en la campaña y en la previsualización, y agrega un valor sintético de ejemplo por tipo. Con un no, D-CA-1 y D-CA-2 no aplican.
+- **D-CA-1, la cota de un adicional de texto o número en un speech (1, corregido por la §13 de MOWA):** sin un tope, la advertencia de 150 no sirve. **Recomiendo** exigir un corte que fije el largo, `primeros(n)` (para un número, después de pasarlo a texto), como el titular a 8. La validación al guardar da un problema ubicado que lo sugiere. La fecha con `formato_fecha` ya tiene cota. La alternativa es «sin tope», con solo el control fila por fila (`mensaje_excede_160` excluye).
+- **D-CA-2, un adicional vacío en un mensaje (3):** **recomiendo** excluir el producto con un código nuevo, `falta_campo_adicional`, si la expresión del segmento usa ese campo y en esa fila está vacío, igual que `falta_titular`. Va después de falta_vencimiento y antes de mensaje_excede_160, con el nombre técnico (puede haber varios) y el legible en la pantalla. También aplica a un campo archivado. Así nunca sale un SMS con un hueco. La alternativa es dejarlo vacío.
+- **D-CA-3, columnas del .xlsx de MOWA MES (5):** **recomiendo** NO agregar columnas al archivo de MES. Un adicional entra solo dentro del texto del speech. RF-54 se mantiene byte a byte.
+
+### Cortes
+
+| Corte | Qué | Depende | Revisión |
+|---|---|---|---|
+| **T-MAP-B4** | Los alias literales en el catálogo del mapeador (para F3) | — | coordinador, designer |
+| **T-CA-B1** | Núcleo: `CatalogoCartera` (base + adicionales), el puerto, el nombre técnico y los reservados, `CampoDestino` con etiqueta literal, todos los consumidores pasan a recibir el catálogo, y las pruebas de arquitectura y de «capacidad nueva». Sin migración: el puerto en memoria | C1 aprobado | coordinador; **MOWA MES (§13)**, porque `expresiones` y la campaña cambian de firma |
+| **T-CA-B2** | Persistencia y API: migración (`campo_adicional` y `carga_fila.adicionales`), la ingesta con conversión por tipo y `valor_no_convertible`, el repositorio de cartera con *cast* por tipo, P-4 y P-5, y el contrato | B1 | coordinador, MOWA MES; dev_frontend y designer como consumidores |
+| **T-MAP-B5** | Los hallazgos H-1 y H-2 de la revisión del mapeador | B2, porque tocan `similitud.py` y `mapeo_explicito.py` | coordinador |
+| **T-CA-F0** | Reglas de interfaz (designer) y la aprobación del usuario | contrato de B2 | usuario |
+| **T-CA-F1** | La creación en el mapeador (sobre el componente y F3) y la distinción visual en Cartera, el editor y el constructor | F0 | designer |
+| **T-MM-B?** | Lo de MOWA MES, solo si D-CA-0 es sí: variables v2 con los adicionales, sus valores en la campaña y la previsualización, un ejemplo por tipo, D-CA-1 y D-CA-2 (de su equipo) | B2 y las decisiones | MOWA MES |
+| **T-CA-C2** | Cierre contra RF-64 a RF-66 | todos | architec |
+
+**Aprobado por architec, y decisiones del usuario del 2026-10-27, todas por la opción recomendada:**
+- **P-6:** el tipo es fijo y se archiva en vez de borrar. Ningún dato se borra, el técnico no se reutiliza, se puede reactivar, y lo que ya lo usa sigue funcionando con un aviso.
+- **D-CA-0:** SÍ, el speech de MOWA MES ofrece los adicionales.
+- **D-CA-1:** se exige `primeros(n)` a un adicional de texto o de número (al de número, después de pasarlo a texto).
+- **D-CA-2:** un adicional vacío excluye el producto con `falta_campo_adicional`.
+- **D-CA-3:** no se agregan columnas al .xlsx de MES (RF-54 byte a byte).
+
+**§13 de MOWA MES sobre T-CA-B1:** la prueba de oro del mensaje y las pruebas de la campaña y de la descripción sugerida pasan sin cambiar ningún valor esperado. Solo cambian las firmas. D-CA-3 aprobado.
+
+**Orden:** B4 (corto, ya encargado) → CA-B1 → CA-B2 → MAP-B5. F0 puede empezar con el contrato de B2. architec corre `-ConBase`, la migración de ida y vuelta, WSL y la medición de consulta y generación con 46 000 filas, con y sin adicionales, antes y después de B2.
