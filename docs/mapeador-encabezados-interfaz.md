@@ -118,6 +118,8 @@ El `.tag` muestra lo que vale **ahora** para esa columna. Mientras tenga el camp
   - **En una columna no parecida:** con el campo del análisis, `recordado` o `coincide`, como venía; con otro, `manual`. El backend recalcula el origen si no cuadra.
   - Una columna `sin_coincidencia` que se queda en «No cargar» se guarda como `manual` (decisión de B1). No cambia lo que muestra la pantalla.
 
+**Crear un campo adicional desde el mapeo** (RF-64): la referencia al final, el formulario y `fijarCampos` están en [campos-adicionales-interfaz.md](campos-adicionales-interfaz.md) §2. Los adicionales van en un tercer grupo de la lista, «Campos adicionales», después de «Otros campos».
+
 ### 3.6 Problemas
 
 - **Problema de una columna** (`parecido_sin_revisar`, y `campo_repetido` cuando lo trae el análisis): bajo su campo, con `.field__error`, `aria-invalid` y `aria-describedby`. La fila cuenta en «Por revisar». Con el campo en uso deshabilitado, ningún gesto de la pantalla produce un `campo_repetido` nuevo.

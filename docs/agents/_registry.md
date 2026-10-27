@@ -22,6 +22,7 @@
 | /docs/mapeo-campos.md | Doc | Motor de reglas de mapeo y expresión de campos (RF-12) | architec (arquitectura) | 2026-09-12 |
 | /docs/mapeador-encabezados.md | Doc | Diseño técnico del mapeador de encabezados reutilizable (RF-57 a RF-63): formatos, estados, similitud, validación, mapeos recordados, API, componente y cortes | architec (arquitectura) | 2026-10-24 |
 | /docs/mapeador-encabezados-interfaz.md | Doc | Reglas de interfaz vinculantes del mapeador de encabezados (T-MAP-F1): montaje del componente `MapeadorEncabezados`, resumen y filtro, estados, campo de carga, problemas, opciones de lectura, pantalla de cargas, accesibilidad, textos y pruebas mínimas | designer (ui) | 2026-10-27 |
+| /docs/campos-adicionales-interfaz.md | Doc | Reglas de interfaz vinculantes de los campos adicionales (T-CA-F0, RF-64 a RF-66): crear un campo desde el mapeo (referencia, formulario, errores), cómo se distingue un adicional en las listas de Cartera, el editor, el constructor y el mapeador, y renombrar, archivar y reactivar | designer (ui) | 2026-10-27 |
 | /docs/generacion-cargas.md | Doc | Generación y exportación de archivos de carga (RF-09, RF-13, RF-15) | architec (arquitectura) | 2026-09-12 |
 | /docs/contrato-api.md | Doc | Contrato OpenAPI entre la API y el frontend | architec (arquitectura), designer (ui) | 2026-09-13 |
 | /docs/selecciones-guardadas.md | Doc | Selecciones de cartera guardadas y compartidas | architec (arquitectura) | 2026-09-12 |
