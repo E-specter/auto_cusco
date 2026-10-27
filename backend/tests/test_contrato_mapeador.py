@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from app.core.entities.campos_adicionales import TipoAdicional
 from app.core.entities.lectura_tabla import CodigoAdvertenciaLectura, FormatoTabla, OpcionDetectable
 from app.core.entities.mapeador import (
     CodigoErrorMapeador,
@@ -37,6 +38,7 @@ ENUMS = {
     "FormatoTabla": FormatoTabla,
     "OpcionDetectable": OpcionDetectable,
     "CodigoErrorMapeador": CodigoErrorMapeador,
+    "TipoAdicional": TipoAdicional,
 }
 # (esquema, propiedad) -> el enum que tiene que usar
 USOS = {
@@ -47,6 +49,8 @@ USOS = {
     ("AnalisisRespuesta", "formato"): "FormatoTabla",
     ("DetalleErrorMapeador", "codigo"): "CodigoErrorMapeador",
     ("DetalleErrorMapeo", "codigo"): "CodigoErrorMapeador",
+    ("CampoAdicionalRespuesta", "tipo"): "TipoAdicional",
+    ("NuevoCampoAdicionalEntrada", "tipo"): "TipoAdicional",
 }
 # Las claves de la pantalla: prefijo -> enum que las genera (FormatoTabla y OpcionDetectable no se
 # muestran por clave: los nombres de las opciones los pone la pantalla).
@@ -110,6 +114,9 @@ def test_el_contrato_declara_las_rutas_del_mapeador_con_sus_codigos(esquemas) ->
         ("post", "/mapeador/borradores/{borrador_id}/analisis"): {"200", "400", "404"},
         ("post", "/mapeador/borradores/{borrador_id}/validacion"): {"200", "404"},
         ("delete", "/mapeador/borradores/{borrador_id}"): {"204", "404"},
+        ("post", "/mapeador/borradores/{borrador_id}/campos-adicionales"): {"201", "404", "409"},
+        ("get", "/mapeador/{catalogo_id}/campos-adicionales"): {"200", "404"},
+        ("patch", "/mapeador/{catalogo_id}/campos-adicionales/{nombre}"): {"200", "404", "409"},
         ("post", "/cargas/desde-borrador"): {"202", "404", "422"},
     }
     for (metodo, ruta), codigos in esperadas.items():
@@ -144,11 +151,12 @@ def test_los_errores_del_mapeador_declaran_su_codigo_y_sus_datos_opcionales(esqu
     error = esquemas["DetalleErrorMapeador"]
 
     assert set(error["required"]) == {"detail", "codigo"}
-    assert {"hoja", "hojas", "maximo_mb"} <= set(error["properties"])
-    assert not {"hoja", "hojas", "maximo_mb"} & set(error["required"])
+    datos = {"hoja", "hojas", "maximo_mb", "campo"}
+    assert datos <= set(error["properties"])
+    assert not datos & set(error["required"])
 
 
-def test_cada_400_404_y_413_del_mapeador_es_un_detalle_con_codigo() -> None:
+def test_cada_400_404_409_y_413_del_mapeador_es_un_detalle_con_codigo() -> None:
     rutas = app.openapi()["paths"]
     errores = {
         (ruta, metodo, estado): operacion["responses"][estado]
@@ -156,7 +164,7 @@ def test_cada_400_404_y_413_del_mapeador_es_un_detalle_con_codigo() -> None:
         if ruta.startswith("/mapeador") or ruta == "/cargas/desde-borrador"
         for metodo, operacion in metodos.items()
         for estado in operacion["responses"]
-        if estado in {"400", "404", "413"}
+        if estado in {"400", "404", "409", "413"}
     }
 
     assert errores  # hay errores declarados
@@ -226,6 +234,7 @@ def test_cada_campo_del_catalogo_tiene_su_etiqueta(idioma) -> None:
 DATOS_DE_ERROR = {
     CodigoErrorMapeador.ARCHIVO_DEMASIADO_GRANDE: {"maximo_mb"},
     CodigoErrorMapeador.HOJA_INEXISTENTE: {"hoja", "hojas"},
+    CodigoErrorMapeador.NOMBRE_REPETIDO: {"campo"},  # el nombre legible del campo que choca
 }
 
 
@@ -236,3 +245,10 @@ def test_los_textos_de_error_usan_solo_los_datos_que_trae_su_codigo(idioma) -> N
     for codigo in CodigoErrorMapeador:
         marcadores = set(re.findall(r"\{(\w+)\}", diccionario[f"mapeador.error.{codigo.value}"]))
         assert marcadores <= DATOS_DE_ERROR.get(codigo, set()), codigo
+
+
+@pytest.mark.parametrize("idioma", IDIOMAS)
+def test_el_texto_de_nombre_repetido_nombra_el_campo_con_que_choca(idioma) -> None:
+    texto = _diccionario(idioma)["mapeador.error.nombre_repetido"]
+
+    assert "{campo}" in texto

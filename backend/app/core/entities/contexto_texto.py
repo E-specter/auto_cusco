@@ -27,12 +27,19 @@ class VariableContexto:
 
     `origen` es el nombre del contexto que la aporta: `cartera` para un campo de la cartera, o el
     del modulo (`mowa_mes.speech`) para una variable que es suya. La interfaz agrupa por origen.
+
+    Un campo adicional (RF-64) trae su nombre legible en `etiqueta` y `adicional`; si esta
+    `archivado` se sigue resolviendo (lo que ya lo usa compila), pero el editor no lo ofrece. En
+    las demas, `etiqueta` es None y las marcas son falsas.
     """
 
     nombre: str
     tipo: TipoValor
     clave_nombre: str | None = None
     origen: str = ORIGEN_CARTERA
+    etiqueta: str | None = None
+    adicional: bool = False
+    archivado: bool = False
 
 
 @dataclass(frozen=True)

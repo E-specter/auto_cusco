@@ -157,7 +157,7 @@ def test_un_archivado_se_resuelve_para_leer_pero_no_se_ofrece() -> None:
     catalogo.validar_filtro(Filtro("ad_antiguo", Operador.MAYOR, (Decimal(1),)))  # y valida
     catalogo.validar_indicador(Indicador("total", Funcion.SUMA, "ad_antiguo"))
     assert "ad_antiguo" in catalogo.campos() and "ad_antiguo" not in catalogo.ofrecidos()
-    assert "ad_antiguo" not in catalogo.catalogo_publico()
+    assert catalogo.catalogo_publico()["ad_antiguo"]["archivado"] is True  # se lista, marcado
     assert catalogo.tipos()["ad_antiguo"] is TipoDato.NUMERO  # el motor y las columnas lo leen
 
 
@@ -177,6 +177,7 @@ def test_el_catalogo_publico_marca_los_adicionales_y_no_cambia_los_de_la_base() 
         "operadores": publico["dias_atraso"]["operadores"],
         "adicional": True,
         "etiqueta": "Monto extra",
+        "archivado": False,
     }
     assert publico["region"] == CatalogoCartera().catalogo_publico()["region"]
     assert "adicional" not in publico["region"]

@@ -25,7 +25,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.api.cartera import crear_catalogo_cartera, obtener_servicio_cartera
+from app.api.cartera import obtener_catalogo_cartera, obtener_servicio_cartera
 from app.api.errores import DetalleError, ErrorConCodigo
 from app.api.fecha_envio import DetalleErrorFechaEnvio, error_de_fecha_envio
 from app.api.respuestas import ModeloRespuesta
@@ -59,6 +59,7 @@ from app.core.services.previsualizar_texto import (
     ProductoNoEncontrado,
     ValidacionTexto,
 )
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
 from app.core.services.selecciones.servicio import SeleccionesService
 from app.core.services.texto_enriquecido import catalogo as catalogo_funciones
@@ -69,14 +70,17 @@ router = APIRouter(prefix="/texto-enriquecido", tags=["texto enriquecido"])
 # --- Composicion --------------------------------------------------------------------------------
 
 
-def obtener_registro_contextos() -> RegistroContextos:
-    """Los contextos de la aplicacion: una linea por contexto."""
-    return RegistroContextos(
-        [
-            contexto_cartera(crear_catalogo_cartera()),
-            contexto_speech(),
-        ]
-    )
+def registro_de_contextos(catalogo: CatalogoCartera) -> RegistroContextos:
+    """Los contextos de la aplicacion con ese catalogo de campos: una linea por contexto."""
+    return RegistroContextos([contexto_cartera(catalogo), contexto_speech()])
+
+
+def obtener_registro_contextos(
+    catalogo: CatalogoCartera = Depends(obtener_catalogo_cartera),
+) -> RegistroContextos:
+    """Dependencia de FastAPI: los contextos con los campos de la cartera de ESTA peticion (los
+    base y los adicionales que el usuario haya creado)."""
+    return registro_de_contextos(catalogo)
 
 
 def obtener_servicio_texto(
@@ -322,12 +326,17 @@ TipoOEntradaRespuesta = Literal["texto", "numero", "fecha", "booleano", "entrada
 
 class VariableRespuesta(ModeloRespuesta):
     """`origen` es el contexto que aporta la variable: `cartera` para un campo de la cartera, o el
-    del modulo (`mowa_mes.speech`) para una variable suya. La interfaz las agrupa por origen."""
+    del modulo (`mowa_mes.speech`) para una variable suya. La interfaz las agrupa por origen.
+    Una variable `adicional` (RF-64) es un campo que creo el usuario: su nombre legible es
+    `etiqueta`, un texto literal. Si esta `archivado` se sigue resolviendo, pero no se ofrece."""
 
     nombre: str
     tipo: TipoValorRespuesta
     clave_nombre: str | None
     origen: str
+    etiqueta: str | None
+    adicional: bool
+    archivado: bool
 
 
 class RangoRespuesta(ModeloRespuesta):
@@ -541,7 +550,13 @@ def _contexto(contexto: ContextoTexto) -> ContextoRespuesta:
         clave_nombre=contexto.clave_nombre,
         variables=[
             VariableRespuesta(
-                nombre=v.nombre, tipo=v.tipo.value, clave_nombre=v.clave_nombre, origen=v.origen
+                nombre=v.nombre,
+                tipo=v.tipo.value,
+                clave_nombre=v.clave_nombre,
+                origen=v.origen,
+                etiqueta=v.etiqueta,
+                adicional=v.adicional,
+                archivado=v.archivado,
             )
             for v in contexto.variables
         ],

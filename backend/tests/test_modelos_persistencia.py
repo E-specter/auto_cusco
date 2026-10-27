@@ -18,7 +18,7 @@ from app.core.entities.sabana import Severidad, TipoDocumento
 from app.core.services.ingesta_sabana.normalizador import normalizar_fila
 from tests.test_sabana_normalizador import MAPEO, _fila_sintetica
 
-COLUMNAS_TECNICAS = {"carga_id", "numero_fila", "extras"}
+COLUMNAS_TECNICAS = {"carga_id", "numero_fila", "extras", "adicionales"}
 
 
 def _valores_normalizados() -> dict:

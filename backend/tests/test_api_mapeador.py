@@ -99,6 +99,8 @@ def test_el_catalogo_trae_los_campos_y_las_codificaciones(api) -> None:
         "tipo": "clave",
         "obligatorio": True,
         "alias": ["pagare"],
+        "etiqueta": None,
+        "adicional": False,
     }
     assert [c["nombre"] for c in cuerpo["campos"] if c["obligatorio"]] == ["pagare"]
     assert cuerpo["codificaciones"] == ["utf-8-sig", "utf-8", "windows-1252", "latin-1"]

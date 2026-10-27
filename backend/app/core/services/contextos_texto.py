@@ -66,8 +66,16 @@ def _tipo(valor: Any) -> TipoValor:
 def contexto_cartera(catalogo: CatalogoCartera) -> ContextoTexto:
     # Los archivados tambien: lo que ya los usa tiene que seguir compilando (RF-65).
     variables = tuple(
-        VariableContexto(nombre, _tipo(tipo), None, ORIGEN_CARTERA)
-        for nombre, tipo in catalogo.tipos().items()
+        VariableContexto(
+            nombre,
+            _tipo(campo.tipo),
+            None,
+            ORIGEN_CARTERA,
+            campo.etiqueta,
+            campo.adicional,
+            campo.archivado,
+        )
+        for nombre, campo in catalogo.campos().items()
     ) + tuple(
         VariableContexto(nombre, tipo, _CLAVES_DE_ENVIO[nombre], ORIGEN_CARTERA)
         for nombre, tipo in VARIABLES_DE_ENVIO.items()

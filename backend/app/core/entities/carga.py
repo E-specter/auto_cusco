@@ -119,12 +119,15 @@ class FilaParaGuardar:
     """Fila normalizada lista para persistir.
 
     `valores` usa los nombres de columna de la tabla de filas; `extras` guarda
-    las columnas del archivo que no estan en el catalogo (normalmente None).
+    las columnas del archivo que no estan en el catalogo (normalmente None). `adicionales` (RF-64)
+    es nombre tecnico -> valor ya normalizado a su tipo (texto, decimal canonico o fecha ISO); None
+    si la carga no asigno ningun campo adicional, y entonces la columna queda NULL.
     """
 
     numero_fila: int
     valores: dict[str, Any]
     extras: dict[str, Any] | None = None
+    adicionales: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)

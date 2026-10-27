@@ -17,7 +17,7 @@ from app.core.entities.cartera import (
 )
 from app.core.services.seleccion_cartera.campos import CAMPOS_BASE, CatalogoCartera
 
-COLUMNAS_TECNICAS = {"carga_id", "numero_fila", "extras"}
+COLUMNAS_TECNICAS = {"carga_id", "numero_fila", "extras", "adicionales"}
 campos = CatalogoCartera()  # la base: sin campos adicionales
 
 

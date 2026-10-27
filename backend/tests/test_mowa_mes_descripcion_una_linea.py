@@ -178,9 +178,8 @@ def _filtro(texto: str):
 def test_un_valor_de_filtro_con_un_salto_da_una_sugerida_de_una_linea() -> None:
     filtro = _filtro(f"titular:contiene:a{LF}b")
 
-    assert f"a{LF}b" in resumen_filtro(
-        filtro, CatalogoCartera()
-    )  # el resumen en si todavia lo trae
+    # el resumen en si todavia lo trae
+    assert f"a{LF}b" in resumen_filtro(filtro, CatalogoCartera())
     assert descripcion_sugerida([filtro], CatalogoCartera()) == f"{PREFIJO} titular contiene a b"
 
 

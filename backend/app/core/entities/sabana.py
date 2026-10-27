@@ -131,6 +131,10 @@ class TipoCampo(StrEnum):
     BOOLEANO = "booleano"
     VENCIMIENTO_OPERATIVO = "vencimiento_operativo"
     SIN_VALOR = "sin_valor"  # se conserva solo en el registro crudo (N-9)
+    # Los campos adicionales (RF-64): el valor se guarda como texto en `carga_fila.adicionales`.
+    ADICIONAL_TEXTO = "adicional_texto"
+    ADICIONAL_NUMERO = "adicional_numero"
+    ADICIONAL_FECHA = "adicional_fecha"
 
 
 @dataclass(frozen=True)
@@ -167,6 +171,8 @@ class FilaNormalizada:
     numero_fila: int
     valores: dict[str, Any]
     incidencias: list[Incidencia] = field(default_factory=list)
+    # None: el mapeo no asigno ningun campo adicional. Un valor vacio o no convertible no se guarda.
+    adicionales: dict[str, str] | None = None
 
     @property
     def clave(self) -> str | None:

@@ -85,8 +85,9 @@ export type Manejador = (route: Route, ruta: string, metodo: string, url: URL) =
 
 /** A synthetic catalogue: the operational fields plus one text field. */
 export function camposSinteticos(): Campos {
-  const numero = { tipo: 'numero', operadores: ['igual', 'mayor', 'menor', 'entre', 'vacio', 'no_vacio'] };
-  const texto = { tipo: 'texto', operadores: ['igual', 'distinto', 'en', 'contiene', 'vacio', 'no_vacio'] };
+  const base = { adicional: false, etiqueta: null, archivado: false };
+  const numero = { ...base, tipo: 'numero', operadores: ['igual', 'mayor', 'menor', 'entre', 'vacio', 'no_vacio'] };
+  const texto = { ...base, tipo: 'texto', operadores: ['igual', 'distinto', 'en', 'contiene', 'vacio', 'no_vacio'] };
   return {
     pagare: texto,
     segmento_financiero: texto,

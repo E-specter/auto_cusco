@@ -5,24 +5,39 @@ hereda: confirmar un borrador crea la carga, guarda los recordados y borra el bo
 transaccion, con el borrador tomado antes con `SELECT ... FOR UPDATE`.
 """
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import datetime
 
-from sqlalchemy import Connection, Engine, delete, insert, select, update
+from sqlalchemy import Connection, Engine, delete, insert, select, text, update
 from sqlalchemy.dialects.postgresql import insert as insert_pg
 from sqlalchemy.engine import Row
 
-from app.adapters.persistence.modelos import BorradorCargaArchivo, MapeoRecordado
+from app.adapters.persistence.modelos import (
+    BorradorCargaArchivo,
+    MapeoRecordado,
+)
+from app.adapters.persistence.modelos import (
+    CampoAdicional as ModeloCampoAdicional,
+)
 from app.core.entities.borrador import DatosBorrador, NuevoBorrador
+from app.core.entities.campos_adicionales import CampoAdicional, TipoAdicional
+from app.core.ports.repositorio_campos_adicionales_port import RepositorioCamposAdicionalesPort
 from app.core.ports.repositorio_mapeador_port import (
     ClaveRecordada,
     RepositorioMapeadorPort,
     SesionMapeadorPort,
 )
+from app.core.services.ingesta_sabana.catalogo import CATALOGO_SABANA
+from app.core.services.mapeador.similitud import normalizar_cabecera
 
 _BORRADOR = BorradorCargaArchivo.__table__
 _RECORDADO = MapeoRecordado.__table__
+_ADICIONAL = ModeloCampoAdicional.__table__
+
+# Un solo candado para crear o renombrar campos adicionales: son pocos y raros, y asi el nombre
+# tecnico y el legible se eligen sin carreras (el indice unico es la red de seguridad).
+_ESPACIO_BLOQUEO_ADICIONALES = 0x0CA0
 
 _COLUMNAS_BORRADOR = (
     _BORRADOR.c.id,
@@ -46,6 +61,33 @@ def _borrador(fila: Row) -> DatosBorrador:
         opciones=fila.opciones,
         analisis=fila.analisis,
         creado_en=fila.creado_en,
+    )
+
+
+def _adicional(fila: Row) -> CampoAdicional:
+    return CampoAdicional(
+        nombre=fila.nombre,
+        nombre_legible=fila.nombre_legible,
+        tipo=TipoAdicional(fila.tipo),
+        encabezado_origen=fila.encabezado_origen,
+        archivado=fila.archivado,
+    )
+
+
+_COLUMNAS_ADICIONAL = (
+    _ADICIONAL.c.nombre,
+    _ADICIONAL.c.nombre_legible,
+    _ADICIONAL.c.tipo,
+    _ADICIONAL.c.encabezado_origen,
+    _ADICIONAL.c.archivado,
+)
+
+
+def sentencia_de_adicionales(catalogo_id: str):
+    return (
+        select(*_COLUMNAS_ADICIONAL)
+        .where(_ADICIONAL.c.catalogo_id == catalogo_id)
+        .order_by(_ADICIONAL.c.orden)
     )
 
 
@@ -133,6 +175,70 @@ class SesionMapeadorPostgres(SesionMapeadorPort):
     def guardar_recordados(self, catalogo_id: str, asignaciones, ahora: datetime) -> None:
         if asignaciones:
             self._cx.execute(sentencia_de_recordados(catalogo_id, asignaciones, ahora))
+
+    def bloquear_adicionales(self) -> None:
+        self._cx.execute(
+            text("SELECT pg_advisory_xact_lock(CAST(:espacio AS integer), 0)"),
+            {"espacio": _ESPACIO_BLOQUEO_ADICIONALES},
+        )
+
+    def adicionales(self, catalogo_id: str) -> Sequence[CampoAdicional]:
+        return [_adicional(f) for f in self._cx.execute(sentencia_de_adicionales(catalogo_id))]
+
+    def crear_adicional(
+        self, catalogo_id: str, campo: CampoAdicional, ahora: datetime
+    ) -> CampoAdicional:
+        fila = self._cx.execute(
+            insert(_ADICIONAL)
+            .values(
+                nombre=campo.nombre,
+                catalogo_id=catalogo_id,
+                nombre_legible=campo.nombre_legible,
+                nombre_legible_normalizado=normalizar_cabecera(campo.nombre_legible),
+                tipo=campo.tipo.value,
+                encabezado_origen=campo.encabezado_origen,
+                archivado=campo.archivado,
+                creado_en=ahora,
+                actualizado_en=ahora,
+            )
+            .returning(*_COLUMNAS_ADICIONAL)
+        ).one()
+        return _adicional(fila)
+
+    def actualizar_adicional(
+        self,
+        nombre: str,
+        nombre_legible: str | None,
+        archivado: bool | None,
+        ahora: datetime,
+    ) -> CampoAdicional | None:
+        valores: dict = {"actualizado_en": ahora}
+        if nombre_legible is not None:
+            valores["nombre_legible"] = nombre_legible
+            valores["nombre_legible_normalizado"] = normalizar_cabecera(nombre_legible)
+        if archivado is not None:
+            valores["archivado"] = archivado
+        fila = self._cx.execute(
+            update(_ADICIONAL)
+            .where(_ADICIONAL.c.nombre == nombre)
+            .values(**valores)
+            .returning(*_COLUMNAS_ADICIONAL)
+        ).one_or_none()
+        return _adicional(fila) if fila else None
+
+
+class RepositorioCamposAdicionalesPostgres(RepositorioCamposAdicionalesPort):
+    """La lectura de las definiciones de un catalogo (el de la sabana, por defecto)."""
+
+    def __init__(self, engine: Engine, catalogo_id: str = CATALOGO_SABANA.id) -> None:
+        self._engine = engine
+        self._catalogo_id = catalogo_id
+
+    def listar(self) -> Sequence[CampoAdicional]:
+        with self._engine.connect() as conexion:
+            return [
+                _adicional(f) for f in conexion.execute(sentencia_de_adicionales(self._catalogo_id))
+            ]
 
 
 class RepositorioMapeadorPostgres(RepositorioMapeadorPort):

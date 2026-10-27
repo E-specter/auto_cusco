@@ -105,16 +105,16 @@ const SEGMENTOS_SINTETICOS: Esquemas['RangoRespuesta'][] = [
 export function catalogoSintetico(contexto = 'mowa_mes.speech'): Catalogo {
   const esSpeech = contexto === 'mowa_mes.speech';
   const variables: Esquemas['VariableRespuesta'][] = [
-    { nombre: 'titular', tipo: 'texto', clave_nombre: null, origen: 'cartera' },
-    { nombre: 'fecha_vencimiento_cuota', tipo: 'fecha', clave_nombre: null, origen: 'cartera' },
-    { nombre: 'saldo_capital_pendiente', tipo: 'numero', clave_nombre: null, origen: 'cartera' },
-    { nombre: 'telefono', tipo: 'texto', clave_nombre: null, origen: 'cartera' },
-    { nombre: 'cliente_fallecido', tipo: 'booleano', clave_nombre: null, origen: 'cartera' },
+    { nombre: 'titular', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false },
+    { nombre: 'fecha_vencimiento_cuota', tipo: 'fecha', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false },
+    { nombre: 'saldo_capital_pendiente', tipo: 'numero', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false },
+    { nombre: 'telefono', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false },
+    { nombre: 'cliente_fallecido', tipo: 'booleano', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false },
   ];
   if (esSpeech) {
     variables.push(
-      { nombre: 'whatsapp_contacto', tipo: 'texto', clave_nombre: 'textoEnriquecido.variable.whatsapp_contacto', origen: contexto },
-      { nombre: 'dias_atraso_ajustados', tipo: 'numero', clave_nombre: 'textoEnriquecido.variable.dias_atraso_ajustados', origen: contexto },
+      { nombre: 'whatsapp_contacto', tipo: 'texto', clave_nombre: 'textoEnriquecido.variable.whatsapp_contacto', origen: contexto, etiqueta: null, adicional: false, archivado: false },
+      { nombre: 'dias_atraso_ajustados', tipo: 'numero', clave_nombre: 'textoEnriquecido.variable.dias_atraso_ajustados', origen: contexto, etiqueta: null, adicional: false, archivado: false },
     );
   }
 

@@ -48,8 +48,9 @@ from app.core.services.seleccion_cartera.campos import CatalogoCartera
 
 _FILA = CargaFila.__table__
 _CARGA = Carga.__table__
-_COLUMNAS = {columna.name: columna for columna in _FILA.columns}
-_COLUMNAS_PRODUCTO = [c for c in _FILA.columns if c.name != "carga_id"]
+# El JSON `adicionales` no es un campo ni sale tal cual: cada adicional se lee por su nombre.
+_COLUMNAS = {c.name: c for c in _FILA.columns if c.name != "adicionales"}
+_COLUMNAS_PRODUCTO = [c for c in _FILA.columns if c.name not in {"carga_id", "adicionales"}]
 
 CAMPO_CAPITAL = "saldo_capital_pendiente"
 CAMPO_CUOTA = "monto_cuota"

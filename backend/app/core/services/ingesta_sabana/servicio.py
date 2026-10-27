@@ -41,11 +41,13 @@ from app.core.entities.mapeador import Asignacion
 from app.core.entities.sabana import (
     HOJA_DATOS_POR_DEFECTO,
     ArchivoSabanaError,
+    ColumnaSabana,
     Incidencia,
     MapeoCabeceras,
     Severidad,
 )
 from app.core.ports.lector_tabla_port import LectorTablaPort
+from app.core.ports.repositorio_campos_adicionales_port import RepositorioCamposAdicionalesPort
 from app.core.ports.repositorio_cargas_port import RepositorioCargasPort
 from app.core.services.borradores_carga.servicio import Reloj, ahora_utc, opciones_de_lectura
 from app.core.services.ingesta_sabana.cabeceras import (
@@ -53,7 +55,11 @@ from app.core.services.ingesta_sabana.cabeceras import (
     huella_formato,
     mapear_cabeceras,
 )
-from app.core.services.ingesta_sabana.catalogo import CATALOGO_SABANA
+from app.core.services.ingesta_sabana.catalogo import (
+    CATALOGO_SABANA,
+    CATALOGO_VENCIDA,
+    columna_adicional,
+)
 from app.core.services.ingesta_sabana.mapeo_explicito import (
     MapeoGuardadoInvalido,
     mapeo_desde_asignaciones,
@@ -140,6 +146,7 @@ def _filas_para_guardar(
             numero_fila=cruda.numero_fila,
             valores=fila.valores,
             extras=_extras(cruda.celdas, mapeo.desconocidas),
+            adicionales=fila.adicionales,
         )
 
 
@@ -166,10 +173,19 @@ class IngestaSabanaService:
         repositorio: RepositorioCargasPort,
         lector: LectorTablaPort,
         reloj: Reloj = ahora_utc,
+        adicionales: RepositorioCamposAdicionalesPort | None = None,
     ) -> None:
         self._repositorio = repositorio
         self._lector = lector
         self._reloj = reloj
+        self._adicionales = adicionales
+
+    def _catalogo_de_columnas(self) -> tuple[ColumnaSabana, ...]:
+        """Las columnas base y los adicionales, archivados incluidos: un mapeo confirmado antes de
+        archivar uno se sigue procesando."""
+        if self._adicionales is None:
+            return CATALOGO_VENCIDA
+        return (*CATALOGO_VENCIDA, *(columna_adicional(c) for c in self._adicionales.listar()))
 
     # ---------- 1. registrar ----------
 
@@ -284,7 +300,9 @@ class IngestaSabanaService:
             mapeo, origenes = mapear_cabeceras(hoja.cabeceras), None
         else:
             try:
-                mapeo, origenes, _ = mapeo_desde_asignaciones(hoja.cabeceras, carga.asignaciones)
+                mapeo, origenes, _ = mapeo_desde_asignaciones(
+                    hoja.cabeceras, carga.asignaciones, self._catalogo_de_columnas()
+                )
             except MapeoGuardadoInvalido as exc:
                 return self._fallar(
                     carga,

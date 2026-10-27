@@ -18,14 +18,19 @@ from app.core.entities.mapeador import (
 )
 
 
-def _campo_a_dict(campo: CampoDestino) -> dict[str, Any]:
-    return {
+def campo_a_dict(campo: CampoDestino) -> dict[str, Any]:
+    """Un campo del catalogo como se guarda con el analisis. `etiqueta` y `adicional` (RF-64) solo
+    se guardan en un adicional: el analisis de un campo base queda como antes."""
+    datos: dict[str, Any] = {
         "nombre": campo.nombre,
         "clave_etiqueta": campo.clave_etiqueta,
         "tipo": campo.tipo,
         "obligatorio": campo.obligatorio,
         "alias": list(campo.alias),
     }
+    if campo.adicional:
+        datos |= {"etiqueta": campo.etiqueta, "adicional": True}
+    return datos
 
 
 def _campo_desde_dict(datos: Mapping[str, Any]) -> CampoDestino:
@@ -35,6 +40,8 @@ def _campo_desde_dict(datos: Mapping[str, Any]) -> CampoDestino:
         tipo=datos["tipo"],
         obligatorio=datos["obligatorio"],
         alias=tuple(datos["alias"]),
+        etiqueta=datos.get("etiqueta"),
+        adicional=datos.get("adicional", False),
     )
 
 
@@ -69,7 +76,7 @@ def analisis_a_dict(analisis: AnalisisEncabezados) -> dict[str, Any]:
     return {
         "catalogo_id": analisis.catalogo_id,
         "columnas": [_columna_a_dict(c) for c in analisis.columnas],
-        "campos": [_campo_a_dict(c) for c in analisis.campos],
+        "campos": [campo_a_dict(c) for c in analisis.campos],
     }
 
 

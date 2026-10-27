@@ -13,6 +13,7 @@ from app.core.entities.sabana import (
     TipoCampo,
 )
 from app.core.services.ingesta_sabana import reglas
+from app.core.services.ingesta_sabana.adicionales import CONVERSORES_ADICIONALES
 from app.core.services.ingesta_sabana.reglas import Resultado
 
 _CONVERSORES: dict[TipoCampo, Callable[[Any], Resultado[Any]]] = {
@@ -118,13 +119,21 @@ def normalizar_fila(
     `valores`; deben conservarse en el registro crudo (N-9) por el adaptador.
     """
     valores: dict[str, Any] = {}
+    adicionales: dict[str, str] | None = None
     incidencias: list[Incidencia] = []
 
     for indice, columna in mapeo.columnas.items():
         if columna.tipo is TipoCampo.SIN_VALOR:
             continue
         crudo = celdas[indice] if indice < len(celdas) else None
-        aviso = _asignar(columna, crudo, valores)
+        if columna.tipo in CONVERSORES_ADICIONALES:
+            resultado = CONVERSORES_ADICIONALES[columna.tipo](crudo)
+            adicionales = {} if adicionales is None else adicionales
+            if resultado.valor is not None:
+                adicionales[columna.nombre] = resultado.valor
+            aviso = resultado.aviso
+        else:
+            aviso = _asignar(columna, crudo, valores)
         if aviso is not None:
             incidencias.append(
                 Incidencia(
@@ -137,4 +146,6 @@ def normalizar_fila(
             Incidencia(numero_fila, None, aviso.codigo, aviso.severidad, aviso.detalle)
         )
 
-    return FilaNormalizada(numero_fila=numero_fila, valores=valores, incidencias=incidencias)
+    return FilaNormalizada(
+        numero_fila=numero_fila, valores=valores, incidencias=incidencias, adicionales=adicionales
+    )

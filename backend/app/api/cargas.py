@@ -25,6 +25,9 @@ from pydantic import BaseModel, ConfigDict
 from app.adapters.input.lector_tabla import LectorTabla
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_cargas_postgres import RepositorioCargasPostgres
+from app.adapters.persistence.repositorio_mapeador_postgres import (
+    RepositorioCamposAdicionalesPostgres,
+)
 from app.api.errores import respuestas_de_error
 from app.api.mapeador import (
     AsignacionEntrada,
@@ -56,7 +59,12 @@ TAMANO_MAXIMO_BYTES = 64 * 1024 * 1024
 
 
 def crear_servicio_ingesta() -> IngestaSabanaService:
-    return IngestaSabanaService(RepositorioCargasPostgres(get_engine()), LectorTabla())
+    engine = get_engine()
+    return IngestaSabanaService(
+        RepositorioCargasPostgres(engine),
+        LectorTabla(),
+        adicionales=RepositorioCamposAdicionalesPostgres(engine),
+    )
 
 
 def obtener_servicio() -> IngestaSabanaService:

@@ -16,11 +16,11 @@ un 404. Tambien arma el servicio con su repositorio PostgreSQL (`crear_servicio_
 el arranque de la aplicacion para borrar los borradores vencidos.
 """
 
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.adapters.input.lector_csv import CANDIDATOS_DE_SEPARADOR, CODIFICACIONES
 from app.adapters.input.lector_tabla import LectorTabla
@@ -29,6 +29,13 @@ from app.adapters.persistence.repositorio_mapeador_postgres import RepositorioMa
 from app.api.errores import DetalleError, ErrorConCodigo
 from app.api.respuestas import ModeloRespuesta
 from app.core.entities.borrador import BorradorNoEncontrado, CatalogoDesconocido
+from app.core.entities.campos_adicionales import (
+    CampoAdicional,
+    CampoAdicionalNoEncontrado,
+    ColumnaInexistente,
+    NombreDeCampoRepetido,
+    TipoAdicional,
+)
 from app.core.entities.lectura_tabla import (
     AdvertenciaLectura,
     CodigoAdvertenciaLectura,
@@ -38,6 +45,7 @@ from app.core.entities.lectura_tabla import (
 )
 from app.core.entities.mapeador import (
     Asignacion,
+    CampoDestino,
     CodigoErrorMapeador,
     CodigoMapeo,
     ColumnaAnalizada,
@@ -80,13 +88,17 @@ def obtener_servicio_mapeador() -> MapeadorService:
 
 class CampoDestinoRespuesta(ModeloRespuesta):
     """Un campo del catalogo; `clave_etiqueta` es la clave i18n de su nombre legible. `alias` son
-    solo los alias literales, legibles (sin `_` ni expresiones regulares), para buscar el campo."""
+    solo los alias literales, legibles (sin `_` ni expresiones regulares), para buscar el campo.
+    Un campo `adicional` (RF-64) lo creo el usuario: su nombre legible es `etiqueta`, un texto
+    literal que manda sobre `clave_etiqueta`; en uno base es nulo."""
 
     nombre: str
     clave_etiqueta: str
     tipo: str
     obligatorio: bool
     alias: list[str]
+    etiqueta: str | None
+    adicional: bool
 
 
 class CatalogoMapeadorRespuesta(ModeloRespuesta):
@@ -165,10 +177,30 @@ class DetalleErrorMapeo(ModeloRespuesta):
     problemas: list[ProblemaMapeoRespuesta]
 
 
+class CampoAdicionalRespuesta(ModeloRespuesta):
+    """La definicion de un campo adicional. `nombre` es el nombre tecnico (`ad_...`): estable, y el
+    que usa todo lo guardado. `encabezado_origen` es el encabezado de la sabana, normalizado."""
+
+    nombre: str
+    nombre_legible: str
+    tipo: TipoAdicional
+    encabezado_origen: str
+    archivado: bool
+
+
+class CampoAdicionalCreadoRespuesta(ModeloRespuesta):
+    """El campo recien creado y los campos del catalogo con los que ya cuenta el borrador (los
+    base y los adicionales activos), para refrescar la lista del desplegable."""
+
+    campo: CampoDestinoRespuesta
+    campos: list[CampoDestinoRespuesta]
+
+
 class DetalleErrorMapeador(DetalleError):
-    """El cuerpo de un `400`, `404` o `413` del mapeador: el motivo en `detail` (para el registro)
-    y el `codigo` que la pantalla traduce. Los datos viajan solo con su codigo: `hoja` y `hojas`
-    con `hoja_inexistente`, `maximo_mb` con `archivo_demasiado_grande`."""
+    """El cuerpo de un `400`, `404`, `409` o `413` del mapeador: el motivo en `detail` (para el
+    registro) y el `codigo` que la pantalla traduce. Los datos viajan solo con su codigo: `hoja` y
+    `hojas` con `hoja_inexistente`, `maximo_mb` con `archivo_demasiado_grande` y `campo` (el que
+    ya tiene ese nombre) con `nombre_repetido`."""
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=False)
 
@@ -176,11 +208,13 @@ class DetalleErrorMapeador(DetalleError):
     hoja: str | None = None
     hojas: list[str] | None = None
     maximo_mb: int | None = None
+    campo: CampoDestinoRespuesta | None = None
 
 
 _DESCRIPCIONES = {
     400: "El archivo o las opciones de lectura no sirven; `codigo` dice por que",
-    404: "No existe el catalogo o el borrador (o venció, o ya se confirmó)",
+    404: "No existe el catalogo, el borrador (o venció, o ya se confirmó), la columna o el campo",
+    409: "Otro campo ya tiene ese nombre (`campo` es el que choca)",
     413: "El archivo supera el tamano maximo (`maximo_mb`)",
 }
 
@@ -192,13 +226,52 @@ def respuestas_de_error_mapeador(*estados: int) -> dict[int | str, dict[str, Any
     }
 
 
-def error_no_encontrado(error: CatalogoDesconocido | BorradorNoEncontrado) -> ErrorConCodigo:
-    codigo = (
-        CodigoErrorMapeador.CATALOGO_DESCONOCIDO
-        if isinstance(error, CatalogoDesconocido)
-        else CodigoErrorMapeador.BORRADOR_NO_ENCONTRADO
+_CODIGOS_NO_ENCONTRADO: tuple[tuple[type[Exception], CodigoErrorMapeador], ...] = (
+    (CatalogoDesconocido, CodigoErrorMapeador.CATALOGO_DESCONOCIDO),
+    (CampoAdicionalNoEncontrado, CodigoErrorMapeador.CAMPO_ADICIONAL_NO_ENCONTRADO),
+    (ColumnaInexistente, CodigoErrorMapeador.COLUMNA_INEXISTENTE),
+)
+
+
+def error_no_encontrado(error: Exception) -> ErrorConCodigo:
+    """Un `404`: el borrador, salvo que sea de las otras causas conocidas."""
+    codigo = next(
+        (c for tipo, c in _CODIGOS_NO_ENCONTRADO if isinstance(error, tipo)),
+        CodigoErrorMapeador.BORRADOR_NO_ENCONTRADO,
     )
     return ErrorConCodigo(404, str(error), codigo)
+
+
+def _campo_destino(c: CampoDestino) -> CampoDestinoRespuesta:
+    return CampoDestinoRespuesta(
+        nombre=c.nombre,
+        clave_etiqueta=c.clave_etiqueta,
+        tipo=c.tipo,
+        obligatorio=c.obligatorio,
+        alias=list(alias_legibles(c)),
+        etiqueta=c.etiqueta,
+        adicional=c.adicional,
+    )
+
+
+def error_de_nombre_repetido(error: NombreDeCampoRepetido) -> ErrorConCodigo:
+    """Un `409` con el campo que ya tiene ese nombre."""
+    return ErrorConCodigo(
+        409,
+        str(error),
+        CodigoErrorMapeador.NOMBRE_REPETIDO,
+        {"campo": _campo_destino(error.campo).model_dump(mode="json")},
+    )
+
+
+def _definicion(c: CampoAdicional) -> CampoAdicionalRespuesta:
+    return CampoAdicionalRespuesta(
+        nombre=c.nombre,
+        nombre_legible=c.nombre_legible,
+        tipo=c.tipo,
+        encabezado_origen=c.encabezado_origen,
+        archivado=c.archivado,
+    )
 
 
 # La causa mas especifica primero: todas son un `ArchivoSabanaError`.
@@ -308,6 +381,33 @@ class ValidacionEntrada(BaseModel):
     asignaciones: list[AsignacionEntrada]
 
 
+NombreLegible = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)
+]
+
+
+class NuevoCampoAdicionalEntrada(BaseModel):
+    """Crear un campo adicional desde una columna del archivo: `indice` (base 0) es la columna, y
+    su encabezado pasa a ser el alias del campo. El tipo no se puede cambiar despues (RF-65)."""
+
+    indice: int = Field(ge=0)
+    nombre_legible: NombreLegible
+    tipo: TipoAdicional
+
+
+class CambioCampoAdicionalEntrada(BaseModel):
+    """Renombrar, archivar o reactivar: lo que no viene no cambia. El nombre tecnico no cambia."""
+
+    nombre_legible: NombreLegible | None = None
+    archivado: bool | None = None
+
+    @model_validator(mode="after")
+    def _algo_que_cambiar(self) -> "CambioCampoAdicionalEntrada":
+        if self.nombre_legible is None and self.archivado is None:
+            raise ValueError("Falta nombre_legible o archivado")
+        return self
+
+
 # --- Endpoints ----------------------------------------------------------------------------------
 
 
@@ -327,16 +427,7 @@ def obtener_catalogo(
         raise error_no_encontrado(error) from error
     return CatalogoMapeadorRespuesta(
         id=catalogo.id,
-        campos=[
-            CampoDestinoRespuesta(
-                nombre=c.nombre,
-                clave_etiqueta=c.clave_etiqueta,
-                tipo=c.tipo,
-                obligatorio=c.obligatorio,
-                alias=list(alias_legibles(c)),
-            )
-            for c in catalogo.campos
-        ],
+        campos=[_campo_destino(c) for c in catalogo.campos],
         codificaciones=list(CODIFICACIONES),
         separadores=list(CANDIDATOS_DE_SEPARADOR),
     )
@@ -437,3 +528,73 @@ def descartar_borrador(
         servicio.descartar(borrador_id)
     except BorradorNoEncontrado as error:
         raise error_no_encontrado(error) from error
+
+
+@router.post(
+    "/borradores/{borrador_id}/campos-adicionales",
+    response_model=CampoAdicionalCreadoRespuesta,
+    status_code=201,
+    responses=respuestas_de_error_mapeador(404, 409),
+)
+def crear_campo_adicional(
+    borrador_id: int,
+    entrada: NuevoCampoAdicionalEntrada,
+    servicio: MapeadorService = Depends(obtener_servicio_mapeador),
+) -> CampoAdicionalCreadoRespuesta:
+    """Crea un campo adicional desde una columna del borrador y lo suma al analisis guardado, en
+    una sola transaccion: enseguida se puede asignar y validar. `409` si otro campo (base o
+    adicional, archivado o no) ya tiene ese nombre, con el campo que choca; `404` si el borrador o
+    la columna no existen."""
+    try:
+        campo, catalogo = servicio.crear_campo_adicional(
+            borrador_id, entrada.indice, entrada.nombre_legible, entrada.tipo
+        )
+    except NombreDeCampoRepetido as error:
+        raise error_de_nombre_repetido(error) from error
+    except (BorradorNoEncontrado, CatalogoDesconocido, ColumnaInexistente) as error:
+        raise error_no_encontrado(error) from error
+    creado = next(c for c in catalogo.campos if c.nombre == campo.nombre)
+    return CampoAdicionalCreadoRespuesta(
+        campo=_campo_destino(creado), campos=[_campo_destino(c) for c in catalogo.campos]
+    )
+
+
+@router.get(
+    "/{catalogo_id}/campos-adicionales",
+    response_model=list[CampoAdicionalRespuesta],
+    responses=respuestas_de_error_mapeador(404),
+)
+def listar_campos_adicionales(
+    catalogo_id: str, servicio: MapeadorService = Depends(obtener_servicio_mapeador)
+) -> list[CampoAdicionalRespuesta]:
+    """Las definiciones de los campos adicionales del catalogo, archivadas incluidas, en el orden
+    en que se crearon."""
+    try:
+        return [_definicion(c) for c in servicio.campos_adicionales(catalogo_id)]
+    except CatalogoDesconocido as error:
+        raise error_no_encontrado(error) from error
+
+
+@router.patch(
+    "/{catalogo_id}/campos-adicionales/{nombre}",
+    response_model=CampoAdicionalRespuesta,
+    responses=respuestas_de_error_mapeador(404, 409),
+)
+def cambiar_campo_adicional(
+    catalogo_id: str,
+    nombre: str,
+    entrada: CambioCampoAdicionalEntrada,
+    servicio: MapeadorService = Depends(obtener_servicio_mapeador),
+) -> CampoAdicionalRespuesta:
+    """Renombra, archiva o reactiva un campo adicional. El nombre tecnico y el tipo no cambian: lo
+    guardado que lo usa sigue funcionando. Archivar no borra ningun dato. `409` si el nombre nuevo
+    ya lo tiene otro campo."""
+    try:
+        cambiado = servicio.cambiar_campo_adicional(
+            catalogo_id, nombre, entrada.nombre_legible, entrada.archivado
+        )
+    except NombreDeCampoRepetido as error:
+        raise error_de_nombre_repetido(error) from error
+    except (CatalogoDesconocido, CampoAdicionalNoEncontrado) as error:
+        raise error_no_encontrado(error) from error
+    return _definicion(cambiado)

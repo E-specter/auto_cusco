@@ -776,6 +776,7 @@ Sobre `d4dafb6` (RF-59 ampliado, RF-64 a RF-66). Incluye las restricciones que a
 - **D-CA-1:** se exige `primeros(n)` a un adicional de texto o de número (al de número, después de pasarlo a texto).
 - **D-CA-2:** un adicional vacío excluye el producto con `falta_campo_adicional`.
 - **D-CA-3:** no se agregan columnas al .xlsx de MES (RF-54 byte a byte).
+- **Crear y cancelar:** un campo adicional creado durante el mapeo queda en el catálogo aunque se cancele la carga; si no se quería, se archiva. El formulario lo avisa (decisión del usuario del 2026-10-27).
 
 **§13 de MOWA MES sobre T-CA-B1:** la prueba de oro del mensaje y las pruebas de la campaña y de la descripción sugerida pasan sin cambiar ningún valor esperado. Solo cambian las firmas. D-CA-3 aprobado.
 

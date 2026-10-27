@@ -8,6 +8,8 @@ se puede cambiar. El tipo es fijo (supuesto de RF-65) y archivar no borra ningun
 from dataclasses import dataclass
 from enum import StrEnum
 
+from app.core.entities.mapeador import CampoDestino
+
 
 class TipoAdicional(StrEnum):
     TEXTO = "texto"
@@ -28,3 +30,29 @@ class CampoAdicional:
     tipo: TipoAdicional
     encabezado_origen: str
     archivado: bool = False
+
+
+class NombreDeCampoRepetido(Exception):
+    """El nombre legible ya lo tiene, o lo cumple, otro campo (base o adicional, archivado o no).
+
+    `campo` es el que choca: la pantalla lo muestra para que el usuario lo use en lugar de crear
+    otro.
+    """
+
+    def __init__(self, nombre_legible: str, campo: CampoDestino) -> None:
+        super().__init__(f"El nombre {nombre_legible!r} ya lo tiene el campo {campo.nombre!r}")
+        self.campo = campo
+
+
+class CampoAdicionalNoEncontrado(Exception):
+    def __init__(self, nombre: str) -> None:
+        super().__init__(f"No existe el campo adicional {nombre!r}")
+        self.nombre = nombre
+
+
+class ColumnaInexistente(Exception):
+    """El indice no es una columna del analisis del borrador."""
+
+    def __init__(self, indice: int) -> None:
+        super().__init__(f"El analisis no tiene la columna {indice}")
+        self.indice = indice

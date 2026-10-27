@@ -195,7 +195,7 @@
             }
           },
           "404": {
-            "description": "No existe el catalogo o el borrador (o venció, o ya se confirmó)",
+            "description": "No existe el catalogo, el borrador (o venció, o ya se confirmó), la columna o el campo",
             "content": {
               "application/json": {
                 "schema": {
@@ -519,7 +519,7 @@
             }
           },
           "404": {
-            "description": "No existe el catalogo o el borrador (o venció, o ya se confirmó)",
+            "description": "No existe el catalogo, el borrador (o venció, o ya se confirmó), la columna o el campo",
             "content": {
               "application/json": {
                 "schema": {
@@ -592,7 +592,7 @@
             }
           },
           "404": {
-            "description": "No existe el catalogo o el borrador (o venció, o ya se confirmó)",
+            "description": "No existe el catalogo, el borrador (o venció, o ya se confirmó), la columna o el campo",
             "content": {
               "application/json": {
                 "schema": {
@@ -675,7 +675,7 @@
             }
           },
           "404": {
-            "description": "No existe el catalogo o el borrador (o venció, o ya se confirmó)",
+            "description": "No existe el catalogo, el borrador (o venció, o ya se confirmó), la columna o el campo",
             "content": {
               "application/json": {
                 "schema": {
@@ -738,7 +738,7 @@
             }
           },
           "404": {
-            "description": "No existe el catalogo o el borrador (o venció, o ya se confirmó)",
+            "description": "No existe el catalogo, el borrador (o venció, o ya se confirmó), la columna o el campo",
             "content": {
               "application/json": {
                 "schema": {
@@ -784,7 +784,219 @@
             "description": "Successful Response"
           },
           "404": {
-            "description": "No existe el catalogo o el borrador (o venció, o ya se confirmó)",
+            "description": "No existe el catalogo, el borrador (o venció, o ya se confirmó), la columna o el campo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeador"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mapeador/borradores/{borrador_id}/campos-adicionales": {
+      "post": {
+        "tags": [
+          "mapeador de encabezados"
+        ],
+        "summary": "Crear Campo Adicional",
+        "description": "Crea un campo adicional desde una columna del borrador y lo suma al analisis guardado, en\nuna sola transaccion: enseguida se puede asignar y validar. `409` si otro campo (base o\nadicional, archivado o no) ya tiene ese nombre, con el campo que choca; `404` si el borrador o\nla columna no existen.",
+        "operationId": "crear_campo_adicional_mapeador_borradores__borrador_id__campos_adicionales_post",
+        "parameters": [
+          {
+            "name": "borrador_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Borrador Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuevoCampoAdicionalEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampoAdicionalCreadoRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el catalogo, el borrador (o venció, o ya se confirmó), la columna o el campo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeador"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Otro campo ya tiene ese nombre (`campo` es el que choca)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeador"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mapeador/{catalogo_id}/campos-adicionales": {
+      "get": {
+        "tags": [
+          "mapeador de encabezados"
+        ],
+        "summary": "Listar Campos Adicionales",
+        "description": "Las definiciones de los campos adicionales del catalogo, archivadas incluidas, en el orden\nen que se crearon.",
+        "operationId": "listar_campos_adicionales_mapeador__catalogo_id__campos_adicionales_get",
+        "parameters": [
+          {
+            "name": "catalogo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Catalogo Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CampoAdicionalRespuesta"
+                  },
+                  "title": "Response Listar Campos Adicionales Mapeador  Catalogo Id  Campos Adicionales Get"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el catalogo, el borrador (o venció, o ya se confirmó), la columna o el campo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeador"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mapeador/{catalogo_id}/campos-adicionales/{nombre}": {
+      "patch": {
+        "tags": [
+          "mapeador de encabezados"
+        ],
+        "summary": "Cambiar Campo Adicional",
+        "description": "Renombra, archiva o reactiva un campo adicional. El nombre tecnico y el tipo no cambian: lo\nguardado que lo usa sigue funcionando. Archivar no borra ningun dato. `409` si el nombre nuevo\nya lo tiene otro campo.",
+        "operationId": "cambiar_campo_adicional_mapeador__catalogo_id__campos_adicionales__nombre__patch",
+        "parameters": [
+          {
+            "name": "catalogo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Catalogo Id"
+            }
+          },
+          {
+            "name": "nombre",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Nombre"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioCampoAdicionalEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampoAdicionalRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el catalogo, el borrador (o venció, o ya se confirmó), la columna o el campo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorMapeador"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Otro campo ya tiene ese nombre (`campo` es el que choca)",
             "content": {
               "application/json": {
                 "schema": {
@@ -4142,6 +4354,37 @@
         "title": "BorradorV2Respuesta",
         "description": "Una v1 convertida a v2, sin guardar: se edita y se guarda como version nueva."
       },
+      "CambioCampoAdicionalEntrada": {
+        "properties": {
+          "nombre_legible": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre Legible"
+          },
+          "archivado": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivado"
+          }
+        },
+        "type": "object",
+        "title": "CambioCampoAdicionalEntrada",
+        "description": "Renombrar, archivar o reactivar: lo que no viene no cambia. El nombre tecnico no cambia."
+      },
       "CampanaRespuesta": {
         "properties": {
           "id": {
@@ -4367,6 +4610,60 @@
         ],
         "title": "CampanaRespuesta"
       },
+      "CampoAdicionalCreadoRespuesta": {
+        "properties": {
+          "campo": {
+            "$ref": "#/components/schemas/CampoDestinoRespuesta"
+          },
+          "campos": {
+            "items": {
+              "$ref": "#/components/schemas/CampoDestinoRespuesta"
+            },
+            "type": "array",
+            "title": "Campos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "campo",
+          "campos"
+        ],
+        "title": "CampoAdicionalCreadoRespuesta",
+        "description": "El campo recien creado y los campos del catalogo con los que ya cuenta el borrador (los\nbase y los adicionales activos), para refrescar la lista del desplegable."
+      },
+      "CampoAdicionalRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "nombre_legible": {
+            "type": "string",
+            "title": "Nombre Legible"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoAdicional"
+          },
+          "encabezado_origen": {
+            "type": "string",
+            "title": "Encabezado Origen"
+          },
+          "archivado": {
+            "type": "boolean",
+            "title": "Archivado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "nombre_legible",
+          "tipo",
+          "encabezado_origen",
+          "archivado"
+        ],
+        "title": "CampoAdicionalRespuesta",
+        "description": "La definicion de un campo adicional. `nombre` es el nombre tecnico (`ad_...`): estable, y el\nque usa todo lo guardado. `encabezado_origen` es el encabezado de la sabana, normalizado."
+      },
       "CampoConfiguracion": {
         "type": "string",
         "enum": [
@@ -4404,6 +4701,21 @@
             },
             "type": "array",
             "title": "Alias"
+          },
+          "etiqueta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etiqueta"
+          },
+          "adicional": {
+            "type": "boolean",
+            "title": "Adicional"
           }
         },
         "type": "object",
@@ -4412,10 +4724,12 @@
           "clave_etiqueta",
           "tipo",
           "obligatorio",
-          "alias"
+          "alias",
+          "etiqueta",
+          "adicional"
         ],
         "title": "CampoDestinoRespuesta",
-        "description": "Un campo del catalogo; `clave_etiqueta` es la clave i18n de su nombre legible. `alias` son\nsolo los alias literales, legibles (sin `_` ni expresiones regulares), para buscar el campo."
+        "description": "Un campo del catalogo; `clave_etiqueta` es la clave i18n de su nombre legible. `alias` son\nsolo los alias literales, legibles (sin `_` ni expresiones regulares), para buscar el campo.\nUn campo `adicional` (RF-64) lo creo el usuario: su nombre legible es `etiqueta`, un texto\nliteral que manda sobre `clave_etiqueta`; en uno base es nulo."
       },
       "CampoEntrada": {
         "properties": {
@@ -4472,14 +4786,39 @@
             },
             "type": "array",
             "title": "Operadores"
+          },
+          "adicional": {
+            "type": "boolean",
+            "title": "Adicional",
+            "default": false
+          },
+          "etiqueta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etiqueta"
+          },
+          "archivado": {
+            "type": "boolean",
+            "title": "Archivado",
+            "default": false
           }
         },
         "type": "object",
         "required": [
           "tipo",
-          "operadores"
+          "operadores",
+          "adicional",
+          "etiqueta",
+          "archivado"
         ],
-        "title": "CampoRespuesta"
+        "title": "CampoRespuesta",
+        "description": "Un campo filtrable. Uno `adicional` (RF-64) trae su nombre legible en `etiqueta`, un texto\nliteral; en un campo base es nulo y el nombre sale de la clave `campo.<nombre>`. Uno `archivado`\nno se ofrece para filtros nuevos, pero se lista: una seleccion guardada que filtra por el\nnecesita su etiqueta y su tipo."
       },
       "CaracterQuitadoRespuesta": {
         "properties": {
@@ -4750,7 +5089,10 @@
           "codificacion_no_coincide",
           "catalogo_desconocido",
           "borrador_no_encontrado",
-          "mapeo_con_problemas"
+          "mapeo_con_problemas",
+          "nombre_repetido",
+          "campo_adicional_no_encontrado",
+          "columna_inexistente"
         ],
         "title": "CodigoErrorMapeador",
         "description": "Por que el mapeador rechaza una peticion (`400`, `404` o `413`): el `codigo` del cuerpo de\nerror, que la pantalla traduce como `mapeador.error.<codigo>`.\n\nUn valor por linea: la prueba espejo del contrato y del frontend lee esta clase."
@@ -6159,6 +6501,16 @@
               }
             ],
             "title": "Maximo Mb"
+          },
+          "campo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CampoDestinoRespuesta"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -6167,7 +6519,7 @@
           "codigo"
         ],
         "title": "DetalleErrorMapeador",
-        "description": "El cuerpo de un `400`, `404` o `413` del mapeador: el motivo en `detail` (para el registro)\ny el `codigo` que la pantalla traduce. Los datos viajan solo con su codigo: `hoja` y `hojas`\ncon `hoja_inexistente`, `maximo_mb` con `archivo_demasiado_grande`."
+        "description": "El cuerpo de un `400`, `404`, `409` o `413` del mapeador: el motivo en `detail` (para el\nregistro) y el `codigo` que la pantalla traduce. Los datos viajan solo con su codigo: `hoja` y\n`hojas` con `hoja_inexistente`, `maximo_mb` con `archivo_demasiado_grande` y `campo` (el que\nya tiene ese nombre) con `nombre_repetido`."
       },
       "DetalleErrorMapeo": {
         "properties": {
@@ -7761,6 +8113,32 @@
           "obligatoria"
         ],
         "title": "NodoVariableGuardadoRespuesta"
+      },
+      "NuevoCampoAdicionalEntrada": {
+        "properties": {
+          "indice": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Indice"
+          },
+          "nombre_legible": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Nombre Legible"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoAdicional"
+          }
+        },
+        "type": "object",
+        "required": [
+          "indice",
+          "nombre_legible",
+          "tipo"
+        ],
+        "title": "NuevoCampoAdicionalEntrada",
+        "description": "Crear un campo adicional desde una columna del archivo: `indice` (base 0) es la columna, y\nsu encabezado pasa a ser el alias del campo. El tipo no se puede cambiar despues (RF-65)."
       },
       "OpcionDetectable": {
         "type": "string",
@@ -9927,6 +10305,15 @@
         ],
         "title": "SupervisorRespuesta"
       },
+      "TipoAdicional": {
+        "type": "string",
+        "enum": [
+          "texto",
+          "numero",
+          "fecha"
+        ],
+        "title": "TipoAdicional"
+      },
       "TipoCarga": {
         "type": "string",
         "enum": [
@@ -10181,6 +10568,25 @@
           "origen": {
             "type": "string",
             "title": "Origen"
+          },
+          "etiqueta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etiqueta"
+          },
+          "adicional": {
+            "type": "boolean",
+            "title": "Adicional"
+          },
+          "archivado": {
+            "type": "boolean",
+            "title": "Archivado"
           }
         },
         "type": "object",
@@ -10188,10 +10594,13 @@
           "nombre",
           "tipo",
           "clave_nombre",
-          "origen"
+          "origen",
+          "etiqueta",
+          "adicional",
+          "archivado"
         ],
         "title": "VariableRespuesta",
-        "description": "`origen` es el contexto que aporta la variable: `cartera` para un campo de la cartera, o el\ndel modulo (`mowa_mes.speech`) para una variable suya. La interfaz las agrupa por origen."
+        "description": "`origen` es el contexto que aporta la variable: `cartera` para un campo de la cartera, o el\ndel modulo (`mowa_mes.speech`) para una variable suya. La interfaz las agrupa por origen.\nUna variable `adicional` (RF-64) es un campo que creo el usuario: su nombre legible es\n`etiqueta`, un texto literal. Si esta `archivado` se sigue resolviendo, pero no se ofrece."
       },
       "VarianteEntrada": {
         "properties": {

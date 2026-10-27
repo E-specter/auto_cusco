@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from app.api.cartera import obtener_servicio_cartera
 from app.api.selecciones import obtener_servicio_selecciones
-from app.api.texto_enriquecido import obtener_registro_contextos
+from app.api.texto_enriquecido import registro_de_contextos
 from app.core.entities.mapeo import CampoSalida, DefinicionCarga, TipoSalida
 from app.core.entities.mowa_mes import (
     LARGO_ADVERTENCIA,
@@ -250,7 +250,7 @@ def test_solo_el_speech_declara_medida_y_salida() -> None:
     assert cartera.salida(FIJO) == FIJO
     assert mowa.salida is a_gsm7
     assert mowa.medida(FIJO) == largo_gsm7(a_gsm7(FIJO))
-    for contexto in obtener_registro_contextos().disponibles():
+    for contexto in registro_de_contextos(CatalogoCartera()).disponibles():
         if contexto.nombre != NOMBRE:
             assert contexto.medida is len, contexto.nombre
             assert contexto.salida(FIJO) == FIJO, contexto.nombre

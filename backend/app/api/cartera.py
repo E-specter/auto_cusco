@@ -23,6 +23,9 @@ from fastapi import APIRouter, Depends, Query
 
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_cartera_postgres import RepositorioCarteraPostgres
+from app.adapters.persistence.repositorio_mapeador_postgres import (
+    RepositorioCamposAdicionalesPostgres,
+)
 from app.api.consultas import (
     parsear_filtro,
     parsear_indicador,
@@ -46,9 +49,9 @@ router = APIRouter(prefix="/cartera", tags=["cartera"])
 
 
 def crear_catalogo_cartera() -> CatalogoCartera:
-    """El catalogo de campos de la cartera. Solo la base hasta que llegue la persistencia de los
-    campos adicionales (T-CA-B2), que le pasa su repositorio."""
-    return CatalogoCartera()
+    """El catalogo de campos de la cartera: la base y los adicionales guardados. Uno por peticion,
+    porque lee las definiciones una sola vez."""
+    return CatalogoCartera(RepositorioCamposAdicionalesPostgres(get_engine()))
 
 
 def obtener_catalogo_cartera() -> CatalogoCartera:
@@ -67,8 +70,16 @@ def obtener_servicio_cartera() -> ConsultaCarteraService:
 
 
 class CampoRespuesta(ModeloRespuesta):
+    """Un campo filtrable. Uno `adicional` (RF-64) trae su nombre legible en `etiqueta`, un texto
+    literal; en un campo base es nulo y el nombre sale de la clave `campo.<nombre>`. Uno `archivado`
+    no se ofrece para filtros nuevos, pero se lista: una seleccion guardada que filtra por el
+    necesita su etiqueta y su tipo."""
+
     tipo: str
     operadores: list[str]
+    adicional: bool = False
+    etiqueta: str | None = None
+    archivado: bool = False
 
 
 class GrupoRespuesta(ModeloRespuesta):

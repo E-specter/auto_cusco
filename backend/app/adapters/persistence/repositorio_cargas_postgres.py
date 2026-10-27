@@ -62,12 +62,13 @@ _COLUMNAS_DATOS = (
 _COLUMNAS_VALORES = [
     c.name
     for c in CargaFila.__table__.columns
-    if c.name not in {"carga_id", "numero_fila", "extras"}
+    if c.name not in {"carga_id", "numero_fila", "extras", "adicionales"}
 ]
 _COPY_FILAS = sql.SQL("COPY {} ({}) FROM STDIN").format(
     sql.Identifier(CargaFila.__tablename__),
     sql.SQL(", ").join(
-        sql.Identifier(n) for n in ["carga_id", "numero_fila", *_COLUMNAS_VALORES, "extras"]
+        sql.Identifier(n)
+        for n in ["carga_id", "numero_fila", *_COLUMNAS_VALORES, "extras", "adicionales"]
     ),
 )
 _COPY_INCIDENCIAS = sql.SQL("COPY {} ({}) FROM STDIN").format(
@@ -211,6 +212,10 @@ class SesionCargasPostgres(SesionMapeadorPostgres, SesionCargasPort):
                         fila.numero_fila,
                         *(_copiable(fila.valores.get(nombre)) for nombre in _COLUMNAS_VALORES),
                         json.dumps(fila.extras, ensure_ascii=False) if fila.extras else None,
+                        # None es NULL (la version no trae adicionales), nunca el JSON null.
+                        json.dumps(fila.adicionales, ensure_ascii=False)
+                        if fila.adicionales is not None
+                        else None,
                     ]
                 )
                 guardadas += 1

@@ -23,6 +23,8 @@ const campo = (nombre: string, obligatorio = false, alias: string[] = []): Campo
   tipo: 'texto',
   obligatorio,
   alias, // T-MAP-B4: the literal aliases; the search of the field list uses them (T-MAP-F3)
+  etiqueta: null, // T-CA-B2: only an additional field (RF-64) carries its own label
+  adicional: false,
 });
 
 /** A slice of the sheet's catalogue, with its one required field. */

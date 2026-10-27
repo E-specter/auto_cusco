@@ -39,6 +39,7 @@ CODIGOS_INCIDENCIA: Final[frozenset[str]] = frozenset(
         "fecha_invalida",
         "booleano_invalido",
         "monto_invalido",
+        "valor_no_convertible",  # un campo adicional (RF-64): el valor no es de su tipo
         "entero_invalido",
         "vencimiento_operativo_vacio",
         "vencimiento_operativo_invalido",

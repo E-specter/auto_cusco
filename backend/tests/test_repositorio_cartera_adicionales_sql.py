@@ -13,6 +13,7 @@ import pytest
 from sqlalchemy.dialects import postgresql
 
 from app.adapters.persistence.repositorio_cartera_postgres import (
+    _COLUMNAS,
     _COLUMNAS_PRODUCTO,
     RepositorioCarteraPostgres,
 )
@@ -208,3 +209,8 @@ def test_un_filtro_sobre_un_adicional_tambien_filtra_las_metricas(repo) -> None:
     )
 
     assert f"{TEXTO} = 'SUR'" in sql(base) and f"{TEXTO} = 'SUR'" in sql(por_segmento)
+
+
+def test_el_json_de_adicionales_no_es_un_campo_ni_sale_en_las_filas() -> None:
+    assert "adicionales" not in _COLUMNAS
+    assert "adicionales" not in [c.name for c in _COLUMNAS_PRODUCTO]

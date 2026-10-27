@@ -12,7 +12,7 @@ duplicado.
 
 from collections.abc import Iterable
 
-from app.core.entities.campos_adicionales import CampoAdicional
+from app.core.entities.campos_adicionales import CampoAdicional, TipoAdicional
 from app.core.entities.mapeador import CampoDestino, CatalogoCampos
 from app.core.entities.sabana import ColumnaSabana, TipoCampo
 
@@ -101,13 +101,33 @@ def campo_destino_adicional(campo: CampoAdicional) -> CampoDestino:
     )
 
 
-def armar_catalogo_sabana(adicionales: Iterable[CampoAdicional] = ()) -> CatalogoCampos:
-    """Los campos base y, despues, los adicionales ACTIVOS (un archivado no se ofrece, RF-65)."""
+_TIPO_DE_COLUMNA = {
+    TipoAdicional.TEXTO: T.ADICIONAL_TEXTO,
+    TipoAdicional.NUMERO: T.ADICIONAL_NUMERO,
+    TipoAdicional.FECHA: T.ADICIONAL_FECHA,
+}
+
+
+def columna_adicional(campo: CampoAdicional) -> ColumnaSabana:
+    """Un campo adicional como columna de la sabana, para procesar un mapeo confirmado. Nunca es
+    requerida: una carga sin esa columna es igual a las de antes."""
+    return ColumnaSabana(
+        nombre=campo.nombre,
+        tipo=_TIPO_DE_COLUMNA[campo.tipo],
+        patrones=(campo.encabezado_origen,),
+    )
+
+
+def armar_catalogo_sabana(
+    adicionales: Iterable[CampoAdicional] = (), con_archivados: bool = False
+) -> CatalogoCampos:
+    """Los campos base y, despues, los adicionales ACTIVOS (un archivado no se ofrece, RF-65).
+    `con_archivados` los incluye tambien: es para comprobar nombres, no para ofrecerlos."""
     return CatalogoCampos(
         "sabana_vencida",
         (
             *(campo_destino(c) for c in CATALOGO_VENCIDA),
-            *(campo_destino_adicional(c) for c in adicionales if not c.archivado),
+            *(campo_destino_adicional(c) for c in adicionales if con_archivados or not c.archivado),
         ),
     )
 

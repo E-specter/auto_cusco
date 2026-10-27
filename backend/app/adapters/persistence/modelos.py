@@ -37,6 +37,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.core.entities.calendario import TipoExcepcion
+from app.core.entities.campos_adicionales import TipoAdicional
 from app.core.entities.carga import EstadoCarga, EventoAuditoria
 from app.core.entities.mowa_mes import FormatoSpeech, Programacion
 from app.core.entities.mowa_mes_campana import Salida, TipoCarga
@@ -160,6 +161,35 @@ class MapeoRecordado(Base):
     __table_args__ = (CheckConstraint("ocurrencia >= 1", name="ocurrencia_positiva"),)
 
 
+class CampoAdicional(Base):
+    """Un campo adicional de la cartera (RF-64 a RF-66): lo crea el usuario desde el mapeo.
+
+    El nombre tecnico (`ad_...`) es la clave: estable, global y nunca reutilizado, tambien despues
+    de archivar. El nombre legible es unico por catalogo, comparado normalizado (sin tildes ni
+    mayusculas). `encabezado_origen` es el encabezado de la sabana, normalizado: su alias literal.
+    """
+
+    __tablename__ = "campo_adicional"
+
+    nombre: Mapped[str] = mapped_column(Text, primary_key=True)
+    orden: Mapped[int] = mapped_column(BigInteger, Identity(), unique=True)
+    catalogo_id: Mapped[str] = mapped_column(Text)
+    nombre_legible: Mapped[str] = mapped_column(Text)
+    nombre_legible_normalizado: Mapped[str] = mapped_column(Text)
+    tipo: Mapped[str] = mapped_column(String(12))
+    encabezado_origen: Mapped[str] = mapped_column(Text)
+    archivado: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    actualizado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(f"tipo IN ({_en(TipoAdicional)})", name="tipo_valido"),
+        UniqueConstraint("catalogo_id", "nombre_legible_normalizado"),
+    )
+
+
 class CargaArchivo(Base):
     """Archivo original de la version: trazabilidad completa (RF-21) y reproceso (RF-33)."""
 
@@ -228,6 +258,10 @@ class CargaFila(Base):
 
     # Columnas del archivo que no estan en el catalogo (normalmente vacio).
     extras: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+
+    # Los campos adicionales (RF-64): nombre tecnico `ad_...` -> valor ya normalizado a su tipo
+    # (numero como decimal canonico, fecha ISO, texto). NULL = la version no trae ninguno.
+    adicionales: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
 
     __table_args__ = (
         CheckConstraint(

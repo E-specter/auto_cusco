@@ -221,9 +221,8 @@ def test_un_emoji_en_un_filtro_entero_cuenta_dos_para_que_quepa() -> None:
 
     sugerida = descripcion_sugerida([primero, segundo, tercero], CatalogoCartera())
 
-    assert (
-        sugerida == f"{PREFIJO} {resumen_filtro(primero, CatalogoCartera())}..."
-    )  # el segundo ya no cabe
+    # el segundo ya no cabe
+    assert sugerida == f"{PREFIJO} {resumen_filtro(primero, CatalogoCartera())}..."
 
 
 def test_propiedad_la_sugerida_siempre_cabe_y_solo_se_acorta_cuando_hace_falta() -> None:

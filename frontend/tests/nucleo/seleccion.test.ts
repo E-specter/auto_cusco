@@ -30,8 +30,17 @@ const CAMPOS: Campos = {
   dias_atraso: {
     tipo: 'numero',
     operadores: ['vacio', 'entre', 'igual', 'mayor', 'no_vacio', 'en'],
+    adicional: false,
+    etiqueta: null,
+    archivado: false,
   },
-  segmento_financiero: { tipo: 'texto', operadores: ['contiene', 'igual', 'en'] },
+  segmento_financiero: {
+    tipo: 'texto',
+    operadores: ['contiene', 'igual', 'en'],
+    adicional: false,
+    etiqueta: null,
+    archivado: false,
+  },
 };
 
 describe('escribir filtros en la sintaxis de la API', () => {

@@ -24,6 +24,13 @@ from app.core.entities.borrador import (
     DatosBorrador,
     NuevoBorrador,
 )
+from app.core.entities.campos_adicionales import (
+    CampoAdicional,
+    CampoAdicionalNoEncontrado,
+    ColumnaInexistente,
+    NombreDeCampoRepetido,
+    TipoAdicional,
+)
 from app.core.entities.lectura_tabla import (
     AdvertenciaLectura,
     FormatoTabla,
@@ -40,8 +47,14 @@ from app.core.entities.mapeador import (
 from app.core.ports.lector_tabla_port import LectorTablaPort
 from app.core.ports.repositorio_mapeador_port import RepositorioMapeadorPort
 from app.core.services.mapeador.analisis import EsVacio, analizar, es_vacio
-from app.core.services.mapeador.serializacion import analisis_a_dict, analisis_desde_dict
+from app.core.services.mapeador.serializacion import (
+    analisis_a_dict,
+    analisis_desde_dict,
+    campo_a_dict,
+)
+from app.core.services.mapeador.similitud import coincide, normalizar_cabecera
 from app.core.services.mapeador.validacion import validar
+from app.core.services.seleccion_cartera.nombres_adicionales import nombre_tecnico
 
 Reloj = Callable[[], datetime]
 
@@ -50,12 +63,27 @@ def ahora_utc() -> datetime:
     return datetime.now(UTC)
 
 
+ArmarCatalogo = Callable[[Sequence[CampoAdicional], bool], CatalogoCampos]
+
+
 @dataclass(frozen=True)
 class CatalogoMapeable:
-    """Un catalogo de campos y lo que su consumidor toma por vacio (en la sabana, `es_vacio`)."""
+    """Un catalogo de campos y lo que su consumidor toma por vacio (en la sabana, `es_vacio`).
+
+    `armar` suma al catalogo los campos adicionales (RF-64) que el usuario creo: recibe sus
+    definiciones y si incluye los archivados. Sin `armar`, el catalogo no admite adicionales.
+    """
 
     catalogo: CatalogoCampos
     vacio: EsVacio = es_vacio
+    armar: ArmarCatalogo | None = None
+
+    def con_adicionales(
+        self, adicionales: Sequence[CampoAdicional], con_archivados: bool = False
+    ) -> CatalogoCampos:
+        if self.armar is None:
+            return self.catalogo
+        return self.armar(adicionales, con_archivados)
 
 
 @dataclass(frozen=True)
@@ -117,7 +145,12 @@ class MapeadorService:
             raise CatalogoDesconocido(catalogo_id) from None
 
     def catalogo(self, catalogo_id: str) -> CatalogoCampos:
-        return self._catalogo(catalogo_id).catalogo
+        """Los campos del catalogo: los base y los adicionales activos."""
+        mapeable = self._catalogo(catalogo_id)
+        if mapeable.armar is None:
+            return mapeable.catalogo
+        with self._repositorio.transaccion() as sesion:
+            return mapeable.con_adicionales(sesion.adicionales(catalogo_id))
 
     def _vigente(self, borrador: DatosBorrador | None) -> bool:
         vence = None if borrador is None else borrador.vence_en()
@@ -142,7 +175,7 @@ class MapeadorService:
         ahora = self._reloj()
         with self._repositorio.transaccion() as sesion:
             sesion.borrar_borradores_vencidos(ahora - VIGENCIA_DEL_BORRADOR)
-            analisis = self._analizar(tabla, catalogo, sesion.recordados(catalogo_id))
+            analisis = self._analizar(tabla, catalogo, sesion, catalogo_id)
             borrador = sesion.crear_borrador(
                 NuevoBorrador(
                     catalogo_id=catalogo_id,
@@ -158,12 +191,15 @@ class MapeadorService:
         return _analizado(borrador, analisis, tabla, opciones)
 
     @staticmethod
-    def _analizar(tabla: TablaLeida, catalogo: CatalogoMapeable, recordados) -> AnalisisEncabezados:
+    def _analizar(
+        tabla: TablaLeida, catalogo: CatalogoMapeable, sesion, catalogo_id: str
+    ) -> AnalisisEncabezados:
+        adicionales = sesion.adicionales(catalogo_id) if catalogo.armar else ()
         return analizar(
             tabla.cabeceras,
             (fila.celdas for fila in tabla.filas),
-            catalogo.catalogo,
-            recordados,
+            catalogo.con_adicionales(adicionales),
+            sesion.recordados(catalogo_id),
             catalogo.vacio,
         )
 
@@ -181,7 +217,7 @@ class MapeadorService:
             tabla = self._lector.leer(
                 sesion.contenido_de_borrador(borrador_id), borrador.nombre_archivo, opciones
             )
-            analisis = self._analizar(tabla, catalogo, sesion.recordados(borrador.catalogo_id))
+            analisis = self._analizar(tabla, catalogo, sesion, borrador.catalogo_id)
             actualizado = sesion.reemplazar_analisis(
                 borrador_id, opciones_usadas(tabla), analisis_a_dict(analisis)
             )
@@ -208,6 +244,89 @@ class MapeadorService:
         assert borrador is not None
         return analisis_desde_dict(borrador.analisis)
 
+    # --- campos adicionales (RF-64 a RF-66) ---
+
+    def crear_campo_adicional(
+        self, borrador_id: int, indice: int, nombre_legible: str, tipo: TipoAdicional
+    ) -> tuple[CampoAdicional, CatalogoCampos]:
+        """Crea un campo adicional desde una columna del archivo y lo suma al analisis guardado del
+        borrador, en UNA transaccion: el usuario lo puede asignar enseguida y, si algo falla, no
+        queda ni el campo ni el cambio. El encabezado de origen de la columna es su alias.
+
+        `BorradorNoEncontrado`, `ColumnaInexistente` y `NombreDeCampoRepetido` (con el campo que
+        choca). Devuelve el campo y el catalogo con el que ya cuenta el borrador.
+        """
+        nombre_legible = " ".join(nombre_legible.split())
+        with self._repositorio.transaccion() as sesion:
+            borrador = sesion.obtener_borrador(borrador_id, bloquear=True)
+            if not self._vigente(borrador):
+                raise BorradorNoEncontrado(borrador_id)
+            assert borrador is not None
+            mapeable = self._catalogo(borrador.catalogo_id)
+            if mapeable.armar is None:
+                raise CatalogoDesconocido(borrador.catalogo_id)
+            analisis = analisis_desde_dict(borrador.analisis)
+            columna = next((c for c in analisis.columnas if c.indice == indice), None)
+            if columna is None:
+                raise ColumnaInexistente(indice)
+            sesion.bloquear_adicionales()
+            existentes = sesion.adicionales(borrador.catalogo_id)
+            _verificar_nombre(mapeable, existentes, nombre_legible)
+            campo = sesion.crear_adicional(
+                borrador.catalogo_id,
+                CampoAdicional(
+                    nombre=nombre_tecnico(nombre_legible, (c.nombre for c in existentes)),
+                    nombre_legible=nombre_legible,
+                    tipo=tipo,
+                    encabezado_origen=columna.normalizado,
+                ),
+                self._reloj(),
+            )
+            nuevo = next(
+                c for c in mapeable.con_adicionales([campo]).campos if c.nombre == campo.nombre
+            )
+            guardado = dict(borrador.analisis)
+            guardado["campos"] = [*borrador.analisis["campos"], campo_a_dict(nuevo)]
+            sesion.reemplazar_analisis(borrador_id, borrador.opciones, guardado)
+            catalogo = mapeable.con_adicionales([*existentes, campo])
+        return campo, catalogo
+
+    def campos_adicionales(self, catalogo_id: str) -> Sequence[CampoAdicional]:
+        """Todas las definiciones del catalogo, archivadas incluidas (para reactivarlas)."""
+        mapeable = self._catalogo(catalogo_id)
+        if mapeable.armar is None:
+            return ()
+        with self._repositorio.transaccion() as sesion:
+            return sesion.adicionales(catalogo_id)
+
+    def cambiar_campo_adicional(
+        self,
+        catalogo_id: str,
+        nombre: str,
+        nombre_legible: str | None = None,
+        archivado: bool | None = None,
+    ) -> CampoAdicional:
+        """Renombra, archiva o reactiva un campo adicional. El nombre tecnico y el tipo no cambian,
+        asi que lo guardado que lo usa (selecciones, definiciones, mapeos) sigue resolviendo.
+
+        `CampoAdicionalNoEncontrado` y `NombreDeCampoRepetido`.
+        """
+        mapeable = self._catalogo(catalogo_id)
+        with self._repositorio.transaccion() as sesion:
+            sesion.bloquear_adicionales()
+            existentes = sesion.adicionales(catalogo_id)
+            actual = next((c for c in existentes if c.nombre == nombre), None)
+            if actual is None:
+                raise CampoAdicionalNoEncontrado(nombre)
+            if nombre_legible is not None:
+                nombre_legible = " ".join(nombre_legible.split())
+                _verificar_nombre(
+                    mapeable, [c for c in existentes if c.nombre != nombre], nombre_legible
+                )
+            cambiado = sesion.actualizar_adicional(nombre, nombre_legible, archivado, self._reloj())
+        assert cambiado is not None
+        return cambiado
+
     def descartar(self, borrador_id: int) -> None:
         """Cancelar: borra el borrador. `BorradorNoEncontrado` si no existe."""
         with self._repositorio.transaccion() as sesion:
@@ -218,6 +337,18 @@ class MapeadorService:
         """Borra los borradores de mas de 24 horas. Pensado para el arranque de la aplicacion."""
         with self._repositorio.transaccion() as sesion:
             return sesion.borrar_borradores_vencidos(self._reloj() - VIGENCIA_DEL_BORRADOR)
+
+
+def _verificar_nombre(
+    mapeable: CatalogoMapeable, otros: Sequence[CampoAdicional], nombre_legible: str
+) -> None:
+    """El nombre legible no puede coincidir con ningun otro campo: ni con uno base (por su nombre o
+    sus alias) ni con un adicional, archivado o no (por su nombre o su encabezado de origen). Es
+    la misma `coincide` con la que el mapeador reconoce un encabezado."""
+    normalizado = normalizar_cabecera(nombre_legible)
+    for campo in mapeable.con_adicionales(otros, con_archivados=True).campos:
+        if coincide(normalizado, campo):
+            raise NombreDeCampoRepetido(nombre_legible, campo)
 
 
 def opciones_detectadas(

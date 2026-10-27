@@ -103,23 +103,30 @@ class CatalogoCartera:
     """Los campos de la cartera: la base y los adicionales que da el puerto (si lo hay).
 
     `campos()` trae TODOS, archivados incluidos, para que lo que ya los usa siga resolviendo (una
-    seleccion, una definicion guardada, un speech); `ofrecidos()` y `catalogo_publico()` no traen
-    los archivados. Sin puerto, es solo la base. Cada llamada lee el puerto: quien arma una lista
-    larga pide `campos()` una vez.
+    seleccion, una definicion guardada, un speech); `ofrecidos()` no los trae y `catalogo_publico()`
+    los trae marcados. Sin puerto, es solo la base. El puerto se lee UNA vez por instancia, la
+    primera vez que se pide un campo: la API crea un catalogo por peticion.
     """
 
     def __init__(self, adicionales: RepositorioCamposAdicionalesPort | None = None) -> None:
         self._adicionales = adicionales
+        self._leidos: tuple[CampoAdicional, ...] | None = None
 
     def campos(self) -> dict[str, CampoCartera]:
         campos = {
             nombre: CampoCartera(nombre, tipo, clave_etiqueta=f"campo.{nombre}")
             for nombre, tipo in CAMPOS_BASE.items()
         }
-        if self._adicionales is not None:
-            for adicional in self._adicionales.listar():
-                campos[adicional.nombre] = _de_adicional(adicional)
+        for adicional in self._definiciones():
+            campos[adicional.nombre] = _de_adicional(adicional)
         return campos
+
+    def _definiciones(self) -> tuple[CampoAdicional, ...]:
+        """Las definiciones, leidas del puerto UNA vez por catalogo: el catalogo vive lo que dura la
+        peticion (o la generacion), y `armar()` pide los campos por cada filtro."""
+        if self._leidos is None:
+            self._leidos = () if self._adicionales is None else tuple(self._adicionales.listar())
+        return self._leidos
 
     def ofrecidos(self) -> dict[str, CampoCartera]:
         return {n: c for n, c in self.campos().items() if not c.archivado}
@@ -215,15 +222,21 @@ class CatalogoCartera:
             )
 
     def catalogo_publico(self) -> dict[str, dict[str, Any]]:
-        """Campos ofrecidos con su tipo y operadores, para que la interfaz arme los filtros. Un
-        campo adicional trae ademas `adicional` y su `etiqueta`."""
+        """Los campos con su tipo y operadores, para que la interfaz arme los filtros. Un campo
+        adicional trae ademas `adicional`, su `etiqueta` y si esta `archivado`. Los archivados
+        vienen tambien: no se ofrecen para filtros nuevos, pero una seleccion guardada que filtra
+        por uno necesita su etiqueta y su tipo."""
         publico: dict[str, dict[str, Any]] = {}
-        for nombre, campo in self.ofrecidos().items():
+        for nombre, campo in self.campos().items():
             datos: dict[str, Any] = {
                 "tipo": campo.tipo.value,
                 "operadores": sorted(o.value for o in OPERADORES_POR_TIPO[campo.tipo]),
             }
             if campo.adicional:
-                datos |= {"adicional": True, "etiqueta": campo.etiqueta}
+                datos |= {
+                    "adicional": True,
+                    "etiqueta": campo.etiqueta,
+                    "archivado": campo.archivado,
+                }
             publico[nombre] = datos
         return publico

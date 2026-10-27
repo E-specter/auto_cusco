@@ -20,6 +20,7 @@ from app.core.entities.sabana import (
     MapeoCabeceras,
     Severidad,
 )
+from app.core.services.ingesta_sabana.adicionales import CONVERSORES_ADICIONALES
 from app.core.services.ingesta_sabana.catalogo import CATALOGO_VENCIDA, campo_destino
 from app.core.services.ingesta_sabana.reglas import es_vacio
 from app.core.services.mapeador.similitud import coincide, normalizar_cabecera
@@ -82,7 +83,9 @@ def mapeo_desde_asignaciones(
             origenes[campo] = OrigenAsignacion(asignacion["origen"]).value
     asignados = {columna.nombre for columna in columnas.values()}
 
-    campos = [(columna, campo_destino(columna)) for columna in catalogo]
+    # Los adicionales no se buscan ni se echan en falta: su alias es el encabezado de origen.
+    base = [columna for columna in catalogo if columna.tipo not in CONVERSORES_ADICIONALES]
+    campos = [(columna, campo_destino(columna)) for columna in base]
     incidencias: list[Incidencia] = []
     for indice, cabecera in ignoradas.items():
         candidatas = [c for c, campo in campos if coincide(normalizar_cabecera(cabecera), campo)]
@@ -91,7 +94,7 @@ def mapeo_desde_asignaciones(
         elif all(c.nombre in asignados for c in candidatas):
             incidencias.append(_incidencia_duplicada(indice, cabecera))
         # Si el usuario dejo sin cargar una columna que si coincidia con un campo libre, es suyo.
-    faltantes = [columna for columna in catalogo if columna.nombre not in asignados]
+    faltantes = [columna for columna in base if columna.nombre not in asignados]
     for columna in faltantes:
         severidad = Severidad.ERROR if columna.requerida else Severidad.ADVERTENCIA
         incidencias.append(

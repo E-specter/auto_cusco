@@ -86,6 +86,9 @@ class CodigoErrorMapeador(StrEnum):
     CATALOGO_DESCONOCIDO = "catalogo_desconocido"
     BORRADOR_NO_ENCONTRADO = "borrador_no_encontrado"  # no existe, venció o ya se confirmó
     MAPEO_CON_PROBLEMAS = "mapeo_con_problemas"  # el `422` de confirmar: trae `problemas`
+    NOMBRE_REPETIDO = "nombre_repetido"  # el `409` de un campo adicional: trae `campo`
+    CAMPO_ADICIONAL_NO_ENCONTRADO = "campo_adicional_no_encontrado"
+    COLUMNA_INEXISTENTE = "columna_inexistente"  # el indice no es una columna del borrador
 
 
 @dataclass(frozen=True)
