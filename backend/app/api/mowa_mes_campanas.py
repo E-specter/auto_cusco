@@ -20,7 +20,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.adapters.input.lector_reporte_mowa_mes import LectorReporteMowaMes
 from app.adapters.output.exportadores.comunes import disposicion_de_descarga
@@ -50,6 +50,7 @@ from app.core.entities.mowa_mes import (
     TipoCodigo,
 )
 from app.core.entities.mowa_mes_campana import (
+    LARGO_MAXIMO_DESCRIPCION,
     ArchivoDemasiadoGrande,
     ArchivoNoEncontrado,
     CampanaArmada,
@@ -65,6 +66,7 @@ from app.core.entities.mowa_mes_campana import (
     Salida,
     SpeechCambiado,
     TipoCarga,
+    largo_utf16,
 )
 from app.core.entities.mowa_mes_costo import EstadoCosto, EstadoCostoEstimado
 from app.core.entities.mowa_mes_reporte import CifrasGrupo, ReporteInvalido, ReporteYaImportado
@@ -143,7 +145,12 @@ class PeticionCampanaEntrada(BaseModel):
     )
     tipo_carga: TipoCarga = TipoCarga.MASIVA
     descripcion: str | None = Field(
-        default=None, max_length=1000, description="Sin descripcion se usa la sugerida"
+        default=None,
+        description=(
+            "Sin descripcion (o en blanco) se usa la sugerida. Admite hasta "
+            f"{LARGO_MAXIMO_DESCRIPCION} unidades UTF-16, las que cuenta `.length` en el "
+            "navegador (un emoji son 2), sin contar los espacios de los extremos (RF-MM-04)"
+        ),
     )
     salida: Salida = Salida.NUMERO_LARGO
     herramientas: HerramientasModelo = HerramientasModelo()
@@ -168,6 +175,14 @@ class PeticionCampanaEntrada(BaseModel):
             "configuracion. Una variable desconocida o una llave sin cerrar responde 400"
         ),
     )
+
+    @field_validator("descripcion")
+    @classmethod
+    def _descripcion_cabe_en_mes(cls, descripcion: str | None) -> str | None:
+        # Se mide lo que se registra (la campana la guarda sin los espacios de los extremos).
+        if descripcion is not None and largo_utf16(descripcion.strip()) > LARGO_MAXIMO_DESCRIPCION:
+            raise ValueError(f"La descripcion admite hasta {LARGO_MAXIMO_DESCRIPCION} caracteres")
+        return descripcion
 
     def peticion(self, speech_huella: str | None = None, confirmar_limite: bool = False):
         return PeticionCampana(

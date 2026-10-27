@@ -1781,7 +1781,7 @@ export interface components {
             tipo_carga: components["schemas"]["TipoCarga"];
             /**
              * Descripcion
-             * @description Sin descripcion se usa la sugerida
+             * @description Sin descripcion (o en blanco) se usa la sugerida. Admite hasta 100 unidades UTF-16, las que cuenta `.length` en el navegador (un emoji son 2), sin contar los espacios de los extremos (RF-MM-04)
              */
             descripcion?: string | null;
             /** @default numero_largo */
@@ -2822,7 +2822,7 @@ export interface components {
             tipo_carga: components["schemas"]["TipoCarga"];
             /**
              * Descripcion
-             * @description Sin descripcion se usa la sugerida
+             * @description Sin descripcion (o en blanco) se usa la sugerida. Admite hasta 100 unidades UTF-16, las que cuenta `.length` en el navegador (un emoji son 2), sin contar los espacios de los extremos (RF-MM-04)
              */
             descripcion?: string | null;
             /** @default numero_largo */

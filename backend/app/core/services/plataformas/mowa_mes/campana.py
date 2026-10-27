@@ -31,6 +31,7 @@ from app.core.entities.mowa_mes import (
     VersionSpeech,
 )
 from app.core.entities.mowa_mes_campana import (
+    LARGO_MAXIMO_DESCRIPCION,
     PREFIJO_DESCRIPCION,
     ArchivoCarga,
     ArchivoNoEncontrado,
@@ -49,6 +50,7 @@ from app.core.entities.mowa_mes_campana import (
     SpeechCambiado,
     SupervisorAsignado,
     TipoCarga,
+    largo_utf16,
 )
 from app.core.entities.mowa_mes_costo import PlantillaInvalida
 from app.core.ports.repositorio_campanas_mowa_mes_port import RepositorioCampanasMowaMesPort
@@ -145,10 +147,27 @@ def resumen_filtro(filtro: Filtro) -> str:
 
 
 def descripcion_sugerida(filtros: Sequence[Filtro]) -> str:
-    """RF-MM-04: la cartera y un resumen de los filtros, que el usuario puede editar."""
-    if not filtros:
-        return PREFIJO_DESCRIPCION
-    return f"{PREFIJO_DESCRIPCION} {', '.join(resumen_filtro(f) for f in filtros)}"
+    """RF-MM-04: la cartera y un resumen de los filtros, que el usuario puede editar.
+
+    Cabe en `LARGO_MAXIMO_DESCRIPCION` (unidades UTF-16): si el resumen completo no cabe, sale el
+    prefijo con los filtros ENTEROS que quepan desde el principio, cerrado con `...`; y si ni el
+    primero cabe, las primeras unidades del texto completo y `...`."""
+    resumenes = [resumen_filtro(f) for f in filtros]
+    completa = f"{PREFIJO_DESCRIPCION} {', '.join(resumenes)}" if resumenes else PREFIJO_DESCRIPCION
+    if largo_utf16(completa) <= LARGO_MAXIMO_DESCRIPCION:
+        return completa
+    elegida = ""
+    for n in range(1, len(resumenes) + 1):
+        candidata = f"{PREFIJO_DESCRIPCION} {', '.join(resumenes[:n])}..."
+        if largo_utf16(candidata) > LARGO_MAXIMO_DESCRIPCION:
+            break
+        elegida = candidata
+    if elegida:
+        return elegida
+    corte = completa[: LARGO_MAXIMO_DESCRIPCION - 3]  # tantos puntos de codigo como unidades; sobra
+    while largo_utf16(corte) > LARGO_MAXIMO_DESCRIPCION - 3:  # recorta de a un caracter entero
+        corte = corte[:-1]
+    return corte + "..."
 
 
 def fecha_en_lima(momento: datetime) -> date:

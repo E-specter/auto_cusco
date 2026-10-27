@@ -24,6 +24,13 @@ from app.core.entities.mowa_mes import (
 CABECERAS_CARGA = ("numero", "mensaje", "dni")  # RF-MM-10
 HOJA_CARGA = "Hoja1"
 PREFIJO_DESCRIPCION = "CajaCusco"  # RF-MM-04
+LARGO_MAXIMO_DESCRIPCION = 100  # RF-MM-04 (S-MM-3): el campo «Descripción de Campaña» de MES
+
+
+def largo_utf16(texto: str) -> int:
+    """Largo en unidades UTF-16, como lo cuenta `.length` del navegador (un emoji mide 2).
+    `surrogatepass`: una mitad de par suelta, que JSON deja pasar, mide 1 en vez de fallar."""
+    return len(texto.encode("utf-16-le", "surrogatepass")) // 2
 
 
 class TipoCarga(StrEnum):

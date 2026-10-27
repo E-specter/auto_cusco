@@ -5638,15 +5638,14 @@
           "descripcion": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 1000
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Descripcion",
-            "description": "Sin descripcion se usa la sugerida"
+            "description": "Sin descripcion (o en blanco) se usa la sugerida. Admite hasta 100 unidades UTF-16, las que cuenta `.length` en el navegador (un emoji son 2), sin contar los espacios de los extremos (RF-MM-04)"
           },
           "salida": {
             "$ref": "#/components/schemas/Salida",
@@ -8303,15 +8302,14 @@
           "descripcion": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 1000
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Descripcion",
-            "description": "Sin descripcion se usa la sugerida"
+            "description": "Sin descripcion (o en blanco) se usa la sugerida. Admite hasta 100 unidades UTF-16, las que cuenta `.length` en el navegador (un emoji son 2), sin contar los espacios de los extremos (RF-MM-04)"
           },
           "salida": {
             "$ref": "#/components/schemas/Salida",
