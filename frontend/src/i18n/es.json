@@ -379,7 +379,7 @@
   "mowaMes.speech.ejemplo": "Ejemplo en el peor caso: {mensaje}",
   "mowaMes.speech.sinEjemplo": "Sin ejemplo: falta el WhatsApp de contacto.",
   "mowaMes.speech.gsm7": "Al generar, se quitan las tildes, los signos que el SMS no admite se cambian por uno simple y los que no tienen equivalente se borran. La versión se guarda como la escribes.",
-  "mowaMes.speech.calculoUnidad": "Se cuenta como lo cuenta el SMS: € [ ] { } \\ ~ ^ y | ocupan 2 caracteres, y los signos que se cambian se cuentan ya cambiados («…» ocupa 3).",
+  "mowaMes.speech.calculoUnidad": "Se cuenta como lo cuenta el SMS: los signos que se cambian se cuentan ya cambiados («…» ocupa 3, como «...», y «€» también, como «EUR»).",
   "mowaMes.speech.borrados.prefijo": "Al enviar se borran:",
   "mowaMes.speech.borrados.invisible": "carácter invisible",
   "mowaMes.speech.borrados.nombre.u200b": "espacio de ancho cero",

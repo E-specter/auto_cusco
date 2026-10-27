@@ -379,7 +379,7 @@
   "mowaMes.speech.ejemplo": "Worst-case example: {mensaje}",
   "mowaMes.speech.sinEjemplo": "No example: the contact WhatsApp is missing.",
   "mowaMes.speech.gsm7": "When generating, accents are removed, signs the SMS does not accept are replaced by a simple one, and those with no equivalent are deleted. The version is saved as you write it.",
-  "mowaMes.speech.calculoUnidad": "Counted the way the SMS counts it: € [ ] { } \\ ~ ^ and | take 2 characters, and replaced signs are counted already replaced (“…” takes 3).",
+  "mowaMes.speech.calculoUnidad": "Counted the way the SMS counts it: replaced signs are counted already replaced (“…” takes 3, as “...”, and so does “€”, as “EUR”).",
   "mowaMes.speech.borrados.prefijo": "Deleted when sent:",
   "mowaMes.speech.borrados.invisible": "invisible character",
   "mowaMes.speech.borrados.nombre.u200b": "zero-width space",

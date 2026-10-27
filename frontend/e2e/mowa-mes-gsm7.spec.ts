@@ -10,7 +10,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { apiMowaMes, montarApiMowaMes, type ApiFalsaMowaMes } from './api-falsa-mowa-mes';
-import { v1ConBorrados, v2ConBorrados } from './fixtures-gsm7';
+import { v1ConBorrados, v1ConExtendidos, v2ConBorrados } from './fixtures-gsm7';
 import { apiSpeechV2, montarApiSpeechV2, type ApiFalsaSpeechV2 } from './api-falsa-speech-v2';
 import { apiTextoEnriquecidoVacia } from './api-falsa-texto-enriquecido';
 
@@ -21,9 +21,9 @@ const HINT_ES =
 const HINT_EN =
   'When generating, accents are removed, signs the SMS does not accept are replaced by a simple one, and those with no equivalent are deleted. The version is saved as you write it.';
 const UNIDAD_ES =
-  'Se cuenta como lo cuenta el SMS: € [ ] { } \\ ~ ^ y | ocupan 2 caracteres, y los signos que se cambian se cuentan ya cambiados («…» ocupa 3).';
+  'Se cuenta como lo cuenta el SMS: los signos que se cambian se cuentan ya cambiados («…» ocupa 3, como «...», y «€» también, como «EUR»).';
 const UNIDAD_EN =
-  'Counted the way the SMS counts it: € [ ] { } \\ ~ ^ and | take 2 characters, and replaced signs are counted already replaced (“…” takes 3).';
+  'Counted the way the SMS counts it: replaced signs are counted already replaced (“…” takes 3, as “...”, and so does “€”, as “EUR”).';
 
 async function abrir(
   page: Page,
@@ -116,9 +116,9 @@ test.describe('«Al enviar se borran: …» en una v1', () => {
 
     const linea = filaV1(page, 'preventiva').locator('[data-borrados]');
     await expect(linea).toBeVisible();
-    await expect(linea).toHaveText('Al enviar se borran: 👍🏽 · ✓ · espacio de ancho cero U+200B');
+    await expect(linea).toHaveText('Al enviar se borran: 👍🏽 · ✓ · ^ · espacio de ancho cero U+200B');
     // Visible elements in mono, the invisible one by its name and its code point in mono.
-    await expect(linea.locator('[data-borrado-visible]')).toHaveText(['👍🏽', '✓']);
+    await expect(linea.locator('[data-borrado-visible]')).toHaveText(['👍🏽', '✓', '^']);
     await expect(linea.locator('[data-borrado-nombre]')).toHaveText(['espacio de ancho cero']);
     await expect(linea.locator('[data-borrado-codigo]')).toHaveText(['U+200B']);
     const familia = (selector: string) => linea.locator(selector).first().evaluate((e) => getComputedStyle(e).fontFamily);
@@ -136,9 +136,11 @@ test.describe('«Al enviar se borran: …» en una v1', () => {
     const linea = filaV1(page, 'preventiva').locator('[data-borrados]');
     await expect(linea.locator('[data-borrado-visible]').filter({ hasText: '👍🏽' })).toHaveCount(1);
     // «👍🏽» is one element, not an emoji and a skin tone; «✓» is there twice in the text and once in the line.
-    await expect(linea.locator('[data-borrado-visible]')).toHaveCount(2);
+    await expect(linea.locator('[data-borrado-visible]')).toHaveCount(3);
     const texto = (await linea.textContent()) ?? '';
     for (const cambiado of ['á', 'ñ', '“', '”', '«', '»', '—', '…', '°', 'ú']) expect(texto).not.toContain(cambiado);
+    // The extended table is transliterated too (RF-MM-27, 2026-10-26): only `^` has no equivalent.
+    for (const cambiado of ['€', '[', ']', '{', '}', '\\', '~', '|']) expect(texto).not.toContain(cambiado);
   });
 
   test('un segmento sin nada que borrar no tiene línea', async ({ page }) => {
@@ -164,8 +166,26 @@ test.describe('«Al enviar se borran: …» en una v1', () => {
     await page.getByLabel('Version', { exact: true }).selectOption('2');
 
     await expect(filaV1(page, 'preventiva').locator('[data-borrados]')).toHaveText(
-      'Deleted when sent: 👍🏽 · ✓ · zero-width space U+200B',
+      'Deleted when sent: 👍🏽 · ✓ · ^ · zero-width space U+200B',
     );
+  });
+});
+
+test.describe('los extendidos de GSM-7 se transliteran (RF-MM-27, 2026-10-26)', () => {
+  test('el ejemplo sale transliterado, el largo se cuenta ya transliterado y no hay línea de borrados', async ({ page }) => {
+    await abrir(page, (api) => v1ConExtendidos(api));
+    await page.getByLabel('Versión', { exact: true }).selectOption('2');
+    const fila = filaV1(page, 'preventiva');
+
+    // «[€5]{x}» is «(EUR5)(x)» and the form feed is a space: no extended character is left in the example.
+    await expect(fila.locator('[data-ejemplo]')).toContainText('XXXXXXXX (EUR5)(x)dd/mm/yyyy a/b/c - .');
+    const ejemplo = (await fila.locator('[data-ejemplo]').textContent()) ?? '';
+    for (const c of ['€', '[', ']', '{', '}', '\\', '~', '|', '\f']) expect(ejemplo).not.toContain(c);
+    // 8 (holder) + 10 («(EUR5)(x)» with its space) + 10 (the date) + 11 («a/b/c - » and the point): the
+    // same length as the transliterated text, not 2 per extended character.
+    await expect(fila.locator('[data-largo]')).toHaveText('39');
+    // Everything here was replaced and nothing deleted, so there is nothing to warn about.
+    await expect(fila.locator('[data-borrados]')).toBeHidden();
   });
 });
 
@@ -175,7 +195,7 @@ test.describe('«Al enviar se borran: …» en una v2', () => {
     await segmentos(page).nth(0).click();
 
     await expect(lineaV2(page)).toBeVisible();
-    await expect(lineaV2(page)).toHaveText('Al enviar se borran: 👍🏽 · espacio de ancho cero U+200B');
+    await expect(lineaV2(page)).toHaveText('Al enviar se borran: 👍🏽 · espacio de ancho cero U+200B · ^');
     await expect(lineaV2(page)).toHaveClass(/notice--warning/);
     await expect(lineaV2(page).locator('svg')).toHaveCount(1);
     // The visible character and the code point are mono; the sentence and the name are not.
@@ -245,7 +265,7 @@ test.describe('«Al enviar se borran: …» en una v2', () => {
     await abrirV2(page, 'en');
     await segmentos(page).nth(0).click();
 
-    await expect(lineaV2(page)).toHaveText('Deleted when sent: 👍🏽 · zero-width space U+200B');
+    await expect(lineaV2(page)).toHaveText('Deleted when sent: 👍🏽 · zero-width space U+200B · ^');
   });
 });
 

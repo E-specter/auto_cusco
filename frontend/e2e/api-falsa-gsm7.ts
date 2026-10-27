@@ -1,16 +1,17 @@
 /**
  * The GSM-7 normalisation of MOWA MES (RF-MM-27) as the fake API needs it: what the backend deletes
- * from a text, by grapheme, and how long the normalised text is. It mirrors the backend's rules, not
- * its code: accents are removed and the typographic signs are replaced by a simple one (neither is
- * reported), special spaces become a plain space, and what has no equivalent is DELETED and reported,
- * without repeats and in order of appearance. In a grapheme that keeps a part (the «1» of a keycap),
- * only the deleted part is reported. Every text a spec uses is synthetic.
+ * from a text, by grapheme. It mirrors the backend's rules, not its code: accents are removed and the
+ * typographic signs and the extended characters of GSM-7 are replaced by a simple one (neither is
+ * reported), special spaces and the form feed become a plain space, and what has no equivalent
+ * (an emoji, `^`, a vertical tab) is DELETED and reported, without repeats and in order of
+ * appearance. The message ends up in the basic alphabet only, so its length is just its length.
+ * In a grapheme that keeps a part (the «1» of a keycap), only the deleted part is reported.
+ * Every text a spec uses is synthetic.
  */
 import type { CaracterQuitado } from '../src/lib/mowa-mes-gsm7';
 
 const BASICO =
   '@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà';
-const EXTENDIDO = '\f^{}\\[~]|€';
 
 const REEMPLAZOS: Readonly<Record<string, string>> = {
   '“': '"',
@@ -25,12 +26,21 @@ const REEMPLAZOS: Readonly<Record<string, string>> = {
   '°': 'o',
   'º': 'o',
   'ª': 'a',
+  // The extended table of GSM-7 is transliterated too (decision of 2026-10-26); `^` has no equivalent.
+  '€': 'EUR',
+  '[': '(',
+  '{': '(',
+  ']': ')',
+  '}': ')',
+  '\\': '/',
+  '|': '/',
+  '~': '-',
 };
 
-const ESPACIO_ESPECIAL = /^[\p{Zs}\t\v]$/u;
+const ESPACIO_ESPECIAL = /^[\p{Zs}\t\f]$/u;
 const SEGMENTADOR = new Intl.Segmenter('es', { granularity: 'grapheme' });
 
-const enGsm7 = (c: string) => BASICO.includes(c) || EXTENDIDO.includes(c);
+const enGsm7 = (c: string) => BASICO.includes(c);
 const punto = (c: string) => `U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`;
 
 /** What stays of a grapheme once normalised, and the code points that are deleted. */
@@ -50,11 +60,6 @@ function normalizarGrafema(grafema: string): { queda: string; quitados: string[]
 
 export function normalizarGsm7(texto: string): string {
   return [...SEGMENTADOR.segment(texto)].map((s) => normalizarGrafema(s.segment).queda).join('');
-}
-
-/** The length in GSM-7 units: an extended character counts 2. */
-export function largoGsm7(texto: string): number {
-  return [...texto].reduce((suma, c) => suma + (EXTENDIDO.includes(c) ? 2 : 1), 0);
 }
 
 /** What the normalisation deletes from `texto`, by grapheme, without repeats and in order. */

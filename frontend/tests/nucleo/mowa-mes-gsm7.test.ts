@@ -18,6 +18,7 @@ import {
   textoDeBorrados,
   type CaracterQuitado,
 } from '../../src/lib/mowa-mes-gsm7';
+import { caracteresQuitados, normalizarGsm7 } from '../../e2e/api-falsa-gsm7';
 import { setLanguageForTests } from './idioma';
 
 const quitado = (caracter: string, punto_de_codigo: string): CaracterQuitado => ({ caracter, punto_de_codigo });
@@ -152,5 +153,50 @@ describe('elementosBorrados y la línea', () => {
     const elementos = elementosBorrados([quitado('✓', 'U+2713'), quitado('✓', 'U+2713')]);
     expect(elementos).toHaveLength(2);
     expect(textoDeBorrados(elementos)).toBe('✓ · ✓');
+  });
+});
+
+/**
+ * The fake API normalises like the backend (RF-MM-27, decision of 2026-10-26): the extended table of
+ * GSM-7 is transliterated too, so a message ends up in the basic alphabet only. The specs trust this
+ * to build their expected texts, so it is checked on its own.
+ */
+describe('la normalización de la API falsa: los extendidos de GSM-7', () => {
+  it('se transliteran con la tabla fija', () => {
+    expect(normalizarGsm7('[€5]')).toBe('(EUR5)');
+    expect(normalizarGsm7('{a}')).toBe('(a)');
+    expect(normalizarGsm7('a\\b|c')).toBe('a/b/c');
+    expect(normalizarGsm7('a~b')).toBe('a-b');
+  });
+
+  it('el salto de página pasa a un espacio normal', () => {
+    expect(normalizarGsm7('uno\fdos')).toBe('uno dos');
+  });
+
+  it('la tabulación pasa a un espacio, pero la vertical no: es Cc y no Zs, así que se borra y se lista', () => {
+    expect(normalizarGsm7('a\tb')).toBe('a b');
+    expect(normalizarGsm7('a\vb')).toBe('ab');
+    expect(caracteresQuitados('a\vb\v')).toEqual([{ caracter: '\v', punto_de_codigo: 'U+000B' }]);
+  });
+
+  it('`^` no tiene equivalente: se borra y se lista, y lo transliterado no', () => {
+    expect(normalizarGsm7('a^b')).toBe('ab');
+    expect(caracteresQuitados('x^y [€5] {z} a\\b|c ~ \f')).toEqual([{ caracter: '^', punto_de_codigo: 'U+005E' }]);
+  });
+
+  it('un texto con extendidos mide igual que su versión transliterada', () => {
+    const conExtendidos = '[€5] a\\b|c ~ \f{x}';
+    const transliterado = '(EUR5) a/b/c -  (x)'; // the form feed is one more space
+    expect(normalizarGsm7(conExtendidos)).toBe(transliterado);
+    expect(normalizarGsm7(conExtendidos).length).toBe(transliterado.length);
+  });
+
+  it('nada del alfabeto extendido sobrevive', () => {
+    const salida = normalizarGsm7('€ [ ] { } \\ ~ ^ | \f «…»');
+    for (const c of ['€', '[', ']', '{', '}', '\\', '~', '^', '|', '\f']) expect(salida).not.toContain(c);
+  });
+
+  it('un texto del alfabeto básico queda igual', () => {
+    expect(normalizarGsm7('Pague (hoy): 50% /ya')).toBe('Pague (hoy): 50% /ya');
   });
 });
