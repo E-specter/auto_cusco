@@ -60,7 +60,10 @@ export function reanalizarBorrador(id: number, opciones: OpcionesLectura): Promi
   return request<AnalisisBorrador>(`/mapeador/borradores/${id}/analisis`, conJson('POST', opciones));
 }
 
-/** Cancel: 204, also for a draft that expired. */
+/**
+ * Cancel: 204 for a draft that is still in the database, expired or not; 404 for an id
+ * that does not exist. The screen treats both the same.
+ */
 export function descartarBorrador(id: number): Promise<void> {
   return request<void>(`/mapeador/borradores/${id}`, { method: 'DELETE' });
 }

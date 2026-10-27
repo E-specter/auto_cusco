@@ -179,6 +179,7 @@
   "incidencia.cabecera_desconocida": "Unrecognised header; the column was not catalogued",
   "incidencia.cabecera_duplicada": "The header appears more than once",
   "incidencia.columna_faltante": "Expected column missing from the file",
+  "incidencia.columnas_opcionales_ausentes": "The file does not have these optional columns: those fields are empty in this version",
   "incidencia.valor_no_escalar": "The value was an object or a list; it was saved as JSON text",
   "incidencia.valor_no_convertible": "The value does not match the type of the additional field; it was left empty",
   "incidencia.clave_vacia": "The promissory-note key is empty",

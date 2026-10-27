@@ -259,9 +259,15 @@ def test_un_archivo_que_carga_por_alias_da_la_misma_version_por_los_dos_caminos(
     resultado_b = entorno.ingesta.procesar_carga(desde_borrador.id)
 
     assert resultado_a.estado is resultado_b.estado is EstadoCarga.TERMINADA
-    assert resultado_a.resumen == resultado_b.resumen
+    # Las mismas filas y el mismo resumen de filas. Las incidencias de CABECERA cambian a proposito
+    # en el camino con mapeo confirmado (T-MAP-B5, H-2); las de cada fila son las mismas.
+    for campo in ("filas_total", "filas_ingestadas", "incidencias_error"):
+        assert getattr(resultado_a.resumen, campo) == getattr(resultado_b.resumen, campo)
     assert entorno.repo.filas[por_alias.id] == entorno.repo.filas[desde_borrador.id]
-    assert entorno.repo.incidencias[por_alias.id] == entorno.repo.incidencias[desde_borrador.id]
+    de_fila = lambda carga: [i for i in entorno.repo.incidencias[carga.id] if i.fila is not None]  # noqa: E731
+    assert de_fila(por_alias) == de_fila(desde_borrador)
+    cabecera_b = [i.codigo for i in entorno.repo.incidencias[desde_borrador.id] if i.fila is None]
+    assert not {"cabecera_desconocida", "cabecera_duplicada", "columna_faltante"} & set(cabecera_b)
     formato_a = entorno.repo.cargas[por_alias.id]["formato"]
     formato_b = entorno.repo.cargas[desde_borrador.id]["formato"]
     assert formato_a.fila_cabecera == formato_b.fila_cabecera
@@ -289,8 +295,12 @@ def test_la_paridad_incluye_la_columna_duplicada_del_pagare(entorno) -> None:
     entorno.ingesta.procesar_carga(por_alias.id)
     entorno.ingesta.procesar_carga(desde_borrador.id)
 
-    assert entorno.repo.incidencias[por_alias.id] == entorno.repo.incidencias[desde_borrador.id]
+    assert entorno.repo.filas[por_alias.id] == entorno.repo.filas[desde_borrador.id]
+    # El camino de siempre avisa de la repetida; la que el usuario dejo en «No cargar», no.
     assert any(i.codigo == "cabecera_duplicada" for i in entorno.repo.incidencias[por_alias.id])
+    assert not any(
+        i.codigo == "cabecera_duplicada" for i in entorno.repo.incidencias[desde_borrador.id]
+    )
 
 
 # --- El mapeo guardado tiene que seguir siendo el del archivo -----------------------------------
@@ -414,3 +424,25 @@ def test_procesar_dos_veces_la_misma_carga_confirmada_no_cambia_el_mapeo(entorno
         entorno.repo.cargas[primera.id]["formato"].mapeo["columnas"]
         == (entorno.repo.cargas[segunda.id]["formato"].mapeo["columnas"])
     )
+
+
+def test_una_carga_confirmada_avisa_una_sola_vez_de_los_opcionales_ausentes(entorno) -> None:
+    contenido = xlsx([["Pagare", "Titular", "Dato libre"], ["000000000000000001", "UNO", "x"]])
+    por_alias = entorno.ingesta.registrar_carga(FECHA, "a.xlsx", contenido).carga
+    confirmada = entorno.confirmar("a.xlsx", contenido, fecha=OTRA_FECHA)
+
+    entorno.ingesta.procesar_carga(por_alias.id)
+    resultado = entorno.ingesta.procesar_carga(confirmada.id)
+
+    incidencias = entorno.repo.incidencias[confirmada.id]
+    codigos = [i.codigo for i in incidencias]
+    assert codigos == ["columnas_opcionales_ausentes"]  # y nada de cabecera_* ni columna_faltante
+    [resumen] = incidencias
+    assert resumen.fila is None
+    assert resumen.columna.startswith("region, agencia")  # el orden del catalogo
+    assert "titular" not in resumen.columna.split(", ")
+    assert "region" in resumen.detalle  # el detalle queda de respaldo
+    assert resultado.resumen.incidencias_advertencia == 1
+    # El camino de siempre sigue avisando una vez por campo y por la cabecera suelta.
+    viejas = [i.codigo for i in entorno.repo.incidencias[por_alias.id]]
+    assert viejas.count("columna_faltante") > 10 and "cabecera_desconocida" in viejas

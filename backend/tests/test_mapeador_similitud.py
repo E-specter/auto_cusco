@@ -7,8 +7,11 @@ import pytest
 
 from app.core.entities.mapeador import CampoDestino
 from app.core.services.ingesta_sabana.catalogo import CATALOGO_SABANA
+from app.core.services.ingesta_sabana.reglas import es_vacio
+from app.core.services.mapeador.analisis import analizar
 from app.core.services.mapeador.similitud import (
     DIFERENCIA_DE_EMPATE,
+    PALABRAS_VACIAS,
     UMBRAL_PARECIDO,
     alias_legible,
     alias_legibles,
@@ -208,3 +211,87 @@ def test_el_alias_legible_y_los_candidatos_de_similitud_hablan_de_los_mismos_ali
     # Los candidatos son el nombre y los alias literales; sin guiones bajos son los mismos.
     for c in CATALOGO_SABANA.campos:
         assert alias_legibles(c) == tuple(dict.fromkeys(candidatos_de_similitud(c)[1:])), c.nombre
+
+
+# --- El solapamiento de palabras (T-MAP-B5, H-1) -------------------------------------------------
+
+
+def test_un_encabezado_que_contiene_el_nombre_del_campo_y_le_suma_palabras_se_parece_del_todo() -> (
+    None
+):
+    assert similitud_entre("numero de pagare", "pagare") == 1.0
+    assert similitud_entre("pagare", "numero de pagare") == 1.0  # el solapamiento es simetrico
+    assert similitud_entre("numero de pagare", "saldo capital") < UMBRAL_PARECIDO
+
+
+def test_las_palabras_vacias_no_cuentan_como_palabras_en_comun() -> None:
+    # Solo «de» y «la» en comun: sin el filtro daria 2/3 por solapamiento, y con el filtro, 0.
+    assert similitud_entre("fecha de la", "monto de la") < 0.67
+    assert similitud_entre("de la", "de el") == pytest.approx(
+        similitud_entre("de la", "de el")
+    )  # sin palabras utiles no hay solapamiento (ni division por cero)
+    assert similitud_entre("de", "la") == 0.0
+
+
+def test_las_palabras_vacias_son_las_del_encargo() -> None:
+    assert PALABRAS_VACIAS == {"de", "del", "la", "las", "el", "los", "y"}
+
+
+def test_el_umbral_y_el_empate_no_cambian() -> None:
+    assert (UMBRAL_PARECIDO, DIFERENCIA_DE_EMPATE) == (0.75, 0.02)
+
+
+def test_la_coincidencia_exacta_no_depende_de_la_similitud() -> None:
+    pagare = next(c for c in CATALOGO_SABANA.campos if c.nombre == "pagare")
+
+    assert not coincide("numero de pagare", pagare)  # se parece, pero no coincide
+    assert coincide("pagare", pagare)
+    assert similitud("numero de pagare", pagare) == 1.0
+
+
+def test_el_alias_literal_de_un_adicional_sigue_siendo_literal_con_el_solapamiento() -> None:
+    adicional = CampoDestino(
+        "ad_monto_usd",
+        "campo.ad_monto_usd",
+        "numero",
+        False,
+        ("monto (usd)",),
+        "Importe en dolares",
+        True,
+    )
+
+    assert coincide("monto (usd)", adicional)  # el parentesis no es una expresion regular
+    assert not coincide("monto usd", adicional)
+    assert similitud("monto (usd) extra", adicional) >= UMBRAL_PARECIDO  # contiene su alias
+
+
+def sugerencia(*encabezados: str) -> list[tuple[str, str | None]]:
+    analisis = analizar(list(encabezados), [], CATALOGO_SABANA, {}, es_vacio)
+    return [(c.estado.value, c.sugerido) for c in analisis.columnas]
+
+
+@pytest.mark.parametrize(
+    ("encabezado", "estado", "campo"),
+    [
+        # contiene el nombre del campo y le suma palabras: parecido
+        ("numero de pagare", "parecido", "pagare"),
+        ("numero del pagare", "parecido", "pagare"),
+        ("nombre del titular", "parecido", "titular"),
+        ("region sur", "parecido", "region"),
+        ("monto de cuota", "parecido", "monto_cuota"),
+        # empate entre varios campos que lo contienen: sin sugerencia (RF-58)
+        ("saldo", "sin_coincidencia", None),
+        ("tipo", "sin_coincidencia", None),
+        ("cuotas", "sin_coincidencia", None),
+        ("dias de atraso", "sin_coincidencia", None),
+        ("celular del analista", "sin_coincidencia", None),  # tambien contiene «analista»
+        # sin nada que ver con un campo
+        ("observacion libre", "sin_coincidencia", None),
+        ("el", "sin_coincidencia", None),
+        # lo que ya coincidia, sigue coincidiendo
+        ("pagare", "coincide", "pagare"),
+        ("analista", "coincide", "analista_asignacion"),
+    ],
+)
+def test_tabla_de_encabezados_sinteticos_con_su_sugerencia(encabezado, estado, campo) -> None:
+    assert sugerencia(encabezado) == [(estado, campo)]

@@ -4,6 +4,7 @@ import pytest
 
 from app.core.entities.sabana import Severidad
 from app.core.services.ingesta_sabana.cabeceras import describir_mapeo, mapear_cabeceras
+from app.core.services.ingesta_sabana.catalogo import CATALOGO_VENCIDA
 from app.core.services.ingesta_sabana.mapeo_explicito import (
     MapeoGuardadoInvalido,
     mapeo_desde_asignaciones,
@@ -31,6 +32,8 @@ def de_alias(cabeceras):
 
 
 def test_las_asignaciones_de_los_alias_dan_el_mismo_mapeo_que_los_alias() -> None:
+    """Reformulada en T-MAP-B5 (H-2): el mapeo es el mismo (columnas, desconocidas, faltantes y lo
+    que se guarda en `formato.mapeo`); las incidencias de cabecera cambian a proposito."""
     cabeceras = [*CABECERAS_10_09, "Columna inventada"]
 
     antes = mapear_cabeceras(cabeceras)
@@ -39,8 +42,11 @@ def test_las_asignaciones_de_los_alias_dan_el_mismo_mapeo_que_los_alias() -> Non
     assert ahora.columnas == antes.columnas
     assert ahora.desconocidas == antes.desconocidas == ignoradas
     assert ahora.faltantes == antes.faltantes
-    assert ahora.incidencias == antes.incidencias
     assert describir_mapeo(ahora) == describir_mapeo(antes)
+    assert [i.codigo for i in antes.incidencias].count(
+        "cabecera_desconocida"
+    ) == 1  # el camino viejo
+    assert ahora.incidencias == []  # la columna inventada esta en «No cargar»: decision del usuario
     assert set(origenes) == {c.nombre for c in antes.columnas.values()}
 
 
@@ -67,17 +73,19 @@ def test_una_columna_que_coincidia_y_el_usuario_dejo_sin_cargar_no_avisa() -> No
     assert "titular" in [c.nombre for c in mapeo.faltantes]
 
 
-def test_una_columna_sin_nada_que_ver_con_el_catalogo_avisa_como_siempre() -> None:
+def test_una_columna_sin_nada_que_ver_con_el_catalogo_confirmada_en_no_cargar_no_avisa() -> None:
+    """H-2: «No cargar» es una decision del usuario; queda en `ignoradas`, no en las incidencias."""
     cabeceras = ["Pagare", "Dato libre"]
 
-    mapeo, _, _ = mapeo_desde_asignaciones(cabeceras, de_alias(cabeceras))
+    mapeo, _, ignoradas = mapeo_desde_asignaciones(cabeceras, de_alias(cabeceras))
 
-    [aviso] = [i for i in mapeo.incidencias if i.codigo == "cabecera_desconocida"]
-    assert (aviso.columna, aviso.severidad) == ("Dato libre", Severidad.ADVERTENCIA)
-    assert aviso.detalle == "La cabecera de la posicion 2 no esta en el catalogo"
+    assert ignoradas == {1: "Dato libre"}
+    assert [i for i in mapeo.incidencias if i.codigo == "cabecera_desconocida"] == []
 
 
-def test_una_columna_que_repite_un_campo_ya_tomado_avisa_como_duplicada() -> None:
+def test_una_columna_que_repite_un_campo_ya_tomado_y_va_a_no_cargar_no_avisa_como_duplicada() -> (
+    None
+):
     cabeceras = ["Pagare", "PAGARE", "Pagare"]
     asignaciones = [
         asignacion(0, "Pagare", "pagare"),
@@ -87,20 +95,44 @@ def test_una_columna_que_repite_un_campo_ya_tomado_avisa_como_duplicada() -> Non
 
     mapeo, _, _ = mapeo_desde_asignaciones(cabeceras, asignaciones)
 
-    assert [i.codigo for i in mapeo.incidencias if i.codigo.startswith("cabecera_")] == [
-        "cabecera_duplicada"
-    ]
+    assert [i.codigo for i in mapeo.incidencias if i.codigo.startswith("cabecera_")] == []
 
 
-def test_faltar_el_pagare_es_un_error_y_los_demas_campos_una_advertencia() -> None:
+def test_faltar_el_pagare_es_un_error_y_los_demas_campos_una_sola_advertencia_de_resumen() -> None:
     mapeo, _, _ = mapeo_desde_asignaciones(["Titular"], [asignacion(0, "Titular", "titular")])
 
-    severidades = {
-        i.columna: i.severidad for i in mapeo.incidencias if i.codigo == "columna_faltante"
-    }
-    assert severidades["pagare"] is Severidad.ERROR
-    assert severidades["region"] is Severidad.ADVERTENCIA
+    faltantes = [i for i in mapeo.incidencias if i.codigo == "columna_faltante"]
+    assert [(i.columna, i.severidad) for i in faltantes] == [("pagare", Severidad.ERROR)]
+    [resumen] = [i for i in mapeo.incidencias if i.codigo == "columnas_opcionales_ausentes"]
+    opcionales = [c.nombre for c in mapeo.faltantes if not c.requerida]
+    # La lista va en `columna` (la pantalla reemplaza el detalle por el texto traducido), en el
+    # orden del catalogo; el detalle en espanol queda de respaldo.
+    assert (resumen.fila, resumen.columna, resumen.severidad) == (
+        None,
+        ", ".join(opcionales),
+        Severidad.ADVERTENCIA,
+    )
+    assert opcionales and opcionales == [
+        c.nombre for c in CATALOGO_VENCIDA if c.nombre in opcionales
+    ]
+    assert resumen.detalle.startswith(f"{len(opcionales)} columnas opcionales")
+    assert all(nombre in resumen.detalle for nombre in opcionales)
+    assert "titular" not in resumen.detalle  # el que se asigno no esta ausente
     assert mapeo.bloqueante
+    assert {c.nombre for c in mapeo.faltantes} >= {"pagare", "region"}  # `formato.mapeo` igual
+
+
+def test_si_no_falta_ningun_opcional_no_hay_advertencia_de_resumen() -> None:
+    todos = list(CATALOGO_VENCIDA)
+    cabeceras = [f"col{i}" for i in range(len(todos))]
+    asignaciones = [
+        asignacion(i, c, col.nombre)
+        for i, (c, col) in enumerate(zip(cabeceras, todos, strict=True))
+    ]
+
+    mapeo, _, _ = mapeo_desde_asignaciones(cabeceras, asignaciones)
+
+    assert [i for i in mapeo.incidencias if i.codigo.startswith("columna")] == []
 
 
 @pytest.mark.parametrize(

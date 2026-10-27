@@ -13,6 +13,8 @@ from app.core.entities.mapeador import CampoDestino
 
 # Un parecido solo se sugiere si supera este umbral (RF-32: una constante, en un solo lugar).
 UMBRAL_PARECIDO = 0.75
+# Palabras que no distinguen un campo de otro: no cuentan en el solapamiento de palabras.
+PALABRAS_VACIAS = frozenset({"de", "del", "la", "las", "el", "los", "y"})
 # Si los dos mejores candidatos difieren en menos que esto, no se sugiere ninguno (RF-58).
 DIFERENCIA_DE_EMPATE = 0.02
 
@@ -79,14 +81,26 @@ def candidatos_de_similitud(campo: CampoDestino) -> tuple[str, ...]:
     )
 
 
+def _palabras(texto: str) -> set[str]:
+    return set(texto.split()) - PALABRAS_VACIAS
+
+
 def similitud_entre(a: str, b: str) -> float:
-    """El mayor entre la razon de `SequenceMatcher` y la proporcion de palabras en comun (Jaccard
-    de las palabras), de 0 a 1."""
+    """El mayor entre la razon de `SequenceMatcher`, la proporcion de palabras en comun (Jaccard) y
+    el coeficiente de solapamiento de las palabras, |A n B| / min(|A|, |B|), de 0 a 1.
+
+    El solapamiento premia al encabezado que CONTIENE el nombre del campo y le suma palabras
+    («numero de pagare» contiene «pagare»), que las otras dos medidas castigan. Las palabras vacias
+    (`PALABRAS_VACIAS`) no cuentan en las palabras en comun.
+    """
     razon = SequenceMatcher(None, a, b).ratio()
     palabras_a, palabras_b = set(a.split()), set(b.split())
     union = palabras_a | palabras_b
     jaccard = len(palabras_a & palabras_b) / len(union) if union else 0.0
-    return max(razon, jaccard)
+    utiles_a, utiles_b = _palabras(a), _palabras(b)
+    menor = min(len(utiles_a), len(utiles_b))
+    solapamiento = len(utiles_a & utiles_b) / menor if menor else 0.0
+    return max(razon, jaccard, solapamiento)
 
 
 def similitud(normalizado: str, campo: CampoDestino) -> float:

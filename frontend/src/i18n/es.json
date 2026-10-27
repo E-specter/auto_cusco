@@ -179,6 +179,7 @@
   "incidencia.cabecera_desconocida": "Cabecera no reconocida; la columna no se catalogó",
   "incidencia.cabecera_duplicada": "La cabecera aparece más de una vez",
   "incidencia.columna_faltante": "Columna esperada ausente del archivo",
+  "incidencia.columnas_opcionales_ausentes": "El archivo no trae estas columnas opcionales: esos campos quedan vacíos en esta versión",
   "incidencia.valor_no_escalar": "El valor era un objeto o una lista; se guardó como texto JSON",
   "incidencia.valor_no_convertible": "El valor no corresponde al tipo del campo adicional; se dejó vacío",
   "incidencia.clave_vacia": "El pagaré está vacío",

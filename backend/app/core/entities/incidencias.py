@@ -19,6 +19,8 @@ CODIGOS_INCIDENCIA: Final[frozenset[str]] = frozenset(
         "cabecera_desconocida",
         "cabecera_duplicada",
         "columna_faltante",
+        # Solo con un mapeo confirmado (RF-60): UNA advertencia con la lista, no una por campo
+        "columnas_opcionales_ausentes",
         # Lectura del archivo (RF-57)
         "valor_no_escalar",
         # Clave del producto

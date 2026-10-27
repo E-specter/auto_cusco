@@ -21,9 +21,9 @@ from app.core.entities.sabana import (
     Severidad,
 )
 from app.core.services.ingesta_sabana.adicionales import CONVERSORES_ADICIONALES
-from app.core.services.ingesta_sabana.catalogo import CATALOGO_VENCIDA, campo_destino
+from app.core.services.ingesta_sabana.catalogo import CATALOGO_VENCIDA
 from app.core.services.ingesta_sabana.reglas import es_vacio
-from app.core.services.mapeador.similitud import coincide, normalizar_cabecera
+from app.core.services.mapeador.similitud import normalizar_cabecera
 
 
 class MapeoGuardadoInvalido(Exception):
@@ -83,46 +83,34 @@ def mapeo_desde_asignaciones(
             origenes[campo] = OrigenAsignacion(asignacion["origen"]).value
     asignados = {columna.nombre for columna in columnas.values()}
 
-    # Los adicionales no se buscan ni se echan en falta: su alias es el encabezado de origen.
+    # Los adicionales no se echan en falta: su alias es el encabezado de origen y nunca son
+    # obligatorios. Una columna en «No cargar» es una decision del usuario (ya queda en
+    # `formato.mapeo.ignoradas`): no genera `cabecera_desconocida` ni `cabecera_duplicada`.
     base = [columna for columna in catalogo if columna.tipo not in CONVERSORES_ADICIONALES]
-    campos = [(columna, campo_destino(columna)) for columna in base]
-    incidencias: list[Incidencia] = []
-    for indice, cabecera in ignoradas.items():
-        candidatas = [c for c, campo in campos if coincide(normalizar_cabecera(cabecera), campo)]
-        if not candidatas:
-            incidencias.append(_incidencia_desconocida(indice, cabecera))
-        elif all(c.nombre in asignados for c in candidatas):
-            incidencias.append(_incidencia_duplicada(indice, cabecera))
-        # Si el usuario dejo sin cargar una columna que si coincidia con un campo libre, es suyo.
     faltantes = [columna for columna in base if columna.nombre not in asignados]
-    for columna in faltantes:
-        severidad = Severidad.ERROR if columna.requerida else Severidad.ADVERTENCIA
+    incidencias: list[Incidencia] = [
+        Incidencia(
+            None, columna.nombre, "columna_faltante", Severidad.ERROR, "Columna esperada ausente"
+        )
+        for columna in faltantes
+        if columna.requerida
+    ]
+    opcionales = [columna.nombre for columna in faltantes if not columna.requerida]
+    if opcionales:
+        # Una sola advertencia de resumen en lugar de una por campo (N-1: se sigue reportando).
         incidencias.append(
             Incidencia(
-                None, columna.nombre, "columna_faltante", severidad, "Columna esperada ausente"
+                None,
+                # La pantalla reemplaza el detalle por el texto traducido: la lista va en `columna`,
+                # la misma celda que muestra el campo de una `columna_faltante`.
+                ", ".join(opcionales),
+                "columnas_opcionales_ausentes",
+                Severidad.ADVERTENCIA,
+                f"{len(opcionales)} columnas opcionales sin columna en el archivo: "
+                + ", ".join(opcionales),
             )
         )
     mapeo = MapeoCabeceras(
         columnas=columnas, desconocidas=ignoradas, faltantes=faltantes, incidencias=incidencias
     )
     return mapeo, origenes, ignoradas
-
-
-def _incidencia_desconocida(indice: int, cabecera: str) -> Incidencia:
-    return Incidencia(
-        None,
-        cabecera,
-        "cabecera_desconocida",
-        Severidad.ADVERTENCIA,
-        f"La cabecera de la posicion {indice + 1} no esta en el catalogo",
-    )
-
-
-def _incidencia_duplicada(indice: int, cabecera: str) -> Incidencia:
-    return Incidencia(
-        None,
-        cabecera,
-        "cabecera_duplicada",
-        Severidad.ADVERTENCIA,
-        f"La cabecera de la posicion {indice + 1} repite una columna ya asignada",
-    )
