@@ -17,11 +17,13 @@ from app.core.services.contextos_texto import RegistroContextos, contexto_carter
 from app.core.services.fecha_envio import VARIABLES_DE_ENVIO
 from app.core.services.plataformas.mowa_mes import speech
 from app.core.services.plataformas.mowa_mes.contexto_texto import contexto_speech
-from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.texto_enriquecido import evaluador
 from tests.test_mowa_mes_speech import ORIGINAL
 
-CARTERA = contexto_cartera()
+CAMPOS_CARTERA = CatalogoCartera().tipos()  # la base: sin campos adicionales
+
+CARTERA = contexto_cartera(CatalogoCartera())
 SPEECH = contexto_speech()
 REGISTRO = RegistroContextos([CARTERA, SPEECH])
 
@@ -55,7 +57,7 @@ def test_un_registro_sin_contextos_no_encuentra_ninguno() -> None:
 
 def test_un_contexto_no_se_registra_dos_veces() -> None:
     with pytest.raises(ValueError, match="cartera"):
-        RegistroContextos([CARTERA, contexto_cartera()])
+        RegistroContextos([CARTERA, contexto_cartera(CatalogoCartera())])
 
 
 def test_un_contexto_nuevo_se_suma_sin_tocar_el_registro_ni_el_nucleo() -> None:

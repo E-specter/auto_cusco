@@ -10,12 +10,12 @@ compartidas. Por eso vive en el nucleo y no en el adaptador HTTP:
 """
 
 from app.core.entities.cartera import ConsultaInvalida, Filtro, Funcion, Indicador, Operador, Orden
-from app.core.services.seleccion_cartera import campos
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 
 SEPARADOR_VALORES = "|"
 
 
-def parsear_filtro(crudo: str) -> Filtro:
+def parsear_filtro(crudo: str, catalogo: CatalogoCartera) -> Filtro:
     partes = crudo.split(":", 2)
     if len(partes) < 2:
         raise ConsultaInvalida(
@@ -31,7 +31,9 @@ def parsear_filtro(crudo: str) -> Filtro:
         ) from exc
     if len(partes) == 2:
         return Filtro(campo=campo, operador=operador)
-    valores = tuple(campos.convertir(campo, valor) for valor in partes[2].split(SEPARADOR_VALORES))
+    valores = tuple(
+        catalogo.convertir(campo, valor) for valor in partes[2].split(SEPARADOR_VALORES)
+    )
     return Filtro(campo=campo, operador=operador, valores=valores)
 
 

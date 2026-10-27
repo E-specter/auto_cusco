@@ -39,13 +39,26 @@ from app.core.entities.cartera import (
     Segmentacion,
     SinVersionVigente,
 )
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.seleccion_cartera.servicio import CANTIDAD_MAXIMA, ConsultaCarteraService
 
 router = APIRouter(prefix="/cartera", tags=["cartera"])
 
 
+def crear_catalogo_cartera() -> CatalogoCartera:
+    """El catalogo de campos de la cartera. Solo la base hasta que llegue la persistencia de los
+    campos adicionales (T-CA-B2), que le pasa su repositorio."""
+    return CatalogoCartera()
+
+
+def obtener_catalogo_cartera() -> CatalogoCartera:
+    """Dependencia de FastAPI: el catalogo con el que se leen los filtros de la peticion."""
+    return crear_catalogo_cartera()
+
+
 def crear_servicio_cartera() -> ConsultaCarteraService:
-    return ConsultaCarteraService(RepositorioCarteraPostgres(get_engine()))
+    catalogo = crear_catalogo_cartera()
+    return ConsultaCarteraService(RepositorioCarteraPostgres(get_engine(), catalogo), catalogo)
 
 
 def obtener_servicio_cartera() -> ConsultaCarteraService:
@@ -151,12 +164,13 @@ def consultar_cartera(
     limite: int = Query(default=50, ge=1, le=5000),
     desplazamiento: int = Query(default=0, ge=0),
     servicio: ConsultaCarteraService = Depends(obtener_servicio_cartera),
+    catalogo: CatalogoCartera = Depends(obtener_catalogo_cartera),
 ) -> PaginaRespuesta:
     """Productos de la version vigente de la fecha (RF-04, RF-05, RF-08)."""
     try:
         pagina = servicio.consultar(
             fecha_corte,
-            [parsear_filtro(crudo) for crudo in filtro],
+            [parsear_filtro(crudo, catalogo) for crudo in filtro],
             parsear_orden(orden),
             limite,
             desplazamiento,
@@ -178,12 +192,13 @@ def metricas_cartera(
     filtro: list[str] = Query(default=[]),
     indicador: list[str] = Query(default=[]),
     servicio: ConsultaCarteraService = Depends(obtener_servicio_cartera),
+    catalogo: CatalogoCartera = Depends(obtener_catalogo_cartera),
 ) -> MetricasRespuesta:
     """Capital, cuentas, segmentos y cuotas de la seleccion (RF-26), mas RF-27."""
     try:
         metricas = servicio.metricas(
             fecha_corte,
-            [parsear_filtro(crudo) for crudo in filtro],
+            [parsear_filtro(crudo, catalogo) for crudo in filtro],
             [parsear_indicador(crudo) for crudo in indicador],
         )
     except (ConsultaInvalida, SinVersionVigente) as exc:
@@ -201,11 +216,12 @@ def segmentar_cartera(
     campo: str,
     filtro: list[str] = Query(default=[]),
     servicio: ConsultaCarteraService = Depends(obtener_servicio_cartera),
+    catalogo: CatalogoCartera = Depends(obtener_catalogo_cartera),
 ) -> SegmentacionRespuesta:
     """Cuentas y capital por cada valor de un atributo (RF-06)."""
     try:
         segmentacion = servicio.segmentar(
-            fecha_corte, campo, [parsear_filtro(crudo) for crudo in filtro]
+            fecha_corte, campo, [parsear_filtro(crudo, catalogo) for crudo in filtro]
         )
     except (ConsultaInvalida, SinVersionVigente) as exc:
         raise traducir_errores(exc) from exc
@@ -230,6 +246,7 @@ def resumir_cartera(
         default=None, description="Campo por el que segmentar los dos bloques"
     ),
     servicio: ConsultaCarteraService = Depends(obtener_servicio_cartera),
+    catalogo: CatalogoCartera = Depends(obtener_catalogo_cartera),
 ) -> ResumenRespuesta:
     """Metricas del universo filtrado y de sus primeros n, lado a lado (RF-08, RF-26 a RF-28).
 
@@ -239,7 +256,7 @@ def resumir_cartera(
     try:
         resumen = servicio.resumen(
             fecha_corte,
-            [parsear_filtro(crudo) for crudo in filtro],
+            [parsear_filtro(crudo, catalogo) for crudo in filtro],
             parsear_orden(orden),
             cantidad,
             [parsear_indicador(crudo) for crudo in indicador],

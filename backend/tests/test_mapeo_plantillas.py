@@ -7,7 +7,9 @@ import pytest
 
 from app.core.entities.mapeo import PlantillaInvalida
 from app.core.services.mapeo_campos import plantillas
-from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
+
+CAMPOS_CARTERA = CatalogoCartera().tipos()  # la base: sin campos adicionales
 
 DISPONIBLES = tuple(CAMPOS_CARTERA)
 

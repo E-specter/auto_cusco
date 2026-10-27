@@ -28,7 +28,7 @@ from app.core.services.fecha_envio import (
     hoy_en_lima,
 )
 from app.core.services.mapeo_campos.generador import GeneradorCargas
-from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.seleccion_cartera.recorrido import SeleccionPaginada
 from app.core.services.seleccion_cartera.servicio import (
     CANTIDAD_MAXIMA,
@@ -79,6 +79,11 @@ class GeneracionCargasService:
         self._consulta = consulta
         self._hoy = hoy
 
+    @property
+    def catalogo(self) -> CatalogoCartera:
+        """El catalogo de campos con el que se arman filtros y columnas."""
+        return self._consulta.catalogo
+
     def generar(
         self,
         fecha_corte: date,
@@ -98,7 +103,7 @@ class GeneracionCargasService:
         envio = EnvioDeCarga.de(fecha_corte, fecha_envio, self._hoy)
         # Compilar antes de consultar: una plantilla mal escrita se rechaza sin
         # haber tocado la base de datos.
-        variables = {**CAMPOS_CARTERA, **VARIABLES_DE_ENVIO}
+        variables = {**self._consulta.catalogo.tipos(), **VARIABLES_DE_ENVIO}
         generador = GeneradorCargas(definicion, variables, envio.constantes(variables))
         seleccion = SeleccionPaginada(self._consulta, fecha_corte, filtros, orden, cantidad)
         # Los dias ajustados se calculan por producto, y solo si la definicion los usa.

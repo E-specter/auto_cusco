@@ -11,12 +11,15 @@ from fastapi.testclient import TestClient
 from app.api.cartera import obtener_servicio_cartera
 from app.core.entities.cartera import PaginaCartera, SinVersionVigente
 from app.core.entities.texto_enriquecido import CodigoTexto
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.main import app
 
 CORTE = "2026-09-10"
 
 
 class CarteraFalsa:
+    catalogo = CatalogoCartera()  # lo piden quienes parsean filtros o arman columnas
+
     def __init__(self, filas: tuple[dict, ...] = (), error: Exception | None = None) -> None:
         self.filas = filas
         self.error = error

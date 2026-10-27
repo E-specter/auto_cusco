@@ -47,6 +47,7 @@ from app.core.services.plataformas.mowa_mes.campana import (
 )
 from app.core.services.plataformas.mowa_mes.reportes import ReportesMowaMesService
 from app.core.services.seleccion_cartera import expresiones
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
 from app.core.services.texto_enriquecido.gsm7 import a_gsm7
 from tests.test_gestiones_digitales import PROCEDENCIAS, SUPERVISORES, RepositorioSupervisionFalso
@@ -563,16 +564,16 @@ def test_la_cantidad_recorta_la_seleccion() -> None:
 
 def test_descripcion_sugerida_y_propia() -> None:
     filtros = [
-        expresiones.parsear_filtro("dias_atraso:entre:9|90"),
-        expresiones.parsear_filtro("saldo_capital_pendiente:mayor:5000"),
+        expresiones.parsear_filtro("dias_atraso:entre:9|90", CatalogoCartera()),
+        expresiones.parsear_filtro("saldo_capital_pendiente:mayor:5000", CatalogoCartera()),
     ]
     servicio, _, _ = armar_servicio([producto(1)])
 
-    sugerida = descripcion_sugerida(filtros)
+    sugerida = descripcion_sugerida(filtros, CatalogoCartera())
     propia = servicio.previsualizar(peticion(descripcion="  Campana sintetica "))
 
     assert sugerida == "CajaCusco 9 <= dias atraso <= 90, saldo capital pendiente > 5000"
-    assert descripcion_sugerida([]) == "CajaCusco"
+    assert descripcion_sugerida([], CatalogoCartera()) == "CajaCusco"
     assert propia.descripcion == "Campana sintetica"
 
 

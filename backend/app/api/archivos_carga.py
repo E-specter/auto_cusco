@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 
 from app.adapters.output import exportadores
 from app.adapters.output.exportadores.exportador_xlsx import LARGO_MAXIMO_HOJA
-from app.api.cartera import obtener_servicio_cartera
+from app.api.cartera import obtener_catalogo_cartera, obtener_servicio_cartera
 from app.api.consultas import parsear_filtro, parsear_orden, texto_si_es_monto
 from app.api.definiciones_columnas import obtener_servicio_definiciones
 from app.api.errores import ErrorConCodigo, respuestas_de_error_con_codigo
@@ -65,6 +65,7 @@ from app.core.services.generacion_cargas.servicio import (
     GeneracionCargasService,
     ResultadoGeneracion,
 )
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
 
 router = APIRouter(prefix="/archivos-carga", tags=["archivos de carga"])
@@ -318,6 +319,7 @@ def _error(exc: Exception) -> ErrorConCodigo:
 
 def _generar(
     servicio: GeneracionCargasService,
+    catalogo: CatalogoCartera,
     peticion: PeticionGeneracion,
     cantidad: int,
     definicion: DefinicionCarga,
@@ -326,7 +328,7 @@ def _generar(
         return servicio.generar(
             peticion.fecha_corte,
             definicion,
-            [parsear_filtro(crudo) for crudo in peticion.filtros],
+            [parsear_filtro(crudo, catalogo) for crudo in peticion.filtros],
             parsear_orden(peticion.orden),
             cantidad,
             peticion.fecha_envio,
@@ -362,6 +364,7 @@ def listar_formatos() -> list[FormatoRespuesta]:
 def previsualizar(
     peticion: PeticionGeneracion,
     servicio: GeneracionCargasService = Depends(obtener_servicio_generacion),
+    catalogo: CatalogoCartera = Depends(obtener_catalogo_cartera),
     definiciones: DefinicionesColumnasService = Depends(obtener_servicio_definiciones),
 ) -> PrevisualizacionRespuesta:
     """Primeras filas y errores de la carga, sin escribir el archivo.
@@ -371,7 +374,7 @@ def previsualizar(
     """
     muestra = min(peticion.cantidad, FILAS_DE_MUESTRA)
     definicion, _ = _resolver_definicion(peticion, definiciones)
-    resultado = _generar(servicio, peticion, muestra, definicion)
+    resultado = _generar(servicio, catalogo, peticion, muestra, definicion)
     tabla = resultado.tabla
     return PrevisualizacionRespuesta(
         nombre_archivo=exportadores.nombre_de_archivo(tabla.nombre, peticion.formato),
@@ -430,6 +433,7 @@ def _respuesta_de_descarga() -> dict[int | str, dict[str, Any]]:
 def generar_archivo(
     peticion: PeticionGeneracion,
     servicio: GeneracionCargasService = Depends(obtener_servicio_generacion),
+    catalogo: CatalogoCartera = Depends(obtener_catalogo_cartera),
     definiciones: DefinicionesColumnasService = Depends(obtener_servicio_definiciones),
 ) -> Response:
     """Genera la carga completa y devuelve el archivo (RF-09, RF-13, RF-15).
@@ -440,7 +444,7 @@ def generar_archivo(
     (`usada_en`): la previsualizacion no la marca.
     """
     definicion, guardada = _resolver_definicion(peticion, definiciones)
-    resultado = _generar(servicio, peticion, peticion.cantidad, definicion)
+    resultado = _generar(servicio, catalogo, peticion, peticion.cantidad, definicion)
     try:
         archivo = exportadores.exportar(
             resultado.tabla,

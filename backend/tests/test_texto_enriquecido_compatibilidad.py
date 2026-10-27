@@ -19,9 +19,11 @@ from app.core.entities.cartera import TipoDato
 from app.core.entities.mapeo import PlantillaInvalida
 from app.core.entities.texto_enriquecido import ExpresionInvalida
 from app.core.services.mapeo_campos import plantillas
-from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.texto_enriquecido import evaluador
 from app.core.services.texto_enriquecido.tipos import variables_desde_campos
+
+CAMPOS_CARTERA = CatalogoCartera().tipos()  # la base: sin campos adicionales
 
 CARPETA = Path(__file__).resolve().parent
 ARCHIVOS = (

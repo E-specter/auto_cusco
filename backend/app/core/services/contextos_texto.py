@@ -20,7 +20,7 @@ from app.core.entities.contexto_texto import (
 from app.core.entities.segmentacion import TABLA_RANGOS_POR_DEFECTO, VARIABLE_DIAS_AJUSTADOS
 from app.core.entities.texto_enriquecido import TipoValor
 from app.core.services.fecha_envio import DIAS_AJUSTADOS, FECHA_ENVIO, VARIABLES_DE_ENVIO
-from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 
 __all__ = ["ContextoDesconocido", "RegistroContextos", "contexto_cartera"]
 
@@ -63,10 +63,11 @@ def _tipo(valor: Any) -> TipoValor:
     return TipoValor(getattr(valor, "value", valor))
 
 
-def contexto_cartera() -> ContextoTexto:
+def contexto_cartera(catalogo: CatalogoCartera) -> ContextoTexto:
+    # Los archivados tambien: lo que ya los usa tiene que seguir compilando (RF-65).
     variables = tuple(
         VariableContexto(nombre, _tipo(tipo), None, ORIGEN_CARTERA)
-        for nombre, tipo in CAMPOS_CARTERA.items()
+        for nombre, tipo in catalogo.tipos().items()
     ) + tuple(
         VariableContexto(nombre, tipo, _CLAVES_DE_ENVIO[nombre], ORIGEN_CARTERA)
         for nombre, tipo in VARIABLES_DE_ENVIO.items()

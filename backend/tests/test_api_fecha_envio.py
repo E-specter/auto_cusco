@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from app.api.cartera import obtener_servicio_cartera
 from app.core.entities.cartera import PaginaCartera
 from app.core.services import fecha_envio as modulo
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.main import app
 
 CORTE = "2026-09-10"
@@ -25,6 +26,8 @@ def hoy_fijo(monkeypatch):
 
 
 class Cartera:
+    catalogo = CatalogoCartera()  # lo piden quienes parsean filtros o arman columnas
+
     def __init__(self) -> None:
         self.llamadas = 0
 

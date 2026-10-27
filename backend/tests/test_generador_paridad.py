@@ -11,7 +11,7 @@ import pytest
 from app.core.entities.mapeo import DefinicionCarga, PlantillaInvalida, ValorNoGenerable
 from app.core.services.mapeo_campos import formatos, plantillas
 from app.core.services.mapeo_campos.generador import CargaGenerada, GeneradorCargas
-from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from tests.paridad_generador_datos import (
     CAMPOS_DISPONIBLES,
     DEFINICIONES,
@@ -26,6 +26,8 @@ from tests.paridad_generador_datos import (
 # se recalculo con el generador de main sin tocarlo y se comprobo que devolver los telefonos viejos
 # a la matriz serializada da exactamente la huella anterior,
 # 882908f222530cfffda6443cbe5081d7d043b42cf0414b590bcd4b1b34e2ca50.)
+CAMPOS_CARTERA = CatalogoCartera().tipos()  # la base: sin campos adicionales
+
 HUELLA_CONGELADA = "b4b61b10e030cce8e8be65b43da579f8385c0d1d13f4f5f5b991180e541fe4b2"
 
 

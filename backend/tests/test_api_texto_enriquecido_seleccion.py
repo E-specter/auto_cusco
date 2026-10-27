@@ -18,6 +18,7 @@ from app.core.entities.selecciones import (
     SeleccionNoEncontrada,
     SeleccionRevisada,
 )
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.main import app
 
 CORTE = "2026-09-10"
@@ -35,6 +36,8 @@ def _producto(i: int) -> dict:
 
 
 class CarteraFalsa:
+    catalogo = CatalogoCartera()  # lo piden quienes parsean filtros o arman columnas
+
     def __init__(self, total: int = 8, error: Exception | None = None) -> None:
         self.total = total
         self.error = error

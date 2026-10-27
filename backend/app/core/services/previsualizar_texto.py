@@ -400,7 +400,7 @@ class PrevisualizacionTextoService:
         recorrido = SeleccionPaginada(
             self._cartera,
             muestra.fecha_corte,
-            [expresiones.parsear_filtro(crudo) for crudo in filtros],
+            [expresiones.parsear_filtro(crudo, self._cartera.catalogo) for crudo in filtros],
             expresiones.parsear_orden(orden),
             cantidad,
         )

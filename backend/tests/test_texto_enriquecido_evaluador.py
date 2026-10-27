@@ -18,9 +18,11 @@ from app.core.entities.texto_enriquecido import (
     NodoVariable,
     TipoValor,
 )
-from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.texto_enriquecido import evaluador
 from app.core.services.texto_enriquecido.tipos import tipo_de_valor, variables_desde_campos
+
+CAMPOS_CARTERA = CatalogoCartera().tipos()  # la base: sin campos adicionales
 
 T, N, F, B = TipoValor.TEXTO, TipoValor.NUMERO, TipoValor.FECHA, TipoValor.BOOLEANO
 VARIABLES = {"titular": T, "monto": N, "vence": F, "activo": B, "dias": N, "telefono": T}

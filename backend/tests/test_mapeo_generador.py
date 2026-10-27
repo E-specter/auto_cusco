@@ -13,7 +13,9 @@ from app.core.entities.mapeo import (
     TipoSalida,
 )
 from app.core.services.mapeo_campos.generador import GeneradorCargas
-from app.core.services.seleccion_cartera.campos import CAMPOS_CARTERA
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
+
+CAMPOS_CARTERA = CatalogoCartera().tipos()  # la base: sin campos adicionales
 
 DISPONIBLES = tuple(CAMPOS_CARTERA)
 

@@ -13,6 +13,7 @@ from app.core.entities.selecciones import (
     SeleccionInvalida,
     SeleccionNoEncontrada,
 )
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.seleccion_cartera.servicio import CANTIDAD_MAXIMA
 from app.core.services.selecciones.servicio import SeleccionesService, problemas_de
 
@@ -74,7 +75,7 @@ def _servicio():
 
 
 def test_una_seleccion_bien_armada_no_tiene_problemas() -> None:
-    assert problemas_de(VALIDA) == ()
+    assert problemas_de(VALIDA, CatalogoCartera()) == ()
 
 
 @pytest.mark.parametrize(
@@ -92,7 +93,7 @@ def test_una_seleccion_bien_armada_no_tiene_problemas() -> None:
     ],
 )
 def test_cada_parte_que_no_aplica_se_marca(cambio, parte) -> None:
-    problemas = problemas_de(replace(VALIDA, **cambio))
+    problemas = problemas_de(replace(VALIDA, **cambio), CatalogoCartera())
 
     assert [problema.parte for problema in problemas] == [parte]
 

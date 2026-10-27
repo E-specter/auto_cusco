@@ -38,6 +38,7 @@ from app.core.services.previsualizar_texto import (
     MuestraProductoReal,
     PrevisualizacionTextoService,
 )
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
 
 CORTE = date(2026, 9, 10)
@@ -350,7 +351,7 @@ class _Cartera:
 
 
 def _previsualizador(cartera=None, hoy: date = HOY) -> PrevisualizacionTextoService:
-    contextos = RegistroContextos([contexto_cartera(), contexto_speech()])
+    contextos = RegistroContextos([contexto_cartera(CatalogoCartera()), contexto_speech()])
     return PrevisualizacionTextoService(contextos, cartera or _Cartera(), hoy=_reloj(hoy))
 
 

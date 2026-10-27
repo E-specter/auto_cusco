@@ -17,11 +17,12 @@ from app.core.entities.selecciones import (
     SeleccionRevisada,
 )
 from app.core.ports.repositorio_selecciones_port import RepositorioSeleccionesPort
-from app.core.services.seleccion_cartera import campos, expresiones
+from app.core.services.seleccion_cartera import expresiones
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.seleccion_cartera.servicio import CANTIDAD_MAXIMA
 
 
-def problemas_de(datos: DatosSeleccion) -> tuple[ProblemaSeleccion, ...]:
+def problemas_de(datos: DatosSeleccion, catalogo: CatalogoCartera) -> tuple[ProblemaSeleccion, ...]:
     """Partes de la seleccion que no aplican sobre el catalogo de campos actual."""
     problemas: list[ProblemaSeleccion] = []
     if not 1 <= len(datos.nombre.strip()) <= LARGO_MAXIMO_NOMBRE:
@@ -34,12 +35,12 @@ def problemas_de(datos: DatosSeleccion) -> tuple[ProblemaSeleccion, ...]:
         )
     for crudo in datos.filtros:
         try:
-            campos.validar_filtro(expresiones.parsear_filtro(crudo))
+            catalogo.validar_filtro(expresiones.parsear_filtro(crudo, catalogo))
         except ConsultaInvalida as exc:
             problemas.append(ProblemaSeleccion(ParteSeleccion.FILTRO, crudo, str(exc)))
     if datos.orden:
         try:
-            campos.validar_orden(expresiones.parsear_orden(datos.orden))
+            catalogo.validar_orden(expresiones.parsear_orden(datos.orden))
         except ConsultaInvalida as exc:
             problemas.append(ProblemaSeleccion(ParteSeleccion.ORDEN, datos.orden, str(exc)))
     if datos.cantidad is not None and not 1 <= datos.cantidad <= CANTIDAD_MAXIMA:
@@ -54,7 +55,7 @@ def problemas_de(datos: DatosSeleccion) -> tuple[ProblemaSeleccion, ...]:
     for crudo in datos.indicadores:
         try:
             indicador = expresiones.parsear_indicador(crudo)
-            campos.validar_indicador(indicador)
+            catalogo.validar_indicador(indicador)
         except ConsultaInvalida as exc:
             problemas.append(ProblemaSeleccion(ParteSeleccion.INDICADOR, crudo, str(exc)))
             continue
@@ -82,8 +83,11 @@ def _limpiar(datos: DatosSeleccion) -> DatosSeleccion:
 
 
 class SeleccionesService:
-    def __init__(self, repositorio: RepositorioSeleccionesPort) -> None:
+    def __init__(
+        self, repositorio: RepositorioSeleccionesPort, catalogo: CatalogoCartera | None = None
+    ) -> None:
         self._repositorio = repositorio
+        self._catalogo = catalogo or CatalogoCartera()
 
     def listar(self) -> list[SeleccionRevisada]:
         return [self._revisada(seleccion) for seleccion in self._repositorio.listar()]
@@ -96,7 +100,7 @@ class SeleccionesService:
 
     def revisar(self, datos: DatosSeleccion) -> tuple[ProblemaSeleccion, ...]:
         """Que partes no aplican, sin guardar nada."""
-        return problemas_de(_limpiar(datos))
+        return problemas_de(_limpiar(datos), self._catalogo)
 
     def crear(self, datos: DatosSeleccion) -> SeleccionRevisada:
         return self._revisada(self._repositorio.crear(self._validos(datos)))
@@ -111,14 +115,13 @@ class SeleccionesService:
         if not self._repositorio.eliminar(seleccion_id):
             raise SeleccionNoEncontrada(seleccion_id)
 
-    @staticmethod
-    def _validos(datos: DatosSeleccion) -> DatosSeleccion:
+    def _validos(self, datos: DatosSeleccion) -> DatosSeleccion:
         limpios = _limpiar(datos)
-        problemas = problemas_de(limpios)
+        problemas = problemas_de(limpios, self._catalogo)
         if problemas:
             raise SeleccionInvalida(problemas)
         return limpios
 
-    @staticmethod
-    def _revisada(seleccion: SeleccionGuardada) -> SeleccionRevisada:
-        return SeleccionRevisada(seleccion=seleccion, problemas=problemas_de(seleccion.datos))
+    def _revisada(self, seleccion: SeleccionGuardada) -> SeleccionRevisada:
+        problemas = problemas_de(seleccion.datos, self._catalogo)
+        return SeleccionRevisada(seleccion=seleccion, problemas=problemas)

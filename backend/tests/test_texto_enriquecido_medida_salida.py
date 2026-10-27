@@ -27,6 +27,7 @@ from app.core.services.contextos_texto import contexto_cartera
 from app.core.services.mapeo_campos.generador import GeneradorCargas
 from app.core.services.plataformas.mowa_mes import speech
 from app.core.services.plataformas.mowa_mes.contexto_texto import NOMBRE, contexto_speech
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.texto_enriquecido.gsm7 import a_gsm7, largo_gsm7
 from app.core.services.texto_enriquecido.serializacion import expresion_desde_dict
 from app.main import app
@@ -243,7 +244,7 @@ def test_el_editor_y_la_tabla_miden_igual_y_avisan_igual_en_los_150_y_los_160(
 
 
 def test_solo_el_speech_declara_medida_y_salida() -> None:
-    cartera, mowa = contexto_cartera(), contexto_speech()
+    cartera, mowa = contexto_cartera(CatalogoCartera()), contexto_speech()
 
     assert cartera.medida is len
     assert cartera.salida(FIJO) == FIJO

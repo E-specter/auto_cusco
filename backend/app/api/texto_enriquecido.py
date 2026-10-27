@@ -25,7 +25,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.api.cartera import obtener_servicio_cartera
+from app.api.cartera import crear_catalogo_cartera, obtener_servicio_cartera
 from app.api.errores import DetalleError, ErrorConCodigo
 from app.api.fecha_envio import DetalleErrorFechaEnvio, error_de_fecha_envio
 from app.api.respuestas import ModeloRespuesta
@@ -73,7 +73,7 @@ def obtener_registro_contextos() -> RegistroContextos:
     """Los contextos de la aplicacion: una linea por contexto."""
     return RegistroContextos(
         [
-            contexto_cartera(),
+            contexto_cartera(crear_catalogo_cartera()),
             contexto_speech(),
         ]
     )

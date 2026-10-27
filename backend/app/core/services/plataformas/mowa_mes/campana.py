@@ -69,6 +69,7 @@ from app.core.services.plataformas.mowa_mes import (
 from app.core.services.plataformas.mowa_mes.division import EscritorArchivo
 from app.core.services.plataformas.mowa_mes.segmentos import ProgramacionInvalida
 from app.core.services.seleccion_cartera import expresiones
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.seleccion_cartera.recorrido import SeleccionPaginada
 from app.core.services.seleccion_cartera.servicio import CANTIDAD_MAXIMA, ConsultaCarteraService
 from app.core.services.texto_enriquecido.gsm7 import largo_gsm7
@@ -129,8 +130,16 @@ def _texto(valor: Any) -> str:
     return valor.isoformat() if isinstance(valor, date) else str(valor)
 
 
-def resumen_filtro(filtro: Filtro) -> str:
-    campo = filtro.campo.replace("_", " ")
+def resumen_filtro(filtro: Filtro, catalogo: CatalogoCartera) -> str:
+    """El filtro en una frase. Un campo adicional sale con su nombre legible (el que el usuario
+    puede cambiar); un campo base, como siempre: su nombre con espacios."""
+    campos = catalogo.campos()
+    adicional = campos.get(filtro.campo)
+    campo = (
+        adicional.etiqueta
+        if adicional is not None and adicional.adicional and adicional.etiqueta
+        else filtro.campo.replace("_", " ")
+    )
     valores = [_texto(v) for v in filtro.valores]
     if filtro.operador in _SIMBOLOS:
         return f"{campo} {_SIMBOLOS[filtro.operador]} {valores[0]}"
@@ -147,14 +156,14 @@ def resumen_filtro(filtro: Filtro) -> str:
     return f"con {campo}"
 
 
-def descripcion_sugerida(filtros: Sequence[Filtro]) -> str:
+def descripcion_sugerida(filtros: Sequence[Filtro], catalogo: CatalogoCartera) -> str:
     """RF-MM-04: la cartera y un resumen de los filtros, que el usuario puede editar.
 
     Cabe en `LARGO_MAXIMO_DESCRIPCION` (unidades UTF-16): si el resumen completo no cabe, sale el
     prefijo con los filtros ENTEROS que quepan desde el principio, cerrado con `...`; y si ni el
     primero cabe, las primeras unidades del texto completo y `...`."""
     # Un valor de filtro de texto puede traer un salto adentro: la descripcion es de una linea.
-    resumenes = [una_linea(resumen_filtro(f)) for f in filtros]
+    resumenes = [una_linea(resumen_filtro(f, catalogo)) for f in filtros]
     completa = f"{PREFIJO_DESCRIPCION} {', '.join(resumenes)}" if resumenes else PREFIJO_DESCRIPCION
     if largo_utf16(completa) <= LARGO_MAXIMO_DESCRIPCION:
         return completa
@@ -278,7 +287,8 @@ class CampanasMowaMesService:
     def armar(self, peticion: PeticionCampana) -> CampanaArmada:
         _validar_opciones(peticion)
         try:
-            filtros = [expresiones.parsear_filtro(crudo) for crudo in peticion.filtros]
+            catalogo = self._consulta.catalogo
+            filtros = [expresiones.parsear_filtro(crudo, catalogo) for crudo in peticion.filtros]
             orden = expresiones.parsear_orden(peticion.orden)
         except ConsultaInvalida as exc:
             raise PeticionCampanaInvalida(str(exc)) from exc
@@ -325,7 +335,7 @@ class CampanasMowaMesService:
             campanas_sin_tarifa=costo_del_mes.campanas_sin_tarifa,
             costo_esta_campana=costo_estimado,
         )
-        sugerida = descripcion_sugerida(filtros)
+        sugerida = descripcion_sugerida(filtros, self._consulta.catalogo)
         descripcion = (peticion.descripcion or "").strip() or sugerida
         previsto = nombre_archivo.nombre_previsto(
             plantilla,

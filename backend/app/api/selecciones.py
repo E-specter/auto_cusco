@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_selecciones_postgres import RepositorioSeleccionesPostgres
+from app.api.cartera import crear_catalogo_cartera
 from app.api.errores import respuestas_de_error
 from app.api.respuestas import ModeloRespuesta
 from app.core.entities.selecciones import (
@@ -38,7 +39,9 @@ router = APIRouter(prefix="/selecciones", tags=["selecciones"])
 
 def obtener_servicio_selecciones() -> SeleccionesService:
     """Dependencia de FastAPI; los tests la sustituyen por un doble de prueba."""
-    return SeleccionesService(RepositorioSeleccionesPostgres(get_engine()))
+    return SeleccionesService(
+        RepositorioSeleccionesPostgres(get_engine()), crear_catalogo_cartera()
+    )
 
 
 class SeleccionEntrada(BaseModel):

@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from app.core.entities.mowa_mes_campana import LARGO_MAXIMO_DESCRIPCION, largo_utf16, una_linea
 from app.core.services.plataformas.mowa_mes.campana import descripcion_sugerida, resumen_filtro
 from app.core.services.seleccion_cartera import expresiones
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.main import app
 from tests.test_api_mowa_mes_campanas import CUERPO, Entorno, _cliente, _crear
 
@@ -171,20 +172,22 @@ def test_el_contrato_dice_que_los_saltos_pasan_a_un_espacio() -> None:
 
 
 def _filtro(texto: str):
-    return expresiones.parsear_filtro(texto)
+    return expresiones.parsear_filtro(texto, CatalogoCartera())
 
 
 def test_un_valor_de_filtro_con_un_salto_da_una_sugerida_de_una_linea() -> None:
     filtro = _filtro(f"titular:contiene:a{LF}b")
 
-    assert f"a{LF}b" in resumen_filtro(filtro)  # el resumen en si todavia lo trae
-    assert descripcion_sugerida([filtro]) == f"{PREFIJO} titular contiene a b"
+    assert f"a{LF}b" in resumen_filtro(
+        filtro, CatalogoCartera()
+    )  # el resumen en si todavia lo trae
+    assert descripcion_sugerida([filtro], CatalogoCartera()) == f"{PREFIJO} titular contiene a b"
 
 
 def test_el_operador_en_con_un_salto_en_un_valor_une_con_barra_sin_salto() -> None:
     filtro = _filtro(f"titular:en:a{CRLF}b|c")
 
-    assert descripcion_sugerida([filtro]) == f"{PREFIJO} titular en a b/c"
+    assert descripcion_sugerida([filtro], CatalogoCartera()) == f"{PREFIJO} titular en a b/c"
 
 
 def test_la_sugerida_con_un_salto_se_previsualiza_y_se_guarda_sin_el() -> None:
@@ -205,9 +208,12 @@ def test_los_100_de_la_sugerida_se_miden_despues_de_cambiar_el_salto() -> None:
     justo = _filtro(f"titular:contiene:{'x' * 70}{CRLF}yy")  # 17 + 70 + 1 + 2 = 90
     uno_mas = _filtro(f"titular:contiene:{'x' * 71}{CRLF}yy")  # 91
 
-    assert descripcion_sugerida([justo]) == f"{PREFIJO} {una_linea(resumen_filtro(justo))}"
-    assert largo_utf16(descripcion_sugerida([justo])) == LARGO_MAXIMO_DESCRIPCION
-    assert descripcion_sugerida([uno_mas]).endswith("...")
+    assert (
+        descripcion_sugerida([justo], CatalogoCartera())
+        == f"{PREFIJO} {una_linea(resumen_filtro(justo, CatalogoCartera()))}"
+    )
+    assert largo_utf16(descripcion_sugerida([justo], CatalogoCartera())) == LARGO_MAXIMO_DESCRIPCION
+    assert descripcion_sugerida([uno_mas], CatalogoCartera()).endswith("...")
 
 
 def test_propiedad_la_sugerida_nunca_lleva_un_salto_y_siempre_cabe() -> None:
@@ -224,7 +230,7 @@ def test_propiedad_la_sugerida_nunca_lleva_un_salto_y_siempre_cabe() -> None:
             for _ in range(azar.randint(0, 5))
         ]
 
-        sugerida = descripcion_sugerida(filtros)
+        sugerida = descripcion_sugerida(filtros, CatalogoCartera())
 
         assert not any(s in sugerida for s in (CR, LF, LS, PS)), repr(sugerida)
         assert largo_utf16(sugerida) <= LARGO_MAXIMO_DESCRIPCION

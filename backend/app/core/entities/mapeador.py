@@ -14,9 +14,11 @@ from enum import StrEnum
 class CampoDestino:
     """Un campo del catalogo.
 
-    `alias` son expresiones regulares sobre el encabezado normalizado (`fullmatch`).
-    `clave_etiqueta` es la clave i18n del nombre legible (`campo.<nombre>`). `tipo` es solo
-    descriptivo.
+    `alias` son expresiones regulares sobre el encabezado normalizado (`fullmatch`), salvo en un
+    campo `adicional` (RF-64): ahi es el encabezado de origen, un texto literal.
+    `clave_etiqueta` es la clave i18n del nombre legible (`campo.<nombre>`); un campo adicional lo
+    escribe el usuario y trae `etiqueta`, su nombre legible literal, que manda sobre la clave.
+    `tipo` es solo descriptivo.
     """
 
     nombre: str
@@ -24,6 +26,8 @@ class CampoDestino:
     tipo: str
     obligatorio: bool
     alias: tuple[str, ...]
+    etiqueta: str | None = None
+    adicional: bool = False
 
 
 @dataclass(frozen=True)

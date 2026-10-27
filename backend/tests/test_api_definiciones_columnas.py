@@ -10,13 +10,16 @@ from app.api.definiciones_columnas import obtener_servicio_definiciones
 from app.core.entities.definiciones_columnas import MAXIMO_COLUMNAS
 from app.core.services.contextos_texto import contexto_cartera
 from app.core.services.definiciones_columnas.servicio import DefinicionesColumnasService
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.main import app
 from tests.definiciones_memoria import RepositorioEnMemoria
 
 
 @pytest.fixture
 def cliente():
-    servicio = DefinicionesColumnasService(RepositorioEnMemoria(), contexto_cartera())
+    servicio = DefinicionesColumnasService(
+        RepositorioEnMemoria(), contexto_cartera(CatalogoCartera())
+    )
     app.dependency_overrides[obtener_servicio_definiciones] = lambda: servicio
     try:
         yield TestClient(app), servicio

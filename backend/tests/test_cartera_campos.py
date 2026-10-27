@@ -15,15 +15,16 @@ from app.core.entities.cartera import (
     Orden,
     TipoDato,
 )
-from app.core.services.seleccion_cartera import campos
+from app.core.services.seleccion_cartera.campos import CAMPOS_BASE, CatalogoCartera
 
 COLUMNAS_TECNICAS = {"carga_id", "numero_fila", "extras"}
+campos = CatalogoCartera()  # la base: sin campos adicionales
 
 
 def test_los_campos_consultables_son_las_columnas_de_la_cartera() -> None:
     columnas = {c.name for c in CargaFila.__table__.columns} - COLUMNAS_TECNICAS
 
-    assert set(campos.CAMPOS_CARTERA) == columnas
+    assert set(CAMPOS_BASE) == columnas
 
 
 @pytest.mark.parametrize(

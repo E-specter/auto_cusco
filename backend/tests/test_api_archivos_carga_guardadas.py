@@ -17,6 +17,7 @@ from app.api.definiciones_columnas import obtener_servicio_definiciones
 from app.core.entities.cartera import PaginaCartera, SinVersionVigente
 from app.core.services.contextos_texto import contexto_cartera
 from app.core.services.definiciones_columnas.servicio import DefinicionesColumnasService
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.main import app
 from tests.definiciones_memoria import RepositorioEnMemoria
 from tests.test_api_archivos_carga import ConsultaFalsa, _definicion_con_formula, _peticion
@@ -27,7 +28,9 @@ FECHA = "2026-09-10"
 @pytest.fixture
 def cliente():
     consulta = ConsultaFalsa()
-    servicio = DefinicionesColumnasService(RepositorioEnMemoria(), contexto_cartera())
+    servicio = DefinicionesColumnasService(
+        RepositorioEnMemoria(), contexto_cartera(CatalogoCartera())
+    )
     app.dependency_overrides[obtener_servicio_cartera] = lambda: consulta
     app.dependency_overrides[obtener_servicio_definiciones] = lambda: servicio
     try:
@@ -315,6 +318,8 @@ def test_una_guardada_con_un_campo_que_ya_no_existe_es_400_sin_marcar_nada(clien
 
 
 class CarteraConDias:
+    catalogo = CatalogoCartera()  # lo piden quienes parsean filtros o arman columnas
+
     """Productos con `dias_atraso`: el segmento sale de ahi (la tabla por defecto llega a 120)."""
 
     def __init__(self, dias: list) -> None:
@@ -342,7 +347,9 @@ class CarteraConDias:
 @pytest.fixture
 def segmentada():
     """Una definicion con segmentacion (excluir lo que no cae en un rango) y su cartera."""
-    servicio = DefinicionesColumnasService(RepositorioEnMemoria(), contexto_cartera())
+    servicio = DefinicionesColumnasService(
+        RepositorioEnMemoria(), contexto_cartera(CatalogoCartera())
+    )
     cartera = CarteraConDias([5, 200, None, 40])  # el 2 y el 3 no caen en ningun segmento
     app.dependency_overrides[obtener_servicio_cartera] = lambda: cartera
     app.dependency_overrides[obtener_servicio_definiciones] = lambda: servicio

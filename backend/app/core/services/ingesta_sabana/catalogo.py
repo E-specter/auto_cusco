@@ -10,6 +10,9 @@ cabecera "Pagare" toma la clave y la segunda ("PAGARE" o "PAGARE2") el
 duplicado.
 """
 
+from collections.abc import Iterable
+
+from app.core.entities.campos_adicionales import CampoAdicional
 from app.core.entities.mapeador import CampoDestino, CatalogoCampos
 from app.core.entities.sabana import ColumnaSabana, TipoCampo
 
@@ -84,8 +87,31 @@ def campo_destino(columna: ColumnaSabana) -> CampoDestino:
     )
 
 
-# El catalogo de la sabana para el mapeador de encabezados (RF-63). Su `id` es la clave de los
-# mapeos recordados: no se cambia.
-CATALOGO_SABANA = CatalogoCampos(
-    "sabana_vencida", tuple(campo_destino(c) for c in CATALOGO_VENCIDA)
-)
+def campo_destino_adicional(campo: CampoAdicional) -> CampoDestino:
+    """Un campo adicional (RF-64) como campo del mapeador: nunca obligatorio, su alias es el
+    encabezado de origen (un texto) y su nombre legible es una etiqueta literal."""
+    return CampoDestino(
+        nombre=campo.nombre,
+        clave_etiqueta=f"campo.{campo.nombre}",
+        tipo=campo.tipo.value,
+        obligatorio=False,
+        alias=(campo.encabezado_origen,),
+        etiqueta=campo.nombre_legible,
+        adicional=True,
+    )
+
+
+def armar_catalogo_sabana(adicionales: Iterable[CampoAdicional] = ()) -> CatalogoCampos:
+    """Los campos base y, despues, los adicionales ACTIVOS (un archivado no se ofrece, RF-65)."""
+    return CatalogoCampos(
+        "sabana_vencida",
+        (
+            *(campo_destino(c) for c in CATALOGO_VENCIDA),
+            *(campo_destino_adicional(c) for c in adicionales if not c.archivado),
+        ),
+    )
+
+
+# El catalogo base de la sabana para el mapeador de encabezados (RF-63). Su `id` es la clave de los
+# mapeos recordados: no se cambia. Con campos adicionales, `armar_catalogo_sabana`.
+CATALOGO_SABANA = armar_catalogo_sabana()

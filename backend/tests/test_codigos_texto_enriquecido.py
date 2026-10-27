@@ -30,6 +30,7 @@ from app.core.entities.texto_enriquecido import (
 )
 from app.core.services.contextos_texto import contexto_cartera
 from app.core.services.definiciones_columnas.servicio import DefinicionesColumnasService
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.texto_enriquecido import evaluador, sintaxis
 from app.main import app
 from tests.definiciones_memoria import RepositorioEnMemoria
@@ -88,7 +89,9 @@ class _SeleccionesVacias:
 def _emitidos_por_la_api() -> set[CodigoTexto]:
     """Lo que solo informa la API del motor (B4a): se pide por HTTP, como lo hace la interfaz."""
     cartera = _CarteraVacia()
-    definiciones = DefinicionesColumnasService(RepositorioEnMemoria(), contexto_cartera())
+    definiciones = DefinicionesColumnasService(
+        RepositorioEnMemoria(), contexto_cartera(CatalogoCartera())
+    )
     app.dependency_overrides[obtener_servicio_cartera] = lambda: cartera
     app.dependency_overrides[obtener_servicio_definiciones] = lambda: definiciones
     app.dependency_overrides[obtener_servicio_selecciones] = lambda: _SeleccionesVacias()

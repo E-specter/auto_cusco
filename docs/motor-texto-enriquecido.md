@@ -385,7 +385,7 @@ Estado: hecha y probada sin base (2026-09-30). Sin cambios en la API ni en `cont
 ### `GeneradorCargas` (`services/mapeo_campos/generador.py`)
 
 - **Cada columna se evalúa con el motor.** Una plantilla se compila a expresión (admite `[@titular | primeros(8)]`) y el tipo de la columna lo sigue aplicando `formatos.convertir`, después del motor: **un solo camino de tipado**. D11: una columna de una sola variable con funciones conserva su valor tipado (una fecha sumada sigue siendo fecha).
-- **Variables.** Recibe un mapa nombre → tipo (`CAMPOS_CARTERA`, o ya `TipoValor`) o solo nombres (se toman como texto: una columna de variable directa sale igual).
+- **Variables.** Recibe un mapa nombre → tipo (`CatalogoCartera.tipos()`, o ya `TipoValor`) o solo nombres (se toman como texto: una columna de variable directa sale igual).
 - **Problemas de fila del motor** (división por cero, variable obligatoria vacía, teléfono inválido…) son un `ErrorGeneracion` con `codigo`, la celda queda vacía y el resto de la carga sigue.
 - **Valor por defecto:** entra cuando todo el resultado queda vacío (no cuando hay un problema), y pasa por el tipo de la columna. Un campo en blanco (`"  "`) no cuenta como vacío (RF-12).
 - **Segmento.** Un segmento está *reconocido* si es un rango de la tabla (criterio calculado) o un valor que alguna columna contempla en sus variantes (criterio por campo). Reconocido: cada columna usa su variante, o su contenido por defecto si no tiene una. No reconocido: con `excluir` la fila **no sale** y queda en `CargaGenerada.exclusiones` con `sin_segmento` y su motivo; con `usar_por_defecto` sale con el contenido por defecto. Los números de fila de errores y exclusiones son los del producto en el pedido, no los de la salida.

@@ -28,9 +28,10 @@ from app.core.services.mapeo_campos.serializacion import (
     definicion_a_dict,
     definicion_desde_dict,
 )
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from tests.definiciones_memoria import RepositorioEnMemoria
 
-CARTERA = contexto_cartera()
+CARTERA = contexto_cartera(CatalogoCartera())
 
 
 def _servicio(contexto=CARTERA) -> tuple[DefinicionesColumnasService, RepositorioEnMemoria]:

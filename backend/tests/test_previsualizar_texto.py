@@ -12,8 +12,9 @@ from app.core.services.previsualizar_texto import (
     MuestraProductoReal,
     PrevisualizacionTextoService,
 )
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 
-CARTERA = contexto_cartera()
+CARTERA = contexto_cartera(CatalogoCartera())
 SPEECH = contexto_speech()
 SERVICIO = PrevisualizacionTextoService(RegistroContextos([CARTERA, SPEECH]))
 

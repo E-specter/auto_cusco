@@ -31,6 +31,10 @@ def normalizar_cabecera(cabecera: str) -> str:
 
 
 def _nombre_como_texto(campo: CampoDestino) -> str:
+    """El nombre del campo como texto para comparar. El de un campo adicional es su nombre legible:
+    su nombre tecnico (`ad_...`) no es algo que un encabezado pueda decir."""
+    if campo.adicional and campo.etiqueta:
+        return normalizar_cabecera(campo.etiqueta)
     return campo.nombre.replace("_", " ")
 
 
@@ -39,31 +43,40 @@ def coincide(normalizado: str, campo: CampoDestino) -> bool:
     con `_` como espacio. Es la unica definicion de «coincide» de la aplicacion."""
     if normalizado == _nombre_como_texto(campo):
         return True
-    return any(re.fullmatch(alias, normalizado) for alias in campo.alias)
+    # El alias de un campo adicional es un texto (su encabezado de origen), no una regex.
+    return any(
+        re.fullmatch(re.escape(alias) if campo.adicional else alias, normalizado)
+        for alias in campo.alias
+    )
 
 
 def _es_literal(alias: str) -> bool:
     return _METACARACTERES.search(alias) is None
 
 
-def alias_legible(alias: str) -> str | None:
+def alias_legible(alias: str, literal: bool = False) -> str | None:
     """El alias como texto para mostrar o buscar, o `None` si no se puede: un alias con
     metacaracteres es una expresion regular, no un texto. Un literal sale con `_` como espacio.
-    Es LA funcion de «alias legible»: la usa la API del catalogo, y tambien los alias de un campo
-    adicional (RF-64, que es el encabezado de origen) pasan por aqui."""
-    return alias.replace("_", " ") if _es_literal(alias) else None
+    `literal=True` es para el alias de un campo adicional (RF-64): es su encabezado de origen y
+    siempre es un texto, aunque lleve un punto o un parentesis.
+    Es LA funcion de «alias legible»: la usa la API del catalogo, tambien para los adicionales."""
+    return alias.replace("_", " ") if literal or _es_literal(alias) else None
 
 
 def alias_legibles(campo: CampoDestino) -> tuple[str, ...]:
     """Los alias de un campo que se pueden mostrar, en el orden del catalogo y sin repetir. Un
     campo sin alias literales da `()`."""
-    return tuple(dict.fromkeys(a for a in map(alias_legible, campo.alias) if a is not None))
+    legibles = (alias_legible(a, campo.adicional) for a in campo.alias)
+    return tuple(dict.fromkeys(a for a in legibles if a is not None))
 
 
 def candidatos_de_similitud(campo: CampoDestino) -> tuple[str, ...]:
     """Los textos contra los que se compara un encabezado: el nombre del campo y sus alias que son
     texto literal. Un alias con metacaracteres de expresion regular no participa."""
-    return (_nombre_como_texto(campo), *(a for a in campo.alias if _es_literal(a)))
+    return (
+        _nombre_como_texto(campo),
+        *(a for a in campo.alias if campo.adicional or _es_literal(a)),
+    )
 
 
 def similitud_entre(a: str, b: str) -> float:

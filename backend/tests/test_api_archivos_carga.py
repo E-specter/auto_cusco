@@ -19,6 +19,7 @@ from app.api.archivos_carga import OpcionesEntrada
 from app.api.cartera import obtener_servicio_cartera
 from app.core.entities.cartera import PaginaCartera, SinVersionVigente
 from app.core.entities.exportacion import OPCIONES_POR_DEFECTO
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.main import app
 
 FECHA = "2026-09-10"
@@ -45,6 +46,8 @@ DEFINICION = {
 
 
 class ConsultaFalsa:
+    catalogo = CatalogoCartera()  # la generacion pide los tipos de los campos al catalogo
+
     def __init__(self, total: int = 2, error: Exception | None = None) -> None:
         self.total = total
         self.error = error

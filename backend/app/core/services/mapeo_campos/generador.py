@@ -102,8 +102,8 @@ class GeneradorCargas:
     """Compila una definicion una vez y la aplica a muchos productos.
 
     `campos_disponibles` son las variables de la fila: un mapa nombre -> tipo (como
-    `CAMPOS_CARTERA`, o ya `TipoValor`) o solo los nombres, que se toman como texto (una columna
-    de variable directa sale igual con cualquiera de los dos).
+    `CatalogoCartera.tipos()`, o ya `TipoValor`) o solo los nombres, que se toman como texto (una
+    columna de variable directa sale igual con cualquiera de los dos).
 
     `constantes` son variables del catalogo con el mismo valor en toda la carga (la fecha de envio,
     RF-55): el motor las pliega al compilar (B7) y el producto no las trae.

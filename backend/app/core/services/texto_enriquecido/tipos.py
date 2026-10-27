@@ -46,7 +46,7 @@ __all__ = [
 
 
 def variables_desde_campos(campos: Mapping[str, TipoDato]) -> dict[str, TipoValor]:
-    """Las variables de un catalogo de campos (`CAMPOS_CARTERA`), con su tipo.
+    """Las variables de un catalogo de campos (`CatalogoCartera.tipos()`), con su tipo.
 
     `TipoDato.BOOLEANO` pasa a `booleano` (D2): incluye los `*_aplica`.
     """

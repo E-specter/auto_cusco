@@ -3,6 +3,13 @@
 Todo se resuelve contra la version vigente de la fecha pedida, uniendo
 `carga_fila` con `carga`. Los filtros llegan validados por el caso de uso y se
 traducen a expresiones de SQLAlchemy, nunca a SQL armado con texto.
+
+Un campo adicional (RF-64 a RF-66) no tiene columna propia: vive en el JSONB `adicionales` de
+`carga_fila` (`{nombre: valor}`, ya normalizado por tipo al ingestar) y se lee como
+`adicionales ->> 'ad_x'` con un CAST segun su tipo (`NUMERIC` o `DATE`; el texto, tal cual). Asi
+filtros, orden, indicadores, segmentacion y las filas que salen (para las columnas de carga) lo
+tratan igual que a un campo base. La columna llega con la migracion de T-CA-B2: hasta entonces solo
+se arma el SQL (probado compilado al dialecto de PostgreSQL, sin base).
 """
 
 from collections.abc import Mapping, Sequence
@@ -10,7 +17,19 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import ColumnElement, Engine, FromClause, Select, func, select
+from sqlalchemy import (
+    ColumnElement,
+    Date,
+    Engine,
+    FromClause,
+    Numeric,
+    Select,
+    cast,
+    column,
+    func,
+    select,
+)
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.adapters.persistence.modelos import Carga, CargaFila
 from app.core.entities.cartera import (
@@ -22,8 +41,10 @@ from app.core.entities.cartera import (
     Operador,
     Orden,
     Recorte,
+    TipoDato,
 )
 from app.core.ports.repositorio_cartera_port import RepositorioCarteraPort
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 
 _FILA = CargaFila.__table__
 _CARGA = Carga.__table__
@@ -36,8 +57,23 @@ CAMPO_SEGMENTO = "segmento_financiero"
 SIN_SEGMENTO = "(sin segmento)"
 
 
-def _condicion(filtro: Filtro) -> ColumnElement[bool]:
-    columna = _COLUMNAS[filtro.campo]
+def _expresion_adicional(nombre: str, tipo: TipoDato) -> ColumnElement:
+    """`adicionales ->> 'ad_x'` con el CAST de su tipo. El formato lo garantiza la ingesta
+    (numero: texto decimal; fecha: ISO), asi que el CAST es seguro."""
+    # La columna la crea la migracion de T-CA-B2; mientras tanto se nombra sin pasar por el modelo.
+    adicionales = _FILA.c.get("adicionales")
+    if adicionales is None:
+        adicionales = column("adicionales", JSONB, _selectable=_FILA)
+    texto = adicionales[nombre].astext
+    if tipo is TipoDato.NUMERO:
+        return cast(texto, Numeric)
+    if tipo is TipoDato.FECHA:
+        return cast(texto, Date)
+    return texto
+
+
+def _condicion(filtro: Filtro, columnas: Mapping[str, ColumnElement]) -> ColumnElement[bool]:
+    columna = columnas[filtro.campo]
     valores = filtro.valores
     match filtro.operador:
         case Operador.IGUAL:
@@ -67,14 +103,16 @@ def _condicion(filtro: Filtro) -> ColumnElement[bool]:
     raise ValueError(f"Operador no soportado: {filtro.operador}")  # pragma: no cover
 
 
-def _ordenar(consulta: Select, orden: Orden | None) -> Select:
+def _ordenar(
+    consulta: Select, orden: Orden | None, columnas: Mapping[str, ColumnElement] = _COLUMNAS
+) -> Select:
     """Orden pedido con los nulos al final y desempate estable por pagare.
 
     Es el mismo para la lista, los primeros n de las metricas y el archivo de
     carga: si difiriera, las metricas de la seleccion describirian otros productos.
     """
     if orden is not None:
-        columna = _COLUMNAS[orden.campo]
+        columna = columnas[orden.campo]
         criterio = columna.desc() if orden.descendente else columna.asc()
         consulta = consulta.order_by(criterio.nulls_last())
     return consulta.order_by(_FILA.c.pagare)
@@ -99,19 +137,38 @@ def _agregado(indicador: Indicador, columnas: Mapping[str, ColumnElement]):
 
 
 class RepositorioCarteraPostgres(RepositorioCarteraPort):
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, engine: Engine, catalogo: CatalogoCartera | None = None) -> None:
         self._engine = engine
+        self._catalogo = catalogo or CatalogoCartera()
 
     @staticmethod
     def _origen():
         return _FILA.join(_CARGA, _CARGA.c.id == _FILA.c.carga_id)
 
-    @staticmethod
-    def _condiciones(fecha_corte: date, filtros: Sequence[Filtro]) -> list[ColumnElement[bool]]:
+    def _adicionales(self) -> dict[str, ColumnElement]:
+        """Los campos adicionales (archivados incluidos: se leen) como expresiones."""
+        return {
+            nombre: _expresion_adicional(nombre, campo.tipo)
+            for nombre, campo in self._catalogo.campos().items()
+            if campo.adicional
+        }
+
+    def _columnas(self) -> dict[str, ColumnElement]:
+        """Cada campo de la cartera por nombre: la columna del base o la expresion del adicional."""
+        return {**_COLUMNAS, **self._adicionales()}
+
+    def _columnas_producto(self) -> list[ColumnElement]:
+        """Lo que sale de un producto: sus columnas y, rotulados con su nombre, los adicionales."""
+        return [*_COLUMNAS_PRODUCTO, *(e.label(n) for n, e in self._adicionales().items())]
+
+    def _condiciones(
+        self, fecha_corte: date, filtros: Sequence[Filtro]
+    ) -> list[ColumnElement[bool]]:
+        columnas = self._columnas()
         return [
             _CARGA.c.fecha_corte == fecha_corte,
             _CARGA.c.vigente,
-            *(_condicion(filtro) for filtro in filtros),
+            *(_condicion(filtro, columnas) for filtro in filtros),
         ]
 
     def hay_version_vigente(self, fecha_corte: date) -> bool:
@@ -131,15 +188,29 @@ class RepositorioCarteraPostgres(RepositorioCarteraPort):
         limite: int,
         desplazamiento: int,
     ) -> tuple[int, list[dict[str, Any]]]:
-        condiciones = self._condiciones(fecha_corte, filtros)
-        consulta = select(*_COLUMNAS_PRODUCTO).select_from(self._origen()).where(*condiciones)
-        consulta = _ordenar(consulta, orden).limit(limite).offset(desplazamiento)
+        cuenta, consulta = self._sentencias_de_consultar(
+            fecha_corte, filtros, orden, limite, desplazamiento
+        )
         with self._engine.connect() as cx:
-            total = cx.execute(
-                select(func.count()).select_from(self._origen()).where(*condiciones)
-            ).scalar_one()
+            total = cx.execute(cuenta).scalar_one()
             filas = [dict(fila._mapping) for fila in cx.execute(consulta)]
         return total, filas
+
+    def _sentencias_de_consultar(
+        self,
+        fecha_corte: date,
+        filtros: Sequence[Filtro],
+        orden: Orden | None,
+        limite: int,
+        desplazamiento: int,
+    ) -> tuple[Select, Select]:
+        condiciones = self._condiciones(fecha_corte, filtros)
+        consulta = (
+            select(*self._columnas_producto()).select_from(self._origen()).where(*condiciones)
+        )
+        consulta = _ordenar(consulta, orden, self._columnas()).limit(limite).offset(desplazamiento)
+        cuenta = select(func.count()).select_from(self._origen()).where(*condiciones)
+        return cuenta, consulta
 
     def _fuente(
         self, fecha_corte: date, filtros: Sequence[Filtro], recorte: Recorte | None
@@ -151,9 +222,12 @@ class RepositorioCarteraPostgres(RepositorioCarteraPort):
         """
         condiciones = self._condiciones(fecha_corte, filtros)
         if recorte is None:
-            return self._origen(), condiciones, _COLUMNAS
-        seleccion = select(*_COLUMNAS_PRODUCTO).select_from(self._origen()).where(*condiciones)
-        primeros = _ordenar(seleccion, recorte.orden).limit(recorte.cantidad).subquery("primeros")
+            return self._origen(), condiciones, self._columnas()
+        seleccion = (
+            select(*self._columnas_producto()).select_from(self._origen()).where(*condiciones)
+        )
+        ordenada = _ordenar(seleccion, recorte.orden, self._columnas())
+        primeros = ordenada.limit(recorte.cantidad).subquery("primeros")
         return primeros, [], {columna.name: columna for columna in primeros.c}
 
     def metricas(
@@ -163,6 +237,34 @@ class RepositorioCarteraPostgres(RepositorioCarteraPort):
         indicadores: Sequence[Indicador],
         recorte: Recorte | None = None,
     ) -> MetricasCartera:
+        base, por_segmento = self._sentencias_de_metricas(
+            fecha_corte, filtros, indicadores, recorte
+        )
+        with self._engine.connect() as cx:
+            cuentas, capital_total, cuota_minima, cuota_maxima, *valores = cx.execute(base).one()
+            segmentos = cx.execute(por_segmento).all()
+        return MetricasCartera(
+            cuentas=cuentas,
+            capital_total=Decimal(capital_total),
+            cuota_minima=cuota_minima,
+            cuota_maxima=cuota_maxima,
+            cuentas_por_segmento={
+                (valor if valor is not None else SIN_SEGMENTO): conteo
+                for valor, conteo in segmentos
+            },
+            adicionales={
+                indicador.nombre: valor
+                for indicador, valor in zip(indicadores, valores, strict=True)
+            },
+        )
+
+    def _sentencias_de_metricas(
+        self,
+        fecha_corte: date,
+        filtros: Sequence[Filtro],
+        indicadores: Sequence[Indicador],
+        recorte: Recorte | None,
+    ) -> tuple[Select, Select]:
         origen, condiciones, columnas = self._fuente(fecha_corte, filtros, recorte)
         capital = columnas[CAMPO_CAPITAL]
         cuota = columnas[CAMPO_CUOTA]
@@ -185,23 +287,7 @@ class RepositorioCarteraPostgres(RepositorioCarteraPort):
             .group_by(segmento)
             .order_by(segmento)
         )
-        with self._engine.connect() as cx:
-            cuentas, capital_total, cuota_minima, cuota_maxima, *valores = cx.execute(base).one()
-            segmentos = cx.execute(por_segmento).all()
-        return MetricasCartera(
-            cuentas=cuentas,
-            capital_total=Decimal(capital_total),
-            cuota_minima=cuota_minima,
-            cuota_maxima=cuota_maxima,
-            cuentas_por_segmento={
-                (valor if valor is not None else SIN_SEGMENTO): conteo
-                for valor, conteo in segmentos
-            },
-            adicionales={
-                indicador.nombre: valor
-                for indicador, valor in zip(indicadores, valores, strict=True)
-            },
-        )
+        return base, por_segmento
 
     def segmentar(
         self,
@@ -210,19 +296,28 @@ class RepositorioCarteraPostgres(RepositorioCarteraPort):
         filtros: Sequence[Filtro],
         recorte: Recorte | None = None,
     ) -> list[Grupo]:
-        origen, condiciones, columnas = self._fuente(fecha_corte, filtros, recorte)
-        columna = columnas[campo]
-        capital = columnas[CAMPO_CAPITAL]
-        consulta = (
-            select(columna, func.count(), func.coalesce(func.sum(capital), 0))
-            .select_from(origen)
-            .where(*condiciones)
-            .group_by(columna)
-            .order_by(func.count().desc(), columna)
-        )
+        consulta = self._sentencia_de_segmentar(fecha_corte, campo, filtros, recorte)
         with self._engine.connect() as cx:
             filas = cx.execute(consulta).all()
         return [
             Grupo(valor=valor, cuentas=cuentas, capital=Decimal(total))
             for valor, cuentas, total in filas
         ]
+
+    def _sentencia_de_segmentar(
+        self,
+        fecha_corte: date,
+        campo: str,
+        filtros: Sequence[Filtro],
+        recorte: Recorte | None,
+    ) -> Select:
+        origen, condiciones, columnas = self._fuente(fecha_corte, filtros, recorte)
+        columna = columnas[campo]
+        capital = columnas[CAMPO_CAPITAL]
+        return (
+            select(columna, func.count(), func.coalesce(func.sum(capital), 0))
+            .select_from(origen)
+            .where(*condiciones)
+            .group_by(columna)
+            .order_by(func.count().desc(), columna)
+        )
