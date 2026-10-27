@@ -296,12 +296,12 @@ def test_una_v2_que_usa_la_fecha_excluye_un_producto_sin_vencimiento() -> None:
 
 
 def test_el_titular_largo_se_recorta_y_el_corto_no_deja_huecos() -> None:
-    datos = _v2(TODOS=(_titular(LlamadaFuncion("primeros", (4,))), _texto("|"), _fecha()))
+    datos = _v2(TODOS=(_titular(LlamadaFuncion("primeros", (4,))), _texto("-"), _fecha()))
 
     largo = _evaluar(datos, titular="ABCDEFGH")
     corto = _evaluar(datos, titular="AB")
 
-    assert (largo.mensaje, corto.mensaje) == ("ABCD|06/09/2026", "AB|06/09/2026")
+    assert (largo.mensaje, corto.mensaje) == ("ABCD-06/09/2026", "AB-06/09/2026")
 
 
 def test_nombrar_la_variable_en_el_texto_fijo_no_cuenta_como_usarla() -> None:
@@ -312,7 +312,8 @@ def test_nombrar_la_variable_en_el_texto_fijo_no_cuenta_como_usarla() -> None:
     fila = _evaluar(datos, titular=None)
 
     assert isinstance(fila, FilaCarga)
-    assert fila.mensaje == "Estimado titular [@titular] fecha_vencimiento_cuota06/09/2026"
+    # Los corchetes del texto fijo no se interpretan y salen como parentesis (RF-MM-27).
+    assert fila.mensaje == "Estimado titular (@titular) fecha_vencimiento_cuota06/09/2026"
     constructor = speech.ConstructorMensajes(datos, WHATSAPP)
     assert not constructor.usa_titular(Segmento.DE_1_A_8)
     assert constructor.usa_vencimiento(Segmento.DE_1_A_8)

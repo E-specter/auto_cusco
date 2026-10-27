@@ -2430,8 +2430,9 @@ export interface components {
          * @description `largo_maximo` es nulo cuando la expresion de una v2 no tiene maximo calculable: `sin_maximo`
          *     dice por que (una variable cuyo largo depende del dato, o una funcion que no lo acota).
          *
-         *     Desde RF-MM-27 el largo va en unidades GSM-7 (un extendido cuenta 2; el texto fijo se mide ya
-         *     transliterado) y el `ejemplo` sale normalizado a GSM-7, tal como se enviaria.
+         *     Desde RF-MM-27 el largo va en unidades GSM-7 (la elipsis y el euro miden 3; ya no hay
+         *     extendidos, porque se transliteran; el texto fijo se mide ya transliterado) y el `ejemplo`
+         *     sale normalizado a GSM-7, tal como se enviaria.
          */
         LargoSegmentoRespuesta: {
             segmento: components["schemas"]["Segmento"];

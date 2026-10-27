@@ -211,8 +211,8 @@ def evaluar_producto(
     if constructor.requiere_whatsapp_faltante(rango.segmento):
         return rango.segmento
     mensaje = constructor.mensaje_de(rango.segmento, titular, vencimiento, dias_ajustados)
-    # El mensaje ya viene normalizado a GSM-7 (RF-MM-27) y se mide en unidades GSM-7 (un extendido
-    # cuenta 2): se normaliza ANTES de los 150 y de los 160, no despues.
+    # El mensaje ya viene normalizado a GSM-7 (RF-MM-27) y se mide en unidades GSM-7 (sin
+    # extendidos, o sea `len`): se normaliza ANTES de los 150 y de los 160, no despues.
     codigo = speech.codigo_por_largo(largo_gsm7(mensaje))
     if codigo is CodigoMowaMes.MENSAJE_EXCEDE_160:
         return Exclusion(pagare, codigo)

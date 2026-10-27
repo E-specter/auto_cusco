@@ -76,10 +76,10 @@ def _reemplazar(valor: str, buscar: str, reemplazo: str) -> str:
 def _cota_gsm7(entrada: int | None, args: tuple) -> int | None:
     """El triple de la entrada: es un tope verdadero (RF-47), en caracteres y en unidades GSM-7.
 
-    El peor caso de `a_gsm7` es `…`: 1 caracter pasa a 3 (y mide 3); un extendido mide 2. El
-    supuesto de «1 por caracter en las variables» que usa MOWA MES no vive en esta funcion sino en
-    como ese conector mide el texto (`compilar(..., medida=...)`, con la variable cruda y la
-    normalizacion aplicada al texto ya evaluado).
+    El peor caso de `a_gsm7` es `…` o `€`: 1 caracter pasa a 3 (y mide 3); los demas extendidos
+    pasan a 1 o se borran. El supuesto de «1 por caracter en las variables» que usa MOWA MES no
+    vive en esta funcion sino en como ese conector mide el texto (`compilar(..., medida=...)`, con
+    la variable cruda y la normalizacion aplicada al texto ya evaluado).
     """
     return None if entrada is None else 3 * entrada
 

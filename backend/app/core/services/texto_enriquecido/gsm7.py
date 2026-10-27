@@ -8,21 +8,26 @@ GSM-7 antes de medirlo. Tres funciones:
   1. NFD y se quitan las marcas combinantes (tildes, dieresis, la virgulilla de la n), como la
      conciliacion de MOWA MES, que hace lo mismo con el mensaje de los dos lados (sin el `strip`);
   2. se transliteran los signos tipograficos con equivalente simple (`TRANSLITERACION`): comillas,
-     puntos suspensivos, guiones, `°`, `º` y `ª`. Puede ALARGAR: `…` pasa de 1 a 3 caracteres. Los
-     espacios especiales (cualquier caracter Unicode de categoria Zs que no sea el espacio normal:
-     el espacio duro, el fino, U+202F, U+3000...) y la tabulacion se cambian por un espacio normal
+     puntos suspensivos, guiones, `°`, `º` y `ª`, y los caracteres de la tabla extendida de GSM-7
+     (decision del usuario, 2026-10-26, RF-MM-27, que cierra S-MM-9): `€` pasa a `EUR`, `[` y `{` a
+     `(`, `]` y `}` a `)`, `\\` y `|` a `/`, `~` a `-` y el salto de pagina a un espacio normal. El
+     mensaje queda SIEMPRE en el alfabeto basico y cada caracter mide 1. Puede ALARGAR: `…` pasa de
+     1 a 3 caracteres y `€`, de 1 a 3. Los espacios especiales (cualquier caracter Unicode de
+     categoria Zs que no sea el espacio normal: el espacio duro, el fino, U+202F, U+3000...) y la
+     tabulacion se cambian por un espacio normal
      (decision del usuario, 2026-10-20), para que las palabras no queden pegadas; no cuentan como
      borrados y no cambian el largo. Los separadores de linea y de parrafo (Zl, Zp) y la
      tabulacion vertical no tienen equivalente decidido y se borran;
-  3. se borra lo que siga fuera del alfabeto basico y de la tabla extendida (por ejemplo, un emoji).
-  Se conservan los extendidos (`€ [ ] { } \\ ~ ^ |` y el salto de pagina) y los saltos de linea.
+  3. se borra lo que siga fuera del alfabeto basico (por ejemplo, un emoji o el `^`, que no tiene
+     equivalente decidido).
+  Se conservan los saltos de linea.
   Es idempotente y se puede aplicar por pieza: darle `a_gsm7` a cada trozo y unirlos da lo mismo
   que dárselo al texto entero (cada paso trabaja caracter por caracter), siempre que se aplique
   DESPUES de un recorte como `primeros(8)`: recortar antes de normalizar cuenta como caracter la
   letra con tilde y puede cortar distinto.
 - `largo_gsm7(texto)`: lo que mide el SMS en unidades GSM-7: 1 por caracter y 2 por cada extendido
-  (supuesto S-MM-9: asi lo cuenta el estandar; falta confirmar como lo cobra MES). Pensado para
-  texto que ya esta en GSM-7; un caracter fuera de la tabla cuenta 1.
+  (asi lo cuenta el estandar). Para lo que sale de `a_gsm7` da `len`, porque ya no quedan
+  extendidos. Un caracter fuera de la tabla cuenta 1.
 - `caracteres_borrados(texto)`: los caracteres que `a_gsm7` BORRA, sin repetir y en orden de
   aparicion, para avisar al usuario. Lo transliterado y los diacriticos no cuentan: no se pierden.
 """
@@ -48,10 +53,12 @@ _BASICO = (
     "¿abcdefghijklmno"  # 0x60 - 0x6F
     "pqrstuvwxyzäöñüà"  # 0x70 - 0x7F
 )
-# Tabla extendida (se manda como escape + codigo): cada uno ocupa DOS unidades en el SMS.
+# Tabla extendida del estandar (se manda como escape + codigo): cada uno ocupa DOS unidades en el
+# SMS, y asi los cuenta `largo_gsm7`. `a_gsm7` ya no los deja pasar (se transliteran o se borran).
 EXTENDIDOS = "\f^{}\\[~]|€"
 
-CARACTERES_GSM7 = frozenset(_BASICO) | frozenset(EXTENDIDOS)
+# Lo que puede haber en un mensaje normalizado: solo el alfabeto basico.
+CARACTERES_GSM7 = frozenset(_BASICO)
 
 # Decision del usuario (2026-10-19): signos con equivalente simple en lugar de borrarlos.
 TRANSLITERACION: dict[str, str] = {
@@ -67,6 +74,16 @@ TRANSLITERACION: dict[str, str] = {
     "°": "o",  # signo de grado
     "º": "o",  # indicador ordinal masculino
     "ª": "a",  # indicador ordinal femenino
+    # La tabla extendida (RF-MM-27, 2026-10-26): el `^` no esta y por eso se borra y se avisa.
+    "€": "EUR",  # euro
+    "[": "(",
+    "{": "(",
+    "]": ")",
+    "}": ")",
+    "\\": "/",  # barra invertida
+    "|": "/",  # barra vertical
+    "~": "-",  # virgulilla
+    "\f": " ",  # salto de pagina
 }
 
 
@@ -212,5 +229,6 @@ def largo_gsm7(texto: str) -> int:
 
 def largo_gsm7_normalizado(texto: str) -> int:
     """El largo en GSM-7 de lo que SALDRIA de `a_gsm7(texto)`: exacto para un texto fijo aunque
-    todavia no este normalizado (la transliteracion puede alargarlo: `…` mide 3)."""
-    return largo_gsm7(a_gsm7(texto))
+    todavia no este normalizado (la transliteracion puede alargarlo: `…` y `€` miden 3). Lo
+    normalizado no tiene extendidos, asi que su largo es `len`."""
+    return len(a_gsm7(texto))

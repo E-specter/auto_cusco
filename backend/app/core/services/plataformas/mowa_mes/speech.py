@@ -243,8 +243,8 @@ def _compilar(
     whatsapp: str | None,
 ) -> Compilada:
     constantes = {VARIABLE_CONTACTO: whatsapp} if whatsapp else None
-    # La cota queda en unidades GSM-7 (RF-MM-27): el texto fijo se mide ya normalizado y los
-    # extendidos cuentan 2; las variables cuentan 1 por caracter (supuesto documentado, docs/
+    # La cota queda en unidades GSM-7 (RF-MM-27): el texto fijo se mide ya normalizado (`…` y `€`
+    # miden 3); las variables cuentan 1 por caracter (supuesto documentado, docs/
     # motor-texto-enriquecido.md §24: el control exacto sigue siendo el de cada fila).
     # NO se cuelga `a_gsm7` de las variables: su cota es el triple y romperia el 156 de «9 a 30».
     return evaluador.compilar(

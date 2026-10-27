@@ -229,7 +229,8 @@ class ProblemaSpeech:
 class LargoSegmento:
     """Largo maximo que puede alcanzar el mensaje de un segmento (RF-MM-19, RF-MM-27).
 
-    El largo va en unidades GSM-7 (un extendido cuenta 2) y el `ejemplo` ya normalizado a GSM-7.
+    El largo va en unidades GSM-7 (la elipsis y el euro miden 3; no quedan extendidos) y el
+    `ejemplo` ya normalizado a GSM-7.
     """
 
     rango: RangoSegmento

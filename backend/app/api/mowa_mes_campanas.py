@@ -585,7 +585,8 @@ def _previsualizacion(armada: CampanaArmada) -> PrevisualizacionCampanaRespuesta
                 supervision=f.supervision,
                 pagare=f.pagare,
                 segmento=f.segmento,
-                largo=largo_gsm7(f.mensaje),  # unidades GSM-7: un extendido cuenta 2 (RF-MM-27)
+                # unidades GSM-7 (RF-MM-27); ya normalizado, sin extendidos
+                largo=largo_gsm7(f.mensaje),
                 advertencias=list(f.advertencias),
             )
             for f in armada.filas[:FILAS_DE_MUESTRA]

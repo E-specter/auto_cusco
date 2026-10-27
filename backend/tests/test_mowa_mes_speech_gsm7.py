@@ -3,8 +3,9 @@
 Lo que se prueba, sobre el constructor, la previsualizacion y la campana (nada de PostgreSQL):
 - el mensaje de una v1 y de una v2 sale normalizado, con `a_gsm7` aplicada al texto YA evaluado y no
   a las variables (el titular se recorta a 8 caracteres antes de normalizarse);
-- el largo se mide DESPUES de normalizar y en unidades GSM-7: la elipsis mide 3 y un extendido 2,
-  para el control de los 150 y los 160 y para la cota de la previsualizacion;
+- el largo se mide DESPUES de normalizar y en unidades GSM-7: la elipsis y el euro (`EUR`) miden 3 y
+  ya no queda ningun extendido que mida 2, para el control de los 150 y los 160 y para la cota de
+  la previsualizacion;
 - la previsualizacion devuelve el ejemplo normalizado y lo que se borra del texto fijo, por grafema;
 - la supervision hereda el mensaje normalizado;
 - la version se guarda como se escribio: las huellas no cambian.
@@ -126,10 +127,11 @@ def test_el_titular_con_emoji_pierde_el_emoji_despues_de_recortarse() -> None:
     assert _mensaje(version, titular=f"AB{EMOJI}CDEFGHIJ") == "ABCDEFG x06/09/2026."
 
 
-def test_los_extendidos_se_conservan_en_el_mensaje() -> None:
-    version = _v1(DE_1_A_8=(f" paga {EURO}10 [ya]", "."))
+def test_los_extendidos_se_transliteran_en_el_mensaje() -> None:
+    version = _v1(DE_1_A_8=(f" paga {EURO}10 [ya] {{x}} a|b ~ \\ ^", "."))
 
-    assert _mensaje(version) == f"ZZPRUEBA paga {EURO}10 [ya]06/09/2026."
+    # RF-MM-27 (2026-10-26): el `^` no tiene equivalente y se borra; los demas pasan al basico.
+    assert _mensaje(version) == "ZZPRUEBA paga EUR10 (ya) (x) a/b - / 06/09/2026."
 
 
 def test_la_supervision_hereda_el_mensaje_normalizado_de_la_primera_fila() -> None:
@@ -173,9 +175,10 @@ def _largo_total(relleno: str) -> int:
     ("relleno", "unidades", "codigo"),
     [
         ("y" * 130, 150, None),
-        ("y" * 129 + EURO, 151, CodigoMowaMes.MENSAJE_EXCEDE_150),  # el extendido cuenta 2
-        ("y" * 138 + EURO, 160, CodigoMowaMes.MENSAJE_EXCEDE_150),
-        ("y" * 139 + EURO, 161, CodigoMowaMes.MENSAJE_EXCEDE_160),
+        ("y" * 127 + EURO, 150, None),  # el euro mide 3 al transliterarse, como la elipsis
+        ("y" * 128 + EURO, 151, CodigoMowaMes.MENSAJE_EXCEDE_150),
+        ("y" * 137 + EURO, 160, CodigoMowaMes.MENSAJE_EXCEDE_150),
+        ("y" * 138 + EURO, 161, CodigoMowaMes.MENSAJE_EXCEDE_160),
         ("y" * 127 + ELIPSIS, 150, None),  # la elipsis mide 3 al transliterarse
         ("y" * 128 + ELIPSIS, 151, CodigoMowaMes.MENSAJE_EXCEDE_150),
         ("y" * 137 + ELIPSIS, 160, CodigoMowaMes.MENSAJE_EXCEDE_150),
@@ -229,13 +232,13 @@ def _producto(**cambios) -> dict:
 
 
 def test_la_cota_de_una_v2_se_cuenta_en_unidades_gsm7() -> None:
-    # texto fijo "Hola ..." (la elipsis mide 3) + un extendido (2) + titular 8 + fecha 10
+    # texto fijo "Hola ... EUR " (la elipsis y el euro miden 3 cada uno) + titular 8 + fecha 10
     version = _v2(NodoTexto(f"Hola {ELIPSIS} {EURO} "), _titular(), _fecha())
 
     largos = {x.rango.segmento: x for x in speech.previsualizar_v2(version.expresiones, WHATSAPP)}
 
     esperado = largo_gsm7(a_gsm7(f"Hola {ELIPSIS} {EURO} ")) + 8 + 10
-    assert esperado == len("Hola ... ") + 2 + len(" ") + 8 + 10  # el euro cuenta 2
+    assert esperado == len("Hola ... EUR ") + 8 + 10  # el euro es EUR: 3, sin extendidos
     assert largos[Segmento.DE_1_A_8].largo_maximo == esperado
 
 

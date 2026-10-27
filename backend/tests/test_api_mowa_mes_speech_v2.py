@@ -378,13 +378,14 @@ def test_la_previsualizacion_v2_normaliza_el_ejemplo_y_avisa_lo_que_se_borra(cli
         "/mowa-mes/speech/previsualizacion", json={"expresiones": expresiones}
     ).json()["segmentos"][0]
 
-    assert segmento["ejemplo"] == f"Hola  ... {_EURO} "  # el ejemplo sale como se enviaria
+    assert segmento["ejemplo"] == "Hola  ... EUR "  # el ejemplo sale como se enviaria
     assert segmento["caracteres_quitados"] == [
         {"caracter": _EMOJI + _TONO, "punto_de_codigo": "U+1F44D U+1F3FD"},
         {"caracter": _EMOJI, "punto_de_codigo": "U+1F44D"},
     ]
-    # la elipsis mide 3 y el euro 2 (unidades GSM-7): "Hola " 5 + "  " 2... del texto ya normalizado
-    assert segmento["largo_maximo"] == len(segmento["ejemplo"]) + 1
+    # la elipsis y el euro miden 3 cada uno (unidades GSM-7) y no queda ningun extendido: el largo
+    # es el del texto ya normalizado
+    assert segmento["largo_maximo"] == len(segmento["ejemplo"])
 
 
 def test_la_previsualizacion_v2_trae_la_lista_vacia_si_no_se_borra_nada(cliente) -> None:

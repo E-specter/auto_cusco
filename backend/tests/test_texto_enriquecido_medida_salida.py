@@ -39,12 +39,12 @@ O_TILDE = "\N{LATIN SMALL LETTER O WITH ACUTE}"
 EURO = "\N{EURO SIGN}"
 
 # Lo que se envia de FIJO: la elipsis son 3 signos, el emoji se borra (deja dos espacios), la tilde
-# se quita y el euro (un extendido) ocupa 2 unidades.
+# se quita y el euro pasa a `EUR` (RF-MM-27, 2026-10-26: ya no hay extendidos que midan 2).
 FIJO = f"Aviso {ELIPSIS} {EMOJI} pag{O_TILDE} {EURO} "
-FIJO_ENVIADO = "Aviso ...  pago " + EURO + " "
+FIJO_ENVIADO = "Aviso ...  pago EUR "
 TITULAR_DE_EJEMPLO = "TITULAR/"  # primeros(8) de TITULAR/SINTETICO,UNO
 ENVIADO = FIJO_ENVIADO + TITULAR_DE_EJEMPLO
-LARGO_ENVIADO = 27  # 16 + 2 (el euro) + 1 + 8; en caracteres serian 26 y sin normalizar 28
+LARGO_ENVIADO = 28  # 16 + 3 (EUR) + 1 + 8: todo se mide en caracteres, sin extendidos
 
 
 @pytest.fixture
@@ -296,7 +296,7 @@ def test_una_variante_por_segmento_tambien_sale_normalizada(cliente) -> None:
     celdas = _celdas(respuesta.json())
     assert [c["usa_variante"] for c in celdas] == [False, True, False, False, False, False]
     assert celdas[1]["texto"] == FIJO_ENVIADO * 2 + TITULAR_DE_EJEMPLO
-    assert celdas[1]["largo"] == 2 * 19 + 8  # 19 = 16 de texto + 2 del euro + 1 del espacio
+    assert celdas[1]["largo"] == 2 * 20 + 8  # 20 = 16 de texto + 3 de EUR + 1 del espacio
     for indice in (0, 2, 3, 4, 5):
         _comprobar_celda(celdas[indice])
 
@@ -352,7 +352,7 @@ def test_un_texto_vacio_sin_cambios_de_salida_usa_el_valor_por_defecto_tal_cual(
 
 def test_una_plantilla_se_compila_tambien_con_la_medida_del_generador() -> None:
     # La rama de plantilla del generador (RF-54) no pasa por /texto-enriquecido (que solo manda
-    # expresiones): se prueba directo. ab + elipsis (3) + euro (2) = 7; len() daria 4.
+    # expresiones): se prueba directo. ab + elipsis (3) + EUR (3) = 8; len() daria 4.
     campo = CampoSalida("mensaje", f"ab{ELIPSIS}{EURO}", TipoSalida.TEXTO)
     generador = GeneradorCargas(
         DefinicionCarga("d", (campo,)),
@@ -363,4 +363,4 @@ def test_una_plantilla_se_compila_tambien_con_la_medida_del_generador() -> None:
 
     celda = generador.detallar_fila({"titular": "x"}, 1).celdas[0]
 
-    assert (celda.cota, celda.texto) == (7, f"ab...{EURO}")
+    assert (celda.cota, celda.texto) == (8, "ab...EUR")

@@ -497,9 +497,9 @@ def test_la_muestra_de_la_campana_trae_el_mensaje_normalizado_y_su_largo_en_unid
     cuerpo = client.post("/mowa-mes/campanas/previsualizacion", json=CUERPO).json()
 
     mensaje = cuerpo["muestra"][-1]["mensaje"]  # el unico producto cargado: segmento 1 a 8
-    assert mensaje.startswith("ZZPRU001 vencio \N{EURO SIGN}10")
+    assert mensaje.startswith("ZZPRU001 vencio EUR10")  # el euro pasa a EUR (RF-MM-27)
     assert mensaje.endswith(" ...") and "\N{THUMBS UP SIGN}" not in mensaje
-    assert cuerpo["muestra"][-1]["largo"] == len(mensaje) + 1  # el euro cuenta 2
+    assert cuerpo["muestra"][-1]["largo"] == len(mensaje)  # sin extendidos: 1 por caracter
     assert all(
         m["largo"] == len(m["mensaje"]) + m["mensaje"].count("\N{EURO SIGN}")
         for m in cuerpo["muestra"]

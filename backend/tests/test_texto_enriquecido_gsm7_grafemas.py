@@ -155,7 +155,7 @@ def test_un_emoji_pegado_a_una_letra_con_tilde_informa_solo_el_emoji() -> None:
         f"{COMILLA_I}hola{COMILLA_D} {ANGULAR_I}x{ANGULAR_D} {SIMPLE_I}a{SIMPLE_D} {PUNTOS}",
         f"{RAYA_CORTA} {RAYA_LARGA} N{GRADO} 1{ORD_M} 2{ORD_F}",  # signos transliterados
         f"a{ESP_DURO}b{ESP_FINO}c{ESP_IDEOGRAFICO}d\te",  # pasan a un espacio normal
-        f"{EURO} [x] {{y}} \\ ~ ^ |",  # extendidos: se conservan
+        f"{EURO} [x] {{y}} \\ ~ |",  # extendidos: se transliteran, no se pierden
         "linea 1\nlinea 2",
         "",
     ],

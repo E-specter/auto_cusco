@@ -130,13 +130,13 @@ def _previsualizar_de_antes(partes, whatsapp):
         texto = segmento.parte_1 + segmento.parte_2
         cantidad_variables = texto.count(VARIABLE_WHATSAPP)
         # RF-MM-27: la misma aritmetica de antes, con el texto fijo medido ya normalizado a
-        # GSM-7 (un extendido cuenta 2, la elipsis mide 3) en lugar de contar caracteres.
+        # GSM-7 (la elipsis y el euro miden 3; ya no hay extendidos) en lugar de contar caracteres.
         largo = (
             LARGO_TITULAR
             + LARGO_VENCIMIENTO
             + largo_gsm7_normalizado(texto)
-            # el marcador "[whatsapp]" mide 12 en GSM-7 (los corchetes son extendidos) y se
-            # reemplaza por el enlace de 26
+            # el marcador "[whatsapp]" mide 10 normalizado, "(whatsapp)" (antes 12: los corchetes
+            # eran extendidos), y se reemplaza por el enlace de 26
             - cantidad_variables * (largo_gsm7_normalizado(VARIABLE_WHATSAPP) - largo_enlace)
         )
         ejemplo = None
@@ -223,7 +223,8 @@ def test_el_texto_del_usuario_con_corchetes_no_se_interpreta_nunca() -> None:
 
     mensaje = constructor.mensaje_de(partes.segmento, "ZZPRUEBA", VENCIMIENTO)
 
-    assert mensaje == "ZZPRUEBA [@titular] [@@] [@ 05/09/2026 [@"
+    # y los corchetes salen como parentesis al normalizar (RF-MM-27)
+    assert mensaje == "ZZPRUEBA (@titular) (@@) (@ 05/09/2026 (@"
 
 
 def test_problemas_de_sigue_rechazando_la_referencia_a_campos() -> None:

@@ -14,7 +14,7 @@ menor que lo que el texto puede llegar a medir.
 
 El texto fijo se mide con `medida` (por defecto `len`, caracteres). MOWA MES pasa
 `largo_gsm7_normalizado`: la cota queda en unidades GSM-7, exacta para el texto fijo (que se
-transliteraba y cuenta 2 por extendido) y de 1 por caracter para las variables (B16).
+transliteraba: `…` y `€` miden 3) y de 1 por caracter para las variables (B16).
 """
 
 from collections.abc import Callable, Sequence

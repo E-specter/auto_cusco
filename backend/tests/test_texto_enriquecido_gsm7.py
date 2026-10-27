@@ -1,8 +1,9 @@
 """GSM-7 en el motor (RF-MM-27, B16): `a_gsm7`, `largo_gsm7` y `caracteres_borrados`.
 
-Un caso por signo de la tabla de transliteracion, el emoji borrado, un extendido conservado que
-cuenta 2 y el salto de linea; despues propiedades con semilla fija (el proyecto no usa Hypothesis:
-`random.Random` y una semilla, para que una falla se reproduzca igual). Datos sinteticos.
+Un caso por signo de la tabla de transliteracion (los extendidos incluidos: RF-MM-27, 2026-10-26),
+el emoji y el `^` borrados y el salto de linea; despues propiedades con semilla fija (el proyecto
+no usa Hypothesis: `random.Random` y una semilla, para que una falla se reproduzca igual). Datos
+sinteticos.
 """
 
 import random
@@ -28,6 +29,7 @@ from app.core.services.texto_enriquecido.gsm7 import (
     TRANSLITERACION,
     a_gsm7,
     caracteres_borrados,
+    grafemas_borrados,
     largo_gsm7,
     largo_gsm7_normalizado,
 )
@@ -40,11 +42,12 @@ T, F = TipoValor.TEXTO, TipoValor.FECHA
 
 
 def test_la_tabla_tiene_127_caracteres_basicos_y_10_extendidos_sin_repetir() -> None:
-    basicos = CARACTERES_GSM7 - set(EXTENDIDOS)
-
-    assert (len(basicos), len(EXTENDIDOS), len(set(EXTENDIDOS))) == (127, 10, 10)
+    # CARACTERES_GSM7 es lo que puede haber en un mensaje: solo el alfabeto basico. Los extendidos
+    # siguen como constante: `largo_gsm7` los cuenta como el estandar (2).
+    assert (len(CARACTERES_GSM7), len(EXTENDIDOS), len(set(EXTENDIDOS))) == (127, 10, 10)
     assert set(EXTENDIDOS) == set("\f^{}\\[~]|€")
-    assert "\n" in basicos and "\r" in basicos  # los saltos de linea son del alfabeto basico
+    assert not CARACTERES_GSM7 & set(EXTENDIDOS)
+    assert "\n" in CARACTERES_GSM7 and "\r" in CARACTERES_GSM7  # los saltos de linea, basicos
 
 
 def test_la_transliteracion_solo_usa_signos_que_gsm7_no_tiene_y_da_caracteres_de_gsm7() -> None:
@@ -104,9 +107,47 @@ def test_translitera_los_signos_con_equivalente_simple(entrada, esperado) -> Non
     assert a_gsm7(entrada) == esperado
 
 
+@pytest.mark.parametrize(
+    ("entrada", "esperado"),
+    [
+        ("5 \u20ac", "5 EUR"),  # €
+        ("a[b", "a(b"),
+        ("a{b", "a(b"),
+        ("a]b", "a)b"),
+        ("a}b", "a)b"),
+        ("a\\b", "a/b"),
+        ("a|b", "a/b"),
+        ("a~b", "a-b"),
+        ("a\fb", "a b"),  # el salto de pagina: un espacio normal
+        ("Precio \u20ac [10]", "Precio EUR (10)"),
+        ("{a|b} \\ ~", "(a/b) / -"),
+    ],
+)
+def test_translitera_los_extendidos_al_alfabeto_basico(entrada, esperado) -> None:
+    assert a_gsm7(entrada) == esperado
+    assert caracteres_borrados(entrada) == ()  # nada se pierde
+    assert grafemas_borrados(entrada) == ()
+
+
+def test_el_circunflejo_se_borra_y_se_avisa() -> None:
+    assert a_gsm7("a^b") == "ab"
+    assert caracteres_borrados("a^b^") == ("^",)
+    assert grafemas_borrados("a^b^\U0001f600") == ("^", "\U0001f600")
+
+
+def test_ningun_extendido_sobrevive_ni_cuenta_doble() -> None:
+    texto = "".join(EXTENDIDOS)
+
+    salida = a_gsm7(texto)
+
+    assert not set(salida) & set(EXTENDIDOS)
+    assert largo_gsm7(salida) == len(salida)  # ya no queda ninguno que mida 2
+
+
 def test_hay_un_caso_para_cada_signo_de_la_tabla() -> None:
     probados = {"\u201c", "\u201d", "\u00ab", "\u00bb", "\u2018", "\u2019", "\u2026"}
     probados |= {"\u2013", "\u2014", "\u00b0", "º", "ª"}
+    probados |= set(EXTENDIDOS) - {"^"}  # el `^` no se transliteran: se borra
 
     assert probados == set(TRANSLITERACION)
 
@@ -131,14 +172,6 @@ def test_la_transliteracion_puede_alargar_el_texto() -> None:
 )
 def test_borra_lo_que_queda_fuera_de_gsm7(entrada, esperado) -> None:
     assert a_gsm7(entrada) == esperado
-
-
-@pytest.mark.parametrize("extendido", list(EXTENDIDOS))
-def test_conserva_cada_extendido_y_cada_uno_cuenta_2(extendido) -> None:
-    texto = f"a{extendido}b"
-
-    assert a_gsm7(texto) == texto
-    assert largo_gsm7(texto) == 4  # 1 + 2 + 1
 
 
 def test_conserva_los_saltos_de_linea() -> None:
@@ -169,10 +202,10 @@ def test_largo_gsm7_cuenta_2_por_cada_extendido_y_1_por_el_resto() -> None:
 
 
 def test_largo_gsm7_normalizado_mide_lo_que_saldria() -> None:
-    assert (
-        largo_gsm7_normalizado("N\u00b0 5\u2026 € \U0001f600") == 10 + 1
-    )  # «No 5... € »: 10 caracteres y el euro cuenta 2
+    # «No 5... EUR »: 12 caracteres, y ninguno es extendido: el largo es `len`
+    assert largo_gsm7_normalizado("N\u00b0 5\u2026 € \U0001f600") == 12
     assert largo_gsm7_normalizado("hola") == largo_gsm7("hola")
+    assert largo_gsm7_normalizado("[x]") == 3  # «(x)»: antes media 5
 
 
 # --- caracteres_borrados -----------------------------------------------------------------------
@@ -233,7 +266,7 @@ def test_a_gsm7_se_aplica_desde_la_expresion() -> None:
 # --- la cota -----------------------------------------------------------------------------------
 
 
-def test_la_cota_de_a_gsm7_es_el_triple_porque_el_peor_caso_es_la_elipsis() -> None:
+def test_la_cota_de_a_gsm7_es_el_triple_porque_el_peor_caso_es_la_elipsis_o_el_euro() -> None:
     corta = _compilar(_a_gsm7("t", LlamadaFuncion("primeros", (8,))))
     sin_recorte = _compilar(_a_gsm7())
 
@@ -241,7 +274,8 @@ def test_la_cota_de_a_gsm7_es_el_triple_porque_el_peor_caso_es_la_elipsis() -> N
     assert sin_recorte.cota is None  # una variable sin recorte no tiene cota, como antes
     peor = corta.evaluar({"t": "\u2026" * 8}).texto
     assert (len(peor), largo_gsm7(peor)) == (24, 24)  # el peor caso llega justo a la cota
-    assert largo_gsm7(corta.evaluar({"t": "\u20ac" * 8}).texto) == 16  # un extendido, 2 por 1
+    euros = corta.evaluar({"t": "\u20ac" * 8}).texto  # «EUR» tambien alarga a 3: otro peor caso
+    assert (len(euros), largo_gsm7(euros)) == (24, 24)
 
 
 def test_con_a_gsm7_en_la_variable_la_cota_es_un_tope_verdadero_en_caracteres_y_unidades() -> None:
@@ -261,8 +295,8 @@ def test_el_texto_fijo_se_mide_en_unidades_gsm7_si_el_conector_lo_pide() -> None
     en_gsm7 = _compilar(NodoTexto(fijo), medida=largo_gsm7_normalizado)
 
     assert por_defecto.cota == len(fijo) == 13  # como siempre: caracteres
-    # «Cuota No 5... €»: 15 caracteres y el € cuenta 2
-    assert en_gsm7.cota == len(a_gsm7(fijo)) + 1 == 16
+    # «Cuota No 5... EUR»: 17 caracteres, todos del alfabeto basico
+    assert en_gsm7.cota == len(a_gsm7(fijo)) == 17
 
 
 def test_la_cota_de_un_texto_fijo_ya_normalizado_es_exactamente_su_largo_gsm7() -> None:
@@ -275,12 +309,13 @@ def test_la_cota_de_un_texto_fijo_ya_normalizado_es_exactamente_su_largo_gsm7() 
 
 def test_el_supuesto_de_1_por_caracter_es_de_quien_normaliza_el_texto_ya_evaluado() -> None:
     # El camino de MOWA MES: la variable va cruda, la cota cuenta 8 y la normalizacion se aplica al
-    # texto evaluado. Un dato con un extendido puede pasarla; el control exacto es el de cada fila.
+    # texto evaluado. Un dato con un `€` o un `…` puede pasarla; el control exacto es el de cada
+    # fila.
     compilada = _compilar(NodoVariable("t", (LlamadaFuncion("primeros", (8,)),)))
 
     mensaje = a_gsm7(compilada.evaluar({"t": "\u20ac" * 8}).texto)
 
-    assert (compilada.cota, largo_gsm7(mensaje)) == (8, 16)
+    assert (compilada.cota, largo_gsm7(mensaje)) == (8, 24)  # «EUR» x 8
 
 
 # --- Propiedades con semilla -------------------------------------------------------------------
@@ -290,10 +325,10 @@ _CON_TILDE = "áéíóúüñÁÉÍÓÚÜÑàèìòùâêîôûãõçÇäöÄÖå
 _SIGNOS = "".join(TRANSLITERACION)
 _FUERA = "\U0001f600\U0001f680\u0439\u00a0\t\u200d`\x01\u03b1\uac01\u4e2d\x0b\u2028\u2029 \u2009"
 _COMBINANTES = "\u0301\u0308\u0323\u0327\u0303"
-_EXTENDIDOS_Y_ALARGAN = EXTENDIDOS + "\u2026"
+_ALARGAN = "€\u2026"  # los unicos que pasan de 1 a 3 caracteres
 ALFABETO_RICO = list(_LETRAS + _CON_TILDE + _SIGNOS + _FUERA + _COMBINANTES + EXTENDIDOS + "\n\r")
-# Lo que NO alarga: sin extendidos (cuentan 2) y sin `…` (pasa a 3). Es la hipotesis del supuesto.
-ALFABETO_SIN_ALARGAR = [c for c in ALFABETO_RICO if c not in _EXTENDIDOS_Y_ALARGAN]
+# Lo que NO alarga: sin `€` ni `…` (pasan a 3). Es la hipotesis del supuesto.
+ALFABETO_SIN_ALARGAR = [c for c in ALFABETO_RICO if c not in _ALARGAN]
 
 
 def _texto(azar: random.Random, alfabeto: list[str], maximo: int = 40) -> str:
@@ -309,12 +344,15 @@ def test_es_idempotente() -> None:
         assert a_gsm7(una_vez) == una_vez, repr(texto)
 
 
-def test_la_salida_siempre_esta_dentro_de_gsm7() -> None:
+def test_la_salida_siempre_esta_dentro_del_alfabeto_basico_de_gsm7() -> None:
     azar = random.Random(SEMILLA + 1)
 
     for _ in range(3000):
         texto = _texto(azar, ALFABETO_RICO)
-        assert set(a_gsm7(texto)) <= CARACTERES_GSM7, repr(texto)
+        salida = a_gsm7(texto)
+        assert set(salida) <= CARACTERES_GSM7, repr(texto)
+        assert not set(salida) & set(EXTENDIDOS), repr(texto)  # y ningun extendido
+        assert largo_gsm7(salida) == len(salida), repr(texto)
 
 
 def test_el_largo_de_la_salida_nunca_pasa_de_3_veces_el_de_la_entrada() -> None:
@@ -489,7 +527,8 @@ def test_los_separadores_de_linea_y_de_parrafo_y_la_tabulacion_vertical_se_sigue
 
 
 def test_el_espacio_normal_y_los_saltos_de_linea_no_se_tocan() -> None:
-    assert a_gsm7("a b\nc\rd\fe") == "a b\nc\rd\fe"
+    assert a_gsm7("a b\nc\rd") == "a b\nc\rd"
+    assert a_gsm7("d\fe") == "d e"  # el salto de pagina si pasa a un espacio
 
 
 def test_el_espacio_duro_en_los_extremos_queda_como_espacio_y_la_conciliacion_lo_recorta() -> None:
@@ -531,6 +570,6 @@ def test_pasado_el_tope_se_sigue_normalizando_bien() -> None:
     a_gsm7("".join(chr(c) for c in range(0x4E00, 0x4E00 + 3 * TOPE_DE_CACHE)))  # llena las dos
 
     texto = "Peña\u00a0N\u00b0 5\u2026 \u01d8 \U0001f600€"
-    assert a_gsm7(texto) == "Pena No 5... u €"
+    assert a_gsm7(texto) == "Pena No 5... u EUR"
     assert caracteres_borrados(texto) == ("\U0001f600",)
     assert len(gsm7._TABLA) <= TOPE_DE_CACHE

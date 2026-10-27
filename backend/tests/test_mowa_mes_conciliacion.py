@@ -80,7 +80,7 @@ _EURO = "\N{EURO SIGN}"
 
 def _mensaje_nuevo_de_mowa_mes() -> str:
     """El mensaje tal como lo arma MOWA MES hoy: un emoji que se borra, una guillemet que se
-    transliteran, un espacio duro, tildes y un extendido (el euro)."""
+    transliteran, un espacio duro, tildes y el euro, que pasa a `EUR` (RF-MM-27, 2026-10-26)."""
     partes = PartesSegmento(
         Segmento.DE_1_A_8,
         f" tu cuota venció {_EMOJI}{_ANGULAR_I}mañana{_ANGULAR_D}{_NBSP}paga {_EURO}10",
@@ -97,8 +97,42 @@ def test_la_campana_nueva_normalizada_concilia_contra_un_reporte_con_el_mismo_te
 
     resultado = conciliar([nueva], [_enviada(2, nueva)])
 
-    assert mensaje == 'ZZPRUEBA tu cuota vencio "manana" paga €10' + "05/09/2026 gracias"
+    # T-MTE-B19: el euro ya no se conserva: sale `EUR` (antes `€10`). Es el cambio de este literal.
+    assert mensaje == 'ZZPRUEBA tu cuota vencio "manana" paga EUR10' + "05/09/2026 gracias"
     assert (resultado.total.enviados, resultado.sin_correspondencia) == (1, 0)
+
+
+# --- Campanas anteriores a B19: guardaron los extendidos tal cual (T-MTE-B19) -------------------
+#
+# `normalizar_mensaje` NO usa `a_gsm7` y no cambia: una fila cargada antes de B19, con `€` o `[` en
+# el mensaje, concilia contra un reporte de MES con el mismo texto crudo. Si la conciliacion usara
+# `a_gsm7`, la clave del reporte («EUR10») ya no coincidiria con la de lo cargado («€10»).
+
+_ANTERIOR_A_B19 = "ZZPRUEBA paga \N{EURO SIGN}10 [ya] {x} a|b ~ \\ ^"
+
+
+def test_una_campana_anterior_a_b19_con_extendidos_concilia_contra_el_mismo_texto_crudo() -> None:
+    anterior = FilaCarga("900000107", _ANTERIOR_A_B19, "33333333")
+
+    resultado = conciliar([anterior], [_enviada(2, anterior)])
+
+    assert (resultado.total.enviados, resultado.sin_correspondencia) == (1, 0)
+
+
+def test_la_clave_de_la_conciliacion_no_transliteran_los_extendidos() -> None:
+    assert normalizar_mensaje(_ANTERIOR_A_B19) == _ANTERIOR_A_B19
+    assert normalizar_mensaje(a_gsm7(_ANTERIOR_A_B19)) != normalizar_mensaje(_ANTERIOR_A_B19)
+
+
+def test_la_campana_anterior_y_la_nueva_concilian_cada_una_contra_su_texto() -> None:
+    anterior = FilaCarga("900000108", _ANTERIOR_A_B19, "44444444")
+    nueva = FilaCarga("900000109", a_gsm7(_ANTERIOR_A_B19), "55555555")  # «EUR10 (ya) (x)...»
+    reporte = [_enviada(2, anterior), _enviada(3, nueva)]
+
+    resultado = conciliar([anterior, nueva], reporte)
+
+    assert nueva.mensaje != anterior.mensaje
+    assert (resultado.total.enviados, resultado.sin_correspondencia) == (2, 0)
 
 
 def test_la_campana_nueva_y_la_anterior_con_tildes_concilian_igual() -> None:
