@@ -56,7 +56,7 @@ Los requerimientos de este documento se numeran `RF-MM-XX` dentro del módulo, p
 * **RF-MM-08 — Día gestionable:** Calcular el siguiente día gestionable a partir de la fecha de generación: de lunes a viernes, excluyendo los feriados nacionales de Perú.
   * Los feriados nacionales se calculan para cualquier año: los de fecha fija por su día y mes, y Jueves y Viernes Santo a partir de la fecha de Pascua. Así el cálculo no depende de cargar las fechas de cada año.
   * La configuración permite agregar días no laborables decretados y retirar un feriado cuando cambie la ley (RF-32, RF-33).
-  * Supuesto S-MM-4: la regla inicial es la lista de feriados nacionales de Perú vigente al 2026. Debe revisarse con el usuario.
+  * La regla trae solo los 16 feriados nacionales de ley vigentes al 2026; cualquier otro día no laborable (decretos, descansos regionales o compensables) lo registra el usuario a mano, y queda guardado y visible para todos los usuarios (decisión del usuario, 2026-10-26, que cierra el supuesto S-MM-4).
 * **RF-MM-09 — Base de datos de la campaña:** Tomar como base de la campaña una selección de cartera de una fecha de corte (filtros, orden y cantidad, o una selección guardada), con el mismo orden y desempate que la lista de `/cartera` y que el resumen del top n (RF-08).
 
 ## 3. Archivo de carga
@@ -233,6 +233,7 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Falta de titular o de fecha en un speech v2 | Se excluye solo si la expresión del segmento usa esa variable, según la expresión compilada; el orden de exclusiones no cambia; una v2 convertida desde una v1 usa esas variables (y además las marca obligatorias) y excluye igual (RF-MM-13) | Usuario (2026-10-03), consultado por coordinador_modulo_mowa_mes |
 | Codificación del SMS (GSM-7 o UCS-2) | Se fuerza GSM-7 al generar: se quitan los diacríticos, se transliteran los signos tipográficos con equivalente simple (comillas, puntos suspensivos, guiones, `°`, `º`, `ª`) y los de la tabla extendida (`€`, corchetes, llaves, barras, `~`), y se borran los caracteres sin equivalente; la versión se guarda como se escribió (RF-MM-27) | Usuario (2026-10-19), consultado por architec; la transliteración, a pregunta de coordinador_modulo_mowa_mes; la de los extendidos, el 2026-10-26 (cierra S-MM-9) |
 | Retiro del editor de dos partes (fase M3) | Ahora: las versiones nuevas son solo v2; las v1 siguen usándose en solo lectura y se convierten a v2 para personalizarlas (RF-MM-17) | Usuario (2026-10-19), consultado por architec |
+| Feriados (S-MM-4) | La regla registra de por sí los 16 feriados nacionales de ley (contrastados con los calendarios de 2026 y 2027); los días no laborables adicionales se registran a mano, quedan guardados y los ven todos (RF-MM-08). Si se aprueba un feriado nuevo o el traslado a lunes, se ajusta la regla | Usuario (2026-10-26), consultado por architec |
 
 ## 7. Evidencia de los ejemplos
 
@@ -260,12 +261,10 @@ Los ejemplos están en `archivos_anexo_chat/`, con prefijo `MOWA_MES_Ejemplo_`: 
 |---|---|---|
 | S-MM-1 | Sin integración por API: se generan archivos y se importa el reporte a mano | Todo el módulo |
 | S-MM-3 | La descripción de campaña no tiene largo máximo mientras no se confirme el de MES | RF-MM-04 |
-| S-MM-4 | Feriados nacionales de Perú vigentes al 2026, calculados por regla para cualquier año; decretos y cambios de ley por configuración | RF-MM-08 |
 
-Quedan abiertos S-MM-1, S-MM-3 y S-MM-4: los tres dependen de información externa (qué ofrece MES y qué dice la ley), no de una preferencia del usuario. S-MM-2, S-MM-5 y S-MM-6 se confirmaron el 2026-09-21, y S-MM-7 y S-MM-8 el 2026-09-14; los cinco pasaron a la sección 6. S-MM-9 (los extendidos de GSM-7 se conservaban y contaban 2) se cerró el 2026-10-26 sin esperar a MES: el usuario decidió transliterarlos (RF-MM-27).
+Quedan abiertos S-MM-1 y S-MM-3: los dos dependen de información externa (qué ofrece MES), no de una preferencia del usuario. S-MM-2, S-MM-5 y S-MM-6 se confirmaron el 2026-09-21, y S-MM-7 y S-MM-8 el 2026-09-14; los cinco pasaron a la sección 6. S-MM-9 (los extendidos de GSM-7 se conservaban y contaban 2) se cerró el 2026-10-26 sin esperar a MES: el usuario decidió transliterarlos (RF-MM-27). S-MM-4 se confirmó el mismo día y pasó a la sección 6: architec contrastó la regla con los calendarios publicados para 2026 y 2027 (coinciden los 16 feriados y no hay ley nueva; siguen en trámite, sin aprobar, un feriado el 13 de octubre y el traslado de algunos feriados a lunes). Los descansos compensables por la visita del papa (D. S. 020-2026-TR, del 11 al 16 de noviembre de 2026) son regionales y no son feriados: el usuario no los marcó.
 
 - **S-MM-3:** el usuario mira el largo máximo en el formulario de la web de MES (2026-10-26).
-- **S-MM-4:** architec contrastó la regla el 2026-10-26 con los calendarios publicados para 2026 y 2027: coinciden los 16 feriados, y no hay ley nueva que agregue uno. Siguen en trámite, sin aprobar, un feriado el 13 de octubre y el traslado de algunos feriados a lunes; si se aprueban, se ajusta la regla. Los descansos compensables por la visita del papa (D. S. 020-2026-TR, del 11 al 16 de noviembre de 2026) son regionales y no son feriados: se cargan, si corresponde, como excepción del calendario.
 
 ## 9. Registro de cambios
 
@@ -287,4 +286,4 @@ Quedan abiertos S-MM-1, S-MM-3 y S-MM-4: los tres dependen de información exter
 
 **2026-10-26**
 - **RF existentes ampliados:** RF-MM-27 (mensaje en GSM-7): los caracteres de la tabla extendida se transliteran (`^` se borra) y el mensaje queda en el alfabeto básico. Decisión del usuario; cierra el supuesto S-MM-9.
-- **Supuestos:** S-MM-4 contrastado con los calendarios de 2026 y 2027, sin diferencias; sigue abierto hasta que el usuario lo confirme (sección 8).
+- **RF existentes ampliados:** RF-MM-08 (día gestionable): la regla trae solo los feriados de ley y lo demás se registra a mano, visible para todos. Decisión del usuario; cierra el supuesto S-MM-4, contrastado con los calendarios de 2026 y 2027 sin diferencias.
