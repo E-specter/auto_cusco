@@ -17,12 +17,12 @@ type Asignacion = Esquemas['AsignacionEntrada'];
 type Problema = Esquemas['ProblemaMapeoRespuesta'];
 type Columna = Esquemas['ColumnaAnalizadaRespuesta'];
 
-const campo = (nombre: string, obligatorio = false): Campo => ({
+const campo = (nombre: string, obligatorio = false, alias: string[] = []): Campo => ({
   nombre,
   clave_etiqueta: `campo.${nombre}`,
   tipo: 'texto',
   obligatorio,
-  alias: [], // T-MAP-B4: los alias literales; la busqueda (T-MAP-F3) los usa
+  alias, // T-MAP-B4: the literal aliases; the search of the field list uses them (T-MAP-F3)
 });
 
 /** A slice of the sheet's catalogue, with its one required field. */
@@ -31,7 +31,7 @@ export const CAMPOS_SINTETICOS: Campo[] = [
   campo('pagare_duplicado'),
   campo('titular'),
   campo('saldo_capital_pendiente'),
-  campo('telefono'),
+  campo('telefono', false, ['celular', 'movil']),
   campo('dias_atraso'),
   campo('documento'),
 ];

@@ -23,7 +23,12 @@ const pasoActual = (page: Page) => dialogo(page).locator('[data-paso-marca][aria
 const continuar = (page: Page) => dialogo(page).getByRole('button', { name: 'Continuar' });
 const confirmar = (page: Page) => dialogo(page).getByRole('button', { name: 'Confirmar y cargar' });
 const fila = (page: Page, indice: number) => dialogo(page).locator(`tr[data-fila="${indice}"]`);
-const campoDe = (page: Page, indice: number) => fila(page, indice).locator('select');
+const campoDe = (page: Page, indice: number) => fila(page, indice).locator('[role="combobox"]');
+/** Opens the row's field list and clicks the field by its technical name ('' is «No cargar esta columna»). */
+async function elegirCampo(page: Page, indice: number, valor: string): Promise<void> {
+  await campoDe(page, indice).click();
+  await fila(page, indice).locator(`[role="option"][data-valor="${valor}"]`).click();
+}
 const opcion = (page: Page, cual: 'hoja' | 'separador' | 'codificacion') => dialogo(page).locator(`[data-opcion-select="${cual}"]`);
 const errorDeOpcion = (page: Page, cual: 'hoja' | 'separador' | 'codificacion') => dialogo(page).locator(`[data-opcion-error="${cual}"]`);
 const motivo = (page: Page) => dialogo(page).locator('[data-motivo]');
@@ -192,7 +197,7 @@ test.describe('cómo se lee el archivo', () => {
     const { carga } = await abrir(page, VARIAS_HOJAS, { analisisPara: (opciones) => ({ ...VARIAS_HOJAS, hoja: opciones.hoja ?? 'VENCIDA' }) });
     await alPaso2(page);
     await dialogo(page).getByRole('button', { name: 'Ver columnas' }).click();
-    await campoDe(page, 1).selectOption('dias_atraso');
+    await elegirCampo(page, 1, 'dias_atraso');
 
     await opcion(page, 'hoja').selectOption('MORA');
 
@@ -205,7 +210,7 @@ test.describe('cómo se lee el archivo', () => {
 
     await expect(aviso).toBeHidden();
     await expect(opcion(page, 'hoja')).toHaveValue('VENCIDA');
-    await expect(campoDe(page, 1)).toHaveValue('dias_atraso');
+    await expect(campoDe(page, 1)).toHaveAttribute('data-valor', 'dias_atraso');
     expect(carga.reanalisis).toEqual([]);
   });
 
@@ -213,7 +218,7 @@ test.describe('cómo se lee el archivo', () => {
     const { carga } = await abrir(page, VARIAS_HOJAS, { analisisPara: (opciones) => ({ ...VARIAS_HOJAS, hoja: opciones.hoja ?? 'VENCIDA' }) });
     await alPaso2(page);
     await dialogo(page).getByRole('button', { name: 'Ver columnas' }).click();
-    await campoDe(page, 1).selectOption('dias_atraso');
+    await elegirCampo(page, 1, 'dias_atraso');
 
     await opcion(page, 'hoja').selectOption('MORA');
     await dialogo(page).getByRole('button', { name: 'Volver a leer' }).click();
@@ -221,7 +226,7 @@ test.describe('cómo se lee el archivo', () => {
     await expect.poll(() => carga.reanalisis).toEqual([{ hoja: 'MORA' }]);
     await expect(dialogo(page).locator('[data-reanalizar]')).toBeHidden();
     await expect(opcion(page, 'hoja')).toHaveValue('MORA');
-    await expect(campoDe(page, 1)).toHaveValue('titular');
+    await expect(campoDe(page, 1)).toHaveAttribute('data-valor', 'titular');
   });
 });
 
@@ -309,14 +314,14 @@ test.describe('al confirmar', () => {
     });
     await alPaso2(page);
     await dialogo(page).getByRole('button', { name: 'Ver columnas' }).click();
-    await campoDe(page, 1).selectOption('dias_atraso');
+    await elegirCampo(page, 1, 'dias_atraso');
 
     await confirmar(page).click();
 
     await expect.poll(() => carga.confirmaciones).toHaveLength(1);
     await expect(dialogo(page)).toBeVisible();
     await expect(pasoActual(page)).toHaveAttribute('data-paso-marca', '2');
-    await expect(campoDe(page, 1)).toHaveValue('dias_atraso');
+    await expect(campoDe(page, 1)).toHaveAttribute('data-valor', 'dias_atraso');
     await expect(confirmar(page)).toBeDisabled();
     await expect(motivo(page)).not.toHaveText('');
     expect(carga.descartados).toEqual([]);
@@ -339,7 +344,7 @@ test.describe('al confirmar', () => {
 
     // The first validation comes with a change: the draft is found missing there.
     await dialogo(page).getByRole('button', { name: 'Ver columnas' }).click();
-    await campoDe(page, 1).selectOption('dias_atraso');
+    await elegirCampo(page, 1, 'dias_atraso');
 
     await expect(dialogo(page).locator('[data-upload-error]')).toHaveText('La carga en curso venció, ya se confirmó o no existe. Vuelve a elegir el archivo.');
     await expect(pasoActual(page)).toHaveAttribute('data-paso-marca', '1');
@@ -435,7 +440,7 @@ test.describe('el foco', () => {
     await alPaso2(page);
     await dialogo(page).getByRole('button', { name: 'Ver columnas' }).click();
 
-    await campoDe(page, 1).selectOption('dias_atraso');
+    await elegirCampo(page, 1, 'dias_atraso');
 
     await expect(continuar(page)).toBeFocused();
   });
@@ -455,7 +460,7 @@ test.describe('el foco', () => {
     });
     await alPaso2(page);
     await dialogo(page).getByRole('button', { name: 'Ver columnas' }).click();
-    await campoDe(page, 1).selectOption('dias_atraso');
+    await elegirCampo(page, 1, 'dias_atraso');
     await expect(confirmar(page)).toBeEnabled();
 
     await confirmar(page).click();
@@ -519,7 +524,7 @@ test.describe('detalles del paso 2', () => {
     await abrir(page, VARIAS_HOJAS);
     await alPaso2(page);
     await dialogo(page).getByRole('button', { name: 'Ver columnas' }).click();
-    await campoDe(page, 1).selectOption('dias_atraso');
+    await elegirCampo(page, 1, 'dias_atraso');
 
     await opcion(page, 'hoja').selectOption('MORA');
 
@@ -527,4 +532,57 @@ test.describe('detalles del paso 2', () => {
     await expect(dialogo(page).getByRole('button', { name: 'Volver a leer' })).toHaveAccessibleDescription(aviso);
     await expect(dialogo(page).getByRole('button', { name: 'Mantener lo elegido' })).toHaveAccessibleDescription(aviso);
   });
+});
+
+test.describe('la lista de campos dentro del diálogo (T-MAP-F3)', () => {
+  test('el primer Escape cierra la lista; solo el segundo cierra el diálogo', async ({ page }) => {
+    await abrir(page, CON_PARECIDOS);
+    await alPaso2(page);
+
+    await campoDe(page, 1).fill('dias');
+    await campoDe(page, 1).press('Escape');
+
+    await expect(fila(page, 1).getByRole('listbox')).toBeHidden();
+    await expect(dialogo(page)).toBeVisible();
+    await expect(campoDe(page, 1)).toHaveAttribute('data-valor', 'saldo_capital_pendiente');
+
+    await campoDe(page, 1).press('Escape');
+    await expect(dialogo(page)).toBeHidden();
+  });
+
+  test('Intro en la lista elige el campo y no envía el formulario', async ({ page }) => {
+    const { carga } = await abrir(page, CON_PARECIDOS);
+    await alPaso2(page);
+
+    await campoDe(page, 1).fill('atraso');
+    await campoDe(page, 1).press('Enter');
+
+    await expect(campoDe(page, 1)).toHaveAttribute('data-valor', 'dias_atraso');
+    await expect(pasoActual(page)).toHaveAttribute('data-paso-marca', '2');
+    expect(carga.confirmaciones).toEqual([]);
+  });
+
+  // At about 930 px the «Campo de carga» column was cut on the right: the field list now shrinks with it.
+  // Long headers and three examples each, as a real sheet brings them.
+  const LARGO = analisisSintetico([
+    columna(0, 'NUMERO DE PAGARE DEL CREDITO', 'coincide', 'pagare', ['PG-0000001', 'PG-0000002', 'PG-0000003']),
+    columna(1, 'SALDO CAPITAL PENDIENTE AL CORTE', 'parecido', 'saldo_capital_pendiente', ['1500000.50', '82000.00', '310.75']),
+    columna(2, 'NOMBRE COMPLETO DEL CLIENTE', 'parecido', 'titular', ['NOMBRE UNO', 'NOMBRE DOS', 'NOMBRE TRES']),
+  ]);
+  for (const [ancho, alto] of [[1440, 900], [930, 800], [360, 740]] as const) {
+    test(`a ${ancho} px la columna «Campo de carga» entra entera, sin desplazar la tabla de lado`, async ({ page }) => {
+      await page.setViewportSize({ width: ancho, height: alto });
+      await abrir(page, LARGO);
+      await alPaso2(page);
+
+      const medidas = await dialogo(page).evaluate((d) => {
+        const tabla = d.querySelector<HTMLElement>('.table-scroll')!;
+        const campo = d.querySelector<HTMLElement>('tr[data-fila="1"] [role="combobox"]')!.getBoundingClientRect();
+        const caja = d.getBoundingClientRect();
+        return { sobra: tabla.scrollWidth - tabla.clientWidth, derecha: campo.right, limite: caja.right };
+      });
+      expect(medidas.sobra).toBeLessThanOrEqual(0);
+      expect(medidas.derecha).toBeLessThanOrEqual(medidas.limite);
+    });
+  }
 });

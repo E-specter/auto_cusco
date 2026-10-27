@@ -1494,7 +1494,7 @@ import '../styles/console.css';
         // Back to the same step, with what was chosen intact and the problems on their rows.
         mapeo.controlador?.fijarProblemas(problemas);
         // The button was off while confirming, so the focus is lost: to the first marked field, or the summary.
-        const marcado = raizMapeador.querySelector<HTMLElement>('select[aria-invalid="true"]');
+        const marcado = raizMapeador.querySelector<HTMLElement>('[role="combobox"][aria-invalid="true"]');
         marcado?.focus();
         if (document.activeElement !== marcado) $<HTMLElement>('[data-mapeo-resumen]')!.focus();
       } else if (esBorradorPerdido(caught)) {

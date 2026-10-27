@@ -68,7 +68,7 @@ Si el análisis no deja nada por revisar ni ningún problema, el componente mues
 
 ### 3.3 La tabla
 
-Una `.table` dentro de `.table-scroll`, con `<caption>` «Columnas del archivo», y `.table--apilable` a menos de 48rem. Una fila por columna del archivo:
+Una `.table` dentro de `.table-scroll`, con `<caption>` «Columnas del archivo», y `.table--apilable` a menos de 48rem. La tabla no se desplaza de lado dentro del diálogo de `/cargas`: la lista de campos se encoge con la columna y recorta el nombre elegido con «…», que se lee completo en `title` y al abrir la lista. Con el `select` de antes, a unos 930 px la columna «Campo de carga» se cortaba a la derecha (T-MAP-F3). Apilar ya a 64rem también lo resolvía, pero cada fila ocupaba casi todo el alto del diálogo. Una fila por columna del archivo:
 
 | Columna | Qué muestra |
 |---|---|
@@ -76,7 +76,7 @@ Una `.table` dentro de `.table-scroll`, con `<caption>` «Columnas del archivo»
 | **Encabezado del archivo** | El texto tal como viene |
 | **Ejemplos** | Hasta 3, en mono, separados por « · », cada uno recortado con puntos suspensivos y completo en `title`. Sin ejemplos, «—» |
 | **Estado** | Un `.tag`, y debajo una línea corta cuando hace falta (§3.4) |
-| **Campo de carga** | El `select` y, en un parecido pendiente, el botón «Aceptar» (§3.5) |
+| **Campo de carga** | La lista de campos con búsqueda y, en un parecido pendiente, el botón «Aceptar» (§3.5) |
 
 ### 3.4 Estados
 
@@ -93,25 +93,35 @@ El `.tag` muestra lo que vale **ahora** para esa columna. Mientras tenga el camp
 
 ### 3.5 El campo de carga
 
-- **El `select`** tiene, en este orden:
+- **La lista de campos** tiene, en este orden:
   - «No cargar esta columna»;
   - el grupo «Obligatorios»;
   - el grupo «Otros campos», ordenado por etiqueta (`ordenarPorEtiqueta`).
-- **Un campo que ya usa otra columna sale deshabilitado** en el `select` de las demás filas (decisión del usuario, 2026-10-27).
+- **Es un combobox con lista en que se puede escribir** (RF-59 ampliado, 2026-10-27). Sigue el patrón de combobox con autocompletado de lista de las prácticas de ARIA, con selección manual. No es un `select`: en un `select` no se puede escribir para filtrar.
+  - **Cerrado,** es un `.input` con una flecha que muestra el campo elegido, o «No cargar esta columna». Recibir el foco no abre la lista, así que tabular por la tabla no hace ruido. Al recibir el foco, el texto queda seleccionado, y lo que se escribe lo reemplaza.
+  - **Se abre** al escribir, con clic, con ↓ o con Alt+↓. Abierto con clic o con flecha, muestra todos los campos, con la opción activa en el campo elegido. Abierto escribiendo, filtra.
+  - **La búsqueda** no distingue mayúsculas ni tildes. Cada palabra escrita tiene que aparecer en el nombre legible del campo, en su nombre técnico (con espacios en vez de `_`) o en sus alias (`alias` del catálogo: solo los literales, legibles, T-MAP-B4). Es la misma búsqueda que la del selector de variables del editor de texto (`filtrarVariables`).
+  - **«No cargar esta columna» queda siempre en la lista,** escriba lo que escriba el analista. Los grupos sin resultados no se muestran.
+  - **Al escribir,** la opción activa pasa al primer campo elegible que coincide, así que «saldo» + Intro elige. Con el texto vacío, vuelve al campo elegido.
+  - **Si ningún campo coincide,** la lista muestra «No cargar esta columna» y, debajo, una línea que no es opción: «No hay campos con «xyz»». La elección vigente no cambia.
+  - **Teclado:** ↑ y ↓ recorren las opciones; Inicio y Fin quedan para el texto. Intro elige la opción activa y cierra. Escape cierra sin cambiar nada y devuelve el texto al campo elegido; solo un segundo Escape cierra el diálogo que contiene la lista. Tab y salir con clic también cierran sin cambiar nada: se elige solo con Intro o con un clic sobre la opción.
+  - **La lista se abre debajo del campo, dentro de la celda,** y empuja la fila; no flota. Así no la recorta el desplazamiento de la tabla ni el del diálogo, y apilada a 360 px se ve igual. Mide hasta unas 8 opciones de alto y tiene su propio desplazamiento, que sigue a la opción activa.
+  - **Lector de pantalla:** el campo es `role="combobox"` con `aria-expanded`, `aria-controls` y `aria-autocomplete="list"`, y señala la opción activa con `aria-activedescendant`. Los grupos son `role="group"` con su nombre. La cantidad de resultados se anuncia en una región `role="status"` del componente, solo mientras se escribe: «12 campos», «1 campo», «No hay campos con «xyz»».
+- **Un campo que ya usa otra columna sale deshabilitado** en la lista de las demás filas (decisión del usuario, 2026-10-27). Se ve y se recorre con las flechas, con `aria-disabled="true"`, y no se puede elegir: Intro o un clic sobre él no hacen nada.
   - La opción sigue diciendo dónde está en uso, «Saldo de capital pendiente · en uso en C», para que se entienda por qué no se puede elegir. Los lectores de pantalla la anuncian como no disponible.
-  - La fila que tiene el campo lo conserva habilitado en su propio `select`.
+  - La fila que tiene el campo lo conserva habilitado en su propia lista.
   - Para intercambiar dos columnas, primero se pasa una a «No cargar». Un hint sobre la tabla lo dice una sola vez: «Un campo se usa en una sola columna. Para pasarlo a otra, primero deja la suya en «No cargar»».
-  - **Si el análisis llega con un repetido** (por ejemplo, un recordado y una coincidencia en el mismo campo): las dos filas lo tienen elegido y habilitado en su `select`, cada una con el problema `campo_repetido` bajo el `select` y contada en «Por revisar». En las demás filas el campo sale deshabilitado, con «· en uso en C y F». El problema se va cuando una de las dos elige otro campo o «No cargar».
-- **«Aceptar»** (`.btn--sm`) aparece solo en un parecido sin aceptar. Manda `parecido_aceptado` con el mismo campo sugerido. Al aceptar, el botón desaparece y el foco pasa al `select` de esa fila.
+  - **Si el análisis llega con un repetido** (por ejemplo, un recordado y una coincidencia en el mismo campo): las dos filas lo tienen elegido y habilitado en su lista, cada una con el problema `campo_repetido` bajo el campo y contada en «Por revisar». En las demás filas el campo sale deshabilitado, con «· en uso en C y F». El problema se va cuando una de las dos elige otro campo o «No cargar».
+- **«Aceptar»** (`.btn--sm`) aparece solo en un parecido sin aceptar. Manda `parecido_aceptado` con el mismo campo sugerido. Al aceptar, el botón desaparece y el foco pasa al campo de esa fila.
 - **Qué origen manda cada gesto** (para que el backend y la pantalla digan lo mismo, §3.4 del diseño y `resolver_asignaciones`):
-  - **En una columna parecida:** con el campo sugerido elegido en el `select`, manda el origen inicial no revisado que trae el análisis (`coincide`), nunca `manual`, porque en el backend `manual` contaría como revisión. Así, volver a elegir el sugerido en la lista no lo acepta; para eso está «Aceptar», que manda `parecido_aceptado`. Un campo distinto del sugerido, o «No cargar», manda `manual`.
+  - **En una columna parecida:** con el campo sugerido elegido en la lista, manda el origen inicial no revisado que trae el análisis (`coincide`), nunca `manual`, porque en el backend `manual` contaría como revisión. Así, volver a elegir el sugerido en la lista no lo acepta; para eso está «Aceptar», que manda `parecido_aceptado`. Un campo distinto del sugerido, o «No cargar», manda `manual`.
   - **En una columna no parecida:** con el campo del análisis, `recordado` o `coincide`, como venía; con otro, `manual`. El backend recalcula el origen si no cuadra.
   - Una columna `sin_coincidencia` que se queda en «No cargar» se guarda como `manual` (decisión de B1). No cambia lo que muestra la pantalla.
 
 ### 3.6 Problemas
 
-- **Problema de una columna** (`parecido_sin_revisar`, y `campo_repetido` cuando lo trae el análisis): bajo su `select`, con `.field__error`, `aria-invalid` y `aria-describedby`. La fila cuenta en «Por revisar». Con el campo en uso deshabilitado, ningún gesto de la pantalla produce un `campo_repetido` nuevo.
-- **Problema sin columna** (`obligatorio_sin_columna`, que llega sin índice): en un `.notice--danger` arriba de la tabla, uno por campo. Lleva el botón «Elegir la columna», que pasa a «Todas» y lleva el foco al `select` de la primera columna en «No cargar». Es el único resumen de la pantalla (§9.4 del motor).
+- **Problema de una columna** (`parecido_sin_revisar`, y `campo_repetido` cuando lo trae el análisis): bajo su campo, con `.field__error`, `aria-invalid` y `aria-describedby`. La fila cuenta en «Por revisar». Con el campo en uso deshabilitado, ningún gesto de la pantalla produce un `campo_repetido` nuevo.
+- **Problema sin columna** (`obligatorio_sin_columna`, que llega sin índice): en un `.notice--danger` arriba de la tabla, uno por campo. Lleva el botón «Elegir la columna», que pasa a «Todas» y lleva el foco al campo de la primera columna en «No cargar». Es el único resumen de la pantalla (§9.4 del motor).
 - **`{campo}` en los textos de problema** se llena con la etiqueta visible del campo, nunca con su nombre técnico.
 - Los códigos de protección (`campo_desconocido`, `indice_fuera_de_rango`, `asignacion_faltante`, `indice_repetido`, y `campo_repetido` fuera del análisis inicial) no los produce la pantalla. Si alguno llegara, va al resumen con su texto.
 
@@ -137,7 +147,7 @@ Hoja, separador y codificación son de la pantalla de carga, sobre el componente
 
 ## 6. Accesibilidad
 
-- Cada `select` se llama «Campo de carga para la columna C, «Saldo Capital»». Cada «Aceptar» se llama «Aceptar Saldo de capital pendiente para la columna C».
+- Cada campo de la lista se llama «Campo de carga para la columna C, «Saldo Capital»». Cada «Aceptar» se llama «Aceptar Saldo de capital pendiente para la columna C».
 - El contador de «Por revisar» se anuncia en una región `aria-live="polite"`, solo cuando cambia.
 - El orden de tabulación es el de lectura: filtro, «Aceptar sugerencias», y después cada fila.
 - Contraste AA en claro y oscuro, con axe en los estados de §8.
@@ -153,7 +163,7 @@ Los textos del componente van en `mapeador.*` (es y en). Los de estado, origen, 
 
 ## 8. Pruebas mínimas
 
-- **Vitest:** el estado puro. Asignaciones iniciales desde el análisis, aceptar uno y aceptar todos, una elección manual, «en uso», los contadores del filtro y la etiqueta de la columna (letra o número). Además, el origen que manda cada gesto: en una columna parecida, volver al sugerido en el `select` no manda `manual`; y el tag vuelve a su estado del análisis cuando el campo vuelve a ser el original.
+- **Vitest:** el estado puro. Asignaciones iniciales desde el análisis, aceptar uno y aceptar todos, una elección manual, «en uso», los contadores del filtro y la etiqueta de la columna (letra o número). Además, el origen que manda cada gesto: en una columna parecida, volver al sugerido en la lista no manda `manual`; la búsqueda (`filtrarVariables` con las etiquetas de campo) ignora mayúsculas y tildes y busca por nombre legible y técnico; y el tag vuelve a su estado del análisis cuando el campo vuelve a ser el original.
 - **Playwright:**
   - todo coincide: el aviso de éxito, la tabla recogida y confirmar habilitado;
   - un parecido se acepta con su botón, y elegir el mismo campo en la lista no lo acepta;
@@ -163,5 +173,7 @@ Los textos del componente van en `mapeador.*` (es y en). Los de estado, origen, 
   - un repetido que trae el análisis marca las dos filas, y se resuelve pasando una a «No cargar»;
   - obligatorio sin columna, con «Elegir la columna»;
   - la fila revisada sigue en «Por revisar» hasta cambiar el filtro;
-  - `destruir()`.
-- **axe,** en claro, oscuro y 360 px: con parecidos por revisar, con un obligatorio sin columna y con la tabla recogida.
+  - `destruir()`;
+  - la búsqueda (T-MAP-F3): escribir sin tildes ni mayúsculas filtra y anuncia la cantidad; «No cargar esta columna» queda siempre; sin resultados dice «No hay campos con…» y la elección no cambia; ↓ e Intro eligen; Escape cierra sin cambiar y no cierra el diálogo; Tab cierra sin cambiar; el campo en uso aparece con `aria-disabled` y no se elige;
+  - en `/cargas`, a 1440, ~930 y 360 px, la columna «Campo de carga» entra en el diálogo sin desplazar la tabla de lado.
+- **axe,** en claro, oscuro y 360 px: con parecidos por revisar, con un obligatorio sin columna, con la tabla recogida y con la lista abierta y filtrada.

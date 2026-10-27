@@ -6,7 +6,7 @@
  * The backend decides; this shows. Choices live in `lib/mapeador.ts`; every
  * change is validated through `validar` (300 ms after the last one, cancelling
  * the request before). Rows are built once per analysis and then updated in
- * place, so a select never loses the focus while the analyst works.
+ * place, so a field list never loses the focus while the analyst works.
  */
 
 import { etiquetaCampo } from '../lib/campos';
@@ -29,6 +29,7 @@ import {
   type Problema,
 } from '../lib/mapeador';
 import type { components } from '../lib/contrato-api';
+import { crearSelectorCampo, type OpcionCampo, type SelectorCampo } from './selector-campo';
 
 type CampoDestino = components['schemas']['CampoDestinoRespuesta'];
 
@@ -95,6 +96,7 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
     filtro: [...raiz.querySelectorAll<HTMLButtonElement>('[data-filtro-opcion]')],
     aceptarTodas: q<HTMLButtonElement>('[data-aceptar-todas]'),
     anuncio: q<HTMLElement>('[data-anuncio]'),
+    anuncioBusqueda: q<HTMLElement>('[data-anuncio-busqueda]'),
     filas: q<HTMLElement>('[data-filas]'),
     advertencias: q<HTMLElement>('[data-advertencias]'),
     advertenciasTitulo: q<HTMLElement>('[data-advertencias-titulo]'),
@@ -183,40 +185,43 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
 
   // ---- Rows --------------------------------------------------------------------------------
 
-  /** Options in order: «No cargar», required fields, then the rest by label (§3.5). */
-  function crearSelect(indice: number, encabezado: string): HTMLSelectElement {
-    const select = document.createElement('select');
-    select.className = 'input';
-    select.id = `${id}-campo-${indice}`;
-    select.dataset.campo = String(indice);
-    select.setAttribute(
-      'aria-label',
-      t('mapeador.vista.campoPara', { columna: columnaLetra(indice), encabezado }),
-    );
-    const ninguno = document.createElement('option');
-    ninguno.value = NO_CARGAR;
-    ninguno.textContent = t('mapeador.vista.noCargar');
-    select.append(ninguno);
-    for (const [clave, obligatorio] of [
-      ['mapeador.vista.obligatorios', true],
-      ['mapeador.vista.otros', false],
-    ] as const) {
-      const grupo = document.createElement('optgroup');
-      grupo.label = t(clave);
-      const delGrupo = campos
-        .filter((c) => c.obligatorio === obligatorio)
-        .sort((a, b) => etiquetaDe(a).localeCompare(etiquetaDe(b)));
-      for (const campo of delGrupo) {
-        const opcion = document.createElement('option');
-        opcion.value = campo.nombre;
-        grupo.append(opcion);
-      }
-      if (delGrupo.length > 0) select.append(grupo);
-    }
-    select.addEventListener('change', () => {
-      cambio(elegir(s.asignaciones, s.analisis, indice, select.value === NO_CARGAR ? null : select.value));
+  /** Required fields first, then the rest, each by label (§3.5). */
+  const ordenados = () =>
+    [...campos].sort((a, b) => Number(b.obligatorio) - Number(a.obligatorio) || etiquetaDe(a).localeCompare(etiquetaDe(b)));
+
+  /** The fields as one row's list shows them now: one another column uses is disabled, except in the rows that hold it. */
+  function opcionesDe(indice: number): OpcionCampo[] {
+    const enUso = usos(s.asignaciones);
+    const propio = asignacionDe(indice).campo;
+    return ordenados().map((campo) => {
+      const otras = (enUso.get(campo.nombre) ?? []).filter((i) => i !== indice);
+      const etiqueta = etiquetaDe(campo);
+      return {
+        nombre: campo.nombre,
+        etiqueta,
+        alias: campo.alias,
+        texto: otras.length ? t('mapeador.vista.enUso', { campo: etiqueta, columnas: otras.map(columnaLetra).join(' y ') }) : etiqueta,
+        grupo: campo.obligatorio ? 'obligatorios' : 'otros',
+        // Decision of 2026-10-27.
+        deshabilitada: otras.length > 0 && propio !== campo.nombre,
+      };
     });
-    return select;
+  }
+
+  const selectores = new Map<number, SelectorCampo>();
+
+  function crearSelector(indice: number, encabezado: string): SelectorCampo {
+    const selector = crearSelectorCampo({
+      id: `${id}-campo-${indice}`,
+      nombre: t('mapeador.vista.campoPara', { columna: columnaLetra(indice), encabezado }),
+      opciones: () => opcionesDe(indice),
+      valor: () => asignacionDe(indice).campo ?? NO_CARGAR,
+      onElegir: (valor) => cambio(elegir(s.asignaciones, s.analisis, indice, valor === NO_CARGAR ? null : valor)),
+      anunciar: (texto) => (el.anuncioBusqueda.textContent = texto),
+    });
+    selector.input.dataset.campo = String(indice);
+    selectores.set(indice, selector);
+    return selector;
   }
 
   function crearFila(columna: Analisis['columnas'][number]): HTMLTableRowElement {
@@ -265,7 +270,7 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
     celdaCampo.dataset.etiqueta = t('mapeador.vista.col.campo');
     const control = document.createElement('div');
     control.className = 'mapeador__control';
-    const select = crearSelect(columna.indice, columna.encabezado);
+    const selector = crearSelector(columna.indice, columna.encabezado);
     const botonAceptar = document.createElement('button');
     botonAceptar.type = 'button';
     botonAceptar.className = 'btn btn--sm';
@@ -273,9 +278,9 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
     botonAceptar.textContent = t('mapeador.vista.aceptar');
     botonAceptar.addEventListener('click', () => {
       cambio(aceptar(s.asignaciones, s.analisis, columna.indice));
-      select.focus();
+      selector.input.focus();
     });
-    control.append(select, botonAceptar);
+    control.append(selector.raiz, botonAceptar);
     const error = document.createElement('p');
     error.className = 'field__error';
     error.id = `${id}-error-${columna.indice}`;
@@ -292,9 +297,8 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
     return texto === clave ? problema.detalle : texto;
   }
 
-  /** Each row in place: tag, note, select options (in use, disabled), «Aceptar» and its problem. */
+  /** Each row in place: tag, note, its field list, «Aceptar» and its problem. */
   function pintarFilas(): void {
-    const enUso = usos(s.asignaciones);
     for (const columna of s.analisis.columnas) {
       const fila = el.filas.querySelector<HTMLTableRowElement>(`[data-fila="${columna.indice}"]`)!;
       const asignacion = asignacionDe(columna.indice);
@@ -311,18 +315,9 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
             ? t('mapeador.vista.nota.parecido', { campo: etiquetaDeNombre(columna.sugerido) })
             : '';
 
-      const select = fila.querySelector<HTMLSelectElement>('[data-campo]')!;
-      for (const opcion of select.querySelectorAll('option')) {
-        if (opcion.value === NO_CARGAR) continue;
-        const otras = (enUso.get(opcion.value) ?? []).filter((i) => i !== columna.indice);
-        const etiqueta = etiquetaDeNombre(opcion.value);
-        opcion.textContent = otras.length
-          ? t('mapeador.vista.enUso', { campo: etiqueta, columnas: otras.map(columnaLetra).join(' y ') })
-          : etiqueta;
-        // A field another column uses is disabled, except in the rows that hold it (decision of 2026-10-27).
-        opcion.disabled = otras.length > 0 && asignacion.campo !== opcion.value;
-      }
-      select.value = asignacion.campo ?? NO_CARGAR;
+      const selector = selectores.get(columna.indice)!;
+      selector.pintar();
+      const campo = selector.input;
 
       const botonAceptar = fila.querySelector<HTMLButtonElement>('[data-aceptar]')!;
       botonAceptar.hidden = !pendiente(columna, asignacion);
@@ -337,11 +332,11 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
       const propios = s.problemas.filter((p) => p.indice === columna.indice);
       error.textContent = propios.map(mensajeProblema).join(' ');
       if (propios.length) {
-        select.setAttribute('aria-invalid', 'true');
-        select.setAttribute('aria-describedby', error.id);
+        campo.setAttribute('aria-invalid', 'true');
+        campo.setAttribute('aria-describedby', error.id);
       } else {
-        select.removeAttribute('aria-invalid');
-        select.removeAttribute('aria-describedby');
+        campo.removeAttribute('aria-invalid');
+        campo.removeAttribute('aria-describedby');
       }
 
       fila.hidden = s.filtro === 'revisar' && !s.visibles.has(columna.indice);
@@ -367,7 +362,7 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
           ir.addEventListener('click', () => {
             fijarFiltro('todas');
             const libre = s.asignaciones.find((a) => a.campo === null) ?? s.asignaciones[0];
-            if (libre) el.filas.querySelector<HTMLSelectElement>(`[data-campo="${libre.indice}"]`)?.focus();
+            if (libre) selectores.get(libre.indice)?.input.focus();
           });
           item.append(' ', ir);
         }
@@ -445,6 +440,7 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
 
   /** Rows and texts that depend on the language; the analyst's choices stay. */
   function construir(): void {
+    selectores.clear();
     el.filas.replaceChildren(...s.analisis.columnas.map(crearFila));
     el.listoTexto.textContent = t('mapeador.vista.listo', { n: formatNumber(s.analisis.columnas.length) });
     pintarContexto();

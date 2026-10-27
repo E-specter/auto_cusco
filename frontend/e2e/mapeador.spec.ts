@@ -27,7 +27,13 @@ async function abrir(page: Page, analisis: Analisis): Promise<ApiFalsaMapeador> 
 
 const raiz = (page: Page) => page.locator('#mapeador-prueba');
 const fila = (page: Page, indice: number) => raiz(page).locator(`tr[data-fila="${indice}"]`);
-const campoDe = (page: Page, indice: number) => fila(page, indice).locator('select');
+const campoDe = (page: Page, indice: number) => fila(page, indice).locator('[role="combobox"]');
+/** Opens the row's field list and clicks the field by its technical name ('' is «No cargar esta columna»). */
+const opcionDe = (page: Page, indice: number, valor: string) => fila(page, indice).locator(`[role="option"][data-valor="${valor}"]`);
+async function elegirCampo(page: Page, indice: number, valor: string): Promise<void> {
+  await campoDe(page, indice).click();
+  await fila(page, indice).locator(`[role="option"][data-valor="${valor}"]`).click();
+}
 const estadoListo = (page: Page) => page.locator('[data-estado-prueba]');
 
 const TODO_COINCIDE = analisisSintetico([
@@ -75,8 +81,8 @@ test.describe('revisar parecidos', () => {
   test('un parecido se acepta con su botón; elegirlo otra vez en la lista no lo acepta', async ({ page }) => {
     const api = await abrir(page, CON_PARECIDOS);
 
-    await campoDe(page, 1).selectOption('dias_atraso');
-    await campoDe(page, 1).selectOption('saldo_capital_pendiente');
+    await elegirCampo(page, 1, 'dias_atraso');
+    await elegirCampo(page, 1, 'saldo_capital_pendiente');
     await expect.poll(() => api.pedidos.at(-1)?.find((a) => a.indice === 1)).toEqual({ indice: 1, campo: 'saldo_capital_pendiente', origen: 'coincide' });
     await expect(fila(page, 1)).toContainText('Por revisar');
 
@@ -104,9 +110,9 @@ test.describe('revisar parecidos', () => {
     await abrir(page, CON_PARECIDOS);
     await raiz(page).getByRole('button', { name: /^Todas/ }).click();
 
-    await campoDe(page, 3).selectOption('dias_atraso');
+    await elegirCampo(page, 3, 'dias_atraso');
     await expect(fila(page, 3)).toContainText('Elegido a mano');
-    await campoDe(page, 3).selectOption('telefono');
+    await elegirCampo(page, 3, 'telefono');
     await expect(fila(page, 3)).toContainText('Recordado');
   });
 });
@@ -116,11 +122,19 @@ test.describe('un campo en una sola columna', () => {
     await abrir(page, CON_PARECIDOS);
     await raiz(page).getByRole('button', { name: /^Todas/ }).click();
 
-    const opcion = campoDe(page, 4).locator('option[value="pagare"]');
-    await expect(opcion).toBeDisabled();
+    await campoDe(page, 4).click();
+    const opcion = opcionDe(page, 4, 'pagare');
+    await expect(opcion).toHaveAttribute('aria-disabled', 'true');
     await expect(opcion).toHaveText('Pagaré · en uso en A');
-    await expect(campoDe(page, 0).locator('option[value="pagare"]')).toBeEnabled();
-    await expect(campoDe(page, 0)).toHaveValue('pagare');
+    // Visible and reachable, but Enter and a click do nothing.
+    // `force`: Playwright itself will not click an aria-disabled element; the list must ignore it too.
+    await opcion.click({ force: true });
+    await expect(campoDe(page, 4)).toHaveAttribute('data-valor', '');
+    await campoDe(page, 4).press('Escape');
+
+    await campoDe(page, 0).click();
+    await expect(opcionDe(page, 0, 'pagare')).not.toHaveAttribute('aria-disabled');
+    await expect(campoDe(page, 0)).toHaveAttribute('data-valor', 'pagare');
   });
 
   test('dos encabezados iguales se distinguen por su columna', async ({ page }) => {
@@ -141,10 +155,12 @@ test.describe('un campo en una sola columna', () => {
     for (const indice of [1, 2]) {
       await expect(fila(page, indice).locator('.field__error')).toHaveText('Titular está asignado a más de una columna: deja una sola.');
       await expect(campoDe(page, indice)).toHaveAttribute('aria-invalid', 'true');
-      await expect(campoDe(page, indice).locator('option[value="titular"]')).toBeEnabled();
+      await campoDe(page, indice).click();
+      await expect(opcionDe(page, indice, 'titular')).not.toHaveAttribute('aria-disabled');
+      await campoDe(page, indice).press('Escape');
     }
 
-    await campoDe(page, 2).selectOption('');
+    await elegirCampo(page, 2, '');
     await expect(fila(page, 1).locator('.field__error')).toBeEmpty();
     await expect(estadoListo(page)).toHaveText('listo');
   });
@@ -160,7 +176,7 @@ test.describe('problemas sin columna', () => {
 
     await expect(raiz(page).getByRole('button', { name: /^Todas/ })).toHaveAttribute('aria-pressed', 'true');
     await expect(campoDe(page, 0)).toBeFocused();
-    await campoDe(page, 0).selectOption('pagare');
+    await elegirCampo(page, 0, 'pagare');
     await expect(resumen).toBeHidden();
   });
 });
@@ -181,7 +197,7 @@ test('fijarProblemas (el 422 de confirmar): muestra los problemas en su lugar si
   await expect(raiz(page).locator('table')).toBeVisible();
   await expect(fila(page, 1).locator('.field__error')).toHaveText('Titular está asignado a más de una columna: deja una sola.');
   await expect(raiz(page).locator('[data-resumen]')).toContainText('Falta asignar una columna al campo obligatorio Pagaré.');
-  await expect(campoDe(page, 1)).toHaveValue('titular');
+  await expect(campoDe(page, 1)).toHaveAttribute('data-valor', 'titular');
   const estado = await page.evaluate(() =>
     (window as unknown as { controladorPrueba: { estado(): { modificado: boolean } } }).controladorPrueba.estado(),
   );
@@ -193,10 +209,100 @@ test('destruir: deja de validar y de emitir', async ({ page }) => {
   await page.evaluate(() => (window as unknown as { controladorPrueba: { destruir(): void } }).controladorPrueba.destruir());
   const antes = api.pedidos.length;
 
-  await campoDe(page, 1).selectOption('dias_atraso');
+  await elegirCampo(page, 1, 'dias_atraso');
   await page.waitForTimeout(600);
 
   expect(api.pedidos.length).toBe(antes);
+});
+
+test.describe('buscar en la lista de campos (T-MAP-F3, RF-59)', () => {
+  const opciones = (page: Page, indice: number) => fila(page, indice).getByRole('option');
+  const anuncio = (page: Page) => raiz(page).locator('[data-anuncio-busqueda]');
+
+  test.beforeEach(async ({ page }) => {
+    await abrir(page, CON_PARECIDOS);
+    await raiz(page).getByRole('button', { name: /^Todas/ }).click();
+  });
+
+  test('escribir filtra sin mayúsculas ni tildes, dice cuántos hay y «No cargar» queda siempre', async ({ page }) => {
+    await campoDe(page, 4).fill('DIAS');
+
+    await expect(campoDe(page, 4)).toHaveAttribute('aria-expanded', 'true');
+    await expect(opciones(page, 4)).toHaveText(['No cargar esta columna', 'Días de atraso']);
+    await expect(anuncio(page)).toHaveText('1 campo');
+
+    // Every word, in any order, against the visible and the technical name.
+    await campoDe(page, 4).fill('capital saldo');
+    await expect(opciones(page, 4)).toHaveText(['No cargar esta columna', 'Saldo de capital pendiente · en uso en B']);
+
+    await campoDe(page, 4).fill('');
+    await expect(opciones(page, 4)).toHaveCount(CAMPOS_SINTETICOS.length + 1);
+    await expect(anuncio(page)).toHaveText(`${CAMPOS_SINTETICOS.length} campos`);
+  });
+
+  test('busca también por los alias del catálogo', async ({ page }) => {
+    await campoDe(page, 4).fill('celular');
+    await expect(opciones(page, 4)).toHaveText(['No cargar esta columna', 'Teléfono · en uso en D']);
+
+    await campoDe(page, 4).fill('MÓVIL');
+    await expect(opciones(page, 4)).toHaveText(['No cargar esta columna', 'Teléfono · en uso en D']);
+  });
+
+  test('sin resultados lo dice, y Escape cierra sin cambiar la elección', async ({ page }) => {
+    await campoDe(page, 3).fill('zzz');
+
+    await expect(opciones(page, 3)).toHaveText(['No cargar esta columna']);
+    await expect(fila(page, 3).locator('.selector-campo__vacio')).toHaveText('No hay campos con «zzz».');
+    await expect(anuncio(page)).toHaveText('No hay campos con «zzz».');
+
+    await campoDe(page, 3).press('Escape');
+
+    await expect(campoDe(page, 3)).toHaveAttribute('aria-expanded', 'false');
+    await expect(campoDe(page, 3)).toHaveValue('Teléfono');
+    await expect(campoDe(page, 3)).toHaveAttribute('data-valor', 'telefono');
+    await expect(fila(page, 3)).toContainText('Recordado');
+  });
+
+  test('con el teclado: ↓ abre y recorre, la opción activa se señala, y un campo en uso no se elige', async ({ page }) => {
+    const campo = campoDe(page, 4);
+    await campo.focus();
+    await expect(campo).toHaveAttribute('aria-expanded', 'false');
+
+    await campo.press('ArrowDown');
+    await expect(campo).toHaveAttribute('aria-expanded', 'true');
+    await expect(campo).toHaveAttribute('aria-activedescendant', await opcionDe(page, 4, '').getAttribute('id') ?? '');
+
+    // Pagaré, the only required field, is in use in A: reachable, said, and Enter leaves it alone.
+    await campo.press('ArrowDown');
+    await expect(campo).toHaveAttribute('aria-activedescendant', await opcionDe(page, 4, 'pagare').getAttribute('id') ?? '');
+    await campo.press('Enter');
+    await expect(campo).toHaveAttribute('aria-expanded', 'true');
+    await expect(campo).toHaveAttribute('data-valor', '');
+
+    await campo.press('ArrowDown');
+    await campo.press('Enter');
+    await expect(campo).toHaveAttribute('aria-expanded', 'false');
+    await expect(campo).toHaveAttribute('data-valor', 'dias_atraso');
+    await expect(campo).toBeFocused();
+    await expect(fila(page, 4)).toContainText('Elegido a mano');
+  });
+
+  test('escribir e Intro elige el primer campo que coincide', async ({ page }) => {
+    await campoDe(page, 4).fill('atraso');
+    await campoDe(page, 4).press('Enter');
+
+    await expect(campoDe(page, 4)).toHaveAttribute('data-valor', 'dias_atraso');
+    await expect(campoDe(page, 4)).toHaveValue('Días de atraso');
+  });
+
+  test('Tab cierra la lista sin elegir', async ({ page }) => {
+    await campoDe(page, 4).fill('atraso');
+    await campoDe(page, 4).press('Tab');
+
+    await expect(fila(page, 4).getByRole('listbox')).toBeHidden();
+    await expect(campoDe(page, 4)).toHaveAttribute('data-valor', '');
+    await expect(campoDe(page, 4)).toHaveValue('No cargar esta columna');
+  });
 });
 
 // ---- axe --------------------------------------------------------------------------------
@@ -233,6 +339,17 @@ for (const tema of ['light', 'dark'] as const) {
       await expect(raiz(page).locator('[data-listo]')).toBeVisible();
       await sinViolaciones(page);
     });
+
+    for (const ancho of [1440, 930, 360]) {
+      test(`con la lista abierta y filtrada, a ${ancho} px`, async ({ page }) => {
+        await page.setViewportSize({ width: ancho, height: 900 });
+        await abrir(page, CON_PARECIDOS);
+        await raiz(page).getByRole('button', { name: /^Todas/ }).click();
+        await campoDe(page, 4).fill('a');
+        await expect(fila(page, 4).getByRole('listbox')).toBeVisible();
+        await sinViolaciones(page);
+      });
+    }
 
     test('a 360 px, con parecidos', async ({ page }) => {
       await page.setViewportSize({ width: 360, height: 800 });

@@ -18,6 +18,7 @@ import {
   usos,
   type Analisis,
 } from '../../src/lib/mapeador';
+import { filtrarVariables } from '../../src/lib/editor-texto';
 
 const ANALISIS: Analisis = {
   borrador_id: 1,
@@ -117,5 +118,29 @@ describe('campos en uso y lo que falta revisar', () => {
     ];
     expect([...porRevisar(ANALISIS, iniciales, problemas)].sort()).toEqual([1, 2]);
     expect([...porRevisar(ANALISIS, aceptar(iniciales, ANALISIS, 1), [])]).toEqual([]);
+  });
+});
+
+describe('la búsqueda en la lista de campos (T-MAP-F3)', () => {
+  const CAMPOS = [
+    { nombre: 'dias_atraso', etiqueta: 'Días de atraso' },
+    { nombre: 'saldo_capital_pendiente', etiqueta: 'Saldo de capital pendiente' },
+    { nombre: 'pagare', etiqueta: 'Pagaré' },
+  ];
+  const buscar = (consulta: string) => filtrarVariables(CAMPOS, consulta, (c) => c.etiqueta).map((c) => c.nombre);
+
+  it('no distingue mayúsculas ni tildes', () => {
+    expect(buscar('DIAS')).toEqual(['dias_atraso']);
+    expect(buscar('pagaré')).toEqual(['pagare']);
+  });
+
+  it('cada palabra, en cualquier orden, contra el nombre legible y el técnico', () => {
+    expect(buscar('capital saldo')).toEqual(['saldo_capital_pendiente']);
+    expect(buscar('atraso dias')).toEqual(['dias_atraso']);
+  });
+
+  it('sin texto, todos; sin coincidencias, ninguno', () => {
+    expect(buscar('  ')).toHaveLength(3);
+    expect(buscar('zzz')).toEqual([]);
   });
 });

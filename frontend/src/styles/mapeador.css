@@ -79,9 +79,68 @@
   align-items: center;
   gap: var(--space-2);
 }
-.mapeador__control .input {
+.mapeador__control .selector-campo {
   flex: 1 1 14rem;
-  inline-size: auto;
+  min-inline-size: 0;
+}
+
+/* The field list of a header (§3.5): an input you can type into, and its list in the flow, under it. */
+.selector-campo {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+}
+.selector-campo__input {
+  padding-inline-end: var(--space-5);
+  text-overflow: ellipsis;
+}
+/* The arrow says it is a list; drawn with borders, so it takes the ink colour of the theme. */
+.selector-campo::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 1.05em;
+  inset-inline-end: var(--space-3);
+  inline-size: 0.45em;
+  block-size: 0.45em;
+  border-inline-end: 2px solid var(--color-text);
+  border-block-end: 2px solid var(--color-text);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.selector-campo__lista {
+  max-block-size: 18rem;
+  overflow-y: auto;
+  border: var(--color-border-hairline) solid var(--color-border);
+  border-radius: var(--radius-structural);
+  background-color: var(--color-bg);
+  font-size: var(--text-sm);
+}
+.selector-campo__grupo {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--color-text-muted);
+  font-family: var(--font-secondary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.selector-campo__opcion {
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+.selector-campo__opcion[aria-selected='true'] {
+  font-weight: 600;
+}
+.selector-campo__opcion:hover,
+.selector-campo__opcion.is-activa {
+  background-color: var(--color-surface-sunken);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+.selector-campo__opcion[aria-disabled='true'] {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+.selector-campo__vacio {
+  margin: 0;
 }
 
 .mapeador__advertencias ul {

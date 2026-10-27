@@ -13,8 +13,11 @@ export function normalizarBusqueda(texto: string): string {
 
 type VariableConEtiqueta = { nombre: string; origen: string };
 
-/** Variables whose label or technical name contains every word of `consulta`. */
-export function filtrarVariables<V extends VariableConEtiqueta>(
+/**
+ * Variables whose label or technical name contains every word of `consulta`. The header mapper
+ * searches its fields with it too (docs/mapeador-encabezados-interfaz.md §3.5).
+ */
+export function filtrarVariables<V extends { nombre: string }>(
   variables: readonly V[],
   consulta: string,
   etiqueta: (variable: V) => string,
