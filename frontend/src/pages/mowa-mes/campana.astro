@@ -120,10 +120,33 @@ import '../../styles/mowa-mes.css';
 
             <div class="field">
               <label class="field__label" for="mm-descripcion" data-i18n="mowaMes.campana.descripcion">Descripción de la campaña</label>
-              <textarea class="input" id="mm-descripcion" rows="2" data-descripcion aria-describedby="mm-descripcion-hint"></textarea>
+              <div class="mm-descripcion">
+                <textarea
+                  class="input"
+                  id="mm-descripcion"
+                  rows="2"
+                  maxlength="100"
+                  data-descripcion
+                  aria-describedby="mm-descripcion-hint mm-descripcion-contador"></textarea>
+                <!-- aria-disabled, not disabled: it stays in the tab order and can be found (T-MM-F9). -->
+                <button
+                  type="button"
+                  class="btn btn--sm"
+                  data-descripcion-copiar
+                  aria-disabled="true"
+                  aria-label="Copiar descripción"
+                  data-i18n-attr="aria-label:mowaMes.campana.descripcion.copiar.nombre"
+                >
+                  <Icon name="copy" size={16} />
+                  <span data-i18n="mowaMes.campana.descripcion.copiar">Copiar</span>
+                </button>
+              </div>
               <p class="field__hint" id="mm-descripcion-hint" data-i18n="mowaMes.campana.descripcion.hint">
                 Identifica la campaña en el listado de reportes de MES. Se sugiere a partir de la selección; puedes editarla.
               </p>
+              <!-- The count is read as part of the field's description, never announced key by key. -->
+              <p class="field__hint mm-descripcion__contador" id="mm-descripcion-contador" data-descripcion-contador>0/100</p>
+              <p class="mono muted mm-descripcion__estado" role="status" data-descripcion-estado></p>
             </div>
 
             <div class="field">
@@ -427,10 +450,15 @@ import '../../styles/mowa-mes.css';
     type VersionSpeech,
   } from '../../lib/api-mowa-mes';
   import {
+    DESCRIPCION_MAXIMA,
+    contadorDescripcion,
+    copiarConRespaldo,
+    descripcionARegistrar,
     entradaCampana,
     entradaCreacion,
     etiquetaArchivoPrevisto,
     mensajeLimiteExcedido,
+    pegadoExcede,
     problemasCampana,
     textoDeProblemaCampana,
     resumenProblemasCampana,
@@ -1106,6 +1134,8 @@ import '../../styles/mowa-mes.css';
     if (!estado.descripcionEditada) {
       $<HTMLTextAreaElement>('#mm-descripcion').value = previa.descripcion_sugerida;
     }
+    // Setting `value` fires no `input`: the counter and «Copiar» follow the suggestion by hand.
+    pintarDescripcion();
   }
 
   async function previsualizar(): Promise<void> {
@@ -1327,8 +1357,106 @@ import '../../styles/mowa-mes.css';
   $<HTMLSelectElement>('#mm-speech').addEventListener('change', () => programarPrevisualizacion(0));
   $<HTMLInputElement>('#mm-whatsapp').addEventListener('input', () => programarPrevisualizacion());
   $<HTMLInputElement>('#mm-fecha-unica').addEventListener('input', () => programarPrevisualizacion());
-  $<HTMLTextAreaElement>('#mm-descripcion').addEventListener('input', () => {
+  // ---- The description field (RF-MM-04): counter and «Copiar» -----------------------------
+
+  const campoDescripcion = $<HTMLTextAreaElement>('#mm-descripcion');
+  const botonCopiar = $<HTMLButtonElement>('[data-descripcion-copiar]');
+  const estadoDescripcion = $<HTMLElement>('[data-descripcion-estado]');
+  /** A paste that did not fit has just been announced: the `input` that follows must not clear it. */
+  let avisoDePegado = false;
+  /** The timer of the pending message; cancelled if the text changes first. */
+  let temporizadorDelAviso: number | undefined;
+  /** Long enough for a screen reader to take the empty region as a change before the words come back. */
+  const ESPERA_DEL_AVISO_MS = 100;
+
+  /**
+   * Says something in the status region. The region is emptied first and written a moment later: a
+   * second copy repeats the same words, and a screen reader does not read a text that did not change.
+   * One animation frame (~16 ms) is too little: some readers, NVDA among them, merge close changes.
+   */
+  function avisar(texto: string): void {
+    window.clearTimeout(temporizadorDelAviso);
+    estadoDescripcion.textContent = '';
+    temporizadorDelAviso = window.setTimeout(() => {
+      estadoDescripcion.textContent = texto;
+    }, ESPERA_DEL_AVISO_MS);
+  }
+
+  function queCopiar(): string {
+    return descripcionARegistrar(campoDescripcion.value, estado.previsualizacion?.descripcion_sugerida ?? '');
+  }
+
+  function pintarDescripcion(): void {
+    const contador = $<HTMLElement>('[data-descripcion-contador]');
+    contador.textContent = contadorDescripcion(campoDescripcion.value);
+    // At the limit the number already says it: the tone only backs it up.
+    contador.dataset.tope = String(campoDescripcion.value.length >= DESCRIPCION_MAXIMA);
+    botonCopiar.setAttribute('aria-disabled', String(queCopiar() === ''));
+  }
+
+  /** The classic way: select what will be registered and ask the browser to copy it. */
+  function seleccionarYCopiar(texto: string): boolean {
+    if (campoDescripcion.value.trim() !== '') {
+      // The field's own text, without the spaces at the ends: if the copy fails it stays selected.
+      const inicio = campoDescripcion.value.length - campoDescripcion.value.trimStart().length;
+      campoDescripcion.focus();
+      campoDescripcion.setSelectionRange(inicio, inicio + texto.length);
+      return document.execCommand('copy');
+    }
+    // Nothing written: the suggestion is what is copied, from an off-screen textarea taken out in `finally`.
+    const temporal = document.createElement('textarea');
+    temporal.value = texto;
+    temporal.setAttribute('readonly', '');
+    temporal.setAttribute('aria-hidden', 'true');
+    temporal.style.cssText = 'position:fixed;inset-block-start:0;inset-inline-start:-9999px;opacity:0';
+    document.body.append(temporal);
+    try {
+      temporal.select();
+      return document.execCommand('copy');
+    } finally {
+      temporal.remove();
+    }
+  }
+
+  botonCopiar.addEventListener('click', async () => {
+    const texto = queCopiar();
+    if (texto === '') return;
+    const hayTextoEnElCampo = campoDescripcion.value.trim() !== '';
+    const resultado = await copiarConRespaldo(texto, {
+      escribir: navigator.clipboard?.writeText ? (t) => navigator.clipboard.writeText(t) : undefined,
+      seleccionarYCopiar: () => seleccionarYCopiar(texto),
+    });
+    avisoDePegado = false;
+    if (resultado === 'fallo') {
+      avisar(
+        t(hayTextoEnElCampo ? 'mowaMes.campana.descripcion.copiarFallo' : 'mowaMes.campana.descripcion.copiarFalloVacio'),
+      );
+      // With text, it stays selected in the field for Ctrl+C; without it, the focus goes back to the button.
+      if (!hayTextoEnElCampo) botonCopiar.focus();
+      return;
+    }
+    avisar(t('mowaMes.campana.descripcion.copiada'));
+    botonCopiar.focus();
+  });
+
+  campoDescripcion.addEventListener('paste', (evento) => {
+    const pegado = evento.clipboardData?.getData('text') ?? '';
+    const seleccionado = campoDescripcion.selectionEnd - campoDescripcion.selectionStart;
+    if (!pegadoExcede(campoDescripcion.value, seleccionado, pegado)) return;
+    // The browser cuts it off in silence at `maxlength`: say it once, so the end is not lost unnoticed.
+    avisoDePegado = true;
+    avisar(t('mowaMes.campana.descripcion.pegadoCortado', { max: DESCRIPCION_MAXIMA }));
+  });
+
+  campoDescripcion.addEventListener('input', () => {
     estado.descripcionEditada = true;
+    // A message about the text that was there (copied, failed) is stale once it changes.
+    if (avisoDePegado) avisoDePegado = false;
+    else {
+      window.clearTimeout(temporizadorDelAviso);
+      estadoDescripcion.textContent = '';
+    }
+    pintarDescripcion();
   });
   $<HTMLInputElement>('#mm-plantilla').addEventListener('input', () => {
     estado.plantillaEditada = true;

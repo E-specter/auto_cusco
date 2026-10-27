@@ -9,9 +9,14 @@ import type { AvisoCampana, ConsumoLimite, PrevisualizacionCampana } from '../..
 import {
   CANTIDAD_MAXIMA_CAMPANA,
   CANTIDAD_MINIMA_CAMPANA,
+  DESCRIPCION_MAXIMA,
   SALIDA_FIJA,
   TIPO_CARGA_FIJO,
+  contadorDescripcion,
+  copiarConRespaldo,
+  descripcionARegistrar,
   descripcionSigueSugerida,
+  pegadoExcede,
   entradaCampana,
   entradaCreacion,
   etiquetaArchivoPrevisto,
@@ -365,5 +370,102 @@ describe('textoDeProblemaCampana (el rango de la cantidad sale de las constantes
   it('los demás problemas siguen llevando su número de fecha', () => {
     setLanguageForTests('es');
     expect(textoDeProblemaCampana({ tipo: 'fecha_envio_invalida', indice: 1 })).toContain('2');
+  });
+});
+
+describe('la descripción de la campaña (RF-MM-04)', () => {
+  it('el tope es el del formulario de MES', () => {
+    expect(DESCRIPCION_MAXIMA).toBe(100);
+  });
+
+  it('el contador cuenta unidades UTF-16, igual que el maxlength del navegador', () => {
+    expect(contadorDescripcion('')).toBe('0/100');
+    expect(contadorDescripcion('CajaCusco')).toBe('9/100');
+    // Un emoji cuenta 2, como en la API.
+    expect(contadorDescripcion('😀')).toBe('2/100');
+    expect(contadorDescripcion('a'.repeat(100))).toBe('100/100');
+  });
+
+  it('se copia lo que se registrará: el texto sin espacios en los extremos', () => {
+    expect(descripcionARegistrar('  CajaCusco 9 a 30  ', 'sugerida')).toBe('CajaCusco 9 a 30');
+    // Los espacios de dentro no se tocan.
+    expect(descripcionARegistrar(' a  b ', 'sugerida')).toBe('a  b');
+  });
+
+  it('con el campo vacío, o solo con espacios, se copia la sugerida de la previsualización', () => {
+    expect(descripcionARegistrar('', 'CajaCusco f1, f2...')).toBe('CajaCusco f1, f2...');
+    expect(descripcionARegistrar('   ', 'CajaCusco f1, f2...')).toBe('CajaCusco f1, f2...');
+  });
+
+  it('sin texto ni sugerida no hay nada que copiar', () => {
+    expect(descripcionARegistrar('  ', '')).toBe('');
+  });
+
+  it('un pegado que no cabe se detecta contra el espacio que queda, descontando lo seleccionado', () => {
+    expect(pegadoExcede('', 0, 'a'.repeat(100))).toBe(false);
+    expect(pegadoExcede('', 0, 'a'.repeat(101))).toBe(true);
+    expect(pegadoExcede('a'.repeat(90), 0, 'b'.repeat(11))).toBe(true);
+    expect(pegadoExcede('a'.repeat(90), 0, 'b'.repeat(10))).toBe(false);
+    // Lo seleccionado se reemplaza: libera espacio.
+    expect(pegadoExcede('a'.repeat(100), 20, 'b'.repeat(20))).toBe(false);
+    expect(pegadoExcede('a'.repeat(100), 20, 'b'.repeat(21))).toBe(true);
+    // Un emoji cuenta 2.
+    expect(pegadoExcede('a'.repeat(99), 0, '😀')).toBe(true);
+  });
+});
+
+describe('copiar con respaldo: el orden de los intentos', () => {
+  const sinEscribir = () => Promise.reject(new Error('negado'));
+
+  it('con el portapapeles bien, no se llama al respaldo', async () => {
+    const escritos: string[] = [];
+    let respaldos = 0;
+    const resultado = await copiarConRespaldo('hola', {
+      escribir: async (t) => void escritos.push(t),
+      seleccionarYCopiar: () => (respaldos++, true),
+    });
+    expect(resultado).toBe('portapapeles');
+    expect(escritos).toEqual(['hola']);
+    expect(respaldos).toBe(0);
+  });
+
+  it('sin portapapeles y con el respaldo en true, copia con el respaldo', async () => {
+    let respaldos = 0;
+    const resultado = await copiarConRespaldo('hola', { seleccionarYCopiar: () => (respaldos++, true) });
+    expect(resultado).toBe('respaldo');
+    expect(respaldos).toBe(1);
+  });
+
+  it('con el portapapeles rechazado y el respaldo en true, copia con el respaldo', async () => {
+    let respaldos = 0;
+    const resultado = await copiarConRespaldo('hola', {
+      escribir: sinEscribir,
+      seleccionarYCopiar: () => (respaldos++, true),
+    });
+    expect(resultado).toBe('respaldo');
+    expect(respaldos).toBe(1);
+  });
+
+  it('con el respaldo en false, es un fallo', async () => {
+    expect(await copiarConRespaldo('hola', { escribir: sinEscribir, seleccionarYCopiar: () => false })).toBe('fallo');
+    expect(await copiarConRespaldo('hola', { seleccionarYCopiar: () => false })).toBe('fallo');
+  });
+
+  it('con un respaldo que lanza, es un fallo y no una excepción', async () => {
+    const lanza = () => {
+      throw new Error('execCommand no existe');
+    };
+    expect(await copiarConRespaldo('hola', { escribir: sinEscribir, seleccionarYCopiar: lanza })).toBe('fallo');
+    expect(await copiarConRespaldo('hola', { seleccionarYCopiar: lanza })).toBe('fallo');
+  });
+
+  it('un portapapeles que lanza de forma síncrona también cae al respaldo', async () => {
+    const resultado = await copiarConRespaldo('hola', {
+      escribir: () => {
+        throw new Error('sin permiso');
+      },
+      seleccionarYCopiar: () => true,
+    });
+    expect(resultado).toBe('respaldo');
   });
 });

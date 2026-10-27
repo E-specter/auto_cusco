@@ -426,6 +426,47 @@
   gap: var(--space-3);
 }
 
+/* The description field: the textarea and «Copiar» side by side, aligned at the top (T-MM-F9). */
+.mm-descripcion {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.mm-descripcion .input {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.mm-descripcion .btn {
+  flex: none;
+}
+
+/* aria-disabled keeps the button in the tab order; it must still look unavailable and not react. */
+.mm-descripcion .btn[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mm-descripcion__contador {
+  font-variant-numeric: tabular-nums;
+}
+
+/* At the limit the tone backs up the number, which already says it. */
+.mm-descripcion__contador[data-tope='true'] {
+  color: var(--color-warning-text);
+}
+
+/*
+ * The status region must always exist for assistive technology: one that is out of the accessibility
+ * tree (display:none) when its content changes is announced badly by NVDA and JAWS, and `avisar` empties
+ * it on purpose before repeating a message. Empty, it keeps no height, and the negative margin takes
+ * back the gap `.field` leaves before it, so it leaves no visible hole.
+ */
+.mm-descripcion__estado:empty {
+  margin-block-start: calc(var(--space-2) * -1);
+}
+
 .mm-campana__resumen {
   font-size: var(--text-sm);
   font-weight: 600;

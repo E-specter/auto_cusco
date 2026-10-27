@@ -214,6 +214,69 @@ export function descripcionSigueSugerida(actual: string, sugerida: string): bool
   return actual.trim() === sugerida.trim();
 }
 
+// ---- The description field (RF-MM-04) ----------------------------------------------
+
+/**
+ * What the «Descripción de Campaña» field of MES accepts. It is measured in UTF-16 units, like the
+ * textarea's `maxlength` and `.length`: an emoji counts 2 here, as in the API.
+ */
+export const DESCRIPCION_MAXIMA = 100;
+
+/** «37/100», for the counter under the field. */
+export function contadorDescripcion(valor: string): string {
+  return `${valor.length}/${DESCRIPCION_MAXIMA}`;
+}
+
+/**
+ * What the campaign will register: the text without spaces at the ends or, when nothing is written,
+ * the API's suggestion (the backend does the same).
+ */
+export function descripcionARegistrar(valor: string, sugerida: string): string {
+  return valor.trim() || sugerida;
+}
+
+/**
+ * Whether a paste into the field does not fit and the browser will cut it off in silence (`maxlength`):
+ * what is pasted against the room left once the selection it replaces is gone.
+ */
+export function pegadoExcede(valor: string, largoSeleccionado: number, pegado: string): boolean {
+  return pegado.length > DESCRIPCION_MAXIMA - (valor.length - largoSeleccionado);
+}
+
+/** How a copy ended: with the async clipboard, with the classic fallback, or not at all. */
+export type ResultadoCopia = 'portapapeles' | 'respaldo' | 'fallo';
+
+export interface OperacionesCopia {
+  /** `navigator.clipboard.writeText`; absent where the browser has no async clipboard (plain http outside localhost). */
+  escribir?: (texto: string) => Promise<void>;
+  /** The classic way: select the text and `document.execCommand('copy')`; `false` when the browser refuses. */
+  seleccionarYCopiar: () => boolean;
+}
+
+/**
+ * The order of attempts: the async clipboard first; only if it is missing or rejects, the classic
+ * fallback; only if that returns `false` or throws, the failure. The fallback is never tried when the
+ * clipboard worked.
+ */
+export async function copiarConRespaldo(
+  texto: string,
+  { escribir, seleccionarYCopiar }: OperacionesCopia,
+): Promise<ResultadoCopia> {
+  if (escribir) {
+    try {
+      await escribir(texto);
+      return 'portapapeles';
+    } catch {
+      // Falls through to the classic way.
+    }
+  }
+  try {
+    return seleccionarYCopiar() ? 'respaldo' : 'fallo';
+  } catch {
+    return 'fallo';
+  }
+}
+
 /**
  * One sentence per problem, errors before warnings, in the order the API
  * evaluated them. For a screen-reader status line, updated once per preview.

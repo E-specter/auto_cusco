@@ -460,6 +460,21 @@ export function exclusionesSinteticas(n: number): Exclusion[] {
 
 // ---- Campaign preview and creation (T-MM-F2, part A) --------------------------------
 
+/**
+ * The suggested description as the backend shortens it (RF-MM-04, T-MM-B10): the prefix and the filters
+ * joined; if it does not fit in 100 (UTF-16 units, like `.length`), whole filters are dropped from the
+ * end and it closes with `...`; if not even the first one fits, the text is cut at 97 and `...` is added.
+ */
+export function acortarDescripcion(prefijo: string, filtros: string[], tope = 100): string {
+  const completa = [prefijo, filtros.join(', ')].filter(Boolean).join(' ');
+  if (completa.length <= tope) return completa;
+  for (let n = filtros.length - 1; n >= 1; n--) {
+    const candidata = `${prefijo} ${filtros.slice(0, n).join(', ')}...`;
+    if (candidata.length <= tope) return candidata;
+  }
+  return `${prefijo} ${filtros[0] ?? ''}`.slice(0, tope - 3) + '...';
+}
+
 const SIN_ERRORES_NI_ADVERTENCIAS: { errores: AvisoCampana[]; advertencias: AvisoCampana[] } = {
   errores: [],
   advertencias: [],
@@ -484,7 +499,7 @@ export function previsualizacionCampanaSintetica(
   const supervision = 2;
   const totalCargados = productos + supervision;
   const speechId = entrada.speech_id ?? 1;
-  const descripcionSugerida = 'CajaCusco 9 <= dias atraso <= 30';
+  const descripcionSugerida = acortarDescripcion('CajaCusco', ['9 <= dias atraso <= 30']);
   const plantilla = entrada.plantilla_nombre_archivo?.trim() || contexto.plantilla;
   const usadas = new Set([...plantilla.matchAll(/\{([^{}]*)\}/g)].map((m) => m[1]));
   const { limite: limiteParcial, ...resto } = parcial;
