@@ -1303,7 +1303,8 @@ export interface components {
         CampoConfiguracion: "limite_mensual" | "whatsapp_contacto" | "registros_por_archivo" | "bytes_por_archivo" | "tarifa_sms" | "plantilla_nombre_archivo";
         /**
          * CampoDestinoRespuesta
-         * @description Un campo del catalogo; `clave_etiqueta` es la clave i18n de su nombre legible.
+         * @description Un campo del catalogo; `clave_etiqueta` es la clave i18n de su nombre legible. `alias` son
+         *     solo los alias literales, legibles (sin `_` ni expresiones regulares), para buscar el campo.
          */
         CampoDestinoRespuesta: {
             /** Nombre */
@@ -1314,6 +1315,8 @@ export interface components {
             tipo: string;
             /** Obligatorio */
             obligatorio: boolean;
+            /** Alias */
+            alias: string[];
         };
         /** CampoEntrada */
         CampoEntrada: {

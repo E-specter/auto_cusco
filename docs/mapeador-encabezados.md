@@ -137,7 +137,7 @@ La versión de la sábana (`carga`) guarda en `formato.mapeo` lo de hoy, **sin c
 ## 6. API
 
 Genérica del mapeador, prefijo `/mapeador`:
-- **`GET /mapeador/catalogos/{catalogo_id}`:** los campos con nombre, clave de etiqueta, tipo y obligatorio (la lista del desplegable) `codificaciones` y `separadores`, los que ofrece el selector de un CSV, en el orden en que el lector los prueba al detectar (`CODIFICACIONES` y `CANDIDATOS_DE_SEPARADOR`). 404 si el catálogo no existe.
+- **`GET /mapeador/catalogos/{catalogo_id}`:** los campos con nombre, clave de etiqueta, tipo, obligatorio y `alias` (la lista del desplegable; los `alias` son SOLO los alias literales, en forma legible —`_` como espacio, sin expresiones regulares— y salen de `alias_legibles` de `services/mapeador/similitud.py`, junto a `_es_literal`; un campo sin alias literales da `[]`. Los campos adicionales de RF-64, cuyo alias es su encabezado de origen, pasan por la misma función. La búsqueda de la pantalla, T-MAP-F3, los usa) `codificaciones` y `separadores`, los que ofrece el selector de un CSV, en el orden en que el lector los prueba al detectar (`CODIFICACIONES` y `CANDIDATOS_DE_SEPARADOR`). 404 si el catálogo no existe.
 - **`POST /mapeador/{catalogo_id}/borradores`** (multipart: `archivo`, y opcionales `hoja`, `separador` y `codificacion`): crea el borrador y devuelve el análisis:
   - lo general: `borrador_id`, `catalogo_id`, `formato`, `hojas`, `hoja`, `separador`, `codificacion`, `filas` (cuántas);
   - las columnas: `indice` (base 0), `encabezado`, `ejemplos`, `estado`, `sugerido` y `similitud` (nula si no hay sugerido);

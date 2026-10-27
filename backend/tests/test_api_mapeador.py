@@ -5,6 +5,8 @@ los archivos; se sustituyen las dependencias de FastAPI. Cada codigo de estado t
 Archivos y valores sinteticos.
 """
 
+import re
+
 import pytest
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,8 +18,10 @@ from app.api.cargas import obtener_servicio
 from app.api.mapeador import obtener_servicio_mapeador
 from app.core.entities.lectura_tabla import OpcionesLectura
 from app.core.services.borradores_carga.servicio import MapeadorService
+from app.core.services.ingesta_sabana.catalogo import CATALOGO_SABANA
 from app.core.services.ingesta_sabana.mapeable import CATALOGO_SABANA_MAPEABLE
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService
+from app.core.services.mapeador.similitud import alias_legibles
 from app.main import app, configurar_cors
 from tests.test_ingesta_mapeo_explicito import Espia, xlsx
 from tests.test_ingesta_servicio import RepositorioEnMemoria
@@ -94,11 +98,28 @@ def test_el_catalogo_trae_los_campos_y_las_codificaciones(api) -> None:
         "clave_etiqueta": "campo.pagare",
         "tipo": "clave",
         "obligatorio": True,
+        "alias": ["pagare"],
     }
     assert [c["nombre"] for c in cuerpo["campos"] if c["obligatorio"]] == ["pagare"]
     assert cuerpo["codificaciones"] == ["utf-8-sig", "utf-8", "windows-1252", "latin-1"]
     assert cuerpo["codificaciones"] == list(CODIFICACIONES)
     assert cuerpo["separadores"] == [";", "\t", ","] == list(CANDIDATOS_DE_SEPARADOR)
+
+
+def test_el_catalogo_trae_los_alias_literales_en_forma_legible(api) -> None:
+    campos = {
+        c["nombre"]: c
+        for c in api.cliente.get("/mapeador/catalogos/sabana_vencida").json()["campos"]
+    }
+
+    assert campos["dias_atraso"]["alias"] == ["dias atraso hoy"]
+    assert campos["tipo_reprogramacion"]["alias"] == ["tipo de reprogramacion"]
+    assert campos["saldo_soles_corte"]["alias"] == []  # su unico alias es una expresion regular
+    # ninguno es una expresion regular, ni lleva guion bajo, y todos salen de la misma funcion
+    for nombre, c in campos.items():
+        assert all(re.search(r"[\.^$*+?{}\[\]|()_]", a) is None for a in c["alias"]), nombre
+        catalogo = {x.nombre: x for x in CATALOGO_SABANA.campos}[nombre]
+        assert c["alias"] == list(alias_legibles(catalogo)), nombre
 
 
 def test_un_catalogo_que_no_existe_es_404(api) -> None:

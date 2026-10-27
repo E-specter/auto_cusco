@@ -57,6 +57,7 @@ from app.core.entities.sabana import (
 )
 from app.core.services.borradores_carga.servicio import BorradorAnalizado, MapeadorService
 from app.core.services.ingesta_sabana.mapeable import CATALOGO_SABANA_MAPEABLE
+from app.core.services.mapeador.similitud import alias_legibles
 
 router = APIRouter(prefix="/mapeador", tags=["mapeador de encabezados"])
 
@@ -78,12 +79,14 @@ def obtener_servicio_mapeador() -> MapeadorService:
 
 
 class CampoDestinoRespuesta(ModeloRespuesta):
-    """Un campo del catalogo; `clave_etiqueta` es la clave i18n de su nombre legible."""
+    """Un campo del catalogo; `clave_etiqueta` es la clave i18n de su nombre legible. `alias` son
+    solo los alias literales, legibles (sin `_` ni expresiones regulares), para buscar el campo."""
 
     nombre: str
     clave_etiqueta: str
     tipo: str
     obligatorio: bool
+    alias: list[str]
 
 
 class CatalogoMapeadorRespuesta(ModeloRespuesta):
@@ -330,6 +333,7 @@ def obtener_catalogo(
                 clave_etiqueta=c.clave_etiqueta,
                 tipo=c.tipo,
                 obligatorio=c.obligatorio,
+                alias=list(alias_legibles(c)),
             )
             for c in catalogo.campos
         ],

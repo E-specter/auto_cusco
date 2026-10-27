@@ -4397,6 +4397,13 @@
           "obligatorio": {
             "type": "boolean",
             "title": "Obligatorio"
+          },
+          "alias": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alias"
           }
         },
         "type": "object",
@@ -4404,10 +4411,11 @@
           "nombre",
           "clave_etiqueta",
           "tipo",
-          "obligatorio"
+          "obligatorio",
+          "alias"
         ],
         "title": "CampoDestinoRespuesta",
-        "description": "Un campo del catalogo; `clave_etiqueta` es la clave i18n de su nombre legible."
+        "description": "Un campo del catalogo; `clave_etiqueta` es la clave i18n de su nombre legible. `alias` son\nsolo los alias literales, legibles (sin `_` ni expresiones regulares), para buscar el campo."
       },
       "CampoEntrada": {
         "properties": {

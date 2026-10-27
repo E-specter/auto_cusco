@@ -46,6 +46,20 @@ def _es_literal(alias: str) -> bool:
     return _METACARACTERES.search(alias) is None
 
 
+def alias_legible(alias: str) -> str | None:
+    """El alias como texto para mostrar o buscar, o `None` si no se puede: un alias con
+    metacaracteres es una expresion regular, no un texto. Un literal sale con `_` como espacio.
+    Es LA funcion de «alias legible»: la usa la API del catalogo, y tambien los alias de un campo
+    adicional (RF-64, que es el encabezado de origen) pasan por aqui."""
+    return alias.replace("_", " ") if _es_literal(alias) else None
+
+
+def alias_legibles(campo: CampoDestino) -> tuple[str, ...]:
+    """Los alias de un campo que se pueden mostrar, en el orden del catalogo y sin repetir. Un
+    campo sin alias literales da `()`."""
+    return tuple(dict.fromkeys(a for a in map(alias_legible, campo.alias) if a is not None))
+
+
 def candidatos_de_similitud(campo: CampoDestino) -> tuple[str, ...]:
     """Los textos contra los que se compara un encabezado: el nombre del campo y sus alias que son
     texto literal. Un alias con metacaracteres de expresion regular no participa."""

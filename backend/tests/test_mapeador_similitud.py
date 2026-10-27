@@ -1,13 +1,17 @@
 """Normalizacion, coincidencia y similitud del mapeador (T-MAP-B1, RF-58)."""
 
 import random
+import re
 
 import pytest
 
 from app.core.entities.mapeador import CampoDestino
+from app.core.services.ingesta_sabana.catalogo import CATALOGO_SABANA
 from app.core.services.mapeador.similitud import (
     DIFERENCIA_DE_EMPATE,
     UMBRAL_PARECIDO,
+    alias_legible,
+    alias_legibles,
     candidatos_de_similitud,
     coincide,
     normalizar_cabecera,
@@ -163,3 +167,44 @@ def test_un_campo_solo_con_alias_de_expresion_regular_se_compara_contra_su_nombr
 def test_las_constantes_de_configuracion() -> None:
     assert UMBRAL_PARECIDO == 0.75
     assert DIFERENCIA_DE_EMPATE == 0.02
+
+
+# --- El alias legible (T-MAP-B4) ----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "regex", [r"dni ?/ ?ruc", r"saldo.*", r"^x$", r"a|b", r"(a)", r"a\.b", r"[ab]", r"a{2}"]
+)
+def test_un_alias_de_expresion_regular_no_es_legible(regex) -> None:
+    assert alias_legible(regex) is None
+    assert alias_legibles(campo("x", regex)) == ()
+
+
+def test_un_alias_literal_sale_en_forma_legible_con_los_guiones_bajos_como_espacio() -> None:
+    assert alias_legible("dias atraso hoy") == "dias atraso hoy"
+    assert alias_legible("dias_atraso_hoy") == "dias atraso hoy"
+    assert alias_legible("dias sicmac-c") == "dias sicmac-c"  # el guion no es metacaracter
+
+
+def test_los_alias_legibles_de_un_campo_van_en_el_orden_del_catalogo_y_sin_repetir() -> None:
+    mixto = campo("x", "beta", r"a|b", "alfa", "beta", "al_fa", "gamma")
+
+    assert alias_legibles(mixto) == ("beta", "alfa", "al fa", "gamma")
+    assert alias_legibles(mixto) == alias_legibles(mixto)  # estable
+
+
+def test_un_campo_sin_alias_literales_da_vacio() -> None:
+    assert alias_legibles(campo("x")) == ()
+    assert alias_legibles(campo("x", r"dni ?/ ?ruc", r"saldo.*")) == ()
+
+
+def test_ningun_alias_legible_del_catalogo_tiene_metacaracteres_ni_guion_bajo() -> None:
+    for c in CATALOGO_SABANA.campos:
+        for alias in alias_legibles(c):
+            assert re.search(r"[\.^$*+?{}\[\]|()_]", alias) is None, (c.nombre, alias)
+
+
+def test_el_alias_legible_y_los_candidatos_de_similitud_hablan_de_los_mismos_alias() -> None:
+    # Los candidatos son el nombre y los alias literales; sin guiones bajos son los mismos.
+    for c in CATALOGO_SABANA.campos:
+        assert alias_legibles(c) == tuple(dict.fromkeys(candidatos_de_similitud(c)[1:])), c.nombre

@@ -22,6 +22,7 @@ const campo = (nombre: string, obligatorio = false): Campo => ({
   clave_etiqueta: `campo.${nombre}`,
   tipo: 'texto',
   obligatorio,
+  alias: [], // T-MAP-B4: los alias literales; la busqueda (T-MAP-F3) los usa
 });
 
 /** A slice of the sheet's catalogue, with its one required field. */
