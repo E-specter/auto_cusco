@@ -149,54 +149,62 @@ test.describe('seguimiento: el detalle de una exclusión por campo adicional', (
 
 // ---- Campaign preview ----------------------------------------------------------------------
 
+function entradaMinima(): PeticionCampanaEntrada {
+  return {
+    fecha_corte: '2026-09-13',
+    filtros: [],
+    cantidad: 1000,
+    seleccion_id: 1,
+    tipo_carga: 'masiva',
+    salida: 'numero_largo',
+    herramientas: { keyword: false, respuesta_automatica: false, blacklist_indecopi: false, speech_optimizado: false },
+    programacion: 'hora_determinada',
+    envios: ['2026-09-14T09:00:00-05:00'],
+  };
+}
+
+/** The compact selector's own calls, layered over the module's mock (as in mowa-mes-campana.spec.ts). */
+async function montarSeleccion(page: Page): Promise<void> {
+  const versiones: Version[] = [version({ fecha_corte: '2026-09-13', vigente: true })];
+  const campos: Campos = camposSinteticos();
+  const selecciones: SeleccionGuardada[] = [seleccionGuardada({ id: 1, nombre: 'Preventiva top 1000', cantidad: 1000 })];
+  await page.route('**/api/**', async (route) => {
+    const url = new URL(route.request().url());
+    const ruta = url.pathname.replace(/^\/api/, '');
+    const metodo = route.request().method();
+    if (ruta === '/cargas' && metodo === 'GET') return json(route, 200, versiones);
+    if (ruta === '/cartera/campos') return json(route, 200, campos);
+    if (ruta === '/selecciones' && metodo === 'GET') return json(route, 200, selecciones);
+    return route.fallback();
+  });
+}
+
+/** The campaign page with the preview scripted: `parcial` overrides what the fake builds (exclusions, archived fields). */
+async function abrirCampana(
+  page: Page,
+  parcial: Parameters<typeof previsualizacionCampanaSintetica>[1],
+  idioma: 'es' | 'en' = 'es',
+  tema: Tema = 'light',
+): Promise<void> {
+  await fijarApariencia(page, idioma, tema);
+  const api = apiMowaMes();
+  api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previsualizacionCampanaSintetica(entradaMinima(), parcial) }];
+  await montarApiMowaMes(page, api);
+  await montarSeleccion(page);
+  await page.goto('/mowa-mes/campana');
+  await page.getByLabel(idioma === 'es' ? 'Selección guardada' : 'Saved selection').selectOption({ label: 'Preventiva top 1000' });
+}
+
 test.describe('campaña: los nombres junto al motivo de la exclusión', () => {
   const RUTA = '/mowa-mes/campana';
 
-  function entradaMinima(): PeticionCampanaEntrada {
-    return {
-      fecha_corte: '2026-09-13',
-      filtros: [],
-      cantidad: 1000,
-      seleccion_id: 1,
-      tipo_carga: 'masiva',
-      salida: 'numero_largo',
-      herramientas: { keyword: false, respuesta_automatica: false, blacklist_indecopi: false, speech_optimizado: false },
-      programacion: 'hora_determinada',
-      envios: ['2026-09-14T09:00:00-05:00'],
-    };
-  }
-
-  /** The compact selector's own calls, layered over the module's mock (as in mowa-mes-campana.spec.ts). */
-  async function montarSeleccion(page: Page): Promise<void> {
-    const versiones: Version[] = [version({ fecha_corte: '2026-09-13', vigente: true })];
-    const campos: Campos = camposSinteticos();
-    const selecciones: SeleccionGuardada[] = [seleccionGuardada({ id: 1, nombre: 'Preventiva top 1000', cantidad: 1000 })];
-    await page.route('**/api/**', async (route) => {
-      const url = new URL(route.request().url());
-      const ruta = url.pathname.replace(/^\/api/, '');
-      const metodo = route.request().method();
-      if (ruta === '/cargas' && metodo === 'GET') return json(route, 200, versiones);
-      if (ruta === '/cartera/campos') return json(route, 200, campos);
-      if (ruta === '/selecciones' && metodo === 'GET') return json(route, 200, selecciones);
-      return route.fallback();
-    });
-  }
-
   async function abrir(page: Page, idioma: 'es' | 'en' = 'es', tema: Tema = 'light'): Promise<void> {
-    await fijarApariencia(page, idioma, tema);
-    const api = apiMowaMes();
-    api.respuestas.previsualizarCampana = [
-      {
-        estado: 200,
-        cuerpo: previsualizacionCampanaSintetica(entradaMinima(), {
-          exclusiones: { total: EXCLUSIONES.length, limite: 100, desplazamiento: 0, exclusiones: EXCLUSIONES },
-        }),
-      },
-    ];
-    await montarApiMowaMes(page, api);
-    await montarSeleccion(page);
-    await page.goto(RUTA);
-    await page.getByLabel(idioma === 'es' ? 'Selección guardada' : 'Saved selection').selectOption({ label: 'Preventiva top 1000' });
+    await abrirCampana(
+      page,
+      { exclusiones: { total: EXCLUSIONES.length, limite: 100, desplazamiento: 0, exclusiones: EXCLUSIONES } },
+      idioma,
+      tema,
+    );
     await expect(filas(page)).toHaveCount(EXCLUSIONES.length);
   }
 
@@ -263,11 +271,93 @@ test.describe('campaña: los nombres junto al motivo de la exclusión', () => {
   }
 });
 
+// ---- Campaign preview: archived fields ---------------------------------------------------------
+
+test.describe('campaña: el aviso de campos archivados que el speech usa (T-MM-F12)', () => {
+  const REGION = { nombre: 'ad_region', etiqueta: 'Región' };
+  const ZONA = { nombre: 'ad_zona', etiqueta: 'Zona' };
+  const UNO =
+    'El speech usa el campo archivado «Región». Las sábanas cargadas después de archivarlo ya no lo traen, y los productos que lo necesitan quedan fuera. Para evitarlo, reactívalo en Cargas › Campos adicionales o quítalo del speech.';
+  const VARIOS =
+    'El speech usa los campos archivados «Región», «Zona». Las sábanas cargadas después de archivarlos ya no los traen, y los productos que los necesitan quedan fuera. Para evitarlo, reactívalos en Cargas › Campos adicionales o quítalos del speech.';
+
+  const aviso = (page: Page) => page.locator('[data-campos-archivados]');
+  const resultado = (page: Page) => page.locator('[data-resultado]');
+
+  async function abrir(page: Page, camposArchivados: Array<{ nombre: string; etiqueta: string }>, idioma: 'es' | 'en' = 'es', tema: Tema = 'light') {
+    await abrirCampana(page, { campos_archivados: camposArchivados }, idioma, tema);
+    await expect(resultado(page)).toBeVisible();
+  }
+
+  test('con un campo archivado, el aviso con su nombre legible, en singular y como advertencia', async ({ page }) => {
+    await abrir(page, [REGION]);
+
+    await expect(aviso(page)).toBeVisible();
+    await expect(aviso(page)).toHaveText(UNO);
+    await expect(aviso(page)).toHaveClass(/notice--warning/);
+    await expect(aviso(page).locator('svg')).toHaveCount(1);
+    await expect(aviso(page)).not.toContainText('ad_region');
+  });
+
+  test('con dos, el plural con los dos nombres, en el orden que llegan', async ({ page }) => {
+    await abrir(page, [REGION, ZONA]);
+
+    await expect(aviso(page)).toHaveText(VARIOS);
+  });
+
+  test('va bajo el resumen y antes de las cifras', async ({ page }) => {
+    await abrir(page, [REGION]);
+
+    const orden = await aviso(page).evaluate((el) => {
+      const resumen = document.querySelector('[data-resumen]')!;
+      const cifras = document.querySelector('[data-cifras]')!;
+      return {
+        despuesDelResumen: Boolean(resumen.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING),
+        antesDeLasCifras: Boolean(el.compareDocumentPosition(cifras) & Node.DOCUMENT_POSITION_FOLLOWING),
+      };
+    });
+    expect(orden).toEqual({ despuesDelResumen: true, antesDeLasCifras: true });
+  });
+
+  test('con la lista vacía no hay aviso', async ({ page }) => {
+    await abrir(page, []);
+
+    await expect(aviso(page)).toBeHidden();
+    await expect(aviso(page)).toBeEmpty();
+  });
+
+  test('en inglés, el aviso está traducido, con las comillas del inglés', async ({ page }) => {
+    await abrir(page, [REGION, ZONA], 'en');
+
+    await expect(aviso(page)).toHaveText(
+      'The speech uses the archived fields “Región”, “Zona”. Sheets loaded after they were archived no longer bring them, and the products that need them are left out. To avoid this, reactivate them in Uploads › Additional fields or remove them from the speech.',
+    );
+    await expect(aviso(page)).not.toContainText('mowaMes.');
+  });
+
+  for (const tema of TEMAS) {
+    test(`a 360 px el aviso cabe y no hay violaciones, tema ${nombreDelTema(tema)}`, async ({ page }) => {
+      await page.setViewportSize({ width: 360, height: 900 });
+      await abrir(page, [REGION, ZONA], 'es', tema);
+      await expect(aviso(page)).toHaveText(VARIOS);
+
+      const desborde = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      expect(desborde).toBeLessThanOrEqual(0);
+      const caja = await aviso(page).boundingBox();
+      expect(caja!.x + caja!.width).toBeLessThanOrEqual(361);
+
+      await capturar(aviso(page), 'campana-aviso-archivados-360px', tema);
+      await sinViolaciones(page);
+    });
+  }
+});
+
 // ---- v2 speech editor ------------------------------------------------------------------------
 
 test.describe('configuración: el editor v2 con campos adicionales', () => {
   const RUTA = '/mowa-mes/configuracion';
-  const AVISO = 'Usa el campo archivado «Región». Las sábanas cargadas después de archivarlo ya no lo traen: ahí sale vacío. Para evitarlo, reactívalo en Cargas › Campos adicionales.';
+  const AVISO =
+    'El speech usa el campo archivado «Región». Las sábanas cargadas después de archivarlo ya no lo traen: en la campaña, los productos que lo necesitan quedan fuera. Para evitarlo, reactívalo en Cargas › Campos adicionales o quítalo del speech.';
 
   type Variable = { tipo: 'texto'; valor: string } | { tipo: 'variable'; nombre: string; funciones: Array<{ nombre: string; args: Array<string | number> }> };
 
@@ -322,7 +412,9 @@ test.describe('configuración: el editor v2 con campos adicionales', () => {
 
     await expect(aviso(page)).toBeVisible();
     await expect(aviso(page)).toHaveText(AVISO);
-    await expect(aviso(page)).toHaveClass(/notice--info/);
+    await expect(aviso(page)).toHaveClass(/notice--warning/);
+    // Su propio texto, no el del motor (el de Cartera y /columnas dice «ahí sale vacío»; este dice qué pasa en la campaña).
+    await expect(aviso(page)).not.toContainText('ahí sale vacío');
     // Va después del aviso de falta de WhatsApp, en el mismo lugar que los demás avisos del speech.
     const despues = await aviso(page).evaluate(
       (el) => Boolean(document.querySelector('[data-speech-falta-whatsapp]')!.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING),
@@ -412,6 +504,9 @@ test.describe('configuración: el editor v2 con campos adicionales', () => {
     await selectorDeVersion(page).selectOption({ label: 'Speech v2 archivado' });
 
     await expect(aviso(page)).toBeVisible();
-    await expect(aviso(page)).not.toContainText('camposAdicionales.');
+    await expect(aviso(page)).toHaveText(
+      'The speech uses the archived field “Región”. Sheets loaded after it was archived no longer bring it: in the campaign, the products that need it are left out. To avoid this, reactivate it in Uploads › Additional fields or remove it from the speech.',
+    );
+    await expect(aviso(page)).not.toContainText('mowaMes.');
   });
 });

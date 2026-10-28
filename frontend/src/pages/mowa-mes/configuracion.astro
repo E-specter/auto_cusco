@@ -251,9 +251,10 @@ import '../../styles/mowa-mes-speech-v2.css';
             </span>
           </p>
 
-          <!-- The preview works with an archived additional field and says so (T-MM-F11), like /columnas. -->
-          <p class="notice notice--info" data-speech-archivados hidden>
-            <Icon name="info" size={20} />
+          <!-- The speech reads an archived additional field: in the campaign, the products that need it are left out
+               (T-MM-F11, T-MM-F12). A warning, with its own texts: the engine's «sigue funcionando» would mislead. -->
+          <p class="notice notice--warning" data-speech-archivados hidden>
+            <Icon name="triangle-alert" size={20} />
             <span data-speech-archivados-texto></span>
           </p>
 
@@ -482,8 +483,8 @@ import '../../styles/mowa-mes-speech-v2.css';
   import { notaVariablesDesconocidas, pintarBotonesDeVariables } from '../../lib/mowa-mes-plantilla';
   import { formatBytes, formatDate, formatDateTime, formatNumber, parseApiDate } from '../../lib/format';
   import { obtenerComoV2, problemasDeErrorSpeech } from '../../lib/api-speech-v2';
-  import { avisoDeArchivados } from '../../lib/campos';
   import { SEPARADOR_BORRADOS, elementosBorrados, type CaracterQuitado } from '../../lib/mowa-mes-gsm7';
+  import { avisoDeCamposArchivados } from '../../lib/mowa-mes-seguimiento';
   import { applyTranslations, locale, t } from '../../lib/i18n';
   import {
     entradaDeExpresiones,
@@ -1256,11 +1257,12 @@ import '../../styles/mowa-mes-speech-v2.css';
   }
 
   /**
-   * The notice of an archived additional field the speech still uses: it keeps working, but is no longer
-   * offered. Hidden when there is none, and also when there is no preview to say it about.
+   * The notice of an archived additional field the speech reads: sheets loaded after archiving no longer bring
+   * it, so in the campaign the products that need it are left out. Hidden when there is none, and also when
+   * there is no preview to say it about.
    */
-  function pintarArchivados(etiquetas: readonly string[]): void {
-    const aviso = avisoDeArchivados(etiquetas);
+  function pintarArchivados(campos: Parameters<typeof avisoDeCamposArchivados>[0]): void {
+    const aviso = avisoDeCamposArchivados(campos, 'editor');
     $<HTMLElement>('[data-speech-archivados]').hidden = aviso === null;
     $<HTMLElement>('[data-speech-archivados-texto]').textContent = aviso ?? '';
   }
@@ -1659,7 +1661,7 @@ import '../../styles/mowa-mes-speech-v2.css';
       ctl?.fijarNiveles(nivelesDeV2(vista.segmentos));
       pintarBorradosV2();
       $<HTMLElement>('[data-speech-falta-whatsapp]').hidden = !vista.segmentos.some((s) => s.falta_whatsapp);
-      pintarArchivados(vista.campos_archivados.map((c) => c.etiqueta));
+      pintarArchivados(vista.campos_archivados);
       mostrarProblemasV2(vista.problemas);
     } catch (caido) {
       if (caido instanceof DOMException && caido.name === 'AbortError') return;

@@ -303,6 +303,13 @@ import '../../styles/mowa-mes.css';
           <div data-resultado hidden>
             <p class="mm-campana__resumen" role="status" data-resumen></p>
 
+            <!-- An archived additional field the speech still reads: the products that need it are left out
+                 (T-MM-F12). Under the summary and before the figures, because it explains exclusions. -->
+            <p class="notice notice--warning" data-campos-archivados hidden>
+              <Icon name="triangle-alert" size={20} />
+              <span data-campos-archivados-texto></span>
+            </p>
+
             <dl class="mm-cifras" data-cifras></dl>
 
             <p class="mm-nombre-archivo" data-nombre-archivo hidden>
@@ -471,7 +478,7 @@ import '../../styles/mowa-mes.css';
   } from '../../lib/mowa-mes-campana';
   import { campoDeError, moverElemento, paginar, traducirCodigo, type PaginaLocal } from '../../lib/mowa-mes';
   import { notaVariablesDesconocidas, pintarBotonesDeVariables } from '../../lib/mowa-mes-plantilla';
-  import { leerResumenDescarga, listaDeCampos, nombreArchivo } from '../../lib/mowa-mes-seguimiento';
+  import { avisoDeCamposArchivados, leerResumenDescarga, listaDeCampos, nombreArchivo } from '../../lib/mowa-mes-seguimiento';
   import { guardarArchivo } from '../../lib/descargas';
   import { openWhenFree } from '../../lib/dialogs';
   import { formatBytes, formatDate, formatNumber, formatSoles, formatTarifa } from '../../lib/format';
@@ -1115,6 +1122,13 @@ import '../../styles/mowa-mes.css';
       !estado.previsualizacion || !estado.previsualizacion.puede_crear || estado.huellaInvalida || boton.dataset.loading === 'true';
   }
 
+  /** The notice of the archived fields the speech reads; hidden with none, and with no preview to say it about. */
+  function pintarArchivados(previa: PrevisualizacionCampana | null): void {
+    const aviso = previa ? avisoDeCamposArchivados(previa.campos_archivados, 'campana') : null;
+    $<HTMLElement>('[data-campos-archivados]').hidden = aviso === null;
+    $<HTMLElement>('[data-campos-archivados-texto]').textContent = aviso ?? '';
+  }
+
   function pintarResultado(): void {
     const previa = estado.previsualizacion;
     const panel = $<HTMLElement>('[data-panel-previsualizacion]');
@@ -1129,6 +1143,7 @@ import '../../styles/mowa-mes.css';
     if (!previa) {
       const resumen = $<HTMLElement>('[data-resumen]');
       if (resumen.textContent !== '') resumen.textContent = '';
+      pintarArchivados(null);
       pintarEstadoCrear();
       return;
     }
@@ -1136,6 +1151,7 @@ import '../../styles/mowa-mes.css';
     const textoResumen = resumenProblemasCampana(previa);
     const resumen = $<HTMLElement>('[data-resumen]');
     if (resumen.textContent !== textoResumen) resumen.textContent = textoResumen;
+    pintarArchivados(previa);
 
     pintarCifras(previa);
     pintarExclusiones(previa);

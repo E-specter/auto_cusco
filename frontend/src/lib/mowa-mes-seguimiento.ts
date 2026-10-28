@@ -37,6 +37,23 @@ export function listaDeCampos(campos: Exclusion['campos'] | undefined): string |
 }
 
 /**
+ * The notice of the archived additional fields the speech still reads (RF-65): in the campaign preview, where
+ * it explains products left out, or in the speech editor. Own texts of MOWA MES, not the engine's
+ * `avisoDeArchivados` («sigue funcionando»), which would mislead here: sheets loaded after archiving no longer
+ * bring the field. `null` when there are none. Singular or plural, with the readable names.
+ */
+export function avisoDeCamposArchivados(campos: Parameters<typeof listaDeCampos>[0], donde: 'campana' | 'editor'): string | null {
+  const lista = listaDeCampos(campos);
+  if (lista === null || !campos) return null;
+  // The four keys written out, so a search for one of them finds where it is used.
+  const [uno, varios] =
+    donde === 'campana'
+      ? (['mowaMes.campana.avisoArchivado', 'mowaMes.campana.avisoArchivados'] as const)
+      : (['mowaMes.speech.v2.avisoArchivado', 'mowaMes.speech.v2.avisoArchivados'] as const);
+  return t(campos.length === 1 ? uno : varios, { campos: lista });
+}
+
+/**
  * What the Detail column says about an exclusion. For `falta_campo_adicional` with fields, a sentence with
  * their names, in singular or plural; for any other code, or with no fields, the text of the code as before.
  */
