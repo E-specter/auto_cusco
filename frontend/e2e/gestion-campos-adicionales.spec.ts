@@ -277,7 +277,7 @@ test.describe('archivar y reactivar', () => {
     await fila(page, 'ad_monto_en_mora').getByRole('button', { name: 'Archivar «Monto en mora»' }).click();
 
     await expect.poll(() => adicionales.cambios).toEqual([{ nombre: 'ad_monto_en_mora', cuerpo: { archivado: true } }]);
-    await expect(estado(page)).toHaveText('Se archivó «Monto en mora». Deja de ofrecerse; lo que ya lo usa sigue funcionando.');
+    await expect(estado(page)).toHaveText('Se archivó «Monto en mora». Deja de ofrecerse, y las sábanas que cargues desde ahora no lo traen.');
     await expect(fila(page, 'ad_monto_en_mora').locator('.tag')).toHaveText('Archivado');
     const nombres = await dialogo(page).locator('tbody tr th').allTextContents();
     expect(nombres.map((n) => n.trim())).toEqual(['Zona de cobranza', 'Campo antiguo', 'Monto en mora']);

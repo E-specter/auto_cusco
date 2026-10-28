@@ -491,8 +491,9 @@ test.describe('Cartera y el selector', () => {
     await expect(fila.locator('.tag[data-archivado]')).toHaveText('Archivado');
     await expect(page.locator('[data-selector-archivados]')).toBeVisible();
     await expect(page.locator('[data-selector-archivados]')).toHaveText(
-      'Usa el campo archivado «Campo antiguo»: sigue funcionando, pero ya no se ofrece.',
+      'Usa el campo archivado «Campo antiguo». Las sábanas cargadas después de archivarlo ya no lo traen: ahí sale vacío. Para evitarlo, reactívalo en Cargas › Campos adicionales.',
     );
+    await expect(page.locator('[data-selector-archivados]')).toHaveClass(/notice--warning/);
   });
 
   test('sin archivados en uso no hay aviso', async ({ page }) => {
@@ -622,13 +623,14 @@ test.describe('el constructor de columnas', () => {
     await expect(elegida).toHaveAttribute('value', 'ad_antiguo');
   });
 
-  test('la vista previa de una definición que usa un archivado avisa que sigue funcionando pero ya no se ofrece', async ({ page }) => {
+  test('la vista previa de una definición que usa un archivado avisa que desde las sábanas siguientes sale vacío', async ({ page }) => {
     await abrirColumnas(page, 'ad_antiguo');
 
     const aviso = page.locator('[data-previa-archivados]');
 
     await expect(aviso).toBeVisible();
-    await expect(aviso).toHaveText('Usa el campo archivado «Campo antiguo»: sigue funcionando, pero ya no se ofrece.');
+    await expect(aviso).toHaveText('Usa el campo archivado «Campo antiguo». Las sábanas cargadas después de archivarlo ya no lo traen: ahí sale vacío. Para evitarlo, reactívalo en Cargas › Campos adicionales.');
+    await expect(aviso).toHaveClass(/notice--warning/);
   });
 
   test('sin archivados en uso, la vista previa no avisa nada', async ({ page }) => {
@@ -737,13 +739,14 @@ test.describe('generar carga', () => {
     await expect(page.getByLabel('Versión', { exact: true })).toBeVisible();
   }
 
-  test('la definición que usa un archivado avisa, sobre la vista previa, que sigue funcionando pero ya no se ofrece', async ({ page }) => {
+  test('la definición que usa un archivado avisa, sobre la vista previa, que desde las sábanas siguientes sale vacío', async ({ page }) => {
     await abrirGenerar(page, 'ad_antiguo');
 
     const aviso = page.locator('[data-previa-archivados]');
 
     await expect(aviso).toBeVisible();
-    await expect(aviso).toHaveText('Usa el campo archivado «Campo antiguo»: sigue funcionando, pero ya no se ofrece.');
+    await expect(aviso).toHaveText('Usa el campo archivado «Campo antiguo». Las sábanas cargadas después de archivarlo ya no lo traen: ahí sale vacío. Para evitarlo, reactívalo en Cargas › Campos adicionales.');
+    await expect(aviso).toHaveClass(/notice--warning/);
   });
 
   test('sin archivados en uso no hay aviso, y sin elegir definición tampoco', async ({ page }) => {

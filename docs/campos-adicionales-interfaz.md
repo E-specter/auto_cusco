@@ -109,13 +109,13 @@ El editor y el constructor usan `etiquetaVariable`, que gana el mismo orden de p
 | Fichas de variable en el texto del editor | Ficha en línea | Solo el nombre legible, sin marca, igual que las demás fichas: ahí importa qué dato sale, no de dónde viene |
 | Lista de campos del mapeador | Combobox (§3.5 del mapeador) | Un tercer grupo, «Campos adicionales», después de «Otros campos». La búsqueda los encuentra por su nombre y por su alias, que es el encabezado de origen |
 
-**Un adicional archivado** no se ofrece en ninguna de esas listas. Si una selección, una definición o un speech guardados ya lo usan, sigue funcionando y no bloquea guardar ni generar. Se avisa así:
+**Un adicional archivado** no se ofrece en ninguna de esas listas. Si una selección, una definición o un speech guardados ya lo usan, no da error ni bloquea guardar o generar. Pero el campo deja de encontrarse en las sábanas nuevas, así que desde la carga siguiente al archivo viene vacío (**decisión del usuario del 2026-10-28**, T-MAP-F5: el aviso lo dice así, y no «sigue funcionando», que inducía a error). Se avisa así:
 
 - **En Cartera, el editor y el constructor,** el aviso sale de la marca `archivado: true` que traen `/cartera/campos` y `VariableRespuesta` (T-CA-B2), con texto del frontend:
   - el filtro, la ficha o la columna que lo usa muestra su nombre y un `.tag tag--advertencia` «Archivado». En un `select` nativo, como el filtro o el orden, no cabe un `.tag`: la opción dice «Monto en mora (archivado)». El tag queda para las casillas, las fichas y el selector de variables;
-  - sobre la vista previa de `/columnas` y de `/generar-carga`, y sobre el resultado de la selección en Cartera, va un `.notice--info` de una línea: «Usa el campo archivado «Monto en mora»: sigue funcionando, pero ya no se ofrece». Con varios, los nombra separados por comas.
+  - sobre la vista previa de `/columnas` y de `/generar-carga`, y sobre el resultado de la selección en Cartera, va un `.notice--warning`, porque tiene una consecuencia y una acción: «Usa el campo archivado «Monto en mora». Las sábanas cargadas después de archivarlo ya no lo traen: ahí sale vacío. Para evitarlo, reactívalo en Cargas › Campos adicionales». Con varios, en plural, y los nombres separados por comas.
   - Los textos van en `camposAdicionales.archivado` y `camposAdicionales.avisoArchivado`.
-- **En MOWA MES,** la previsualización del speech trae su propio aviso del backend (T-MM-B12, `archivados_entre()`), y la pantalla muestra ese. Para que no haya dos textos distintos para lo mismo, el texto del backend de MOWA usa las mismas palabras que `camposAdicionales.avisoArchivado`.
+- **En MOWA MES,** la previsualización del speech trae su propio aviso del backend (T-MM-B12, `archivados_entre()`), y la pantalla muestra ese. Sus textos son propios de MOWA (T-MM-F12): dicen la misma idea con su consecuencia, porque allí el producto queda fuera de la campaña, y terminan con la misma acción. También van en `.notice--warning`.
 
 ## 4. Renombrar, archivar y reactivar (RF-65)
 
@@ -134,7 +134,8 @@ T-CA-F1 no lo incluye; propongo abrirlo como T-CA-F2. Lo dejo fijado aquí para 
   - el `409 nombre_repetido` va bajo el `input`, como en §2.4.
 - **«Archivar»:**
   - no pide confirmar, porque se deshace con «Reactivar» en la misma fila;
-  - el estado (`role="status"`) dice: «Se archivó «Monto en mora». Deja de ofrecerse; lo que ya lo usa sigue funcionando»;
+  - el estado (`role="status"`) dice: «Se archivó «Monto en mora». Deja de ofrecerse, y las sábanas que cargues desde ahora no lo traen»;
+  - la intro del diálogo: «Los campos que creaste al subir sábanas. Archivar uno lo quita de las listas y de las sábanas siguientes; lo ya cargado no se borra» (2026-10-28);
   - el foco pasa a «Reactivar».
 - **«Reactivar»:** el estado dice «Se reactivó «Monto en mora»», y el foco pasa a «Archivar».
 - **El tipo se muestra, pero no se edita.**

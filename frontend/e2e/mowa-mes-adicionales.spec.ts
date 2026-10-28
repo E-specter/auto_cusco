@@ -267,7 +267,7 @@ test.describe('campaña: los nombres junto al motivo de la exclusión', () => {
 
 test.describe('configuración: el editor v2 con campos adicionales', () => {
   const RUTA = '/mowa-mes/configuracion';
-  const AVISO = 'Usa el campo archivado «Región»: sigue funcionando, pero ya no se ofrece.';
+  const AVISO = 'Usa el campo archivado «Región». Las sábanas cargadas después de archivarlo ya no lo traen: ahí sale vacío. Para evitarlo, reactívalo en Cargas › Campos adicionales.';
 
   type Variable = { tipo: 'texto'; valor: string } | { tipo: 'variable'; nombre: string; funciones: Array<{ nombre: string; args: Array<string | number> }> };
 
