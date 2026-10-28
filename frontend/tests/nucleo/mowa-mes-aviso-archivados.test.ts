@@ -26,23 +26,23 @@ describe('sin campos archivados no hay aviso', () => {
 describe('el aviso de la campaña', () => {
   it('con uno, en singular y con su nombre legible', () => {
     expect(avisoDeCamposArchivados([REGION], 'campana')).toBe(
-      'El speech usa el campo archivado «Región». Las sábanas cargadas después de archivarlo ya no lo traen, y los productos que lo necesitan quedan fuera. Para evitarlo, reactívalo en Cargas › Campos adicionales o quítalo del speech.',
+      'El speech usa el campo archivado «Región». Las sábanas cargadas después de archivarlo ya no lo traen, y los productos que lo necesitan quedan fuera. Para evitarlo, reactívalo en Cargas › Campos adicionales o quítalo del speech.',
     );
   });
 
   it('con varios, en plural y con todos los nombres', () => {
     expect(avisoDeCamposArchivados([REGION, ZONA], 'campana')).toBe(
-      'El speech usa los campos archivados «Región», «Zona». Las sábanas cargadas después de archivarlos ya no los traen, y los productos que los necesitan quedan fuera. Para evitarlo, reactívalos en Cargas › Campos adicionales o quítalos del speech.',
+      'El speech usa los campos archivados «Región», «Zona». Las sábanas cargadas después de archivarlos ya no los traen, y los productos que los necesitan quedan fuera. Para evitarlo, reactívalos en Cargas › Campos adicionales o quítalos del speech.',
     );
   });
 
   it('en inglés, con las comillas del inglés, en singular y en plural', () => {
     setLanguageForTests('en');
     expect(avisoDeCamposArchivados([REGION], 'campana')).toBe(
-      'The speech uses the archived field “Región”. Sheets loaded after it was archived no longer bring it, and the products that need it are left out. To avoid this, reactivate it in Uploads › Additional fields or remove it from the speech.',
+      'The speech uses the archived field “Región”. Sheets loaded after it was archived no longer bring it, and the products that need it are left out. To avoid this, reactivate it in Uploads › Additional fields or remove it from the speech.',
     );
     expect(avisoDeCamposArchivados([REGION, ZONA], 'campana')).toBe(
-      'The speech uses the archived fields “Región”, “Zona”. Sheets loaded after they were archived no longer bring them, and the products that need them are left out. To avoid this, reactivate them in Uploads › Additional fields or remove them from the speech.',
+      'The speech uses the archived fields “Región”, “Zona”. Sheets loaded after they were archived no longer bring them, and the products that need them are left out. To avoid this, reactivate them in Uploads › Additional fields or remove them from the speech.',
     );
   });
 });
@@ -50,20 +50,20 @@ describe('el aviso de la campaña', () => {
 describe('el aviso del editor', () => {
   it('con uno y con varios, con su propio texto: dice qué pasa en la campaña y cierra con la misma acción', () => {
     expect(avisoDeCamposArchivados([REGION], 'editor')).toBe(
-      'El speech usa el campo archivado «Región». Las sábanas cargadas después de archivarlo ya no lo traen: en la campaña, los productos que lo necesitan quedan fuera. Para evitarlo, reactívalo en Cargas › Campos adicionales o quítalo del speech.',
+      'El speech usa el campo archivado «Región». Las sábanas cargadas después de archivarlo ya no lo traen: en la campaña, los productos que lo necesitan quedan fuera. Para evitarlo, reactívalo en Cargas › Campos adicionales o quítalo del speech.',
     );
     expect(avisoDeCamposArchivados([REGION, ZONA], 'editor')).toBe(
-      'El speech usa los campos archivados «Región», «Zona». Las sábanas cargadas después de archivarlos ya no los traen: en la campaña, los productos que los necesitan quedan fuera. Para evitarlo, reactívalos en Cargas › Campos adicionales o quítalos del speech.',
+      'El speech usa los campos archivados «Región», «Zona». Las sábanas cargadas después de archivarlos ya no los traen: en la campaña, los productos que los necesitan quedan fuera. Para evitarlo, reactívalos en Cargas › Campos adicionales o quítalos del speech.',
     );
   });
 
   it('en inglés, singular y plural', () => {
     setLanguageForTests('en');
     expect(avisoDeCamposArchivados([REGION], 'editor')).toBe(
-      'The speech uses the archived field “Región”. Sheets loaded after it was archived no longer bring it: in the campaign, the products that need it are left out. To avoid this, reactivate it in Uploads › Additional fields or remove it from the speech.',
+      'The speech uses the archived field “Región”. Sheets loaded after it was archived no longer bring it: in the campaign, the products that need it are left out. To avoid this, reactivate it in Uploads › Additional fields or remove it from the speech.',
     );
     expect(avisoDeCamposArchivados([REGION, ZONA], 'editor')).toBe(
-      'The speech uses the archived fields “Región”, “Zona”. Sheets loaded after they were archived no longer bring them: in the campaign, the products that need them are left out. To avoid this, reactivate them in Uploads › Additional fields or remove them from the speech.',
+      'The speech uses the archived fields “Región”, “Zona”. Sheets loaded after they were archived no longer bring them: in the campaign, the products that need them are left out. To avoid this, reactivate them in Uploads › Additional fields or remove them from the speech.',
     );
   });
 });
@@ -85,7 +85,7 @@ describe('lo que el aviso nunca dice', () => {
     const campana = avisoDeCamposArchivados([REGION], 'campana')!;
     const editor = avisoDeCamposArchivados([REGION], 'editor')!;
     for (const texto of [campana, editor]) {
-      expect(texto).toContain('Para evitarlo, reactívalo en Cargas › Campos adicionales o quítalo del speech.');
+      expect(texto).toContain('Para evitarlo, reactívalo en Cargas › Campos adicionales o quítalo del speech.');
     }
     expect(editor).not.toBe(campana);
     // El del editor dice «en la campaña» porque todavía no está en ella.

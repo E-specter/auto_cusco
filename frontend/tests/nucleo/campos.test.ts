@@ -125,9 +125,9 @@ describe('el aviso de un campo archivado en uso', () => {
   });
 
   it('en singular y en plural, y sin aviso si no hay ninguno', () => {
-    expect(avisoDeArchivados(['Monto en mora'])).toBe('Usa el campo archivado «Monto en mora». Las sábanas cargadas después de archivarlo ya no lo traen: ahí sale vacío. Para evitarlo, reactívalo en Cargas › Campos adicionales.');
+    expect(avisoDeArchivados(['Monto en mora'])).toBe('Usa el campo archivado «Monto en mora». Las sábanas cargadas después de archivarlo ya no lo traen: ahí sale vacío. Para evitarlo, reactívalo en Cargas › Campos adicionales.');
     expect(avisoDeArchivados(['Monto en mora', 'Zona'])).toBe(
-      'Usa los campos archivados «Monto en mora», «Zona». Las sábanas cargadas después de archivarlos ya no los traen: ahí salen vacíos. Para evitarlo, reactívalos en Cargas › Campos adicionales.',
+      'Usa los campos archivados «Monto en mora», «Zona». Las sábanas cargadas después de archivarlos ya no los traen: ahí salen vacíos. Para evitarlo, reactívalos en Cargas › Campos adicionales.',
     );
     expect(avisoDeArchivados([])).toBeNull();
   });
@@ -135,10 +135,10 @@ describe('el aviso de un campo archivado en uso', () => {
   it('en inglés cita el nombre con las comillas del idioma, no con las fijas del español', () => {
     setLanguageForTests('en');
     expect(avisoDeArchivados(['Monto en mora'])).toBe(
-      'It uses the archived field “Monto en mora”. Sheets loaded after it was archived no longer bring it: there it is empty. To avoid this, reactivate it in Uploads › Additional fields.',
+      'It uses the archived field “Monto en mora”. Sheets loaded after it was archived no longer bring it: there it is empty. To avoid this, reactivate it in Uploads › Additional fields.',
     );
     expect(avisoDeArchivados(['Monto en mora', 'Zona'])).toBe(
-      'It uses the archived fields “Monto en mora”, “Zona”. Sheets loaded after they were archived no longer bring them: there they are empty. To avoid this, reactivate them in Uploads › Additional fields.',
+      'It uses the archived fields “Monto en mora”, “Zona”. Sheets loaded after they were archived no longer bring them: there they are empty. To avoid this, reactivate them in Uploads › Additional fields.',
     );
     expect(avisoDeArchivados(['Monto en mora'])).not.toContain('«');
   });

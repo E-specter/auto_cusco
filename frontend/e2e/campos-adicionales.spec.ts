@@ -491,7 +491,7 @@ test.describe('Cartera y el selector', () => {
     await expect(fila.locator('.tag[data-archivado]')).toHaveText('Archivado');
     await expect(page.locator('[data-selector-archivados]')).toBeVisible();
     await expect(page.locator('[data-selector-archivados]')).toHaveText(
-      'Usa el campo archivado «Campo antiguo». Las sábanas cargadas después de archivarlo ya no lo traen: ahí sale vacío. Para evitarlo, reactívalo en Cargas › Campos adicionales.',
+      'Usa el campo archivado «Campo antiguo». Las sábanas cargadas después de archivarlo ya no lo traen: ahí sale vacío. Para evitarlo, reactívalo en Cargas › Campos adicionales.',
     );
     await expect(page.locator('[data-selector-archivados]')).toHaveClass(/notice--warning/);
   });
@@ -629,7 +629,7 @@ test.describe('el constructor de columnas', () => {
     const aviso = page.locator('[data-previa-archivados]');
 
     await expect(aviso).toBeVisible();
-    await expect(aviso).toHaveText('Usa el campo archivado «Campo antiguo». Las sábanas cargadas después de archivarlo ya no lo traen: ahí sale vacío. Para evitarlo, reactívalo en Cargas › Campos adicionales.');
+    await expect(aviso).toHaveText('Usa el campo archivado «Campo antiguo». Las sábanas cargadas después de archivarlo ya no lo traen: ahí sale vacío. Para evitarlo, reactívalo en Cargas › Campos adicionales.');
     await expect(aviso).toHaveClass(/notice--warning/);
   });
 
@@ -745,7 +745,7 @@ test.describe('generar carga', () => {
     const aviso = page.locator('[data-previa-archivados]');
 
     await expect(aviso).toBeVisible();
-    await expect(aviso).toHaveText('Usa el campo archivado «Campo antiguo». Las sábanas cargadas después de archivarlo ya no lo traen: ahí sale vacío. Para evitarlo, reactívalo en Cargas › Campos adicionales.');
+    await expect(aviso).toHaveText('Usa el campo archivado «Campo antiguo». Las sábanas cargadas después de archivarlo ya no lo traen: ahí sale vacío. Para evitarlo, reactívalo en Cargas › Campos adicionales.');
     await expect(aviso).toHaveClass(/notice--warning/);
   });
 

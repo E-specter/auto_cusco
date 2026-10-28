@@ -196,8 +196,6 @@ async function abrirCampana(
 }
 
 test.describe('campaña: los nombres junto al motivo de la exclusión', () => {
-  const RUTA = '/mowa-mes/campana';
-
   async function abrir(page: Page, idioma: 'es' | 'en' = 'es', tema: Tema = 'light'): Promise<void> {
     await abrirCampana(
       page,
@@ -277,9 +275,9 @@ test.describe('campaña: el aviso de campos archivados que el speech usa (T-MM-F
   const REGION = { nombre: 'ad_region', etiqueta: 'Región' };
   const ZONA = { nombre: 'ad_zona', etiqueta: 'Zona' };
   const UNO =
-    'El speech usa el campo archivado «Región». Las sábanas cargadas después de archivarlo ya no lo traen, y los productos que lo necesitan quedan fuera. Para evitarlo, reactívalo en Cargas › Campos adicionales o quítalo del speech.';
+    'El speech usa el campo archivado «Región». Las sábanas cargadas después de archivarlo ya no lo traen, y los productos que lo necesitan quedan fuera. Para evitarlo, reactívalo en Cargas › Campos adicionales o quítalo del speech.';
   const VARIOS =
-    'El speech usa los campos archivados «Región», «Zona». Las sábanas cargadas después de archivarlos ya no los traen, y los productos que los necesitan quedan fuera. Para evitarlo, reactívalos en Cargas › Campos adicionales o quítalos del speech.';
+    'El speech usa los campos archivados «Región», «Zona». Las sábanas cargadas después de archivarlos ya no los traen, y los productos que los necesitan quedan fuera. Para evitarlo, reactívalos en Cargas › Campos adicionales o quítalos del speech.';
 
   const aviso = (page: Page) => page.locator('[data-campos-archivados]');
   const resultado = (page: Page) => page.locator('[data-resultado]');
@@ -330,7 +328,7 @@ test.describe('campaña: el aviso de campos archivados que el speech usa (T-MM-F
     await abrir(page, [REGION, ZONA], 'en');
 
     await expect(aviso(page)).toHaveText(
-      'The speech uses the archived fields “Región”, “Zona”. Sheets loaded after they were archived no longer bring them, and the products that need them are left out. To avoid this, reactivate them in Uploads › Additional fields or remove them from the speech.',
+      'The speech uses the archived fields “Región”, “Zona”. Sheets loaded after they were archived no longer bring them, and the products that need them are left out. To avoid this, reactivate them in Uploads › Additional fields or remove them from the speech.',
     );
     await expect(aviso(page)).not.toContainText('mowaMes.');
   });
@@ -357,7 +355,7 @@ test.describe('campaña: el aviso de campos archivados que el speech usa (T-MM-F
 test.describe('configuración: el editor v2 con campos adicionales', () => {
   const RUTA = '/mowa-mes/configuracion';
   const AVISO =
-    'El speech usa el campo archivado «Región». Las sábanas cargadas después de archivarlo ya no lo traen: en la campaña, los productos que lo necesitan quedan fuera. Para evitarlo, reactívalo en Cargas › Campos adicionales o quítalo del speech.';
+    'El speech usa el campo archivado «Región». Las sábanas cargadas después de archivarlo ya no lo traen: en la campaña, los productos que lo necesitan quedan fuera. Para evitarlo, reactívalo en Cargas › Campos adicionales o quítalo del speech.';
 
   type Variable = { tipo: 'texto'; valor: string } | { tipo: 'variable'; nombre: string; funciones: Array<{ nombre: string; args: Array<string | number> }> };
 
@@ -505,7 +503,7 @@ test.describe('configuración: el editor v2 con campos adicionales', () => {
 
     await expect(aviso(page)).toBeVisible();
     await expect(aviso(page)).toHaveText(
-      'The speech uses the archived field “Región”. Sheets loaded after it was archived no longer bring it: in the campaign, the products that need it are left out. To avoid this, reactivate it in Uploads › Additional fields or remove it from the speech.',
+      'The speech uses the archived field “Región”. Sheets loaded after it was archived no longer bring it: in the campaign, the products that need it are left out. To avoid this, reactivate it in Uploads › Additional fields or remove it from the speech.',
     );
     await expect(aviso(page)).not.toContainText('mowaMes.');
   });
