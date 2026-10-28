@@ -131,7 +131,7 @@
         "port": 5432,
         "database": "postgres",
         "username": "postgres",
-        "password": ""
+        "askForPassword": true
       },
       {
         "name": "Local PostgreSQL (auto_cusco)",
@@ -140,7 +140,7 @@
         "port": 5432,
         "database": "auto_cusco",
         "username": "auto_cusco_app",
-        "password": ""
+        "askForPassword": true
       }
     ],
 

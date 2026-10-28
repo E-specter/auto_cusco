@@ -180,7 +180,7 @@ Caracteres verificados **sin problema** en esta etapa: `:` `/` `#` `?` `&` `+` `
 
 **Solución de fondo (pendiente, no aplicada):** construir la URL con `sqlalchemy.engine.URL.create(...)` en lugar de un f-string elimina los problemas de la etapa 2, porque pasa la contraseña como campo separado sin codificarla en texto. Los problemas de la etapa 1 (`${` y ` #`) no dependen del código del backend y seguirían aplicando.
 
-`auto_cusco.code-workspace` trae dos conexiones SQLTools de ejemplo (`Local PostgreSQL (admin)` y `Local PostgreSQL (auto_cusco)`) apuntando a `localhost`, listas para completar con las credenciales reales.
+`auto_cusco.code-workspace` trae dos conexiones SQLTools de ejemplo (`Local PostgreSQL (admin)` y `Local PostgreSQL (auto_cusco)`) apuntando a `localhost`, sin contraseña: SQLTools la pide al conectar (`askForPassword`). No escribas la contraseña en este archivo: está versionado y el repositorio es público.
 
 Cuando existan modelos de negocio en `backend/app/core/entities/` (a partir de la Fase 1), esta sección debe actualizarse con: cómo correr migraciones y cómo cargar datos de prueba sintéticos.
 
