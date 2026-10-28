@@ -43,11 +43,15 @@ class CarteraEnMemoria:
     def __init__(self, productos: list[dict], vigente: bool = True) -> None:
         self.productos = productos
         self.vigente = vigente
+        self.carga_id = 1  # la carga vigente: una nueva version vigente tiene otro id
         self.distintos_pedidos: list[tuple] = []
         self.listas_pedidas: list[tuple] = []
 
     def hay_version_vigente(self, fecha_corte):
         return self.vigente
+
+    def version_vigente(self, fecha_corte):
+        return self.carga_id if self.vigente else None
 
     @staticmethod
     def _cumple(producto: dict, filtro: Filtro) -> bool:

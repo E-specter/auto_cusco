@@ -20,6 +20,11 @@ class RepositorioCarteraPort(Protocol):
 
     def hay_version_vigente(self, fecha_corte: date) -> bool: ...
 
+    def version_vigente(self, fecha_corte: date) -> int | None:
+        """El id de la carga vigente de la fecha, o None si no tiene. Se busca por indice (es
+        barato) y es la clave de lo que se guarda en memoria de esa version."""
+        ...
+
     def consultar(
         self,
         fecha_corte: date,

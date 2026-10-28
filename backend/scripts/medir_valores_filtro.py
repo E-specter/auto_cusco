@@ -16,9 +16,12 @@ definiciones y los valores no quedan en la base). Mide, con p50 y p95 sobre las 
 2. la lista sin filtros y con tres filtros de arriba (las dos consultas del endpoint);
 3. un campo que supera el umbral (el documento), que tiene que cortar pronto.
 
-PRESUPUESTO (plan.md §29): p95 menor de 150 ms por lista, con las dos consultas. Si no se cumple,
-la primera opcion es guardar en memoria la decision del umbral por (carga vigente, campo), que no
-cambia mientras la version vigente sea la misma. Solo imprime tiempos y cantidades: ningun valor.
+PRESUPUESTO (plan.md §29): p95 menor de 150 ms por pedido, sumando las dos consultas. Desde T-FV-B3
+el caso de uso guarda en memoria la decision del umbral y las listas por (carga vigente, campo,
+...), asi que se mide aparte la PRIMERA llamada (sin memoria: un servicio nuevo en cada
+repeticion) y las SIGUIENTES (con la memoria llena), y despues las consultas sueltas, para
+repartir el costo y comparar el orden «umbral primero» con agrupar primero (fila REFERENCIA).
+Solo imprime tiempos y cantidades: ningun valor.
 """
 
 import argparse
@@ -57,6 +60,7 @@ from app.core.config import (  # noqa: E402
 from app.core.entities.cartera import Filtro, Operador  # noqa: E402
 from app.core.services.ingesta_sabana.catalogo import CATALOGO_SABANA  # noqa: E402
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService  # noqa: E402
+from app.core.services.seleccion_cartera.cache_valores import CacheValoresFiltro  # noqa: E402
 from app.core.services.seleccion_cartera.campos import CatalogoCartera  # noqa: E402
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService  # noqa: E402
 
@@ -107,7 +111,6 @@ def _preparar_valores(engine, carga_id: int) -> None:
 
 
 def _tiempos(accion: Callable[[], object], repeticiones: int) -> list[float]:
-    accion()  # calienta: el plan y la cache de la base no son lo que se mide
     medidos = []
     for _ in range(repeticiones):
         inicio = time.perf_counter()
@@ -119,6 +122,10 @@ def _tiempos(accion: Callable[[], object], repeticiones: int) -> list[float]:
 def _p(medidos: list[float], percentil: int) -> float:
     ordenados = sorted(medidos)
     return ordenados[min(len(ordenados) - 1, round(percentil / 100 * (len(ordenados) - 1)))]
+
+
+def _resumen(medidos: list[float]) -> tuple[float, float]:
+    return statistics.median(medidos), _p(medidos, 95)
 
 
 def main() -> None:
@@ -143,7 +150,13 @@ def main() -> None:
 
         catalogo = CatalogoCartera(RepositorioCamposAdicionalesPostgres(engine))
         repo = RepositorioCarteraPostgres(engine, catalogo)
-        servicio = ConsultaCarteraService(repo, catalogo, umbral_valores=opciones.umbral)
+
+        def servicio_nuevo() -> ConsultaCarteraService:
+            """Como un pedido de la API sin memoria: un servicio con su memoria vacia."""
+            return ConsultaCarteraService(
+                repo, catalogo, umbral_valores=opciones.umbral, cache_valores=CacheValoresFiltro()
+            )
+
         arriba = [
             Filtro("dias_atraso", Operador.MAYOR, (-10,)),
             Filtro("telefono", Operador.NO_VACIO),
@@ -151,8 +164,44 @@ def main() -> None:
         ]
         tope = opciones.umbral + 1
         n = opciones.repeticiones
-        casos = [
-            ("umbral: campo base (~10)", lambda: repo.distintos_hasta(FECHA, BASE_DE_10, tope)),
+        total = repo.consultar(FECHA, (), None, 1, 0)[0]
+        print(f"productos: {total}; umbral: {opciones.umbral}; repeticiones: {n}")
+        servicio_nuevo().valores(FECHA, BASE_DE_10)  # calienta la base: no es lo que se mide
+
+        # Los pedidos: (nombre, campo, filtros de arriba).
+        pedidos = [
+            ("base (~10), sin filtros", BASE_DE_10, []),
+            ("base (~10), con 3 filtros", BASE_DE_10, arriba),
+            ("adicional (~50), sin filtros", NOMBRE_ADICIONAL, []),
+            ("adicional (~50), con 3 filtros", NOMBRE_ADICIONAL, arriba),
+            ("campo que supera (documento)", SUPERA_EL_UMBRAL, []),
+        ]
+        print("\nPEDIDOS a /cartera/valores (decision + lista, como los atiende la API)")
+        print(
+            f"{'pedido':34} {'1.a p50':>8} {'1.a p95':>8} {'sig. p50':>9} {'sig. p95':>9}"
+            "  p95 < 150"
+        )
+        fuera = []
+        for nombre, campo, filtros in pedidos:
+            # 1.a llamada: sin memoria. Un servicio nuevo en cada repeticion.
+            primeras = _tiempos(lambda c=campo, f=filtros: servicio_nuevo().valores(FECHA, c, f), n)
+            # Siguientes: con la memoria ya llena (la decision y la lista de esa cascada).
+            servicio = servicio_nuevo()
+            servicio.valores(FECHA, campo, filtros)
+            siguientes = _tiempos(lambda s=servicio, c=campo, f=filtros: s.valores(FECHA, c, f), n)
+            (p50a, p95a), (p50b, p95b) = _resumen(primeras), _resumen(siguientes)
+            ok = p95a < PRESUPUESTO_P95_MS and p95b < PRESUPUESTO_P95_MS
+            if not ok:
+                fuera.append(nombre)
+            marca = "ok" if ok else "FUERA (1.a)" if p95a >= PRESUPUESTO_P95_MS else "FUERA (sig.)"
+            print(f"{nombre:34} {p50a:8.1f} {p95a:8.1f} {p50b:9.1f} {p95b:9.1f}  {marca}")
+
+        # Las consultas sueltas, para repartir el costo de la 1.a llamada y elegir el orden:
+        # umbral primero (corta pronto en un campo de alta cardinalidad) o agrupar primero.
+        print("\nCONSULTAS SUELTAS (una sola, sin memoria)")
+        print(f"{'consulta':44} {'p50 ms':>8} {'p95 ms':>8}")
+        sueltas = [
+            ("umbral: base (~10)", lambda: repo.distintos_hasta(FECHA, BASE_DE_10, tope)),
             (
                 "umbral: adicional (~50)",
                 lambda: repo.distintos_hasta(FECHA, NOMBRE_ADICIONAL, tope),
@@ -161,34 +210,27 @@ def main() -> None:
                 "umbral: supera (documento)",
                 lambda: repo.distintos_hasta(FECHA, SUPERA_EL_UMBRAL, tope),
             ),
-            ("lista: base sin filtros", lambda: servicio.valores(FECHA, BASE_DE_10)),
-            ("lista: base con 3 filtros", lambda: servicio.valores(FECHA, BASE_DE_10, arriba)),
-            ("lista: adicional sin filtros", lambda: servicio.valores(FECHA, NOMBRE_ADICIONAL)),
+            ("lista: base, sin filtros", lambda: repo.valores_de(FECHA, BASE_DE_10, [])),
+            ("lista: base, con 3 filtros", lambda: repo.valores_de(FECHA, BASE_DE_10, arriba)),
+            ("lista: adicional, sin filtros", lambda: repo.valores_de(FECHA, NOMBRE_ADICIONAL, [])),
             (
-                "lista: adicional con 3 filtros",
-                lambda: servicio.valores(FECHA, NOMBRE_ADICIONAL, arriba),
+                "REFERENCIA agrupar el que supera (documento)",
+                lambda: repo.valores_de(FECHA, SUPERA_EL_UMBRAL, []),
             ),
-            ("lista: campo que supera", lambda: servicio.valores(FECHA, SUPERA_EL_UMBRAL)),
         ]
-        total = repo.consultar(FECHA, (), None, 1, 0)[0]
-        print(f"productos: {total}; umbral: {opciones.umbral}; repeticiones: {n}\n")
-        print(f"{'caso':34} {'p50 ms':>8} {'p95 ms':>8}  presupuesto")
-        fuera = []
-        for nombre, accion in casos:
-            medidos = _tiempos(accion, n)
-            p50, p95 = statistics.median(medidos), _p(medidos, 95)
-            es_lista = nombre.startswith("lista")
-            marca = ""
-            if es_lista:
-                marca = "ok" if p95 < PRESUPUESTO_P95_MS else "FUERA (> 150 ms)"
-                if p95 >= PRESUPUESTO_P95_MS:
-                    fuera.append(nombre)
-            print(f"{nombre:34} {p50:8.1f} {p95:8.1f}  {marca}")
+        for nombre, accion in sueltas:
+            accion()
+            p50, p95 = _resumen(_tiempos(accion, n))
+            print(f"{nombre:44} {p50:8.1f} {p95:8.1f}")
         print(
-            "\nPresupuesto cumplido (p95 < 150 ms por lista)"
+            "\n«REFERENCIA»: lo que costaria resolver la decision agrupando en una sola consulta "
+            "un campo de alta cardinalidad (un GROUP BY no corta temprano como el DISTINCT ... "
+            "LIMIT): si sale mucho mas que «umbral: supera», el orden «umbral primero» es el bueno."
+        )
+        print(
+            "\nPresupuesto cumplido (p95 < 150 ms por pedido, en la 1.a llamada y en las demas)"
             if not fuera
-            else f"\nFuera de presupuesto: {', '.join(fuera)}. Primera opcion: guardar en memoria "
-            "la decision del umbral por (carga vigente, campo)."
+            else f"\nFuera de presupuesto: {', '.join(fuera)}."
         )
     finally:
         _limpiar(engine)

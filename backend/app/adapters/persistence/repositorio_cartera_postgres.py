@@ -200,13 +200,13 @@ class RepositorioCarteraPostgres(RepositorioCarteraPort):
         ]
 
     def hay_version_vigente(self, fecha_corte: date) -> bool:
+        return self.version_vigente(fecha_corte) is not None
+
+    def version_vigente(self, fecha_corte: date) -> int | None:
         with self._engine.connect() as cx:
-            return (
-                cx.execute(
-                    select(_CARGA.c.id).where(_CARGA.c.fecha_corte == fecha_corte, _CARGA.c.vigente)
-                ).scalar_one_or_none()
-                is not None
-            )
+            return cx.execute(
+                select(_CARGA.c.id).where(_CARGA.c.fecha_corte == fecha_corte, _CARGA.c.vigente)
+            ).scalar_one_or_none()
 
     def consultar(
         self,
@@ -354,7 +354,7 @@ class RepositorioCarteraPostgres(RepositorioCarteraPort):
         self, fecha_corte: date, campo: str, filtros: Sequence[Filtro]
     ) -> list[ValorDeFiltro]:
         consulta = self._sentencia_de_segmentar(
-            fecha_corte, campo, filtros, None, con_capital=False
+            fecha_corte, campo, filtros, None, con_capital=False, ordenar=False
         )
         with self._engine.connect() as cx:
             return [ValorDeFiltro(valor, cantidad) for valor, cantidad in cx.execute(consulta)]
@@ -366,18 +366,18 @@ class RepositorioCarteraPostgres(RepositorioCarteraPort):
         filtros: Sequence[Filtro],
         recorte: Recorte | None,
         con_capital: bool = True,
+        ordenar: bool = True,
     ) -> Select:
         """La agrupacion de un campo con sus cantidades (y su capital, salvo `con_capital=False`:
-        la lista de valores de un filtro no lo necesita)."""
+        la lista de valores de un filtro no lo necesita). `ordenar=False` la deja sin ORDER BY: la
+        lista de valores la ordena el caso de uso (D-FV-2: son <= umbral grupos y el vacio va al
+        final, que SQL no resuelve solo)."""
         origen, condiciones, columnas = self._fuente(fecha_corte, filtros, recorte)
         columna = columnas[campo]
         medidas = [func.count()]
         if con_capital:
             medidas.append(func.coalesce(func.sum(columnas[CAMPO_CAPITAL]), 0))
-        return (
-            select(columna, *medidas)
-            .select_from(origen)
-            .where(*condiciones)
-            .group_by(columna)
-            .order_by(func.count().desc(), columna)
+        agrupada = (
+            select(columna, *medidas).select_from(origen).where(*condiciones).group_by(columna)
         )
+        return agrupada.order_by(func.count().desc(), columna) if ordenar else agrupada

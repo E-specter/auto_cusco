@@ -43,6 +43,7 @@ from app.core.entities.cartera import (
     Segmentacion,
     SinVersionVigente,
 )
+from app.core.services.seleccion_cartera.cache_valores import CacheValoresFiltro
 from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.seleccion_cartera.servicio import CANTIDAD_MAXIMA, ConsultaCarteraService
 
@@ -60,12 +61,19 @@ def obtener_catalogo_cartera() -> CatalogoCartera:
     return crear_catalogo_cartera()
 
 
+# La memoria de las listas de valores es del proceso, no del pedido: la API crea un servicio por
+# pedido, y una memoria por servicio no serviria de nada. Es acotada y se renueva sola cuando cambia
+# la carga vigente (ver `cache_valores.py`).
+CACHE_VALORES = CacheValoresFiltro()
+
+
 def crear_servicio_cartera() -> ConsultaCarteraService:
     catalogo = crear_catalogo_cartera()
     return ConsultaCarteraService(
         RepositorioCarteraPostgres(get_engine(), catalogo),
         catalogo,
         get_settings().umbral_valores_filtro,
+        CACHE_VALORES,
     )
 
 

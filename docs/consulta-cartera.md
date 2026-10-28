@@ -104,8 +104,9 @@ Pensado para RF-28: al cambiar un filtro, la pantalla hace un solo pedido en vez
 - **El umbral** es `Settings.umbral_valores_filtro` (variable `UMBRAL_VALORES_FILTRO`, 100 por defecto, de 2 a 1000; RF-32): la única fuente, y viaja en la respuesta para que la pantalla no la duplique.
 - **La lista contextual** es la agrupación de `GET /cartera/segmentacion` sin el capital, con los filtros de arriba.
 - **Errores:** `400` si el campo no existe, no es de texto o un filtro de arriba es inválido; `404` si la fecha no tiene versión vigente.
+- **En memoria (T-FV-B3).** La decisión del umbral se guarda por `(id de la carga vigente, campo, umbral)` y cada lista por `(carga vigente, campo, filtros de arriba, umbral)`, en una memoria **acotada** (LRU, 256 entradas de cada tipo, con candado) que comparten todos los pedidos del proceso. Es segura porque las filas de una carga no cambian después de procesarla; si la fecha pasa a otra versión vigente, la clave cambia y se recalcula sola, sin invalidar nada. Solo se guardan listas de campos que ofrecen lista (a lo sumo `umbral` valores). La decisión va **primero**, aun sin filtros: `DISTINCT … LIMIT umbral + 1` corta pronto en un campo de alta cardinalidad, y una agrupación no; por eso tampoco hay atajo «la lista ya supera el umbral». La lista no lleva `ORDER BY`: la ordena el caso de uso (son a lo sumo `umbral` grupos).
 
-Medición (architec): `scripts/medir_valores_filtro.py` mide p50 y p95 de la decisión del umbral y de la lista (sin filtros y con tres) sobre la sábana sintética de 46 000 filas. Presupuesto: p95 menor de 150 ms por lista, con las dos consultas. Si no se cumple, la primera opción es guardar en memoria la decisión del umbral por (carga vigente, campo).
+Medición (architec): `scripts/medir_valores_filtro.py` mide p50 y p95 de cada pedido sobre la sábana sintética de 46 000 filas, separando la **primera llamada** (sin memoria) de las **siguientes**, y las consultas sueltas (con una fila de referencia que agrupa el campo que supera el umbral, para elegir el orden). Presupuesto: p95 menor de 150 ms por pedido, sumando las dos consultas.
 
 ## 6. Reglas de negocio
 

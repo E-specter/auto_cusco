@@ -163,3 +163,54 @@ def test_distintos_hasta_ejecuta_la_decision_con_el_tope_y_devuelve_el_conteo() 
 
     assert cuantos == 101
     assert "LIMIT 101" in sql(motor.sentencias[0])
+
+
+def test_la_lista_de_valores_se_pide_sin_order_by_porque_la_ordena_el_caso_de_uso() -> None:
+    motor = _MotorFalso([("A", 1)])
+    repositorio = RepositorioCarteraPostgres(motor, catalogo_con())  # type: ignore[arg-type]
+
+    repositorio.valores_de(FECHA, "region", [])
+
+    texto = sql(motor.sentencias[0])
+    assert "GROUP BY carga_fila.region" in texto and "ORDER BY" not in texto
+
+
+def test_segmentar_conserva_su_order_by_y_sin_ordenar_solo_quita_ese() -> None:
+    con = sql(repo()._sentencia_de_segmentar(FECHA, "region", [], None))
+    sin = sql(repo()._sentencia_de_segmentar(FECHA, "region", [], None, ordenar=False))
+
+    assert "ORDER BY count(*) DESC, carga_fila.region" in con
+    assert sin == con.split(" ORDER BY")[0]
+
+
+def test_la_version_vigente_se_busca_por_fecha_y_vigente_y_hay_version_la_usa() -> None:
+    motor = _MotorFalso([(7,)])
+    repositorio = RepositorioCarteraPostgres(motor, catalogo_con())  # type: ignore[arg-type]
+    motor.execute = lambda sentencia: (  # type: ignore[method-assign]
+        motor.sentencias.append(sentencia) or _Escalar(7)
+    )
+
+    assert repositorio.version_vigente(FECHA) == 7
+    assert repositorio.hay_version_vigente(FECHA) is True
+    texto = sql(motor.sentencias[0])
+    assert (
+        texto
+        == "SELECT carga.id FROM carga WHERE carga.fecha_corte = '2099-08-03' AND carga.vigente"
+    )
+
+
+class _Escalar:
+    def __init__(self, valor):
+        self.valor = valor
+
+    def scalar_one_or_none(self):
+        return self.valor
+
+
+def test_sin_version_vigente_la_busqueda_da_none_y_hay_version_da_false() -> None:
+    motor = _MotorFalso([])
+    motor.execute = lambda sentencia: _Escalar(None)  # type: ignore[method-assign]
+    repositorio = RepositorioCarteraPostgres(motor, catalogo_con())  # type: ignore[arg-type]
+
+    assert repositorio.version_vigente(FECHA) is None
+    assert repositorio.hay_version_vigente(FECHA) is False

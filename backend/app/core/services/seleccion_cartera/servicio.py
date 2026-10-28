@@ -24,6 +24,7 @@ from app.core.entities.cartera import (
     ValoresCartera,
 )
 from app.core.ports.repositorio_cartera_port import RepositorioCarteraPort
+from app.core.services.seleccion_cartera.cache_valores import CacheValoresFiltro
 from app.core.services.seleccion_cartera.campos import CatalogoCartera
 
 LIMITE_MAXIMO = 5000
@@ -41,10 +42,14 @@ class ConsultaCarteraService:
         repositorio: RepositorioCarteraPort,
         catalogo: CatalogoCartera | None = None,
         umbral_valores: int = UMBRAL_VALORES_FILTRO_POR_DEFECTO,
+        cache_valores: CacheValoresFiltro | None = None,
     ) -> None:
         self._repositorio = repositorio
         self._catalogo = catalogo or CatalogoCartera()
         self._umbral_valores = umbral_valores
+        # La API crea un servicio por pedido: para que la memoria sirva entre pedidos hay que
+        # pasarle una compartida. Sin ella, cada servicio tiene la suya.
+        self._cache_valores = cache_valores or CacheValoresFiltro()
 
     @property
     def catalogo(self) -> CatalogoCartera:
@@ -112,15 +117,41 @@ class ConsultaCarteraService:
             raise ConsultaInvalida(
                 f"El campo {campo!r} es {tipo.value}: solo los de texto tienen lista de valores"
             )
-        self._validar(fecha_corte, filtros)
+        for filtro in filtros:
+            self._catalogo.validar_filtro(filtro)
+        carga_id = self._repositorio.version_vigente(fecha_corte)
+        if carga_id is None:
+            raise SinVersionVigente(fecha_corte)
         umbral = self._umbral_valores
-        if self._repositorio.distintos_hasta(fecha_corte, campo, umbral + 1) > umbral:
+        cache = self._cache_valores
+
+        # 1. La decision, una vez por (carga vigente, campo, umbral). Va PRIMERO y por separado,
+        # aunque no haya filtros: `DISTINCT ... LIMIT umbral + 1` corta pronto en un campo de alta
+        # cardinalidad (un documento), y una agrupacion no: tendria que agrupar todos los productos
+        # de la fecha y traer decenas de miles de grupos solo para descubrir que no se ofrece.
+        # Por la misma razon no hay atajo «la lista ya supera el umbral»: la lista se pide despues
+        # de saber que el campo cabe, y lo filtrado esta siempre dentro de la fecha entera.
+        clave_decision = (carga_id, campo, umbral)
+        ofrece_lista = cache.decision(clave_decision)
+        if ofrece_lista is None:
+            ofrece_lista = (
+                self._repositorio.distintos_hasta(fecha_corte, campo, umbral + 1) <= umbral
+            )
+            cache.guardar_decision(clave_decision, ofrece_lista)
+        if not ofrece_lista:
             return ValoresCartera(campo=campo, umbral=umbral, ofrece_lista=False, valores=())
-        encontrados = self._repositorio.valores_de(fecha_corte, campo, tuple(filtros))
-        ordenados = sorted(encontrados, key=lambda v: (v.valor is None, -v.cantidad, v.valor or ""))
-        return ValoresCartera(
-            campo=campo, umbral=umbral, ofrece_lista=True, valores=tuple(ordenados)
-        )
+
+        # 2. La lista contextual: una agrupacion por (carga, campo, filtros de arriba). Se ordena
+        # aqui (son <= umbral grupos): el vacio al final no lo da un ORDER BY sencillo.
+        clave_lista = (carga_id, campo, tuple(filtros), umbral)
+        ordenados = cache.lista(clave_lista)
+        if ordenados is None:
+            encontrados = self._repositorio.valores_de(fecha_corte, campo, tuple(filtros))
+            ordenados = tuple(
+                sorted(encontrados, key=lambda v: (v.valor is None, -v.cantidad, v.valor or ""))
+            )
+            cache.guardar_lista(clave_lista, ordenados)
+        return ValoresCartera(campo=campo, umbral=umbral, ofrece_lista=True, valores=ordenados)
 
     def resumen(
         self,
