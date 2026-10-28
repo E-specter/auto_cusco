@@ -54,6 +54,7 @@ import {
 import { archivadosEnUso, avisoDeArchivados, etiquetaEnCatalogo, opcionesDeCampos } from '../lib/campos';
 import { llenarSelect, type OpcionDeLista } from './lista-de-campos';
 import { crearGestorValores } from './selector-valores';
+import { botonConFoco, destinoDeArrastre, moverFiltro, posicion, puedeMover, type BotonDeOrden } from '../lib/orden-filtros';
 
 export const EVENTO_SELECCION = 'seleccioncambiada';
 
@@ -192,6 +193,117 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
     const plantilla = q<HTMLTemplateElement>('template[data-icono-quitar]');
     if (plantilla) boton.append(plantilla.content.cloneNode(true));
     return boton;
+  }
+
+  // ---- Order of the filters (RF-68, docs/filtro-valores-interfaz.md §3) --------------------------
+
+  const nombreParaMover = (filtro: FiltroBorrador, indice: number): string =>
+    filtro.campo ? etiquetaEnCatalogo(s.campos, filtro.campo) : t('selector.mover.sinCampo', { n: posicion(indice) });
+
+  function anunciarOrden(texto: string): void {
+    const region = q<HTMLElement>('[data-orden-anuncio]');
+    if (region) region.textContent = texto;
+  }
+
+  /** Moves a filter and tells the screen (it emits like any change of filters, and the lists below ask again). */
+  function mover(desde: number, hacia: number, boton: BotonDeOrden | null): void {
+    const total = s.borrador.filtros.length;
+    const destino = Math.min(total - 1, Math.max(0, hacia));
+    if (destino === desde || desde < 0 || desde >= total) return;
+    const movido = s.borrador.filtros[desde];
+    s.borrador.filtros = moverFiltro(s.borrador.filtros, desde, destino);
+    renderFiltros();
+    anunciarOrden(t('selector.mover.movido', { campo: nombreParaMover(movido, destino), posicion: posicion(destino), total }));
+    // The focus follows the filter, on the same button of its new row (the other one at an edge).
+    if (boton) {
+      root
+        .querySelector<HTMLElement>(`[data-filtros] > .fila[data-indice="${destino}"] [data-mover="${botonConFoco(boton, destino, total)}"]`)
+        ?.focus();
+    }
+    cambio();
+  }
+
+  function botonDeOrden(tipo: BotonDeOrden, indice: number, total: number, nombre: string): HTMLButtonElement {
+    const boton = document.createElement('button');
+    boton.type = 'button';
+    boton.className = 'btn btn--quiet btn--icon fila__orden';
+    boton.dataset.mover = tipo;
+    const etiqueta = t(`selector.mover.${tipo === 'subir' ? 'subir' : 'bajar'}`, { campo: nombre });
+    boton.setAttribute('aria-label', etiqueta);
+    boton.title = etiqueta;
+    boton.disabled = !puedeMover(tipo, indice, total);
+    const plantilla = q<HTMLTemplateElement>(`template[data-icono-${tipo}]`);
+    if (plantilla) boton.append(plantilla.content.cloneNode(true));
+    boton.addEventListener('click', () => mover(indice, tipo === 'subir' ? indice - 1 : indice + 1, tipo));
+    return boton;
+  }
+
+  /** The handle drags with the pointer (and the finger). The keyboard has «Subir» and «Bajar», so it takes no focus. */
+  function asaDeArrastre(indice: number, nombre: string): HTMLElement {
+    const asa = document.createElement('span');
+    asa.className = 'btn btn--quiet btn--icon fila__asa';
+    asa.setAttribute('aria-hidden', 'true');
+    asa.tabIndex = -1;
+    asa.title = t('selector.mover.arrastrar', { campo: nombre });
+    const plantilla = q<HTMLTemplateElement>('template[data-icono-asa]');
+    if (plantilla) asa.append(plantilla.content.cloneNode(true));
+    asa.addEventListener('pointerdown', (evento) => empezarArrastre(evento, asa, indice));
+    return asa;
+  }
+
+  function empezarArrastre(evento: PointerEvent, asa: HTMLElement, indice: number): void {
+    if (evento.pointerType === 'mouse' && evento.button !== 0) return;
+    const lista = q<HTMLElement>('[data-filtros]');
+    if (!lista) return;
+    evento.preventDefault();
+    const filas = [...lista.querySelectorAll<HTMLElement>(':scope > .fila')];
+    const fila = filas[indice];
+    if (!fila) return;
+    asa.setPointerCapture(evento.pointerId);
+    fila.classList.add('fila--arrastrada');
+    const y0 = evento.clientY;
+    let destino = indice;
+
+    const marcar = (antes: number) => {
+      filas.forEach((otra, i) => {
+        otra.classList.toggle('fila--cae-antes', i === antes);
+        otra.classList.toggle('fila--cae-despues', antes === filas.length && i === filas.length - 1);
+      });
+    };
+    const mueve = (e: PointerEvent) => {
+      const centros = filas.map((otra) => {
+        const caja = otra.getBoundingClientRect();
+        return caja.top + caja.height / 2;
+      });
+      const caida = destinoDeArrastre(centros, e.clientY, indice);
+      destino = caida.destino;
+      fila.style.transform = `translateY(${e.clientY - y0}px)`;
+      marcar(caida.antes);
+    };
+    const terminar = (confirmar: boolean) => {
+      asa.removeEventListener('pointermove', mueve);
+      asa.removeEventListener('pointerup', alSoltar);
+      asa.removeEventListener('pointercancel', alCancelar);
+      document.removeEventListener('keydown', alTeclear, true);
+      if (asa.hasPointerCapture(evento.pointerId)) asa.releasePointerCapture(evento.pointerId);
+      fila.classList.remove('fila--arrastrada');
+      fila.style.removeProperty('transform');
+      marcar(-1);
+      if (confirmar) mover(indice, destino, null);
+      else anunciarOrden(t('selector.mover.cancelado'));
+    };
+    const alSoltar = () => terminar(true);
+    const alCancelar = () => terminar(false);
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      terminar(false);
+    };
+    asa.addEventListener('pointermove', mueve);
+    asa.addEventListener('pointerup', alSoltar);
+    asa.addEventListener('pointercancel', alCancelar);
+    document.addEventListener('keydown', alTeclear, true);
   }
 
   function controlDeValor(tipo: TipoCampo | null, valor: string, etiqueta: string): HTMLInputElement | HTMLSelectElement {
@@ -538,7 +650,21 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
       celdaCampo.append(campo, marca);
     }
 
-    fila.append(celdaCampo, operador, quitar, valores, nota);
+    const total = s.borrador.filtros.length;
+    if (total < 2) {
+      fila.append(celdaCampo, operador, quitar, valores, nota);
+      return fila;
+    }
+    // Two filters or more: its number on the left and the order controls beside «Quitar» (§3.1).
+    const nombre = nombreParaMover(filtro, indice);
+    fila.classList.add('fila--ordenada');
+    const numero = document.createElement('span');
+    numero.className = 'fila__numero mono';
+    numero.textContent = String(posicion(indice));
+    const acciones = document.createElement('div');
+    acciones.className = 'fila__acciones';
+    acciones.append(asaDeArrastre(indice, nombre), botonDeOrden('subir', indice, total, nombre), botonDeOrden('bajar', indice, total, nombre), quitar);
+    fila.append(numero, celdaCampo, operador, acciones, valores, nota);
     return fila;
   }
 
@@ -548,6 +674,7 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
     if (!lista) return;
     lista.replaceChildren(...s.borrador.filtros.map(filaFiltro));
     q<HTMLElement>('[data-filtros-vacio]')!.hidden = s.borrador.filtros.length > 0;
+    q<HTMLElement>('[data-orden-hint]')!.hidden = s.borrador.filtros.length < 2;
     if (foco !== undefined && indice !== undefined) {
       lista.querySelector<HTMLElement>(`.fila[data-indice="${indice}"] ${foco}`)?.focus();
     }

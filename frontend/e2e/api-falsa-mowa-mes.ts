@@ -511,7 +511,13 @@ export function previsualizacionCampanaSintetica(
   const supervision = 2;
   const totalCargados = productos + supervision;
   const speechId = entrada.speech_id ?? 1;
-  const descripcionSugerida = acortarDescripcion('CajaCusco', ['9 <= dias atraso <= 30']);
+  // The backend summarises the filters IN THEIR ORDER (docs/filtro-valores-interfaz.md §3.5). With two or more the
+  // fake does the same, in its own words; with none or one it keeps the text every other scenario expects.
+  const filtros = entrada.filtros ?? [];
+  const descripcionSugerida = acortarDescripcion(
+    'CajaCusco',
+    filtros.length >= 2 ? filtros.map((filtro) => filtro.replace(/:/g, ' ')) : ['9 <= dias atraso <= 30'],
+  );
   const plantilla = entrada.plantilla_nombre_archivo?.trim() || contexto.plantilla;
   const usadas = new Set([...plantilla.matchAll(/\{([^{}]*)\}/g)].map((m) => m[1]));
   const { limite: limiteParcial, ...resto } = parcial;

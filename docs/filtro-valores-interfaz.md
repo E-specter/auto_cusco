@@ -83,7 +83,7 @@ Si un filtro de arriba cambia y un valor marcado ya no está en `valores` (P-7):
 
 - **Primera carga:** en el lugar de la lista, «Cargando valores…» (`aria-busy="true"` en el `fieldset`).
 - **Recalcular (§2.6):**
-  - la lista anterior queda a la vista y operable, atenuada, con `aria-busy="true"` y la línea «Actualizando valores…»;
+  - la lista anterior queda a la vista y operable, con `aria-busy="true"` y la línea «Actualizando valores…». No se atenúa: con opacidad baja las cantidades, que ya van en muted y `xs`, quedarían por debajo de AA;
   - al llegar la respuesta, se reemplazan las cantidades y el orden, y lo marcado se conserva;
   - no se vacía la lista mientras espera: así no salta y el foco no se pierde.
 - **Error** (red o 5xx):
@@ -147,12 +147,11 @@ No dice nada de las listas: se recalculan solas (§2.6), y el hint de §3.1 ya e
 - **Cambian el número de cada filtro y las listas de los que quedaron debajo de otro.**
 - **No cambian** el resultado, los totales ni las cifras.
 - **Mover emite `seleccioncambiada` con el orden nuevo,** como cualquier cambio de filtros, y cuenta como cambio sin guardar, porque el orden se guarda con la selección. El selector siempre avisa. Qué hace la pantalla con ese aviso lo decide ella: en Cartera, recalcular da los mismos totales.
-- **[MOWA]** La campaña solo se entera del orden por ese evento (`campana.astro`). Mover vuelve a previsualizar: los totales salen iguales y la descripción sugerida cambia. Si no se emitiera, la sugerida y la creación quedarían con el orden viejo.
-- **[MOWA]** En la campaña de MOWA MES, mover un filtro cambia la `descripcion_sugerida` de una campaña nueva, porque resume los filtros en su orden. Es lo esperado (§29 del plan): es una sugerencia que el usuario edita, y una campaña ya creada guarda su descripción. Si el usuario ya editó la descripción, el orden no la toca, como cualquier otro cambio de filtros.
+- **[MOWA]** La campaña monta el selector compacto (la fecha de corte y la selección guardada), sin filas de filtro: no se mueve nada ahí, y toma el orden de la selección guardada. Cambiar el orden en Cartera y guardar la selección cambia la `descripcion_sugerida` de una campaña nueva, porque resume los filtros en su orden. Es lo esperado (§29 del plan): es una sugerencia que el usuario edita, y una campaña ya creada guarda su descripción. Si el usuario ya editó la descripción, el orden no la toca, como cualquier otro cambio de filtros.
 
 ## 4. La campaña de MOWA MES **[MOWA]**
 
-- El selector es el mismo, con las mismas reglas de §2 y §3.
+- El selector es el mismo componente, en modo compacto (fecha de corte y selección guardada). Las reglas de §2 y §3 son las de Cartera, y la campaña recibe de ellas el orden con que se guardó la selección.
 - **`resumen_filtro`** (T-FV-B1, backend) escribe:
   - `en`, igual que hoy: «tipo de asignación en Primera asignación/Segunda asignación». De eso dependen las pruebas de oro;
   - `en` con el vacío: «… en Primera asignación/(vacío)»;
@@ -229,9 +228,10 @@ En `selector.valores.*` y `selector.mover.*` (es y en). `op.no_en` se suma a los
   - mover no cambia los totales, pero sí las listas de abajo;
   - el orden se guarda con la selección y vuelve igual;
   - **[MOWA]** en la campaña:
-    - el mismo selector;
-    - mover con la descripción sin editar cambia la sugerida, y con la descripción editada (`estado.descripcionEditada`) no la toca;
-    - la petición de previsualización y la de creación llevan los filtros en el orden de la pantalla;
-    - `api-falsa-mowa-mes.ts` responde `GET /cartera/valores`; si no, el selector cae al `textarea` porque la llamada falla (§2.5), sin que los specs se rompan ni esperen de más;
+    - el mismo selector, en modo compacto;
+    - dos selecciones guardadas con el mismo conjunto de filtros en distinto orden dan una `descripcion_sugerida` distinta, que sigue el orden guardado; con la descripción editada (`estado.descripcionEditada`) la sugerida no la toca;
+    - la petición de previsualización y la de creación llevan los filtros en el orden guardado;
+    - reordenar en Cartera y guardar la selección deja el orden nuevo, y al cargarla en la campaña llega en ese orden;
+    - la campaña no pide `/cartera/valores` (modo compacto, sin filas);
     - F2 y F3 corren además `mowa-mes-campana`, `mowa-mes-campana-descripcion` y `mowa-mes-adicionales`.
 - **axe,** en claro, oscuro y 360 px: la lista con marcados, la lista con marcados sin productos, el error y la fila con los controles de orden.

@@ -57,12 +57,25 @@ const { modo = 'completo', id = 'selector' } = Astro.props;
         <template data-icono-quitar>
           <Icon name="x" size={16} />
         </template>
+        <template data-icono-asa>
+          <Icon name="grip-vertical" size={16} />
+        </template>
+        <template data-icono-subir>
+          <Icon name="chevron-up" size={16} />
+        </template>
+        <template data-icono-bajar>
+          <Icon name="chevron-down" size={16} />
+        </template>
 
         <fieldset class="selector__grupo">
           <legend class="selector__leyenda" data-i18n="selector.filtros">Filtros</legend>
           <p class="selector__vacio" data-filtros-vacio data-i18n="selector.filtros.vacio">
             Sin filtros: se considera toda la cartera del día.
           </p>
+          <p class="field__hint selector__ordenHint" data-orden-hint data-i18n="selector.mover.hint" hidden>
+            El orden no cambia el resultado: cada filtro muestra los valores que quedan con los de arriba.
+          </p>
+          <p class="visually-hidden" role="status" data-orden-anuncio></p>
           <ul class="filas" data-filtros />
           <button type="button" class="btn btn--sm selector__agregar" data-agregar-filtro>
             <Icon name="plus" size={16} />

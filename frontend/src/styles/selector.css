@@ -359,3 +359,70 @@ textarea.input {
   gap: var(--space-2);
   margin-block-end: var(--space-2);
 }
+
+/* RF-68: the order of the filters. A row with a number on the left and its order controls beside «Quitar». */
+.selector__ordenHint {
+  margin: 0;
+}
+
+.fila--ordenada {
+  grid-template-columns: auto minmax(0, 1.2fr) minmax(0, 1fr) auto;
+}
+
+.fila--ordenada .fila__valores,
+.fila--ordenada .fila__nota {
+  grid-column: 2 / -1;
+}
+
+.fila__numero {
+  align-self: center;
+  min-inline-size: 1.5ch;
+  font-size: var(--text-sm);
+  text-align: end;
+  color: var(--color-text-muted);
+}
+
+.fila__acciones {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: var(--space-1);
+}
+
+/* The handle is for the pointer and the finger: the page must not scroll under it while dragging. */
+.fila__asa {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.fila--arrastrada {
+  position: relative;
+  z-index: 1;
+  cursor: grabbing;
+  box-shadow: 0 0.25rem 0.75rem hsl(0 0% 0% / 0.25);
+  background-color: var(--color-surface);
+}
+
+.fila--arrastrada .fila__asa {
+  cursor: grabbing;
+}
+
+/* The line that says where it will land. */
+.fila--cae-antes {
+  box-shadow: inset 0 0.1875rem 0 var(--color-accent);
+}
+
+.fila--cae-despues {
+  box-shadow: inset 0 -0.1875rem 0 var(--color-accent);
+}
+
+@media (max-width: 30rem) {
+  .fila--filtro.fila--ordenada {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .fila--filtro.fila--ordenada .fila__operador {
+    grid-column: 2 / -1;
+  }
+}
