@@ -154,6 +154,31 @@ class Grupo:
 
 
 @dataclass(frozen=True)
+class ValorDeFiltro:
+    """Un valor distinto de un campo de texto y cuantos productos lo tienen. `valor` es None para
+    «(vacio)»: los productos sin valor."""
+
+    valor: str | None
+    cantidad: int
+
+
+@dataclass(frozen=True)
+class ValoresCartera:
+    """La lista de valores de un campo de texto para el filtro (RF-67).
+
+    `ofrece_lista` se decide sobre la FECHA entera, no sobre lo filtrado: es False si el campo tiene
+    mas de `umbral` valores distintos, y entonces `valores` va vacio (nunca se devuelve un valor de
+    un campo que lo supera: nombres, documentos, telefonos). Con lista, `valores` sale por cantidad
+    descendente, con desempate alfabetico y «(vacio)» siempre al final.
+    """
+
+    campo: str
+    umbral: int
+    ofrece_lista: bool
+    valores: tuple[ValorDeFiltro, ...]
+
+
+@dataclass(frozen=True)
 class Segmentacion:
     """Analisis por atributo (RF-06): cuentas y capital por cada valor del campo."""
 

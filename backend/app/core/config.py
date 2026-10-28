@@ -7,6 +7,7 @@ copia ese archivo a /.env (nunca versionado) y completa los valores reales.
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/app/core/config.py -> sube 3 niveles hasta la raiz del repo,
@@ -19,6 +20,10 @@ _ENV_FILE = _REPO_ROOT / ".env"
 # sufijo, nunca contra la que se usa para trabajar. Ver docs/testing.md, seccion 4.
 SUFIJO_BASE_PRUEBAS = "_test"
 
+# Hasta cuantos valores distintos un campo de texto ofrece su lista en el filtro (RF-67, RF-32).
+# La unica fuente del numero: `Settings` lo valida, el servicio lo usa y la API lo devuelve.
+UMBRAL_VALORES_FILTRO_POR_DEFECTO = 100
+
 
 class Settings(BaseSettings):
     """Variables de entorno del backend."""
@@ -30,6 +35,10 @@ class Settings(BaseSettings):
     db_name: str = "auto_cusco"
     db_user: str = "auto_cusco_app"
     db_password: str = ""
+
+    # Un campo de texto con mas valores distintos que esto (en la fecha entera) no ofrece lista de
+    # valores: el filtro sigue siendo un cuadro de texto. De 2 a 1000.
+    umbral_valores_filtro: int = Field(default=UMBRAL_VALORES_FILTRO_POR_DEFECTO, ge=2, le=1000)
 
     # Origenes del frontend permitidos por CORS, separados por coma. Vacio = sin CORS.
     cors_origenes: str = ""

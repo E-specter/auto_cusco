@@ -7,6 +7,7 @@ La cartera siempre sale de la version vigente de esa fecha (RF-04).
 from collections.abc import Sequence
 from datetime import date
 
+from app.core.config import UMBRAL_VALORES_FILTRO_POR_DEFECTO
 from app.core.entities.cartera import (
     BloqueResumen,
     ConsultaInvalida,
@@ -19,6 +20,8 @@ from app.core.entities.cartera import (
     ResumenCartera,
     Segmentacion,
     SinVersionVigente,
+    TipoDato,
+    ValoresCartera,
 )
 from app.core.ports.repositorio_cartera_port import RepositorioCarteraPort
 from app.core.services.seleccion_cartera.campos import CatalogoCartera
@@ -34,10 +37,14 @@ CANTIDAD_MAXIMA = 120_000
 
 class ConsultaCarteraService:
     def __init__(
-        self, repositorio: RepositorioCarteraPort, catalogo: CatalogoCartera | None = None
+        self,
+        repositorio: RepositorioCarteraPort,
+        catalogo: CatalogoCartera | None = None,
+        umbral_valores: int = UMBRAL_VALORES_FILTRO_POR_DEFECTO,
     ) -> None:
         self._repositorio = repositorio
         self._catalogo = catalogo or CatalogoCartera()
+        self._umbral_valores = umbral_valores
 
     @property
     def catalogo(self) -> CatalogoCartera:
@@ -86,6 +93,34 @@ class ConsultaCarteraService:
         self._catalogo.tipo_de(campo)
         grupos = self._repositorio.segmentar(fecha_corte, campo, tuple(filtros))
         return Segmentacion(campo=campo, grupos=tuple(grupos))
+
+    def valores(
+        self, fecha_corte: date, campo: str, filtros: Sequence[Filtro] = ()
+    ) -> ValoresCartera:
+        """La lista de valores de un campo de TEXTO para el filtro (RF-67), base o adicional,
+        archivados incluidos.
+
+        Si se ofrece la lista se decide sobre la fecha ENTERA (distintos no nulos <= umbral), asi un
+        campo no cambia de control segun los filtros de arriba; con mas, no se devuelve ningun
+        valor.
+        La lista es contextual: cuenta los productos que cumplen `filtros` (los de arriba, en
+        cascada). Orden (D-FV-2): cantidad descendente, desempate alfabetico, «(vacio)» al final.
+        Los valores se comparan tal cual (D-FV-1).
+        """
+        tipo = self._catalogo.tipo_de(campo)
+        if tipo is not TipoDato.TEXTO:
+            raise ConsultaInvalida(
+                f"El campo {campo!r} es {tipo.value}: solo los de texto tienen lista de valores"
+            )
+        self._validar(fecha_corte, filtros)
+        umbral = self._umbral_valores
+        if self._repositorio.distintos_hasta(fecha_corte, campo, umbral + 1) > umbral:
+            return ValoresCartera(campo=campo, umbral=umbral, ofrece_lista=False, valores=())
+        encontrados = self._repositorio.valores_de(fecha_corte, campo, tuple(filtros))
+        ordenados = sorted(encontrados, key=lambda v: (v.valor is None, -v.cantidad, v.valor or ""))
+        return ValoresCartera(
+            campo=campo, umbral=umbral, ofrece_lista=True, valores=tuple(ordenados)
+        )
 
     def resumen(
         self,

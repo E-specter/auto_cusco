@@ -15,6 +15,7 @@ La cartera de una fecha es el contenido de su **versión vigente** (ver `version
 | `GET /cartera/metricas` | Capital, cuentas, cuota mínima y máxima, cuentas por segmento, más los indicadores que pida el usuario (RF-26, RF-27) |
 | `GET /cartera/segmentacion` | Cuentas y capital por cada valor de un atributo (RF-06) |
 | `GET /cartera/resumen` | Métricas del universo filtrado y de sus primeros n, lado a lado, en un solo llamado (RF-08, RF-26 a RF-28) |
+| `GET /cartera/valores` | La lista de valores de un campo de texto con sus cantidades, para el filtro «es uno de» / «no es ninguno de» (RF-67). Ver la sección 5 bis |
 
 Todos reciben `fecha_corte` en formato `AAAA-MM-DD` y aceptan los mismos filtros.
 
@@ -74,6 +75,37 @@ La respuesta trae `disponibles`, `solicitados` y `suficiente`, y dos bloques: `u
 **Los primeros n son siempre los mismos productos.** Salen con el mismo orden, los nulos al final y el mismo desempate por pagaré que `GET /cartera` y que la generación del archivo de carga. Así, las métricas de la selección describen exactamente los productos de la lista y los del archivo. Dos pruebas contra PostgreSQL lo comprueban: una con un orden que tiene empates, frente a la lista, y otra frente a las filas del archivo generado.
 
 Pensado para RF-28: al cambiar un filtro, la pantalla hace un solo pedido en vez de uno por métrica y por bloque. `/cartera/metricas` y `/cartera/segmentacion` siguen disponibles tal como estaban.
+
+## 5 bis. La lista de valores de un campo de texto (RF-67)
+
+`GET /cartera/valores?fecha_corte=AAAA-MM-DD&campo=…&filtro=…` devuelve los valores distintos de un campo de **texto** (base o adicional, **archivados incluidos**, para que una selección vieja siga mostrando su lista), con cuántos productos tiene cada uno. `filtro` se repite y lleva los filtros **de arriba**, con la sintaxis de siempre: la lista es contextual (la cascada) y el backend no necesita conocer su orden.
+
+```
+?fecha_corte=2026-09-10&campo=region&filtro=agencia:en:AG 1&filtro=dias_atraso:mayor:5
+```
+
+```json
+{
+  "campo": "region",
+  "umbral": 100,
+  "ofrece_lista": true,
+  "valores": [
+    {"valor": "CUSCO SUR", "cantidad": 1820},
+    {"valor": "TACNA", "cantidad": 96},
+    {"valor": null, "cantidad": 12}
+  ]
+}
+```
+
+- **`null` es «(vacío)»:** los productos sin valor. La cartera no tiene texto vacío (`""`), solo `NULL`.
+- **Orden (D-FV-2):** cantidad de mayor a menor, desempate alfabético (la lista no salta entre llamadas) y **«(vacío)» siempre al final**, con su cantidad.
+- **Comparación tal cual (D-FV-1):** «Primera asignación» y «PRIMERA ASIGNACION» son dos valores. Lo corrige la sábana; la lista lo deja a la vista.
+- **`ofrece_lista` se decide sobre la fecha entera, sin filtros:** si el campo tiene **más** de `umbral` valores distintos no nulos, es `false` y `valores` va **vacío**: nunca se devuelve ningún valor de un campo que supera el umbral (nombres, documentos, teléfonos). Así un campo no cambia de control porque cambie un filtro de arriba; solo al cambiar la fecha de corte. En SQL, `SELECT count(*) FROM (SELECT DISTINCT campo … LIMIT umbral + 1)`: corta en cuanto se pasa, sin contar todo.
+- **El umbral** es `Settings.umbral_valores_filtro` (variable `UMBRAL_VALORES_FILTRO`, 100 por defecto, de 2 a 1000; RF-32): la única fuente, y viaja en la respuesta para que la pantalla no la duplique.
+- **La lista contextual** es la agrupación de `GET /cartera/segmentacion` sin el capital, con los filtros de arriba.
+- **Errores:** `400` si el campo no existe, no es de texto o un filtro de arriba es inválido; `404` si la fecha no tiene versión vigente.
+
+Medición (architec): `scripts/medir_valores_filtro.py` mide p50 y p95 de la decisión del umbral y de la lista (sin filtros y con tres) sobre la sábana sintética de 46 000 filas. Presupuesto: p95 menor de 150 ms por lista, con las dos consultas. Si no se cumple, la primera opción es guardar en memoria la decisión del umbral por (carga vigente, campo).
 
 ## 6. Reglas de negocio
 

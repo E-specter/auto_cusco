@@ -378,6 +378,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cartera/valores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Valores De Un Campo
+         * @description Los valores de un campo de TEXTO (base o adicional, archivados incluidos) con sus cantidades,
+         *     entre los productos que cumplen los filtros de arriba (RF-67). Si el campo tiene mas valores
+         *     distintos que el umbral en la fecha entera, `ofrece_lista` es falso y no se devuelve ninguno.
+         *     `400` si el campo no existe o no es de texto; `404` si la fecha no tiene version vigente.
+         */
+        get: operations["valores_de_un_campo_cartera_valores_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cartera/resumen": {
         parameters: {
             query?: never;
@@ -3659,6 +3682,36 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /**
+         * ValorRespuesta
+         * @description Un valor del campo y cuantos productos lo tienen. `valor` nulo es «(vacio)»: los productos
+         *     sin valor.
+         */
+        ValorRespuesta: {
+            /** Valor */
+            valor: string | null;
+            /** Cantidad */
+            cantidad: number;
+        };
+        /**
+         * ValoresRespuesta
+         * @description La lista de valores de un campo de texto para el filtro (RF-67).
+         *
+         *     `ofrece_lista` se decide sobre la fecha entera, sin filtros: es falso si el campo tiene mas de
+         *     `umbral` valores distintos, y entonces `valores` va vacio (nunca se devuelve un valor). Con
+         *     lista, `valores` sale por cantidad descendente, con desempate alfabetico y el vacio al final.
+         *     `umbral` viaja para que la pantalla no lo duplique.
+         */
+        ValoresRespuesta: {
+            /** Campo */
+            campo: string;
+            /** Umbral */
+            umbral: number;
+            /** Ofrece Lista */
+            ofrece_lista: boolean;
+            /** Valores */
+            valores: components["schemas"]["ValorRespuesta"][];
+        };
         /** VariablePlantillaRespuesta */
         VariablePlantillaRespuesta: {
             /** Nombre */
@@ -4738,6 +4791,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SegmentacionRespuesta"];
+                };
+            };
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    valores_de_un_campo_cartera_valores_get: {
+        parameters: {
+            query: {
+                fecha_corte: string;
+                campo: string;
+                /** @description Los filtros de arriba, en la sintaxis de siempre (cascada) */
+                filtro?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValoresRespuesta"];
                 };
             };
             /** @description La peticion no se puede atender tal como viene; el motivo esta en detail */

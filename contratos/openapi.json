@@ -1338,6 +1338,94 @@
         }
       }
     },
+    "/cartera/valores": {
+      "get": {
+        "tags": [
+          "cartera"
+        ],
+        "summary": "Valores De Un Campo",
+        "description": "Los valores de un campo de TEXTO (base o adicional, archivados incluidos) con sus cantidades,\nentre los productos que cumplen los filtros de arriba (RF-67). Si el campo tiene mas valores\ndistintos que el umbral en la fecha entera, `ofrece_lista` es falso y no se devuelve ninguno.\n`400` si el campo no existe o no es de texto; `404` si la fecha no tiene version vigente.",
+        "operationId": "valores_de_un_campo_cartera_valores_get",
+        "parameters": [
+          {
+            "name": "fecha_corte",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Fecha Corte"
+            }
+          },
+          {
+            "name": "campo",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Campo"
+            }
+          },
+          {
+            "name": "filtro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Los filtros de arriba, en la sintaxis de siempre (cascada)",
+              "default": [],
+              "title": "Filtro"
+            },
+            "description": "Los filtros de arriba, en la sintaxis de siempre (cascada)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValoresRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/cartera/resumen": {
       "get": {
         "tags": [
@@ -10557,6 +10645,64 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "ValorRespuesta": {
+        "properties": {
+          "valor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor"
+          },
+          "cantidad": {
+            "type": "integer",
+            "title": "Cantidad"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valor",
+          "cantidad"
+        ],
+        "title": "ValorRespuesta",
+        "description": "Un valor del campo y cuantos productos lo tienen. `valor` nulo es «(vacio)»: los productos\nsin valor."
+      },
+      "ValoresRespuesta": {
+        "properties": {
+          "campo": {
+            "type": "string",
+            "title": "Campo"
+          },
+          "umbral": {
+            "type": "integer",
+            "title": "Umbral"
+          },
+          "ofrece_lista": {
+            "type": "boolean",
+            "title": "Ofrece Lista"
+          },
+          "valores": {
+            "items": {
+              "$ref": "#/components/schemas/ValorRespuesta"
+            },
+            "type": "array",
+            "title": "Valores"
+          }
+        },
+        "type": "object",
+        "required": [
+          "campo",
+          "umbral",
+          "ofrece_lista",
+          "valores"
+        ],
+        "title": "ValoresRespuesta",
+        "description": "La lista de valores de un campo de texto para el filtro (RF-67).\n\n`ofrece_lista` se decide sobre la fecha entera, sin filtros: es falso si el campo tiene mas de\n`umbral` valores distintos, y entonces `valores` va vacio (nunca se devuelve un valor). Con\nlista, `valores` sale por cantidad descendente, con desempate alfabetico y el vacio al final.\n`umbral` viaja para que la pantalla no lo duplique."
       },
       "VariablePlantillaRespuesta": {
         "properties": {

@@ -35,6 +35,7 @@ from app.api.consultas import (
 )
 from app.api.errores import respuestas_de_error
 from app.api.respuestas import ModeloRespuesta
+from app.core.config import get_settings
 from app.core.entities.cartera import (
     BloqueResumen,
     ConsultaInvalida,
@@ -61,7 +62,11 @@ def obtener_catalogo_cartera() -> CatalogoCartera:
 
 def crear_servicio_cartera() -> ConsultaCarteraService:
     catalogo = crear_catalogo_cartera()
-    return ConsultaCarteraService(RepositorioCarteraPostgres(get_engine(), catalogo), catalogo)
+    return ConsultaCarteraService(
+        RepositorioCarteraPostgres(get_engine(), catalogo),
+        catalogo,
+        get_settings().umbral_valores_filtro,
+    )
 
 
 def obtener_servicio_cartera() -> ConsultaCarteraService:
@@ -80,6 +85,29 @@ class CampoRespuesta(ModeloRespuesta):
     adicional: bool = False
     etiqueta: str | None = None
     archivado: bool = False
+
+
+class ValorRespuesta(ModeloRespuesta):
+    """Un valor del campo y cuantos productos lo tienen. `valor` nulo es «(vacio)»: los productos
+    sin valor."""
+
+    valor: str | None
+    cantidad: int
+
+
+class ValoresRespuesta(ModeloRespuesta):
+    """La lista de valores de un campo de texto para el filtro (RF-67).
+
+    `ofrece_lista` se decide sobre la fecha entera, sin filtros: es falso si el campo tiene mas de
+    `umbral` valores distintos, y entonces `valores` va vacio (nunca se devuelve un valor). Con
+    lista, `valores` sale por cantidad descendente, con desempate alfabetico y el vacio al final.
+    `umbral` viaja para que la pantalla no lo duplique.
+    """
+
+    campo: str
+    umbral: int
+    ofrece_lista: bool
+    valores: list[ValorRespuesta]
 
 
 class GrupoRespuesta(ModeloRespuesta):
@@ -237,6 +265,34 @@ def segmentar_cartera(
     except (ConsultaInvalida, SinVersionVigente) as exc:
         raise traducir_errores(exc) from exc
     return _segmentacion_respuesta(segmentacion)
+
+
+@router.get("/valores", response_model=ValoresRespuesta, responses=respuestas_de_error(400, 404))
+def valores_de_un_campo(
+    fecha_corte: date,
+    campo: str,
+    filtro: list[str] = Query(
+        default=[], description="Los filtros de arriba, en la sintaxis de siempre (cascada)"
+    ),
+    servicio: ConsultaCarteraService = Depends(obtener_servicio_cartera),
+    catalogo: CatalogoCartera = Depends(obtener_catalogo_cartera),
+) -> ValoresRespuesta:
+    """Los valores de un campo de TEXTO (base o adicional, archivados incluidos) con sus cantidades,
+    entre los productos que cumplen los filtros de arriba (RF-67). Si el campo tiene mas valores
+    distintos que el umbral en la fecha entera, `ofrece_lista` es falso y no se devuelve ninguno.
+    `400` si el campo no existe o no es de texto; `404` si la fecha no tiene version vigente."""
+    try:
+        valores = servicio.valores(
+            fecha_corte, campo, [parsear_filtro(crudo, catalogo) for crudo in filtro]
+        )
+    except (ConsultaInvalida, SinVersionVigente) as exc:
+        raise traducir_errores(exc) from exc
+    return ValoresRespuesta(
+        campo=valores.campo,
+        umbral=valores.umbral,
+        ofrece_lista=valores.ofrece_lista,
+        valores=[ValorRespuesta(valor=v.valor, cantidad=v.cantidad) for v in valores.valores],
+    )
 
 
 @router.get("/resumen", response_model=ResumenRespuesta, responses=respuestas_de_error(400, 404))

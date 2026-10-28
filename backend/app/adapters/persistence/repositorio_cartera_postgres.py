@@ -44,6 +44,7 @@ from app.core.entities.cartera import (
     Orden,
     Recorte,
     TipoDato,
+    ValorDeFiltro,
 )
 from app.core.ports.repositorio_cartera_port import RepositorioCarteraPort
 from app.core.services.seleccion_cartera.campos import CatalogoCartera
@@ -331,18 +332,50 @@ class RepositorioCarteraPostgres(RepositorioCarteraPort):
             for valor, cuentas, total in filas
         ]
 
+    def distintos_hasta(self, fecha_corte: date, campo: str, tope: int) -> int:
+        with self._engine.connect() as cx:
+            return cx.execute(self._sentencia_de_distintos(fecha_corte, campo, tope)).scalar_one()
+
+    def _sentencia_de_distintos(self, fecha_corte: date, campo: str, tope: int) -> Select:
+        """`SELECT count(*) FROM (SELECT DISTINCT campo ... LIMIT tope)`: la fecha entera, sin
+        filtros, y corta en cuanto junta `tope` distintos."""
+        columna = self._columnas()[campo]
+        distintos = (
+            select(columna.label("valor"))
+            .select_from(self._origen())
+            .where(*self._condiciones(fecha_corte, []), columna.is_not(None))
+            .distinct()
+            .limit(tope)
+            .subquery("distintos")
+        )
+        return select(func.count()).select_from(distintos)
+
+    def valores_de(
+        self, fecha_corte: date, campo: str, filtros: Sequence[Filtro]
+    ) -> list[ValorDeFiltro]:
+        consulta = self._sentencia_de_segmentar(
+            fecha_corte, campo, filtros, None, con_capital=False
+        )
+        with self._engine.connect() as cx:
+            return [ValorDeFiltro(valor, cantidad) for valor, cantidad in cx.execute(consulta)]
+
     def _sentencia_de_segmentar(
         self,
         fecha_corte: date,
         campo: str,
         filtros: Sequence[Filtro],
         recorte: Recorte | None,
+        con_capital: bool = True,
     ) -> Select:
+        """La agrupacion de un campo con sus cantidades (y su capital, salvo `con_capital=False`:
+        la lista de valores de un filtro no lo necesita)."""
         origen, condiciones, columnas = self._fuente(fecha_corte, filtros, recorte)
         columna = columnas[campo]
-        capital = columnas[CAMPO_CAPITAL]
+        medidas = [func.count()]
+        if con_capital:
+            medidas.append(func.coalesce(func.sum(columnas[CAMPO_CAPITAL]), 0))
         return (
-            select(columna, func.count(), func.coalesce(func.sum(capital), 0))
+            select(columna, *medidas)
             .select_from(origen)
             .where(*condiciones)
             .group_by(columna)

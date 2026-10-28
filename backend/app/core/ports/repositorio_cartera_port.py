@@ -11,6 +11,7 @@ from app.core.entities.cartera import (
     MetricasCartera,
     Orden,
     Recorte,
+    ValorDeFiltro,
 )
 
 
@@ -50,3 +51,17 @@ class RepositorioCarteraPort(Protocol):
         filtros: Sequence[Filtro],
         recorte: Recorte | None = None,
     ) -> list[Grupo]: ...
+
+    def distintos_hasta(self, fecha_corte: date, campo: str, tope: int) -> int:
+        """Cuantos valores distintos NO nulos tiene el campo en la fecha ENTERA (sin filtros),
+        contando como mucho hasta `tope`: no recorre todos los distintos de un campo como un
+        documento. Un resultado igual a `tope` quiere decir «`tope` o mas»."""
+        ...
+
+    def valores_de(
+        self, fecha_corte: date, campo: str, filtros: Sequence[Filtro]
+    ) -> list[ValorDeFiltro]:
+        """Los valores del campo entre los productos que cumplen los filtros, con cuantos productos
+        tiene cada uno y el grupo sin valor (None). Sin orden garantizado: lo pone el caso de
+        uso."""
+        ...
