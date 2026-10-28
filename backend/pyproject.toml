@@ -8,9 +8,11 @@ dependencies = [
     "sqlalchemy>=2.0",
     "psycopg[binary]>=3.2",
     "pydantic-settings>=2.5",
-    "python-calamine>=0.8.2",
+    "python-calamine>=0.9.0",
     "alembic>=1.13",
     "openpyxl>=3.1",
+    "mcp>=2.2.0",
+    "fastmcp>=4.0.10",
 ]
 
 [dependency-groups]

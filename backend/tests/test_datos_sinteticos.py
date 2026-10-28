@@ -55,3 +55,26 @@ def test_la_busqueda_distingue_lo_real_de_lo_sintetico() -> None:
         encontrados = [m.group(1) for m in NUMERO.finditer(texto)]
         assert bool(encontrados and not PERMITIDO.fullmatch(encontrados[0])) is sospechoso, texto
     assert NUMERO.search("0000000000000000012") is None  # un pagare no es un telefono
+
+
+def test_los_xlsb_de_prueba_son_sinteticos_y_no_llevan_datos_del_equipo() -> None:
+    """Excel graba la carpeta, el usuario y la empresa dentro del .xlsb: los fixtures de
+    `backend/tests/datos` se guardan desde una carpeta inventada y con propiedades inventadas."""
+    import zipfile
+
+    from app.adapters.input.lector_tabla import LectorTabla
+    from scripts.generar_fixture_xlsb_con_tabla import comprobar_privacidad
+
+    fixtures = sorted((RAIZ / "backend/tests/datos").glob("*.xlsb"))
+    assert fixtures  # la busqueda no queda vacia sin avisar
+    for ruta in fixtures:
+        tabla = LectorTabla().leer(ruta.read_bytes(), ruta.name)
+        telefonos = [str(int(fila.celdas[2])) for fila in tabla.filas]
+        assert all(PERMITIDO.fullmatch(t) for t in telefonos), ruta.name
+        comprobar_privacidad(ruta)  # ni usuario, ni maquina, ni correo, ni rutas reales
+        with zipfile.ZipFile(ruta) as zip_:
+            nucleo = zip_.read("docProps/core.xml").decode("utf-8")
+            aplicacion = zip_.read("docProps/app.xml").decode("utf-8")
+        assert "<dc:creator>sintetico</dc:creator>" in nucleo, ruta.name
+        assert "<cp:lastModifiedBy>sintetico</cp:lastModifiedBy>" in nucleo, ruta.name
+        assert "<Company>sintetico</Company>" in aplicacion, ruta.name
