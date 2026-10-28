@@ -237,6 +237,7 @@
   "op.igual": "equals",
   "op.distinto": "differs from",
   "op.en": "is one of",
+  "op.no_en": "is none of",
   "op.contiene": "contains",
   "op.empieza_con": "starts with",
   "op.mayor": "is greater than",

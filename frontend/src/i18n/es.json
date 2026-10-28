@@ -237,6 +237,7 @@
   "op.igual": "es igual a",
   "op.distinto": "es distinto de",
   "op.en": "es uno de",
+  "op.no_en": "no es ninguno de",
   "op.contiene": "contiene",
   "op.empieza_con": "empieza con",
   "op.mayor": "es mayor que",

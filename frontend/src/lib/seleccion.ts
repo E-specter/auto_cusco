@@ -5,7 +5,7 @@
  * The API speaks one text syntax for all of it (docs/consulta-cartera.md §3,
  * backend `seleccion_cartera/expresiones.py`):
  *
- *     filter:     field:operator:value   (several values joined with `|`)
+ *     filter:     field:operator:value   (several values joined with `|`; `\|` and `\\` escape a bar and a backslash)
  *     order:      field, or -field for descending
  *     indicator:  name:function:field    (`conteo` may omit the field)
  *
@@ -23,6 +23,8 @@ export type TipoCampo = 'texto' | 'numero' | 'fecha' | 'booleano';
 export type Funcion = 'suma' | 'conteo' | 'promedio' | 'minimo' | 'maximo';
 
 export const SEPARADOR_VALORES = '|';
+/** The backslash of the escape (`ESCAPE` in the backend's `expresiones.py`). */
+const ESCAPE = String.fromCharCode(92);
 /** The API's ceiling for the top n (`CANTIDAD_MAXIMA` in the backend). */
 export const CANTIDAD_MAXIMA = 120_000;
 
@@ -31,6 +33,7 @@ const ORDEN_OPERADORES = [
   'igual',
   'distinto',
   'en',
+  'no_en',
   'contiene',
   'empieza_con',
   'mayor',
@@ -49,6 +52,12 @@ export interface FiltroBorrador {
   campo: string;
   operador: string;
   valores: string[];
+  /**
+   * «(vacío)» is marked (RF-67): the products with no value. In `en` and `no_en` it travels as an EMPTY ELEMENT
+   * of the list, never as a line of the text area, where a blank line is only a blank line. Absent means not
+   * marked, so a filter written before this existed reads exactly as it did.
+   */
+  vacio?: boolean;
 }
 
 export interface OrdenBorrador {
@@ -90,7 +99,7 @@ export function seleccionVacia(): SeleccionBorrador {
 export function valoresQuePide(operador: string): number | null {
   if (operador === 'vacio' || operador === 'no_vacio') return 0;
   if (operador === 'entre') return 2;
-  if (operador === 'en') return null;
+  if (operador === 'en' || operador === 'no_en') return null;
   return 1;
 }
 
@@ -127,7 +136,8 @@ export function filtroCompleto(filtro: FiltroBorrador): boolean {
   const pide = valoresQuePide(filtro.operador);
   const valores = filtro.valores.map((valor) => valor.trim()).filter(Boolean);
   if (pide === 0) return true;
-  if (pide === null) return valores.length > 0;
+  // Only «(vacío)» marked is a complete list: «products with no value».
+  if (pide === null) return valores.length > 0 || filtro.vacio === true;
   return valores.length === pide && filtro.valores.length === pide;
 }
 
@@ -152,16 +162,58 @@ export function partesIncompletas(borrador: SeleccionBorrador): {
 
 // ---- Writing and reading the syntax ---------------------------------------------
 
+/**
+ * One value as the syntax carries it: `|` becomes `\|` and `\` becomes `\\`, the same as `escapar_valor` in the backend.
+ * Without it a value that has a bar would be split in two, silently.
+ */
+export function escaparValor(valor: string): string {
+  return valor.split(ESCAPE).join(ESCAPE + ESCAPE).split(SEPARADOR_VALORES).join(ESCAPE + SEPARADOR_VALORES);
+}
+
+/**
+ * The list of values split on `|`, honouring the escape, the same as `partir_valores` in the backend. It is
+ * tolerant: a backslash followed by anything else, or at the end, stays as it is, so a filter saved with a stray
+ * backslash reads the way it always did.
+ */
+export function partirValores(texto: string): string[] {
+  const valores: string[] = [];
+  let actual = '';
+  for (let i = 0; i < texto.length; i += 1) {
+    const c = texto[i];
+    const siguiente = texto[i + 1];
+    if (c === ESCAPE && (siguiente === SEPARADOR_VALORES || siguiente === ESCAPE)) {
+      actual += siguiente;
+      i += 1;
+    } else if (c === SEPARADOR_VALORES) {
+      valores.push(actual);
+      actual = '';
+    } else {
+      actual += c;
+    }
+  }
+  valores.push(actual);
+  return valores;
+}
+
 export function escribirFiltro(filtro: FiltroBorrador): string {
   const base = `${filtro.campo}:${filtro.operador}`;
-  if (valoresQuePide(filtro.operador) === 0) return base;
-  const valores = filtro.valores.map((valor) => valor.trim()).filter(Boolean);
-  return `${base}:${valores.join(SEPARADOR_VALORES)}`;
+  const pide = valoresQuePide(filtro.operador);
+  if (pide === 0) return base;
+  // A blank line the analyst typed is only a blank line: it is dropped here, and never becomes «(vacío)».
+  const elementos = filtro.valores
+    .map((valor) => valor.trim())
+    .filter(Boolean)
+    .map(escaparValor);
+  // «(vacío)» is its own mark and closes the list as an empty element: `en:A|`, or `en:` when it is all there is.
+  if (pide === null && filtro.vacio) elementos.push('');
+  return `${base}:${elementos.join(SEPARADOR_VALORES)}`;
 }
 
 /**
  * The backend splits on the first two colons only, so a value may itself
- * carry a colon ("hora:10:30" is field, operator and "10:30").
+ * carry a colon ("hora:10:30" is field, operator and "10:30"). What follows is
+ * the list of values, with the escape of `|` and `\`; in a list operator an
+ * empty element is «(vacío)» and becomes the mark, not a value.
  */
 export function leerFiltro(texto: string): FiltroBorrador {
   const primero = texto.indexOf(':');
@@ -171,11 +223,12 @@ export function leerFiltro(texto: string): FiltroBorrador {
   if (segundo < 0) {
     return { campo, operador: texto.slice(primero + 1).trim(), valores: [] };
   }
-  return {
-    campo,
-    operador: texto.slice(primero + 1, segundo).trim(),
-    valores: texto.slice(segundo + 1).split(SEPARADOR_VALORES),
-  };
+  const operador = texto.slice(primero + 1, segundo).trim();
+  const elementos = partirValores(texto.slice(segundo + 1));
+  if (valoresQuePide(operador) !== null) return { campo, operador, valores: elementos };
+  const valores = elementos.filter((elemento) => elemento.trim() !== '');
+  const vacio = valores.length < elementos.length;
+  return vacio ? { campo, operador, valores, vacio: true } : { campo, operador, valores };
 }
 
 export function escribirOrden(orden: OrdenBorrador | null): string | null {
