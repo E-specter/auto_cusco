@@ -96,6 +96,7 @@ function previaConTablasPaginadas() {
         exclusiones: Array.from({ length: 100 }, (_, i) => ({
           pagare: `${'0'.repeat(14)}${String(2000 + i)}`,
           codigo: 'telefono_invalido' as const,
+          campos: [],
         })),
       },
     },

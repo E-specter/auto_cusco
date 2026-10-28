@@ -6,7 +6,7 @@ bloquea con FOR UPDATE antes de comparar su huella, asi una edicion concurrente
 no puede colarse entre la comprobacion y la marca de uso.
 """
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from itertools import islice
@@ -76,6 +76,19 @@ def _lotes(valores: Iterable[dict[str, Any]]) -> Iterable[list[dict[str, Any]]]:
 def _insertar(cx: Connection, tabla, valores: Iterable[dict[str, Any]]) -> None:
     for lote in _lotes(valores):
         cx.execute(insert(tabla), lote)
+
+
+def _filas_de_exclusiones(campana_id: int, exclusiones: Sequence[Exclusion]) -> Iterator[dict]:
+    """Una fila por exclusion, en el orden de la seleccion. `campos` (los adicionales vacios de
+    `falta_campo_adicional`) va como lista, o NULL si no hay: igual que una fila de antes."""
+    for orden, e in enumerate(exclusiones, start=1):
+        yield {
+            "campana_id": campana_id,
+            "pagare": e.pagare,
+            "orden": orden,
+            "codigo": e.codigo,
+            "campos": list(e.campos) or None,
+        }
 
 
 def _valores_campana(armada: CampanaArmada) -> dict[str, Any]:
@@ -238,14 +251,7 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
                 ),
             )
             _insertar(cx, _FILA, _filas_cargadas(campana_id, armada.filas, archivos))
-            _insertar(
-                cx,
-                _EXCLUSION,
-                (
-                    {"campana_id": campana_id, "pagare": e.pagare, "orden": i, "codigo": e.codigo}
-                    for i, e in enumerate(armada.exclusiones, start=1)
-                ),
-            )
+            _insertar(cx, _EXCLUSION, _filas_de_exclusiones(campana_id, armada.exclusiones))
         registrada = self.obtener(campana_id)
         assert registrada is not None
         return registrada
@@ -310,13 +316,17 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
                 select(func.count()).select_from(_EXCLUSION).where(*condiciones)
             ).scalar_one()
             filas = cx.execute(
-                select(_EXCLUSION.c.pagare, _EXCLUSION.c.codigo)
+                select(_EXCLUSION.c.pagare, _EXCLUSION.c.codigo, _EXCLUSION.c.campos)
                 .where(*condiciones)
                 .order_by(_EXCLUSION.c.orden)
                 .limit(limite)
                 .offset(desplazamiento)
             ).all()
-        return total, [Exclusion(fila.pagare, CodigoMowaMes(fila.codigo)) for fila in filas]
+        # Una fila anterior a la columna (NULL) se lee como sin campos.
+        return total, [
+            Exclusion(fila.pagare, CodigoMowaMes(fila.codigo), tuple(fila.campos or ()))
+            for fila in filas
+        ]
 
     def archivo(self, campana_id: int, numero: int) -> ArchivoCarga | None:
         with self._engine.connect() as cx:

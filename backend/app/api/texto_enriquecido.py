@@ -72,7 +72,7 @@ router = APIRouter(prefix="/texto-enriquecido", tags=["texto enriquecido"])
 
 def registro_de_contextos(catalogo: CatalogoCartera) -> RegistroContextos:
     """Los contextos de la aplicacion con ese catalogo de campos: una linea por contexto."""
-    return RegistroContextos([contexto_cartera(catalogo), contexto_speech()])
+    return RegistroContextos([contexto_cartera(catalogo), contexto_speech(catalogo)])
 
 
 def obtener_registro_contextos(

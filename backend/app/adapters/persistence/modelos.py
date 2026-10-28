@@ -33,7 +33,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.core.entities.calendario import TipoExcepcion
@@ -649,6 +649,9 @@ class MowaMesExclusion(Base):
     pagare: Mapped[str] = mapped_column(Text, primary_key=True)
     orden: Mapped[int] = mapped_column(Integer)
     codigo: Mapped[str] = mapped_column(String(40))
+    # Los campos adicionales vacios de `falta_campo_adicional` (RF-65), por nombre tecnico. NULL en
+    # las exclusiones anteriores y en las de los demas codigos.
+    campos: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
 
     __table_args__ = (Index(None, "campana_id", "codigo", "orden"),)
 

@@ -467,6 +467,7 @@
   "mowaMes.codigo.sin_speech": "Sin speech: sus días de atraso ajustados pasan de 120 o no tiene días de atraso.",
   "mowaMes.codigo.falta_titular": "Falta el titular, que el mensaje necesita.",
   "mowaMes.codigo.falta_vencimiento": "Falta la fecha de vencimiento de la cuota, que el mensaje necesita.",
+  "mowaMes.codigo.falta_campo_adicional": "Falta un campo adicional que el mensaje necesita.",
   "mowaMes.codigo.mensaje_excede_160": "El mensaje pasa de 160 caracteres: no cabe en un SMS y se excluye.",
   "mowaMes.codigo.mensaje_excede_150": "El mensaje pasa de 150 caracteres: se carga, pero conviene acortar el speech.",
   "mowaMes.codigo.limite_mensual_excedido": "La campaña superaría el límite mensual de SMS: crearla exige confirmación.",

@@ -1439,6 +1439,17 @@ export interface components {
             formato_financiero?: components["schemas"]["FormatoFinancieroEntrada"] | null;
         };
         /**
+         * CampoNombradoRespuesta
+         * @description Un campo adicional con su nombre tecnico (`ad_...`, estable) y su nombre legible, que se
+         *     resuelve al leer con el catalogo: renombrar el campo cambia la etiqueta y no lo guardado.
+         */
+        CampoNombradoRespuesta: {
+            /** Nombre */
+            nombre: string;
+            /** Etiqueta */
+            etiqueta: string;
+        };
+        /**
          * CampoRespuesta
          * @description Un campo filtrable. Uno `adicional` (RF-64) trae su nombre legible en `etiqueta`, un texto
          *     literal; en un campo base es nulo y el nombre sale de la clave `campo.<nombre>`. Uno `archivado`
@@ -1595,7 +1606,7 @@ export interface components {
          *     `NOMBRE = "codigo"`: la prueba espejo del frontend lee esta clase.
          * @enum {string}
          */
-        CodigoMowaMes: "telefono_invalido" | "falta_documento" | "sin_speech" | "falta_titular" | "falta_vencimiento" | "mensaje_excede_160" | "mensaje_excede_150" | "documento_no_estandar" | "limite_mensual_excedido" | "id_sin_correspondencia" | "falta_whatsapp" | "sin_supervisores" | "sin_productos_cargables" | "version_v1_retirada";
+        CodigoMowaMes: "telefono_invalido" | "falta_documento" | "sin_speech" | "falta_titular" | "falta_vencimiento" | "falta_campo_adicional" | "mensaje_excede_160" | "mensaje_excede_150" | "documento_no_estandar" | "limite_mensual_excedido" | "id_sin_correspondencia" | "falta_whatsapp" | "sin_supervisores" | "sin_productos_cargables" | "version_v1_retirada";
         /**
          * CodigoTexto
          * @description Catalogo de codigos que el frontend traducira como `textoEnriquecido.codigo.<codigo>`.
@@ -2291,6 +2302,11 @@ export interface components {
             /** Pagare */
             pagare: string;
             codigo: components["schemas"]["CodigoMowaMes"];
+            /**
+             * Campos
+             * @description Los campos adicionales vacios que hicieron faltar el producto (`falta_campo_adicional`), en el orden de los nodos del speech; vacia en los demas codigos. El nombre legible se resuelve al leer con el catalogo
+             */
+            campos: components["schemas"]["CampoNombradoRespuesta"][];
         };
         /** ExpresionEntrada */
         ExpresionEntrada: {
@@ -3842,6 +3858,11 @@ export interface components {
             problemas: components["schemas"]["ProblemaSpeechRespuesta"][];
             /** Segmentos */
             segmentos: components["schemas"]["LargoSegmentoRespuesta"][];
+            /**
+             * Campos Archivados
+             * @description Los campos adicionales ARCHIVADOS que usan las expresiones de una v2 (RF-65): un aviso, nunca un bloqueo; el campo sigue resolviendo. Vacia en una v1 y si no hay ninguno
+             */
+            campos_archivados: components["schemas"]["CampoNombradoRespuesta"][];
         };
     };
     responses: never;

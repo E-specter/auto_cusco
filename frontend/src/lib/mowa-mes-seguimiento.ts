@@ -19,6 +19,7 @@ export const CODIGOS_EXCLUSION = [
   'sin_speech',
   'falta_titular',
   'falta_vencimiento',
+  'falta_campo_adicional',
   'mensaje_excede_160',
 ] as const satisfies readonly CodigoMowaMes[];
 

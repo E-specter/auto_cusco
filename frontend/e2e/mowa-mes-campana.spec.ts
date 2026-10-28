@@ -205,7 +205,7 @@ test.describe('P1: previsualización válida', () => {
               total: 7,
               limite: 100,
               desplazamiento: 0,
-              exclusiones: [{ pagare: '000000000000000901', codigo: 'telefono_invalido' }],
+              exclusiones: [{ pagare: '000000000000000901', codigo: 'telefono_invalido', campos: [] }],
             },
             archivos_previstos_por_filas: [{ numero: 1, filas: 982, supervision: 2 }],
           },
@@ -555,6 +555,7 @@ function exclusionesSinteticas(total: number, enLista = Math.min(total, 100)) {
     exclusiones: Array.from({ length: enLista }, (_, i) => ({
       pagare: `${'0'.repeat(14)}${String(2000 + i)}`,
       codigo: 'telefono_invalido' as const,
+      campos: [],
     })),
   };
 }
@@ -1013,6 +1014,7 @@ test.describe('F6-B: las tablas de la previsualización se apilan en pantallas a
       exclusiones: Array.from({ length: 30 }, (_, i) => ({
         pagare: `${'0'.repeat(14)}${String(2000 + i)}`,
         codigo: 'telefono_invalido' as const,
+        campos: [],
       })),
     };
   }

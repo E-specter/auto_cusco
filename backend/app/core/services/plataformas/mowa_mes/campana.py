@@ -238,9 +238,19 @@ def evaluar_producto(
     vencimiento = producto.get("fecha_vencimiento_cuota")
     if constructor.usa_vencimiento(rango.segmento) and vencimiento is None:
         return Exclusion(pagare, CodigoMowaMes.FALTA_VENCIMIENTO)
+    # D-CA-2: un campo adicional vacio que el speech lee dejaria un hueco en el SMS. Va antes del
+    # WhatsApp y de los 160; uno vacio que el segmento no usa no excluye nada.
+    adicionales = {n: producto.get(n) for n in constructor.adicionales_usados(rango.segmento)}
+    faltan = tuple(n for n, valor in adicionales.items() if _vacio(valor))
+    if faltan:
+        return Exclusion(pagare, CodigoMowaMes.FALTA_CAMPO_ADICIONAL, campos=faltan)
     if constructor.requiere_whatsapp_faltante(rango.segmento):
         return rango.segmento
-    mensaje = constructor.mensaje_de(rango.segmento, titular, vencimiento, dias_ajustados)
+    # Una llamada sin adicionales es identica a la de antes: los valores solo viajan si hay.
+    valores = {"adicionales": adicionales} if adicionales else {}
+    mensaje = constructor.mensaje_de(
+        rango.segmento, titular, vencimiento, dias_ajustados, **valores
+    )
     # El mensaje ya viene normalizado a GSM-7 (RF-MM-27) y se mide en unidades GSM-7 (sin
     # extendidos, o sea `len`): se normaliza ANTES de los 150 y de los 160, no despues.
     codigo = speech.codigo_por_largo(largo_gsm7(mensaje))
@@ -284,6 +294,11 @@ class CampanasMowaMesService:
     def previsualizar(self, peticion: PeticionCampana) -> CampanaArmada:
         return self.armar(peticion)
 
+    def etiqueta_de(self, campo: str) -> str:
+        """El nombre legible de un campo adicional (el de la cartera si es base): se resuelve al
+        leer, asi renombrar un campo cambia lo que se ve y no lo guardado (D-CA-2)."""
+        return self._consulta.catalogo.etiqueta_de(campo)
+
     def armar(self, peticion: PeticionCampana) -> CampanaArmada:
         _validar_opciones(peticion)
         try:
@@ -301,7 +316,9 @@ class CampanasMowaMesService:
         supervisores, procedencias = self._supervisores_de(peticion)
         documentos = supervision.documentos_por_posicion(supervisores, procedencias)
 
-        constructor = speech.ConstructorMensajes(version.datos, whatsapp)
+        constructor = speech.ConstructorMensajes(
+            version.datos, whatsapp, adicionales=speech.adicionales_de(catalogo)
+        )
         seleccion = SeleccionPaginada(
             self._consulta, peticion.fecha_corte, filtros, orden, peticion.cantidad
         )

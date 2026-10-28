@@ -83,11 +83,17 @@ def test_el_catalogo_de_la_api_declara_las_marcas_de_cada_variable(cliente) -> N
     assert variables["region"]["etiqueta"] is None and variables["region"]["adicional"] is False
 
 
-def test_las_variables_de_otro_contexto_van_con_los_valores_por_defecto(cliente) -> None:
+def test_las_variables_propias_del_speech_van_con_los_valores_por_defecto(cliente) -> None:
+    # Desde T-MM-B12 el contexto del speech suma los adicionales (D-CA-0); las variables que son
+    # suyas (titular, vencimiento, WhatsApp, dias) siguen sin etiqueta ni marcas.
     cuerpo = cliente.get("/texto-enriquecido/catalogo", params={"contexto": "mowa_mes.speech"})
     variables = cuerpo.json()["contexto"]["variables"]
+    propias = [v for v in variables if not v["nombre"].startswith("ad_")]
 
-    assert variables
+    assert propias
     assert all(
-        (v["etiqueta"], v["adicional"], v["archivado"]) == (None, False, False) for v in variables
+        (v["etiqueta"], v["adicional"], v["archivado"]) == (None, False, False) for v in propias
     )
+    adicionales = {v["nombre"]: v for v in variables if v["nombre"].startswith("ad_")}
+    assert adicionales["ad_zona_comercial"]["adicional"] is True
+    assert adicionales["ad_antiguo"]["archivado"] is True

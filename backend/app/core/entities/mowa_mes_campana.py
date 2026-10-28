@@ -123,6 +123,9 @@ class FilaCarga:
 class Exclusion:
     pagare: str
     codigo: CodigoMowaMes
+    # Los nombres tecnicos (`ad_...`) de los campos adicionales vacios que el speech lee (RF-65);
+    # solo los trae `falta_campo_adicional`. El nombre legible se resuelve al leer, con el catalogo.
+    campos: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

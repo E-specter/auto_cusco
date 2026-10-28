@@ -15,6 +15,7 @@
 Filtros y orden en la misma sintaxis que `/cartera`.
 """
 
+from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -35,6 +36,7 @@ from app.adapters.persistence.repositorio_supervision_postgres import (
 )
 from app.api.cartera import obtener_servicio_cartera
 from app.api.errores import respuestas_de_error
+from app.api.mowa_mes import CampoNombradoRespuesta
 from app.api.respuestas import ModeloRespuesta
 from app.core.entities.cartera import SinVersionVigente
 from app.core.entities.gestiones_digitales import Supervisor
@@ -59,6 +61,7 @@ from app.core.entities.mowa_mes_campana import (
     CampanaRegistrada,
     CodigoErrorCampana,
     ConsumoLimite,
+    Exclusion,
     Herramientas,
     LimiteMensualExcedido,
     PeticionCampana,
@@ -279,6 +282,15 @@ class FilaMuestraRespuesta(ModeloRespuesta):
 class ExclusionRespuesta(ModeloRespuesta):
     pagare: str
     codigo: CodigoMowaMes
+    campos: list[CampoNombradoRespuesta] = Field(
+        description=(
+            "Los campos adicionales vacios que hicieron faltar el producto "
+            "(`falta_campo_adicional`), "
+            "en el orden de los nodos del speech; "
+            "vacia en los demas codigos. "
+            "El nombre legible se resuelve al leer con el catalogo"
+        )
+    )
 
 
 class PaginaExclusionesRespuesta(ModeloRespuesta):
@@ -559,7 +571,17 @@ def _supervisores(supervisores) -> list[SupervisorAsignadoRespuesta]:
     ]
 
 
-def _previsualizacion(armada: CampanaArmada) -> PrevisualizacionCampanaRespuesta:
+def _exclusion(e: Exclusion, etiqueta_de: Callable[[str], str]) -> ExclusionRespuesta:
+    return ExclusionRespuesta(
+        pagare=e.pagare,
+        codigo=e.codigo,
+        campos=[CampoNombradoRespuesta(nombre=n, etiqueta=etiqueta_de(n)) for n in e.campos],
+    )
+
+
+def _previsualizacion(
+    armada: CampanaArmada, etiqueta_de: Callable[[str], str]
+) -> PrevisualizacionCampanaRespuesta:
     advertencias = []
     if armada.consumo.excedido:
         codigo = CodigoMowaMes.LIMITE_MENSUAL_EXCEDIDO
@@ -618,8 +640,7 @@ def _previsualizacion(armada: CampanaArmada) -> PrevisualizacionCampanaRespuesta
             limite=EXCLUSIONES_POR_PAGINA,
             desplazamiento=0,
             exclusiones=[
-                ExclusionRespuesta(pagare=e.pagare, codigo=e.codigo)
-                for e in armada.exclusiones[:EXCLUSIONES_POR_PAGINA]
+                _exclusion(e, etiqueta_de) for e in armada.exclusiones[:EXCLUSIONES_POR_PAGINA]
             ],
         ),
         archivos_previstos_por_filas=[
@@ -804,7 +825,7 @@ def previsualizar_campana(
     `detail` y `campo` (`plantilla_nombre_archivo` si el error es de la plantilla).
     """
     try:
-        return _previsualizacion(servicio.previsualizar(entrada.peticion()))
+        return _previsualizacion(servicio.previsualizar(entrada.peticion()), servicio.etiqueta_de)
     except PeticionCampanaInvalida as exc:
         return _peticion_invalida(exc)
     except _ERRORES_ARMADO as exc:
@@ -902,7 +923,7 @@ def listar_exclusiones(
         total=total,
         limite=limite,
         desplazamiento=desplazamiento,
-        exclusiones=[ExclusionRespuesta(pagare=e.pagare, codigo=e.codigo) for e in exclusiones],
+        exclusiones=[_exclusion(e, servicio.etiqueta_de) for e in exclusiones],
     )
 
 

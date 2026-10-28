@@ -110,7 +110,7 @@ def test_previsualizacion_de_una_campana_valida() -> None:
         {"codigo": "telefono_invalido", "tipo": "exclusion", "cantidad": 1}
     ]
     assert cuerpo["exclusiones"]["exclusiones"] == [
-        {"pagare": producto(2)["pagare"], "codigo": "telefono_invalido"}
+        {"pagare": producto(2)["pagare"], "codigo": "telefono_invalido", "campos": []}
     ]
     assert [m["supervision"] for m in cuerpo["muestra"]] == [True] * 5 + [False]
     assert cuerpo["muestra"][5]["largo"] == len(cuerpo["muestra"][5]["mensaje"])

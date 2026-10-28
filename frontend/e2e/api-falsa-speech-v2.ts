@@ -214,7 +214,7 @@ export async function montarApiSpeechV2(
           ),
         });
       }
-      return json(route, 200, { whatsapp, largo_advertencia: 150, largo_maximo: 160, problemas, segmentos });
+      return json(route, 200, { whatsapp, largo_advertencia: 150, largo_maximo: 160, problemas, segmentos, campos_archivados: [] });
     }
 
     if (ruta === '/mowa-mes/speech' && metodo === 'POST' && cuerpo && Array.isArray(cuerpo.expresiones)) {

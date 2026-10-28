@@ -4774,6 +4774,25 @@
         ],
         "title": "CampoEntrada"
       },
+      "CampoNombradoRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "etiqueta"
+        ],
+        "title": "CampoNombradoRespuesta",
+        "description": "Un campo adicional con su nombre tecnico (`ad_...`, estable) y su nombre legible, que se\nresuelve al leer con el catalogo: renombrar el campo cambia la etiqueta y no lo guardado."
+      },
       "CampoRespuesta": {
         "properties": {
           "tipo": {
@@ -5119,6 +5138,7 @@
           "sin_speech",
           "falta_titular",
           "falta_vencimiento",
+          "falta_campo_adicional",
           "mensaje_excede_160",
           "mensaje_excede_150",
           "documento_no_estandar",
@@ -6878,12 +6898,21 @@
           },
           "codigo": {
             "$ref": "#/components/schemas/CodigoMowaMes"
+          },
+          "campos": {
+            "items": {
+              "$ref": "#/components/schemas/CampoNombradoRespuesta"
+            },
+            "type": "array",
+            "title": "Campos",
+            "description": "Los campos adicionales vacios que hicieron faltar el producto (`falta_campo_adicional`), en el orden de los nodos del speech; vacia en los demas codigos. El nombre legible se resuelve al leer con el catalogo"
           }
         },
         "type": "object",
         "required": [
           "pagare",
-          "codigo"
+          "codigo",
+          "campos"
         ],
         "title": "ExclusionRespuesta"
       },
@@ -11037,6 +11066,14 @@
             },
             "type": "array",
             "title": "Segmentos"
+          },
+          "campos_archivados": {
+            "items": {
+              "$ref": "#/components/schemas/CampoNombradoRespuesta"
+            },
+            "type": "array",
+            "title": "Campos Archivados",
+            "description": "Los campos adicionales ARCHIVADOS que usan las expresiones de una v2 (RF-65): un aviso, nunca un bloqueo; el campo sigue resolviendo. Vacia en una v1 y si no hay ninguno"
           }
         },
         "type": "object",
@@ -11045,7 +11082,8 @@
           "largo_advertencia",
           "largo_maximo",
           "problemas",
-          "segmentos"
+          "segmentos",
+          "campos_archivados"
         ],
         "title": "PrevisualizacionRespuesta"
       }

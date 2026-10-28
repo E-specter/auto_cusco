@@ -467,6 +467,7 @@
   "mowaMes.codigo.sin_speech": "No speech: its adjusted days past due exceed 120, or it has no days past due.",
   "mowaMes.codigo.falta_titular": "The holder is missing, and the message needs it.",
   "mowaMes.codigo.falta_vencimiento": "The instalment due date is missing, and the message needs it.",
+  "mowaMes.codigo.falta_campo_adicional": "An additional field that the message needs is missing.",
   "mowaMes.codigo.mensaje_excede_160": "The message is longer than 160 characters: it does not fit in one SMS and is excluded.",
   "mowaMes.codigo.mensaje_excede_150": "The message is longer than 150 characters: it is loaded, but the speech should be shortened.",
   "mowaMes.codigo.limite_mensual_excedido": "The campaign would exceed the monthly SMS limit: creating it requires confirmation.",

@@ -50,5 +50,6 @@ def test_las_exclusiones_siguen_el_orden_de_evaluacion() -> None:
         CodigoMowaMes.SIN_SPEECH,
         CodigoMowaMes.FALTA_TITULAR,
         CodigoMowaMes.FALTA_VENCIMIENTO,
+        CodigoMowaMes.FALTA_CAMPO_ADICIONAL,
         CodigoMowaMes.MENSAJE_EXCEDE_160,
     ]

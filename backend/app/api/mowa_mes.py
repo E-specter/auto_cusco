@@ -30,6 +30,7 @@ from pydantic import BaseModel, Field
 
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_mowa_mes_postgres import RepositorioMowaMesPostgres
+from app.api.cartera import crear_catalogo_cartera
 from app.api.definiciones_columnas import ExpresionGuardadaRespuesta
 from app.api.errores import DetalleError, respuestas_de_error
 from app.api.respuestas import ModeloRespuesta
@@ -84,7 +85,9 @@ _RANGO = {rango.segmento: rango for rango in RANGOS_SEGMENTO}
 
 def obtener_servicio_mowa_mes() -> ConfiguracionMowaMesService:
     """Dependencia de FastAPI; los tests la sustituyen por un doble de prueba."""
-    return ConfiguracionMowaMesService(RepositorioMowaMesPostgres(get_engine()))
+    return ConfiguracionMowaMesService(
+        RepositorioMowaMesPostgres(get_engine()), crear_catalogo_cartera()
+    )
 
 
 # --- Configuracion -------------------------------------------------------
@@ -458,12 +461,28 @@ class LargoSegmentoRespuesta(ModeloRespuesta):
     )
 
 
+class CampoNombradoRespuesta(ModeloRespuesta):
+    """Un campo adicional con su nombre tecnico (`ad_...`, estable) y su nombre legible, que se
+    resuelve al leer con el catalogo: renombrar el campo cambia la etiqueta y no lo guardado."""
+
+    nombre: str
+    etiqueta: str
+
+
 class PrevisualizacionRespuesta(ModeloRespuesta):
     whatsapp: str | None
     largo_advertencia: int
     largo_maximo: int
     problemas: list[ProblemaSpeechRespuesta]
     segmentos: list[LargoSegmentoRespuesta]
+    campos_archivados: list[CampoNombradoRespuesta] = Field(
+        description=(
+            "Los campos adicionales ARCHIVADOS que usan las expresiones de una v2 (RF-65): "
+            "un aviso, nunca un bloqueo; "
+            "el campo sigue resolviendo. "
+            "Vacia en una v1 y si no hay ninguno"
+        )
+    )
 
 
 def _caracter_quitado(grafema: str) -> CaracterQuitadoRespuesta:
@@ -638,8 +657,9 @@ def previsualizar_speech(
     """
     try:
         partes, expresiones = _contenido(entrada.partes, entrada.expresiones)
+        archivados: tuple[tuple[str, str], ...] = ()
         if entrada.expresiones is not None:
-            whatsapp, problemas, largos = servicio.previsualizar_speech_v2(
+            whatsapp, problemas, largos, archivados = servicio.previsualizar_speech_v2(
                 expresiones, entrada.whatsapp
             )
         else:
@@ -665,6 +685,7 @@ def previsualizar_speech(
             )
             for largo in largos
         ],
+        campos_archivados=[CampoNombradoRespuesta(nombre=n, etiqueta=e) for n, e in archivados],
     )
 
 

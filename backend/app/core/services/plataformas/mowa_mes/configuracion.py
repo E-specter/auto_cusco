@@ -33,8 +33,10 @@ from app.core.entities.mowa_mes import (
     VersionSpeech,
 )
 from app.core.entities.mowa_mes_costo import PlantillaInvalida, TarifaInvalida
+from app.core.entities.texto_enriquecido import TipoValor
 from app.core.ports.repositorio_mowa_mes_port import RepositorioMowaMesPort
 from app.core.services.plataformas.mowa_mes import costos, nombre_archivo, speech
+from app.core.services.seleccion_cartera.campos import CatalogoCartera
 
 _NOMBRE_AUTOMATICO = re.compile(r"Speech (\d+)", re.IGNORECASE)
 
@@ -81,8 +83,13 @@ class BorradorV2:
 
 
 class ConfiguracionMowaMesService:
-    def __init__(self, repositorio: RepositorioMowaMesPort) -> None:
+    def __init__(
+        self, repositorio: RepositorioMowaMesPort, catalogo: CatalogoCartera | None = None
+    ) -> None:
         self._repositorio = repositorio
+        # El catalogo de la cartera da los campos adicionales que una v2 puede leer (D-CA-0); sin
+        # el, una v2 solo ve las variables del mensaje.
+        self._catalogo = catalogo
 
     # --- Configuracion del conector ----------------------------------
 
@@ -204,7 +211,8 @@ class ConfiguracionMowaMesService:
         expresiones = speech.convertir_a_v2(version.datos.partes)
         nombre = nombre_siguiente([v.datos.nombre for v in self._repositorio.listar_speech()])
         problemas = speech.problemas_de(
-            DatosSpeech(nombre=nombre, expresiones=expresiones, formato=FormatoSpeech.V2)
+            DatosSpeech(nombre=nombre, expresiones=expresiones, formato=FormatoSpeech.V2),
+            adicionales=speech.adicionales_de(self._catalogo),
         )
         return BorradorV2(version.id, nombre, expresiones, problemas)
 
@@ -244,8 +252,14 @@ class ConfiguracionMowaMesService:
 
     def previsualizar_speech_v2(
         self, expresiones: tuple[ExpresionSegmento, ...], whatsapp: str | None
-    ) -> tuple[str | None, tuple[ProblemaSpeech, ...], tuple[LargoSegmento, ...]]:
-        """Largo maximo (la cota), nivel y ejemplo por segmento de una v2, sin guardar (C-6).
+    ) -> tuple[
+        str | None,
+        tuple[ProblemaSpeech, ...],
+        tuple[LargoSegmento, ...],
+        tuple[tuple[str, str], ...],
+    ]:
+        """Largo maximo (la cota), nivel y ejemplo por segmento de una v2, sin guardar (C-6), y los
+        campos archivados que usa, como (nombre, etiqueta): un aviso, nunca un bloqueo (RF-65).
 
         Un segmento sin cota se informa con `largo_maximo` nulo y su motivo; el control por fila
         de los 160 caracteres es de la campana, sobre el mensaje real.
@@ -253,17 +267,31 @@ class ConfiguracionMowaMesService:
         if whatsapp is not None and not speech.whatsapp_valido(whatsapp):
             raise ConfiguracionInvalida("El WhatsApp debe tener 9 digitos y empezar con 9")
         numero = whatsapp or self._repositorio.obtener_configuracion().whatsapp_contacto
+        adicionales = speech.adicionales_de(self._catalogo)
         problemas = speech.problemas_de(
             DatosSpeech(
                 nombre="previsualizacion", expresiones=expresiones, formato=FormatoSpeech.V2
-            )
+            ),
+            adicionales=adicionales,
         )
-        return numero, problemas, speech.previsualizar_v2(expresiones, numero)
+        largos = speech.previsualizar_v2(expresiones, numero, adicionales=adicionales)
+        return numero, problemas, largos, self._archivados_usados(expresiones, adicionales)
 
-    @staticmethod
-    def _validos(datos: DatosSpeech) -> DatosSpeech:
+    def _archivados_usados(
+        self, expresiones: tuple[ExpresionSegmento, ...], adicionales: dict[str, TipoValor]
+    ) -> tuple[tuple[str, str], ...]:
+        if self._catalogo is None:
+            return ()
+        usados = [
+            n for e in expresiones for n in speech.adicionales_usados_en(e.expresion, adicionales)
+        ]
+        return tuple(
+            (n, self._catalogo.etiqueta_de(n)) for n in self._catalogo.archivados_entre(usados)
+        )
+
+    def _validos(self, datos: DatosSpeech) -> DatosSpeech:
         limpios = speech.limpiar(datos)
-        problemas = speech.problemas_de(limpios)
+        problemas = speech.problemas_de(limpios, adicionales=speech.adicionales_de(self._catalogo))
         if problemas:
             raise SpeechInvalido(problemas)
         orden = {segmento: i for i, segmento in enumerate(Segmento)}

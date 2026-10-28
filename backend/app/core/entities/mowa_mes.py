@@ -98,6 +98,7 @@ class CodigoMowaMes(StrEnum):
     SIN_SPEECH = "sin_speech"
     FALTA_TITULAR = "falta_titular"
     FALTA_VENCIMIENTO = "falta_vencimiento"
+    FALTA_CAMPO_ADICIONAL = "falta_campo_adicional"  # RF-65: el speech lee un adicional vacio
     MENSAJE_EXCEDE_160 = "mensaje_excede_160"
     MENSAJE_EXCEDE_150 = "mensaje_excede_150"
     DOCUMENTO_NO_ESTANDAR = "documento_no_estandar"
@@ -115,6 +116,7 @@ TIPO_CODIGO: dict[CodigoMowaMes, TipoCodigo] = {
     CodigoMowaMes.SIN_SPEECH: TipoCodigo.EXCLUSION,
     CodigoMowaMes.FALTA_TITULAR: TipoCodigo.EXCLUSION,
     CodigoMowaMes.FALTA_VENCIMIENTO: TipoCodigo.EXCLUSION,
+    CodigoMowaMes.FALTA_CAMPO_ADICIONAL: TipoCodigo.EXCLUSION,
     CodigoMowaMes.MENSAJE_EXCEDE_160: TipoCodigo.EXCLUSION,
     CodigoMowaMes.MENSAJE_EXCEDE_150: TipoCodigo.ADVERTENCIA,
     CodigoMowaMes.DOCUMENTO_NO_ESTANDAR: TipoCodigo.ADVERTENCIA,

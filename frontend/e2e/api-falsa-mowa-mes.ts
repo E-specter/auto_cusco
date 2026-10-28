@@ -216,7 +216,7 @@ export function previsualizacionSintetica(
     });
   });
 
-  return { whatsapp, largo_advertencia: 150, largo_maximo: 160, problemas, segmentos };
+  return { whatsapp, largo_advertencia: 150, largo_maximo: 160, problemas, segmentos, campos_archivados: [] };
 }
 
 /** Three law holidays, one of them withdrawn this year, and one added day. */
@@ -455,6 +455,7 @@ export function exclusionesSinteticas(n: number): Exclusion[] {
   return Array.from({ length: n }, (_, i) => ({
     pagare: String(900 + i).padStart(18, '0'),
     codigo: EXCLUSIONES_EN_ORDEN[i % EXCLUSIONES_EN_ORDEN.length],
+    campos: [],
   }));
 }
 
