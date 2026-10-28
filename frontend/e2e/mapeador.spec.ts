@@ -67,6 +67,27 @@ test.describe('el caso de todos los días', () => {
   });
 });
 
+test('«todo listo» no dice que se relacionaron todas si alguna queda sin cargar, y sigue a lo elegido', async ({ page }) => {
+  await abrir(page, analisisSintetico([
+    columna(0, 'Pagare', 'coincide', 'pagare'),
+    columna(1, 'Titular', 'coincide', 'titular'),
+    columna(2, 'Otra cosa', 'sin_coincidencia', null),
+  ]));
+
+  const listo = raiz(page).locator('[data-listo]');
+  await expect(listo).toContainText('Columnas relacionadas con los campos de carga: 2 de 3. Quedan sin cargar: 1.');
+
+  await raiz(page).getByRole('button', { name: 'Ver columnas' }).click();
+  await elegirCampo(page, 2, 'dias_atraso');
+  await expect(listo).toContainText('Las 3 columnas se relacionaron con los campos de carga.');
+});
+
+test('«todo listo» con una sola columna habla de una', async ({ page }) => {
+  await abrir(page, analisisSintetico([columna(0, 'Pagare', 'coincide', 'pagare')]));
+
+  await expect(raiz(page).locator('[data-listo]')).toContainText('La columna se relacionó con un campo de carga.');
+});
+
 test.describe('revisar parecidos', () => {
   test('abre en «Por revisar», con lo que falta, y el parecido dice a qué se parece', async ({ page }) => {
     await abrir(page, CON_PARECIDOS);

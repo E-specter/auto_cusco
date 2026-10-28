@@ -425,7 +425,18 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
     s.contadorAnunciado = revisar;
   }
 
+  /** «Todo listo» counts what the analyst sees now: a column left in «No cargar» is not «related» (§3.2). */
+  function pintarListo(): void {
+    const n = s.analisis.columnas.length;
+    const sinCargar = s.asignaciones.filter((a) => a.campo === null).length;
+    el.listoTexto.textContent =
+      sinCargar > 0
+        ? t('mapeador.vista.listoParcial', { relacionadas: formatNumber(n - sinCargar), n: formatNumber(n), sinCargar: formatNumber(sinCargar) })
+        : t(n === 1 ? 'mapeador.vista.listoUna' : 'mapeador.vista.listo', { n: formatNumber(n) });
+  }
+
   function pintar(): void {
+    pintarListo();
     pintarFilas();
     pintarResumen();
     pintarBarra();
@@ -669,7 +680,6 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
   function construir(): void {
     selectores.clear();
     el.filas.replaceChildren(...s.analisis.columnas.map(crearFila));
-    el.listoTexto.textContent = t('mapeador.vista.listo', { n: formatNumber(s.analisis.columnas.length) });
     pintarContexto();
     pintarAdvertencias();
     pintar();

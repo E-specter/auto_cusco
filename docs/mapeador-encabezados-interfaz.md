@@ -64,7 +64,7 @@ mapeador.destruir();
 
 ### 3.2 Todo listo: la tabla se recoge
 
-Si el análisis no deja nada por revisar ni ningún problema, el componente muestra un `.notice--success`: «Las 45 columnas se relacionaron con los campos de carga». Debajo va «Ver columnas», un botón de divulgación con `aria-expanded` que abre la tabla completa. Es el caso de todos los días, y se confirma sin abrir nada.
+Si el análisis no deja nada por revisar ni ningún problema, el componente muestra un `.notice--success`: «Las 45 columnas se relacionaron con los campos de carga». Si alguna queda en «No cargar esta columna» (sin coincidencia), el aviso no dice que todas se relacionaron: «Columnas relacionadas con los campos de carga: 43 de 45. Quedan sin cargar: 2» (T-MAP-F4). Con una sola columna, «La columna se relacionó con un campo de carga». El texto sigue a lo elegido: si después se asigna un campo a esa columna, por ejemplo uno creado (RF-64), cambia. Debajo va «Ver columnas», un botón de divulgación con `aria-expanded` que abre la tabla completa. Es el caso de todos los días, y se confirma sin abrir nada.
 
 ### 3.3 La tabla
 
