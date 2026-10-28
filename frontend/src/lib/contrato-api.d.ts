@@ -3158,6 +3158,11 @@ export interface components {
             advertencias: components["schemas"]["AvisoCampanaRespuesta"][];
             /** Errores */
             errores: components["schemas"]["AvisoCampanaRespuesta"][];
+            /**
+             * Campos Archivados
+             * @description Los campos adicionales ARCHIVADOS que lee el speech de la campana, de todos sus segmentos: un aviso, nunca bloquea ni cambia `puede_crear`, las exclusiones ni los errores. Las sabanas cargadas despues de archivar un campo ya no lo traen, y los productos que lo necesitan quedan fuera. Vacia si no hay (o si el speech es una v1)
+             */
+            campos_archivados: components["schemas"]["CampoNombradoRespuesta"][];
             /** Puede Crear */
             puede_crear: boolean;
             /**

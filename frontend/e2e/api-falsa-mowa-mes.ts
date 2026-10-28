@@ -560,6 +560,8 @@ export function previsualizacionCampanaSintetica(
       ...limiteParcial,
     }),
     ...SIN_ERRORES_NI_ADVERTENCIAS,
+    // The archived additional fields the speech reads (T-MM-B13): none unless a spec says otherwise.
+    campos_archivados: [],
     puede_crear: true,
     tarifa_sms: contexto.tarifa,
     costo_estimado: montoSintetico(totalCargados, contexto.tarifa),

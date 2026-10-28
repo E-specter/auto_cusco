@@ -390,6 +390,8 @@ class CampanasMowaMesService:
             plantilla_nombre_archivo=plantilla,
             nombre_primer_archivo=None if previsto is None else previsto[0],
             nombre_estimado=False if previsto is None else previsto[1],
+            # Se mira el speech entero, no solo los segmentos con productos (aviso, T-MM-B13).
+            campos_archivados=catalogo.archivados_entre(constructor.adicionales_usados_en_todos()),
         )
 
     def crear(self, peticion: PeticionCampana) -> CampanaRegistrada:

@@ -315,6 +315,7 @@ describe('previsualización completa (contrato)', () => {
       limite: { mes: '2026-09', limite: 2_500_000, cargados_mes: 982, esta_campana: 982, total: 982, disponible: 2_499_018, excedido: false, costo_mes: '19.6400', campanas_sin_tarifa: 0, costo_esta_campana: '19.6400', costo_total: '19.6400' },
       advertencias: [],
       errores: [],
+      campos_archivados: [],
       puede_crear: true,
       tarifa_sms: '0.0200',
       costo_estimado: '19.6400',

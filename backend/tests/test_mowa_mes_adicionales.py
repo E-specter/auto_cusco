@@ -435,14 +435,14 @@ def test_las_exclusiones_anteriores_ganan_a_este_codigo() -> None:
 # --- De punta a punta: la campana pasa los adicionales al constructor -----------------------------
 
 
-def _servicio(productos, adicionales=None):
+def _servicio(productos, adicionales=None, datos=COMPLETO):
     repositorio_adicionales = CamposAdicionalesEnMemoria(
         adicionales or (TEXTO, NUMERO, FECHA, ARCHIVADO)
     )
     mowa_mes = RepositorioMowaMesFalso(WHATSAPP)
     supervision = RepositorioSupervisionFalso()
     supervision.configuracion = ConfiguracionSupervision(PROCEDENCIAS, tuple(SUPERVISORES))
-    version = VersionSpeech(2, COMPLETO, False, None, None, MOMENTO)
+    version = VersionSpeech(2, datos, False, None, None, MOMENTO)
     mowa_mes.versiones[2] = version
     consulta = ConsultaCarteraService(
         RepositorioCarteraFalso(productos), CatalogoCartera(repositorio_adicionales)
@@ -458,8 +458,8 @@ def _servicio(productos, adicionales=None):
     return servicio, repositorio_adicionales
 
 
-def _peticion_v2(**cambios):
-    return peticion(speech_id=2, speech_huella=huella_de(COMPLETO), **cambios)
+def _peticion_v2(datos=COMPLETO, **cambios):
+    return peticion(speech_id=2, speech_huella=huella_de(datos), **cambios)
 
 
 def test_la_campana_arma_el_mensaje_con_el_valor_de_cada_adicional_de_la_fila() -> None:

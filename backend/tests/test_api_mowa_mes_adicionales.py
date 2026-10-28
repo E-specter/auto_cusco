@@ -151,10 +151,10 @@ def test_guardar_una_v2_que_usa_un_archivado_se_permite(speech_api) -> None:
 # --- La campana: la exclusion con sus campos --------------------------------------------------
 
 
-def _campanas_api(productos, repositorio_adicionales=None):
+def _campanas_api(productos, repositorio_adicionales=None, datos=COMPLETO):
     entorno = Entorno(productos=productos)
     repositorio = repositorio_adicionales or CamposAdicionalesEnMemoria()
-    entorno.mowa_mes.versiones[2] = VersionSpeech(2, COMPLETO, False, None, None, MOMENTO)
+    entorno.mowa_mes.versiones[2] = VersionSpeech(2, datos, False, None, None, MOMENTO)
 
     def servicio():
         # Un catalogo por peticion, como la API: renombrar el campo se nota en la siguiente.
@@ -246,7 +246,9 @@ def test_el_contrato_declara_los_campos_siempre_presentes() -> None:
 
     assert "campos" in esquemas["ExclusionRespuesta"]["required"]
     con_aviso = [e for e in esquemas.values() if "campos_archivados" in e.get("properties", {})]
-    assert len(con_aviso) == 1 and "campos_archivados" in con_aviso[0]["required"]
+    # La previsualizacion del speech (B12) y la de la campana (B13): las dos lo llevan siempre.
+    assert len(con_aviso) == 2
+    assert all("campos_archivados" in e["required"] for e in con_aviso)
     assert set(esquemas["CampoNombradoRespuesta"]["required"]) == {"nombre", "etiqueta"}
 
 

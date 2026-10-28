@@ -460,6 +460,13 @@ class ConstructorMensajes:
         (D-CA-2). Una v1 no lee ninguno."""
         return self._segmentos[segmento].adicionales_usados
 
+    def adicionales_usados_en_todos(self) -> tuple[str, ...]:
+        """Los adicionales que lee el speech entero, sin repetir y en el orden de sus segmentos y
+        de sus nodos: ya estan calculados al compilar, no se vuelve a mirar nada."""
+        return tuple(
+            dict.fromkeys(n for s in self._segmentos.values() for n in s.adicionales_usados)
+        )
+
     def requiere_whatsapp_faltante(self, segmento: Segmento) -> bool:
         return segmento in self._sin_whatsapp
 

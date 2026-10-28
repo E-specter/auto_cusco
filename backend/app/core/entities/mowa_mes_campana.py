@@ -230,6 +230,9 @@ class CampanaArmada:
     plantilla_nombre_archivo: str  # la de la peticion o, sin ella, la de la configuracion
     nombre_primer_archivo: str | None  # con `[campana]` como marcador; None sin archivos
     nombre_estimado: bool  # depende de como se divida la carga (D-1)
+    # Los adicionales ARCHIVADOS que lee el speech (nombres tecnicos), de todos sus segmentos: un
+    # aviso, no cambia nada de lo demas (T-MM-B13). Una v1 no lee ninguno.
+    campos_archivados: tuple[str, ...] = ()
 
     @property
     def productos_cargados(self) -> int:
