@@ -114,6 +114,8 @@ export interface ApiFalsaMapeador {
   creaciones?: Array<Esquemas['NuevoCampoAdicionalEntrada']>;
   /** Refusals of the creation, in order; once spent, it creates. */
   rechazosCrear?: Rechazo[];
+  /** Every creation and validation, by the path it went to: the draft is in it. */
+  rutas?: Array<{ metodo: string; ruta: string }>;
   /** The catalogue the creation answers with and grows. */
   catalogo?: Campo[];
 }
@@ -121,6 +123,7 @@ export interface ApiFalsaMapeador {
 /** The validation route, as a handler `montarApi` chains before its 404. */
 export function manejarMapeador(estado: ApiFalsaMapeador): Manejador {
   return async (route: Route, ruta: string, metodo: string) => {
+    if (metodo === 'POST' && /^\/mapeador\/borradores\/\d+\/(campos-adicionales|validacion)$/.test(ruta)) (estado.rutas ??= []).push({ metodo, ruta });
     if (metodo === 'POST' && /^\/mapeador\/borradores\/\d+\/campos-adicionales$/.test(ruta)) {
       const entrada = JSON.parse(route.request().postData() ?? '{}') as Esquemas['NuevoCampoAdicionalEntrada'];
       (estado.creaciones ??= []).push(entrada);

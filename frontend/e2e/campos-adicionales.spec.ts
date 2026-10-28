@@ -762,3 +762,56 @@ test.describe('generar carga', () => {
     await expect(page.locator('[data-definicion-resumen]')).toBeVisible();
   });
 });
+
+test.describe('un mapeador destruido (T-CA-F3)', () => {
+  const CON_TODO = analisisSintetico([
+    columna(0, 'Pagare', 'coincide', 'pagare'),
+    columna(1, 'Nombre cliente', 'parecido', 'titular'),
+    columna(2, 'Monto en mora', 'sin_coincidencia', null, ['1500.50']),
+  ]);
+  const destruir = (page: Page) => page.evaluate(() => (window as unknown as { controladorPrueba: { destruir(): void } }).controladorPrueba.destruir());
+
+  test('los controles que quedan en la página no reaccionan', async ({ page }) => {
+    const mapeador = await abrir(page, CON_TODO);
+    await expect(raiz(page).getByRole('button', { name: /^Por revisar/ })).toHaveAttribute('aria-pressed', 'true');
+    await expect(abrirFormulario(page)).toHaveAttribute('aria-expanded', 'false');
+    const antes = mapeador.pedidos.length;
+
+    await destruir(page);
+
+    await raiz(page).getByRole('button', { name: /^Todas/ }).click();
+    await expect(raiz(page).getByRole('button', { name: /^Por revisar/ })).toHaveAttribute('aria-pressed', 'true');
+    await raiz(page).getByRole('button', { name: 'Aceptar sugerencias (1)' }).click();
+    await expect(raiz(page).getByRole('button', { name: 'Aceptar sugerencias (1)' })).toBeVisible();
+    await abrirFormulario(page).click();
+    await expect(abrirFormulario(page)).toHaveAttribute('aria-expanded', 'false');
+    await expect(formulario(page)).toBeHidden();
+    await campoDe(page, 1).click();
+    await expect(campoDe(page, 1)).toHaveAttribute('aria-expanded', 'false');
+    // Nothing asked the API either: a destroyed mapper validates and creates nothing.
+    await page.waitForTimeout(600);
+    expect(mapeador.pedidos).toHaveLength(antes);
+    expect(mapeador.rutas ?? []).toEqual([]);
+  });
+
+  test('antes de destruirlo esos mismos controles sí reaccionan', async ({ page }) => {
+    await abrir(page, CON_TODO);
+
+    await raiz(page).getByRole('button', { name: /^Todas/ }).click();
+    await expect(raiz(page).getByRole('button', { name: /^Todas/ })).toHaveAttribute('aria-pressed', 'true');
+    await abrirFormulario(page).click();
+    await expect(abrirFormulario(page)).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('un cambio de idioma tampoco lo repinta una vez destruido', async ({ page }) => {
+    await abrir(page, CON_TODO);
+    await destruir(page);
+    await page.evaluate(() => {
+      const cabecera = document.querySelector('#mapeador-prueba [data-filtro-opcion="revisar"]')!;
+      cabecera.textContent = 'sentinela';
+      document.dispatchEvent(new Event('languagechange'));
+    });
+
+    await expect(raiz(page).locator('[data-filtro-opcion="revisar"]')).toHaveText('sentinela');
+  });
+});

@@ -658,3 +658,109 @@ test.describe('crear un campo adicional desde la carga (RF-64)', () => {
     expect(carga.borradoresCreados).toHaveLength(1);
   });
 });
+
+test.describe('dos cargas seguidas en la misma página (T-CA-F3)', () => {
+  const columnas = () => [
+    columna(0, 'Pagare', 'coincide', 'pagare'),
+    columna(1, 'Saldo Capital', 'parecido', 'saldo_capital_pendiente'),
+    columna(2, 'Monto en mora', 'sin_coincidencia', null, ['1500.50', '82.00']),
+  ];
+  const unBorrador = (id: number) => analisisSintetico(columnas(), { borrador_id: id });
+  const referencia = (page: Page) => dialogo(page).getByRole('button', { name: 'Crear un campo adicional' });
+  const formulario = (page: Page) => dialogo(page).getByRole('group', { name: 'Crear un campo adicional' });
+  const hacia = (carga: ApiFalsaCargaMapeada, patron: RegExp) => (carga.mapeador.rutas ?? []).filter((r) => patron.test(r.ruta)).map((r) => r.ruta);
+
+  async function crearUno(page: Page) {
+    await referencia(page).click();
+    await formulario(page).getByRole('radio', { name: 'Número' }).check();
+    await formulario(page).getByRole('button', { name: 'Crear campo' }).click();
+  }
+
+  test('la segunda carga crea un campo con un solo POST, al borrador de ahora', async ({ page }) => {
+    const { carga } = await abrir(page, unBorrador(14));
+    await alPaso2(page);
+    await crearUno(page);
+    await expect(campoDe(page, 2)).toHaveValue('Monto en mora');
+    await dialogo(page).getByRole('button', { name: 'Aceptar sugerencias (1)' }).click();
+    await expect(confirmar(page)).toBeEnabled();
+    await confirmar(page).click();
+    await expect(dialogo(page)).toBeHidden();
+
+    // The second load, in the same page: another draft, the same markup.
+    carga.analisis = unBorrador(15);
+    carga.mapeador.rutas = [];
+    await page.getByRole('button', { name: 'Subir sábana' }).click();
+    await alPaso2(page);
+    await crearUno(page);
+
+    await expect(campoDe(page, 2)).toHaveValue('Monto en mora');
+    await expect(dialogo(page).locator('[data-paso-marca][aria-current="step"]')).toHaveAttribute('data-paso-marca', '2');
+    expect(hacia(carga, /campos-adicionales$/)).toEqual(['/mapeador/borradores/15/campos-adicionales']);
+  });
+
+  test('con Enter en el nombre, la segunda carga también crea una sola vez y en el borrador de ahora', async ({ page }) => {
+    const { carga } = await abrir(page, unBorrador(14));
+    await alPaso2(page);
+    await dialogo(page).locator('[data-mapeo-cancelar]').click();
+    carga.analisis = unBorrador(15);
+    carga.mapeador.rutas = [];
+
+    await alPaso2(page);
+    await referencia(page).click();
+    await formulario(page).getByRole('radio', { name: 'Texto' }).check();
+    await formulario(page).getByLabel('Nombre del campo').press('Enter');
+
+    await expect(campoDe(page, 2)).toHaveValue('Monto en mora');
+    expect(hacia(carga, /campos-adicionales$/)).toEqual(['/mapeador/borradores/15/campos-adicionales']);
+  });
+
+  test('la validación de la segunda carga va una sola vez por cambio, al borrador de ahora', async ({ page }) => {
+    const { carga } = await abrir(page, unBorrador(14));
+    await alPaso2(page);
+    await crearUno(page);
+    await dialogo(page).getByRole('button', { name: 'Aceptar sugerencias (1)' }).click();
+    await expect(confirmar(page)).toBeEnabled();
+    await confirmar(page).click();
+    await expect(dialogo(page)).toBeHidden();
+
+    carga.analisis = unBorrador(15);
+    await page.getByRole('button', { name: 'Subir sábana' }).click();
+    await alPaso2(page);
+    carga.mapeador.rutas = [];
+
+    await dialogo(page).getByRole('button', { name: 'Aceptar sugerencias (1)' }).click();
+    await expect(confirmar(page)).toBeEnabled();
+
+    expect(hacia(carga, /validacion$/)).toEqual(['/mapeador/borradores/15/validacion']);
+  });
+
+  test('cancelar una carga y empezar otra tampoco deja al borrador anterior escuchando', async ({ page }) => {
+    const { carga } = await abrir(page, unBorrador(14));
+    await alPaso2(page);
+    await dialogo(page).locator('[data-mapeo-cancelar]').click();
+    carga.analisis = unBorrador(15);
+    carga.mapeador.rutas = [];
+
+    await alPaso2(page);
+    await crearUno(page);
+
+    await expect(campoDe(page, 2)).toHaveValue('Monto en mora');
+    expect(hacia(carga, /campos-adicionales$/)).toEqual(['/mapeador/borradores/15/campos-adicionales']);
+  });
+
+  test('cerrar el diálogo con Escape y volver a subir tampoco', async ({ page }) => {
+    const { carga } = await abrir(page, unBorrador(14));
+    await alPaso2(page);
+    await page.keyboard.press('Escape');
+    await expect(dialogo(page)).toBeHidden();
+    carga.analisis = unBorrador(15);
+    carga.mapeador.rutas = [];
+
+    await page.getByRole('button', { name: 'Subir sábana' }).click();
+    await alPaso2(page);
+    await crearUno(page);
+
+    await expect(campoDe(page, 2)).toHaveValue('Monto en mora');
+    expect(hacia(carga, /campos-adicionales$/)).toEqual(['/mapeador/borradores/15/campos-adicionales']);
+  });
+});

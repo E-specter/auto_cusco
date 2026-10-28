@@ -229,11 +229,18 @@ test('destruir: deja de validar y de emitir', async ({ page }) => {
   const api = await abrir(page, CON_PARECIDOS);
   await page.evaluate(() => (window as unknown as { controladorPrueba: { destruir(): void } }).controladorPrueba.destruir());
   const antes = api.pedidos.length;
+  const estadoAntes = await estadoListo(page).textContent();
 
-  await elegirCampo(page, 1, 'dias_atraso');
+  // A destroyed mapper is inert, the list of a row included: it does not even open, so there is no option to click.
+  await campoDe(page, 1).click();
+  await campoDe(page, 1).fill('dias');
+  await campoDe(page, 1).press('Enter');
   await page.waitForTimeout(600);
 
+  await expect(campoDe(page, 1)).toHaveAttribute('aria-expanded', 'false');
+  await expect(fila(page, 1).getByRole('option')).toHaveCount(0);
   expect(api.pedidos.length).toBe(antes);
+  await expect(estadoListo(page)).toHaveText(estadoAntes ?? '');
 });
 
 test.describe('buscar en la lista de campos (T-MAP-F3, RF-59)', () => {

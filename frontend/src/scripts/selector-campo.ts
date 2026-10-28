@@ -29,6 +29,8 @@ export interface OpcionesSelectorCampo {
   onElegir: (valor: string) => void;
   /** Says the number of results while typing, in the component's status region. */
   anunciar: (texto: string) => void;
+  /** Takes every listener of the list off when aborted (the mapper that owns it was destroyed). */
+  signal?: AbortSignal;
 }
 
 export interface SelectorCampo {
@@ -47,6 +49,13 @@ const GRUPOS = [
 
 export function crearSelectorCampo(opciones: OpcionesSelectorCampo): SelectorCampo {
   const { id } = opciones;
+  function escuchar<K extends keyof HTMLElementEventMap>(
+    nodo: HTMLElement,
+    tipo: K,
+    funcion: (evento: HTMLElementEventMap[K]) => void,
+  ): void {
+    nodo.addEventListener(tipo, funcion, { signal: opciones.signal });
+  }
   const raiz = document.createElement('div');
   raiz.className = 'selector-campo';
 
@@ -168,11 +177,11 @@ export function crearSelectorCampo(opciones: OpcionesSelectorCampo): SelectorCam
     if (siguiente) marcarActiva(siguiente.dataset.valor!);
   }
 
-  input.addEventListener('focus', () => input.select());
-  input.addEventListener('click', () => {
+  escuchar(input, 'focus', () => input.select());
+  escuchar(input, 'click', () => {
     if (!abierto) abrir('');
   });
-  input.addEventListener('input', () => {
+  escuchar(input, 'input', () => {
     if (!input.value.trim()) activa = opciones.valor();
     abrir(input.value);
     const n = buscar(consulta).length;
@@ -182,7 +191,7 @@ export function crearSelectorCampo(opciones: OpcionesSelectorCampo): SelectorCam
         : t(n === 1 ? 'mapeador.vista.resultadosUno' : 'mapeador.vista.resultados', { n }),
     );
   });
-  input.addEventListener('keydown', (evento) => {
+  escuchar(input, 'keydown', (evento) => {
     switch (evento.key) {
       case 'ArrowDown':
         evento.preventDefault();
@@ -213,12 +222,12 @@ export function crearSelectorCampo(opciones: OpcionesSelectorCampo): SelectorCam
     }
   });
   // The focus stays in the input while clicking an option.
-  lista.addEventListener('mousedown', (evento) => evento.preventDefault());
-  lista.addEventListener('click', (evento) => {
+  escuchar(lista, 'mousedown', (evento) => evento.preventDefault());
+  escuchar(lista, 'click', (evento) => {
     const nodo = (evento.target as HTMLElement).closest<HTMLElement>('[role="option"]');
     if (nodo) elegir(nodo.dataset.valor!);
   });
-  raiz.addEventListener('focusout', (evento) => {
+  escuchar(raiz, 'focusout', (evento) => {
     if (abierto && !raiz.contains(evento.relatedTarget as Node | null)) cerrar();
   });
 

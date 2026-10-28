@@ -98,6 +98,16 @@ function etiquetaDe(campo: CampoDestino): string {
 
 export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): ControladorMapeador {
   const id = raiz.id;
+  // The page mounts each load on the same markup, so what one controller listens to the next one inherits:
+  // every listener hangs from this signal, and `destruir()` takes them all off in one place.
+  const alDestruir = new AbortController();
+  function escuchar<K extends keyof HTMLElementEventMap>(
+    nodo: HTMLElement,
+    tipo: K,
+    funcion: (evento: HTMLElementEventMap[K]) => void,
+  ): void {
+    nodo.addEventListener(tipo, funcion, { signal: alDestruir.signal });
+  }
   const q = <T extends Element>(selector: string) => raiz.querySelector<T>(selector)!;
   const el = {
     contexto: q<HTMLElement>('[data-contexto]'),
@@ -247,6 +257,7 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
   function crearSelector(indice: number, encabezado: string): SelectorCampo {
     const selector = crearSelectorCampo({
       id: `${id}-campo-${indice}`,
+      signal: alDestruir.signal,
       nombre: t('mapeador.vista.campoPara', { columna: columnaLetra(indice), encabezado }),
       opciones: () => opcionesDe(indice),
       valor: () => asignacionDe(indice).campo ?? NO_CARGAR,
@@ -310,7 +321,7 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
     botonAceptar.className = 'btn btn--sm';
     botonAceptar.dataset.aceptar = String(columna.indice);
     botonAceptar.textContent = t('mapeador.vista.aceptar');
-    botonAceptar.addEventListener('click', () => {
+    escuchar(botonAceptar, 'click', () => {
       cambio(aceptar(s.asignaciones, s.analisis, columna.indice));
       selector.input.focus();
     });
@@ -395,7 +406,7 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
           ir.type = 'button';
           ir.className = 'btn btn--sm';
           ir.textContent = t('mapeador.vista.elegirColumna');
-          ir.addEventListener('click', () => {
+          escuchar(ir, 'click', () => {
             fijarFiltro('todas');
             const libre = s.asignaciones.find((a) => a.campo === null) ?? s.asignaciones[0];
             if (libre) selectores.get(libre.indice)?.input.focus();
@@ -567,7 +578,7 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
         usar.className = 'btn btn--sm';
         usar.dataset.adicionalUsar = '';
         usar.textContent = t('mapeador.vista.adicional.usar', { campo: etiquetaDe(enCatalogo), columna: columnaLetra(indice) });
-        usar.addEventListener('click', () => usarCampoExistente(indice, enCatalogo));
+        escuchar(usar, 'click', () => usarCampoExistente(indice, enCatalogo));
         adicional.usarHueco.replaceChildren(usar);
       }
     } else if (codigo === 'columna_inexistente') {
@@ -609,16 +620,16 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
     }
   }
 
-  adicional.abrir.addEventListener('click', () => (s.adicionalAbierto ? cerrarAdicional(true) : abrirAdicional()));
-  adicional.cancelar.addEventListener('click', () => cerrarAdicional(true));
-  adicional.crear.addEventListener('click', () => void crearAdicional());
-  adicional.columna.addEventListener('change', () => {
+  escuchar(adicional.abrir, 'click', () => (s.adicionalAbierto ? cerrarAdicional(true) : abrirAdicional()));
+  escuchar(adicional.cancelar, 'click', () => cerrarAdicional(true));
+  escuchar(adicional.crear, 'click', () => void crearAdicional());
+  escuchar(adicional.columna, 'change', () => {
     adicional.columnaError.textContent = '';
     if (!s.nombreTocado) adicional.nombre.value = columnaPorIndice(columnaElegida())?.encabezado ?? '';
     pintarEjemplos();
     pintarBotonCrear();
   });
-  adicional.nombre.addEventListener('input', () => {
+  escuchar(adicional.nombre, 'input', () => {
     s.nombreTocado = true;
     adicional.nombreError.textContent = '';
     adicional.usarHueco.replaceChildren();
@@ -626,12 +637,12 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
     pintarBotonCrear();
   });
   // The mapper may sit inside a <form> (the upload dialog): Enter here creates the field, never submits that form.
-  adicional.nombre.addEventListener('keydown', (evento) => {
+  escuchar(adicional.nombre, 'keydown', (evento) => {
     if (evento.key !== 'Enter') return;
     evento.preventDefault();
     void crearAdicional();
   });
-  for (const radio of adicional.tipos) radio.addEventListener('change', pintarBotonCrear);
+  for (const radio of adicional.tipos) escuchar(radio, 'change', pintarBotonCrear);
 
   function fijarFiltro(filtro: 'revisar' | 'todas'): void {
     s.filtro = filtro;
@@ -640,10 +651,10 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
   }
 
   for (const boton of el.filtro) {
-    boton.addEventListener('click', () => fijarFiltro(boton.dataset.filtroOpcion as 'revisar' | 'todas'));
+    escuchar(boton, 'click', () => fijarFiltro(boton.dataset.filtroOpcion as 'revisar' | 'todas'));
   }
-  el.aceptarTodas.addEventListener('click', () => cambio(aceptarTodas(s.asignaciones, s.analisis)));
-  el.verColumnas.addEventListener('click', () => {
+  escuchar(el.aceptarTodas, 'click', () => cambio(aceptarTodas(s.asignaciones, s.analisis)));
+  escuchar(el.verColumnas, 'click', () => {
     const abierto = el.verColumnas.getAttribute('aria-expanded') !== 'true';
     el.verColumnas.setAttribute('aria-expanded', String(abierto));
     el.cuerpo.hidden = !abierto;
@@ -705,7 +716,7 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
   }
 
   const alCambiarIdioma = () => construir();
-  document.addEventListener('languagechange', alCambiarIdioma);
+  document.addEventListener('languagechange', alCambiarIdioma, { signal: alDestruir.signal });
 
   montarAnalisis(opciones.analisis);
   emitir();
@@ -741,8 +752,9 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
     },
     destruir() {
       s.destruido = true;
+      // Every listener of this controller, the form to create a field among them, goes with it.
+      alDestruir.abort();
       controladorCrear?.abort();
-      document.removeEventListener('languagechange', alCambiarIdioma);
       clearTimeout(temporizador);
       controlador?.abort();
     },
