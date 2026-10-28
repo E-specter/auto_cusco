@@ -584,6 +584,7 @@
   "mowaMes.seguimiento.exclusiones.motivo.sin_speech": "Sin speech",
   "mowaMes.seguimiento.exclusiones.motivo.falta_titular": "Sin titular",
   "mowaMes.seguimiento.exclusiones.motivo.falta_vencimiento": "Sin vencimiento",
+  "mowaMes.seguimiento.exclusiones.motivo.falta_campo_adicional": "Sin campo adicional",
   "mowaMes.seguimiento.exclusiones.motivo.mensaje_excede_160": "Más de 160",
   "mowaMes.campana.resumen.sinProblemas": "Sin errores ni advertencias: la campaña se puede crear.",
   "mowaMes.campana.archivoPrevisto": "Archivo {n} de {total} (estimado): {filas} filas, {supervision} de supervisión.",
