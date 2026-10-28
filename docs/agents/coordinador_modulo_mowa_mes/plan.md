@@ -408,3 +408,56 @@ Va en un solo corte de backend: D-CA-0 sin D-CA-2 dejaría salir un SMS con un h
 - **P-2. ¿El aviso de archivado también va en la previsualización de la campaña?** **Recomiendo que no** por ahora (7.5).
 
 **Respuestas de `architec` (2026-10-27): plan aprobado.** P-1: sí, la columna `mowa_mes_exclusion.campos text[] NULL`, con la migración encadenada a la de T-CA-B2. La escribe el dev y la aplica `architec`: en `auto_cusco_test` al verificar y, con permiso del usuario, en `auto_cusco`. P-2: no por ahora. La exclusión ya nombra el campo, y se revisa en T-MM-C8 si en uso real hace falta el aviso en la campaña. B12 arranca cuando T-CA-B2 esté en `main`.
+
+## 8. El aviso de archivados en la previsualización de la campaña (T-MM-B13, T-MM-F12), 2026-10-28
+
+P-2 se revisó en T-MM-C8 (`revision-c8.md` §6) y `architec` la decidió el 2026-10-27: **sí, ahora**. El plan va sobre `1a40025`.
+
+**Por qué.** Un adicional archivado deja de encontrarse al analizar una sábana nueva (`test_un_adicional_archivado_deja_de_encontrarse_al_volver_a_analizar`), así que desde esa carga viene vacío. Si el speech de la campaña lo lee, los productos de esos segmentos quedan fuera con `falta_campo_adicional`, y la previsualización de la campaña no dice que la causa es el archivo. El aviso del editor (B12 y F11) solo sale al abrir el speech.
+
+### 8.1 Backend (T-MM-B13)
+
+- **`CampanaArmada.campos_archivados: tuple[str, ...] = ()`**, con los nombres técnicos. `armar` lo calcula con `catalogo.archivados_entre(usados)`:
+  - `usados` son los adicionales que leen los segmentos de la versión del speech, sin repetir y en el orden de los segmentos y de sus nodos;
+  - se saca de `ConstructorMensajes.adicionales_usados`. Si el constructor no deja recorrer sus segmentos, se le agrega un método de una línea; no se vuelve a compilar nada;
+  - una v1 no lee ninguno y da `()`.
+- **Se mira el speech entero, no solo los segmentos que tienen productos.** Es el mismo criterio del aviso del editor, y un segmento hoy vacío puede tener productos mañana.
+- **Es un aviso.** No cambia `puede_crear`, las exclusiones, su orden, los errores ni las advertencias. Tampoco es un código nuevo de `CodigoMowaMes`, así que no se tocan el enum ni las pruebas espejo.
+- **API.** `PrevisualizacionCampanaRespuesta.campos_archivados: list[CampoNombradoRespuesta]` (ya importado en `mowa_mes_campanas.py`), con la etiqueta resuelta al leer con `servicio.etiqueta_de`, como en `ExclusionRespuesta.campos`. Solo va en la previsualización: crear y el detalle de la campaña no cambian. Se regenera el contrato.
+- **`mowa-mes.md` §19.2.**
+
+### 8.2 Frontend (T-MM-F12)
+
+- **Un `.notice` en el resultado de la previsualización de `campana.astro`,** con los nombres legibles de `campos_archivados`. Se oculta cuando la lista viene vacía o cuando no hay previsualización.
+- **Texto, lugar y variante los decide `designer`.** El de `avisoDeArchivados` («sigue funcionando, pero ya no se ofrece») no basta aquí: lo que importa en la campaña es que las sábanas cargadas después de archivarlo ya no lo traen, y los productos que lo necesitan quedan fuera. Borrador:
+  - uno: «El speech usa el campo archivado {campo}. Las sábanas cargadas después de archivarlo ya no lo traen: los productos que lo necesitan quedan fuera. Para que no pase, reactívalo en Campos adicionales o cambia el speech.»
+  - varios: el mismo texto, con los campos en plural;
+  - lugar: bajo el resumen (`[data-resumen]`), antes de las cifras, porque explica exclusiones que pueden ser muchas.
+- **Le pregunto también a `designer`** si el aviso del editor de MOWA debería decir lo mismo. Si dice que sí, son dos claves más en F12.
+- **API falsa:** `campos_archivados: []` por omisión y una opción del spec para llenarlo.
+
+### 8.3 Pruebas
+
+- **B13:**
+  - una v2 que lee un archivado da `campos_archivados` con su nombre técnico, y la API con su etiqueta;
+  - dos segmentos que leen el mismo archivado lo dan una vez;
+  - sin archivados da `[]`, y una v1 también;
+  - el aviso no cambia `puede_crear` ni las exclusiones;
+  - renombrar cambia la etiqueta.
+  - Las pruebas de oro no cambian: no comparan la previsualización entera, y el dev lo comprueba con el diff.
+  - Mutación: aviso siempre vacío, todos los adicionales y no solo los archivados, repetidos, y la etiqueta sin resolver.
+- **F12:**
+  - Playwright: el aviso con uno y con dos archivados, sin aviso con la lista vacía, en inglés, axe en claro y oscuro y 360 px.
+  - Vitest, si el texto sale de una función.
+  - Mutación: no ocultar el aviso, y mostrar el técnico.
+
+### 8.4 Cortes
+
+| Corte | Qué | Depende | Revisión |
+|---|---|---|---|
+| **T-MM-B13** | 8.1 y sus pruebas | `1a40025` | yo; `architec` corre `-ConBase` |
+| **T-MM-F12** | 8.2 y sus pruebas | el contrato de B13 | yo; `designer` el texto y el lugar |
+
+B13 y F12 pueden ir en paralelo: F12 escribe contra la API falsa, y rebasa sobre B13 cuando entre.
+
+**Aprobado por `architec` el 2026-10-28.** El texto del aviso en la campaña lo fija `designer` y dice la consecuencia: desde que se archivó, las sábanas nuevas no traen el campo y esos productos quedan fuera. Cambiar también el aviso del editor es decisión de `designer` y puede ir en F12.
