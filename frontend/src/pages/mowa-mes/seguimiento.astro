@@ -263,6 +263,7 @@ import '../../styles/mowa-mes.css';
   import { presentarCosto, traducirCodigo, type PresentacionCosto } from '../../lib/mowa-mes';
   import {
     CODIGOS_EXCLUSION,
+    detalleDeExclusion,
     filasConciliacion,
     leerResumenDescarga,
     mesDe,
@@ -1011,7 +1012,7 @@ import '../../styles/mowa-mes.css';
       fila.append(
         celda('td', exclusion.pagare, 'mono'),
         motivo,
-        celda('td', traducirCodigo(exclusion.codigo, exclusion.codigo)),
+        celda('td', detalleDeExclusion(exclusion)),
       );
       cuerpo.append(fila);
     });

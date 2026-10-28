@@ -101,6 +101,18 @@ const SEGMENTOS_SINTETICOS: Esquemas['RangoRespuesta'][] = [
   { clave: '9_a_30', etiqueta: '9 a 30', desde: 9, hasta: 30 },
 ];
 
+/**
+ * Additional fields of the portfolio (RF-64, RF-65) as the catalogue lists them: one of text, one number and
+ * one archived. Opt in: a spec pushes them into the `variables` of the context it needs.
+ */
+export function variablesAdicionalesSinteticas(): Esquemas['VariableRespuesta'][] {
+  return [
+    { nombre: 'ad_zona', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: 'Zona', adicional: true, archivado: false },
+    { nombre: 'ad_monto_mora', tipo: 'numero', clave_nombre: null, origen: 'cartera', etiqueta: 'Monto en mora', adicional: true, archivado: false },
+    { nombre: 'ad_region', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: 'Región', adicional: true, archivado: true },
+  ];
+}
+
 /** A catalogue for `contexto`, with the speech's limit when it is the speech. */
 export function catalogoSintetico(contexto = 'mowa_mes.speech'): Catalogo {
   const esSpeech = contexto === 'mowa_mes.speech';

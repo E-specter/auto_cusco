@@ -441,6 +441,8 @@ const EXCLUSIONES_EN_ORDEN: CodigoMowaMes[] = [
 /** The whole `CodigoMowaMes` catalogue (13 codes), for the API's 422 on anything else. */
 const CODIGOS_CATALOGO: CodigoMowaMes[] = [
   ...EXCLUSIONES_EN_ORDEN,
+  // T-MM-B12: an exclusion too, but not in the rotation of `EXCLUSIONES_EN_ORDEN`, so the counts of other specs stay.
+  'falta_campo_adicional',
   'mensaje_excede_150',
   'documento_no_estandar',
   'limite_mensual_excedido',

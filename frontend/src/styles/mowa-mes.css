@@ -411,6 +411,14 @@
   min-inline-size: 16ch;
 }
 
+/* The additional fields that were missing, in the reason cell of the campaign preview: always on their own line
+   under the tag, at every width, so a name is never split next to it. No nowrap: inside its line the names wrap
+   normally, because a long one would overflow at 360 px (T-MM-F11, decision of designer). */
+.mm-exclusion__campos {
+  display: block;
+  margin-block-start: var(--space-1);
+}
+
 /* A withdrawn holiday still reads, struck through, so the year's exception is
    visible where the holiday would have been. */
 .mm-calendario__tabla tr[data-retirado='true'] .mm-calendario__descripcion {

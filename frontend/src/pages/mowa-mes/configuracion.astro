@@ -251,6 +251,12 @@ import '../../styles/mowa-mes-speech-v2.css';
             </span>
           </p>
 
+          <!-- The preview works with an archived additional field and says so (T-MM-F11), like /columnas. -->
+          <p class="notice notice--info" data-speech-archivados hidden>
+            <Icon name="info" size={20} />
+            <span data-speech-archivados-texto></span>
+          </p>
+
           <div class="notice notice--danger" data-speech-problemas hidden role="status">
             <Icon name="circle-alert" size={20} />
             <div>
@@ -476,6 +482,7 @@ import '../../styles/mowa-mes-speech-v2.css';
   import { notaVariablesDesconocidas, pintarBotonesDeVariables } from '../../lib/mowa-mes-plantilla';
   import { formatBytes, formatDate, formatDateTime, formatNumber, parseApiDate } from '../../lib/format';
   import { obtenerComoV2, problemasDeErrorSpeech } from '../../lib/api-speech-v2';
+  import { avisoDeArchivados } from '../../lib/campos';
   import { SEPARADOR_BORRADOS, elementosBorrados, type CaracterQuitado } from '../../lib/mowa-mes-gsm7';
   import { applyTranslations, locale, t } from '../../lib/i18n';
   import {
@@ -1248,6 +1255,16 @@ import '../../styles/mowa-mes-speech-v2.css';
     host.replaceChildren(icono, texto);
   }
 
+  /**
+   * The notice of an archived additional field the speech still uses: it keeps working, but is no longer
+   * offered. Hidden when there is none, and also when there is no preview to say it about.
+   */
+  function pintarArchivados(etiquetas: readonly string[]): void {
+    const aviso = avisoDeArchivados(etiquetas);
+    $<HTMLElement>('[data-speech-archivados]').hidden = aviso === null;
+    $<HTMLElement>('[data-speech-archivados-texto]').textContent = aviso ?? '';
+  }
+
   /** v2: the line of the segment on screen, under the editor. */
   function pintarBorradosV2(): void {
     const seleccionado = ctlV2?.estado().seleccionado ?? null;
@@ -1512,6 +1529,7 @@ import '../../styles/mowa-mes-speech-v2.css';
       nodo.hidden = enV2;
     });
     v2El.bloque.hidden = !enV2;
+    if (!enV2) pintarArchivados([]);
     // A v1 is only read (RF-MM-17, M3): there is nothing to save until it is converted.
     $<HTMLElement>('[data-speech-pie]').hidden = !enV2;
     const version = versionActual();
@@ -1601,6 +1619,7 @@ import '../../styles/mowa-mes-speech-v2.css';
       v2El.borradorTexto.textContent = t('mowaMes.speech.v2.borrador', { base: version.nombre });
     }
     $<HTMLElement>('[data-speech-falta-whatsapp]').hidden = true;
+    pintarArchivados([]);
     mostrarProblemasV2(v2.problemas);
 
     void asegurarEditorV2().then((ctl) => {
@@ -1626,6 +1645,7 @@ import '../../styles/mowa-mes-speech-v2.css';
       estado.largosV2 = [];
       ctl?.fijarNiveles({});
       pintarBorradosV2();
+      pintarArchivados([]);
       return;
     }
     controlPrevisualizacion?.abort();
@@ -1639,9 +1659,12 @@ import '../../styles/mowa-mes-speech-v2.css';
       ctl?.fijarNiveles(nivelesDeV2(vista.segmentos));
       pintarBorradosV2();
       $<HTMLElement>('[data-speech-falta-whatsapp]').hidden = !vista.segmentos.some((s) => s.falta_whatsapp);
+      pintarArchivados(vista.campos_archivados.map((c) => c.etiqueta));
       mostrarProblemasV2(vista.problemas);
     } catch (caido) {
       if (caido instanceof DOMException && caido.name === 'AbortError') return;
+      // A preview that failed says nothing about archived fields.
+      pintarArchivados([]);
       if (caido instanceof ApiError && caido.status === 400) {
         const problemas = problemasDeErrorSpeech(caido);
         if (problemas.length > 0) mostrarProblemasV2(problemas);

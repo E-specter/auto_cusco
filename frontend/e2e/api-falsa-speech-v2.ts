@@ -214,7 +214,13 @@ export async function montarApiSpeechV2(
           ),
         });
       }
-      return json(route, 200, { whatsapp, largo_advertencia: 150, largo_maximo: 160, problemas, segmentos, campos_archivados: [] });
+      const usados = new Set(
+        expresiones.flatMap((e) => e.expresion.nodos.flatMap((n) => (n.tipo === 'variable' && n.nombre ? [n.nombre] : []))),
+      );
+      const camposArchivados = (motor.catalogos['mowa_mes.speech']?.contexto.variables ?? [])
+        .filter((v) => v.archivado && usados.has(v.nombre))
+        .map((v) => ({ nombre: v.nombre, etiqueta: v.etiqueta ?? v.nombre }));
+      return json(route, 200, { whatsapp, largo_advertencia: 150, largo_maximo: 160, problemas, segmentos, campos_archivados: camposArchivados });
     }
 
     if (ruta === '/mowa-mes/speech' && metodo === 'POST' && cuerpo && Array.isArray(cuerpo.expresiones)) {

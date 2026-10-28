@@ -10,7 +10,10 @@ import type {
   Conciliacion,
   ConsumoLimite,
   EstadoConteo,
+  Exclusion,
 } from './api-mowa-mes';
+import { t } from './i18n';
+import { traducirCodigo } from './mowa-mes';
 
 /** Exclusion reasons in evaluation order (docs/mowa-mes.md §12): the filter's options. */
 export const CODIGOS_EXCLUSION = [
@@ -22,6 +25,28 @@ export const CODIGOS_EXCLUSION = [
   'falta_campo_adicional',
   'mensaje_excede_160',
 ] as const satisfies readonly CodigoMowaMes[];
+
+/**
+ * The names of the additional fields that left a product out, by their readable label, each in the quotes
+ * of the language (they live in the template, `mowaMes.exclusiones.campo`) and separated by commas.
+ * `null` when there are none. The label is what a person reads; the technical name is only a fallback.
+ */
+export function listaDeCampos(campos: Exclusion['campos'] | undefined): string | null {
+  if (!campos || campos.length === 0) return null;
+  return campos.map((c) => t('mowaMes.exclusiones.campo', { campo: c.etiqueta || c.nombre })).join(', ');
+}
+
+/**
+ * What the Detail column says about an exclusion. For `falta_campo_adicional` with fields, a sentence with
+ * their names, in singular or plural; for any other code, or with no fields, the text of the code as before.
+ */
+export function detalleDeExclusion(exclusion: Pick<Exclusion, 'codigo' | 'campos'>): string {
+  const lista = exclusion.codigo === 'falta_campo_adicional' ? listaDeCampos(exclusion.campos) : null;
+  if (lista === null) return traducirCodigo(exclusion.codigo, exclusion.codigo);
+  return t(exclusion.campos.length === 1 ? 'mowaMes.exclusiones.faltaCampoAdicional' : 'mowaMes.exclusiones.faltanCamposAdicionales', {
+    campos: lista,
+  });
+}
 
 // ---- Months --------------------------------------------------------------------
 

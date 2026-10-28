@@ -471,7 +471,7 @@ import '../../styles/mowa-mes.css';
   } from '../../lib/mowa-mes-campana';
   import { campoDeError, moverElemento, paginar, traducirCodigo, type PaginaLocal } from '../../lib/mowa-mes';
   import { notaVariablesDesconocidas, pintarBotonesDeVariables } from '../../lib/mowa-mes-plantilla';
-  import { leerResumenDescarga, nombreArchivo } from '../../lib/mowa-mes-seguimiento';
+  import { leerResumenDescarga, listaDeCampos, nombreArchivo } from '../../lib/mowa-mes-seguimiento';
   import { guardarArchivo } from '../../lib/descargas';
   import { openWhenFree } from '../../lib/dialogs';
   import { formatBytes, formatDate, formatNumber, formatSoles, formatTarifa } from '../../lib/format';
@@ -1027,6 +1027,15 @@ import '../../styles/mowa-mes.css';
       // is a pill and carries data, not a sentence.
       tag.textContent = t(`mowaMes.seguimiento.exclusiones.motivo.${exclusion.codigo}`);
       motivo.append(tag);
+      // This table has no Detail column: the additional fields that were missing go in the same cell, after
+      // the tag, as plain text, always on their own line under it (`.mm-exclusion__campos`).
+      const campos = exclusion.codigo === 'falta_campo_adicional' ? listaDeCampos(exclusion.campos) : null;
+      if (campos !== null) {
+        const nombres = document.createElement('span');
+        nombres.className = 'mm-exclusion__campos';
+        nombres.textContent = campos;
+        motivo.append(' ', nombres);
+      }
       motivo.dataset.etiqueta = t('mowaMes.seguimiento.exclusiones.col.motivo');
       fila.append(celda('td', exclusion.pagare, 'mono', t('mowaMes.seguimiento.exclusiones.col.pagare')), motivo);
       cuerpo.append(fila);
