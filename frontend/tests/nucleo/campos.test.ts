@@ -5,7 +5,17 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { etiquetaCampo, etiquetaVariable, humanizarNombre, ordenarPorEtiqueta } from '../../src/lib/campos';
+import {
+  archivadosEnUso,
+  avisoDeArchivados,
+  etiquetaCampo,
+  etiquetaDeCampo,
+  etiquetaVariable,
+  humanizarNombre,
+  opcionesDeCampos,
+  ordenarCampos,
+  ordenarPorEtiqueta,
+} from '../../src/lib/campos';
 import { setLanguageForTests } from './idioma';
 
 afterEach(() => setLanguageForTests('es'));
@@ -45,5 +55,80 @@ describe('orden de lectura', () => {
   it('ordena por la etiqueta visible, no por el nombre técnico', () => {
     expect(ordenarPorEtiqueta(['pagare', 'dias_atraso', 'agencia'])).toEqual(['agencia', 'dias_atraso', 'pagare']);
     expect(ordenarPorEtiqueta(['titular', 'saldo_capital_pendiente'])).toEqual(['saldo_capital_pendiente', 'titular']);
+  });
+});
+
+describe('etiqueta de un campo adicional (RF-66)', () => {
+  it('la etiqueta propia manda sobre la clave y sobre el nombre técnico', () => {
+    expect(etiquetaDeCampo({ nombre: 'ad_monto_mora', etiqueta: 'Monto en mora' })).toBe('Monto en mora');
+    expect(etiquetaDeCampo({ nombre: 'saldo_capital_pendiente', etiqueta: 'Otro nombre' })).toBe('Otro nombre');
+  });
+
+  it('sin etiqueta usa la clave dada, o la del campo, y al final el nombre con espacios', () => {
+    expect(etiquetaDeCampo({ nombre: 'saldo_capital_pendiente', etiqueta: null })).toBe('Saldo de capital pendiente');
+    expect(etiquetaDeCampo({ nombre: 'otro', clave: 'campo.titular' })).toBe('Titular');
+    expect(etiquetaDeCampo({ nombre: 'ad_sin_etiqueta' })).toBe('ad sin etiqueta');
+  });
+
+  it('una variable del catálogo con etiqueta propia la muestra, aunque traiga clave', () => {
+    expect(etiquetaVariable({ nombre: 'ad_monto_mora', clave_nombre: null, etiqueta: 'Monto en mora' })).toBe('Monto en mora');
+    expect(etiquetaVariable({ nombre: 'titular', clave_nombre: null, etiqueta: null })).toBe('Titular');
+  });
+});
+
+describe('listas de campos con adicionales', () => {
+  const campos = {
+    titular: { adicional: false, etiqueta: null },
+    agencia: { adicional: false, etiqueta: null },
+    ad_zona: { adicional: true, etiqueta: 'Zona', archivado: false },
+    ad_antiguo: { adicional: true, etiqueta: 'Antiguo', archivado: true },
+    ad_monto: { adicional: true, etiqueta: 'Aporte', archivado: false },
+  };
+  const nombres = Object.keys(campos);
+
+  it('los base van primero y los adicionales al final, cada grupo por su nombre visible', () => {
+    expect(ordenarCampos(campos, nombres)).toEqual(['agencia', 'titular', 'ad_antiguo', 'ad_monto', 'ad_zona']);
+  });
+
+  it('un archivado no se ofrece, salvo el que ya está elegido, que lo dice en el texto', () => {
+    expect(opcionesDeCampos(campos, nombres, null).map(([valor]) => valor)).toEqual(['agencia', 'titular', 'ad_monto', 'ad_zona']);
+    const conActual = opcionesDeCampos(campos, nombres, 'ad_antiguo');
+    expect(conActual.find(([valor]) => valor === 'ad_antiguo')?.[1]).toBe('Antiguo (archivado)');
+  });
+
+  it('solo los adicionales llevan grupo, y es «Campos adicionales»', () => {
+    const opciones = opcionesDeCampos(campos, nombres, null);
+    expect(opciones.filter(([, , grupo]) => grupo === 'Campos adicionales').map(([valor]) => valor)).toEqual(['ad_monto', 'ad_zona']);
+    expect(opciones.filter(([, , grupo]) => grupo === undefined).map(([valor]) => valor)).toEqual(['agencia', 'titular']);
+  });
+
+  it('el grupo y el sufijo siguen el idioma', () => {
+    setLanguageForTests('en');
+    expect(opcionesDeCampos(campos, nombres, 'ad_antiguo').find(([valor]) => valor === 'ad_antiguo')).toEqual([
+      'ad_antiguo',
+      'Antiguo (archived)',
+      'Additional fields',
+    ]);
+  });
+});
+
+describe('el aviso de un campo archivado en uso', () => {
+  const campos = {
+    titular: { adicional: false },
+    ad_viejo: { adicional: true, etiqueta: 'Monto en mora', archivado: true },
+    ad_otro: { adicional: true, etiqueta: 'Zona', archivado: true },
+    ad_vivo: { adicional: true, etiqueta: 'Vivo', archivado: false },
+  };
+
+  it('nombra solo los archivados que se usan, sin repetirlos', () => {
+    expect(archivadosEnUso(campos, ['titular', 'ad_viejo', 'ad_vivo', 'ad_viejo', 'inexistente'])).toEqual(['Monto en mora']);
+  });
+
+  it('en singular y en plural, y sin aviso si no hay ninguno', () => {
+    expect(avisoDeArchivados(['Monto en mora'])).toBe('Usa el campo archivado «Monto en mora»: sigue funcionando, pero ya no se ofrece.');
+    expect(avisoDeArchivados(['Monto en mora', 'Zona'])).toBe(
+      'Usa los campos archivados «Monto en mora», «Zona»: siguen funcionando, pero ya no se ofrecen.',
+    );
+    expect(avisoDeArchivados([])).toBeNull();
   });
 });

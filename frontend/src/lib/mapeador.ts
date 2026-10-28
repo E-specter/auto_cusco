@@ -73,10 +73,14 @@ export function aceptarTodas(asignaciones: readonly Asignacion[], analisis: Anal
   });
 }
 
-export type Insignia = 'recordado' | 'coincide' | 'por_revisar' | 'aceptado' | 'sin_coincidencia' | 'manual';
+export type Insignia = 'recordado' | 'coincide' | 'por_revisar' | 'aceptado' | 'sin_coincidencia' | 'manual' | 'nuevo';
 
-/** What the tag says now: the analysis state while the column has its field, «Elegido a mano» otherwise (§3.4). */
-export function insignia(columna: Columna, asignacion: Asignacion): Insignia {
+/**
+ * What the tag says now: the analysis state while the column has its field, «Elegido a mano» otherwise
+ * (§3.4); «Campo nuevo» while the column has the field created from it in this load (RF-64).
+ */
+export function insignia(columna: Columna, asignacion: Asignacion, campoNuevo: string | null = null): Insignia {
+  if (campoNuevo !== null && asignacion.campo === campoNuevo) return 'nuevo';
   if (asignacion.campo !== columna.sugerido) return 'manual';
   if (columna.estado === 'parecido') return asignacion.origen === 'parecido_aceptado' ? 'aceptado' : 'por_revisar';
   return columna.estado;
@@ -102,4 +106,21 @@ export function porRevisar(analisis: Analisis, asignaciones: readonly Asignacion
   const indices = new Set(problemas.flatMap((p) => (p.indice === null ? [] : [p.indice])));
   for (const a of asignaciones) if (pendiente(columnaDe(analisis, a.indice), a)) indices.add(a.indice);
   return indices;
+}
+
+/** The columns a new field can be made from: the ones that load nothing now (no match, or «No cargar»). */
+export function columnasLibres(analisis: Analisis, asignaciones: readonly Asignacion[]): Columna[] {
+  return analisis.columnas.filter((c) => asignaciones.find((a) => a.indice === c.indice)?.campo === null);
+}
+
+export type TipoNuevo = Esquemas['TipoAdicional'];
+
+/** «Crear campo» needs a column, a name (without the spaces at the ends) and a type; the rest is the backend's. */
+export function puedeCrearCampo(columna: number | null, nombre: string, tipo: TipoNuevo | null): boolean {
+  return columna !== null && nombre.trim() !== '' && tipo !== null;
+}
+
+/** A field given to a column by hand: the origin of any choice the analyst makes. */
+export function asignarCampo(asignaciones: readonly Asignacion[], indice: number, campo: string | null): Asignacion[] {
+  return reemplazar(asignaciones, { indice, campo, origen: 'manual' });
 }

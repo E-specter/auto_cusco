@@ -114,7 +114,14 @@ export function crearSelectorVariable(opciones: OpcionesSelectorVariable): HTMLE
         const tecnico = document.createElement('span');
         tecnico.className = 'mono muted selector-variable__tecnico';
         tecnico.textContent = variable.nombre;
-        boton.append(nombre, tipo, tecnico);
+        boton.append(nombre, tipo);
+        if (variable.adicional) {
+          const marca = document.createElement('span');
+          marca.className = 'tag tag--neutral';
+          marca.textContent = t('camposAdicionales.adicional');
+          boton.append(marca);
+        }
+        boton.append(tecnico);
         boton.addEventListener('click', () => opciones.onElegir(variable.nombre));
         li.append(boton);
         ul.append(li);

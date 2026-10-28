@@ -319,6 +319,10 @@
   line-height: var(--leading-data);
 }
 
+.productos__archivados {
+  margin: var(--space-3) var(--space-4) 0;
+}
+
 .columnas__opcion:has(input:disabled) {
   color: var(--color-text-muted);
 }

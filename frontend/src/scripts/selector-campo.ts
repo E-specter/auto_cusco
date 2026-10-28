@@ -14,7 +14,7 @@ export interface OpcionCampo {
   etiqueta: string;
   alias: readonly string[];
   texto: string;
-  grupo: 'obligatorios' | 'otros';
+  grupo: 'obligatorios' | 'otros' | 'adicionales';
   deshabilitada: boolean;
 }
 
@@ -42,6 +42,7 @@ const NO_CARGAR = '';
 const GRUPOS = [
   ['obligatorios', 'mapeador.vista.obligatorios'],
   ['otros', 'mapeador.vista.otros'],
+  ['adicionales', 'camposAdicionales.grupo'],
 ] as const;
 
 export function crearSelectorCampo(opciones: OpcionesSelectorCampo): SelectorCampo {

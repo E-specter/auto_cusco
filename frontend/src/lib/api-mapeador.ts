@@ -75,3 +75,15 @@ export function descartarBorrador(id: number): Promise<void> {
 export function confirmarCarga(entrada: Esquemas['ConfirmacionEntrada']): Promise<Esquemas['CargaCreadaRespuesta']> {
   return request<Esquemas['CargaCreadaRespuesta']>('/cargas/desde-borrador', conJson('POST', entrada));
 }
+
+/** Create an additional field from a column of the draft (RF-64): 201 with the field and the catalogue now. */
+export function crearCampoAdicional(
+  borradorId: number,
+  entrada: Esquemas['NuevoCampoAdicionalEntrada'],
+  signal?: AbortSignal,
+): Promise<Esquemas['CampoAdicionalCreadoRespuesta']> {
+  return request<Esquemas['CampoAdicionalCreadoRespuesta']>(
+    `/mapeador/borradores/${borradorId}/campos-adicionales`,
+    conJson('POST', entrada, signal),
+  );
+}

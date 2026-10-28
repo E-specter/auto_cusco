@@ -71,6 +71,90 @@ const { id } = Astro.props;
     </div>
   </div>
 
+  <!-- RF-64: shown only if the page passes `crearCampo` and a column can still be used. Not a <form>: the mapper may sit inside one. -->
+  <div class="mapeador__adicional" data-adicional hidden>
+    <p class="mapeador__adicionalPregunta">
+      <span data-i18n="mapeador.vista.adicional.pregunta">¿Una columna trae un dato que no está en la lista?</span>
+      <button
+        type="button"
+        class="btn btn--sm"
+        aria-expanded="false"
+        aria-controls={`${id}-adicional-panel`}
+        data-adicional-abrir
+        data-i18n="mapeador.vista.adicional.abrir"
+      >
+        Crear un campo adicional
+      </button>
+    </p>
+
+    <div class="panel mapeador__adicionalPanel" id={`${id}-adicional-panel`} role="group" aria-labelledby={`${id}-adicional-titulo`} data-adicional-panel hidden>
+      <div class="panel__head">
+        <h3 class="panel__title" id={`${id}-adicional-titulo`} data-i18n="mapeador.vista.adicional.titulo">Crear un campo adicional</h3>
+      </div>
+      <div class="panel__body mapeador__adicionalCuerpo">
+        <div class="field">
+          <label class="field__label" for={`${id}-adicional-columna`} data-i18n="mapeador.vista.adicional.columna">Columna del archivo</label>
+          <select class="input" id={`${id}-adicional-columna`} aria-describedby={`${id}-adicional-ejemplos ${id}-adicional-columna-error`} data-adicional-columna></select>
+          <p class="field__hint mono" id={`${id}-adicional-ejemplos`} data-adicional-ejemplos></p>
+          <p class="field__error" id={`${id}-adicional-columna-error`} data-adicional-columna-error></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for={`${id}-adicional-nombre`} data-i18n="mapeador.vista.adicional.nombre">Nombre del campo</label>
+          <input
+            class="input"
+            type="text"
+            id={`${id}-adicional-nombre`}
+            maxlength="80"
+            autocomplete="off"
+            aria-describedby={`${id}-adicional-nombre-hint ${id}-adicional-nombre-error`}
+            data-adicional-nombre
+          />
+          <p class="field__hint" id={`${id}-adicional-nombre-hint`} data-i18n="mapeador.vista.adicional.nombreHint">
+            Así lo verás en Cartera, en los textos y en las columnas de carga. Se puede cambiar después.
+          </p>
+          <p class="field__error" id={`${id}-adicional-nombre-error`} data-adicional-nombre-error></p>
+          <p class="mapeador__adicionalUsar" data-adicional-usar-hueco></p>
+        </div>
+
+        <fieldset class="field mapeador__tipo" aria-describedby={`${id}-adicional-tipo-hint`}>
+          <legend class="field__label" data-i18n="mapeador.vista.adicional.tipo">Tipo de dato</legend>
+          <div class="mapeador__tipoOpciones">
+            <label class="mapeador__tipoOpcion">
+              <input type="radio" name={`${id}-adicional-tipo`} value="texto" data-adicional-tipo />
+              <span data-i18n="mapeador.vista.adicional.tipo.texto">Texto</span>
+            </label>
+            <label class="mapeador__tipoOpcion">
+              <input type="radio" name={`${id}-adicional-tipo`} value="numero" data-adicional-tipo />
+              <span data-i18n="mapeador.vista.adicional.tipo.numero">Número</span>
+            </label>
+            <label class="mapeador__tipoOpcion">
+              <input type="radio" name={`${id}-adicional-tipo`} value="fecha" data-adicional-tipo />
+              <span data-i18n="mapeador.vista.adicional.tipo.fecha">Fecha</span>
+            </label>
+          </div>
+          <p class="field__hint" id={`${id}-adicional-tipo-hint`} data-i18n="mapeador.vista.adicional.tipoHint">
+            No se puede cambiar después: para otro tipo, se crea otro campo. Un valor que no sea de este tipo queda vacío y se avisa en su fila.
+          </p>
+        </fieldset>
+
+        <p class="notice notice--info">
+          <Icon name="info" size={20} />
+          <span data-i18n="mapeador.vista.adicional.persistencia">El campo queda en el catálogo para las próximas sábanas, aunque canceles esta carga.</span>
+        </p>
+        <p class="field__error" role="alert" data-adicional-error></p>
+
+        <div class="mapeador__adicionalAcciones">
+          <button type="button" class="btn" data-adicional-cancelar data-i18n="mapeador.vista.adicional.cancelar">Cancelar</button>
+          <button type="button" class="btn btn--primary" data-adicional-crear>
+            <span class="btn__spinner" aria-hidden="true"></span>
+            <span class="btn__label" data-i18n="mapeador.vista.adicional.crear">Crear campo</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="notice notice--info" data-advertencias hidden>
     <Icon name="info" size={20} />
     <details class="mapeador__advertencias">

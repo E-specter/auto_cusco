@@ -9,12 +9,15 @@ import {
   aceptar,
   aceptarTodas,
   asignacionesIniciales,
+  asignarCampo,
+  columnasLibres,
   elegir,
   etiquetaColumna,
   insignia,
   modificado,
   pendiente,
   porRevisar,
+  puedeCrearCampo,
   usos,
   type Analisis,
 } from '../../src/lib/mapeador';
@@ -142,5 +145,52 @@ describe('la búsqueda en la lista de campos (T-MAP-F3)', () => {
   it('sin texto, todos; sin coincidencias, ninguno', () => {
     expect(buscar('  ')).toHaveLength(3);
     expect(buscar('zzz')).toEqual([]);
+  });
+});
+
+describe('crear un campo adicional desde el mapeo (RF-64)', () => {
+  const analisis = {
+    ...({} as Analisis),
+    formato: 'xlsx',
+    columnas: [
+      { indice: 0, encabezado: 'Pagare', ejemplos: [], estado: 'coincide', sugerido: 'pagare', similitud: null },
+      { indice: 1, encabezado: 'Monto', ejemplos: [], estado: 'sin_coincidencia', sugerido: null, similitud: null },
+      { indice: 2, encabezado: 'Zona', ejemplos: [], estado: 'recordado', sugerido: 'zona', similitud: null },
+    ],
+  } as Analisis;
+
+  it('las columnas que se pueden usar son las que no cargan nada ahora', () => {
+    const iniciales = asignacionesIniciales(analisis);
+    expect(columnasLibres(analisis, iniciales).map((c) => c.indice)).toEqual([1]);
+
+    // «No cargar» la libera; darle un campo la ocupa.
+    expect(columnasLibres(analisis, asignarCampo(iniciales, 2, null)).map((c) => c.indice)).toEqual([1, 2]);
+    expect(columnasLibres(analisis, asignarCampo(iniciales, 1, 'titular')).map((c) => c.indice)).toEqual([]);
+  });
+
+  it('«Crear campo» pide columna, nombre sin espacios en los extremos y tipo', () => {
+    expect(puedeCrearCampo(1, 'Monto en mora', 'numero')).toBe(true);
+    expect(puedeCrearCampo(null, 'Monto en mora', 'numero')).toBe(false);
+    expect(puedeCrearCampo(1, '   ', 'numero')).toBe(false);
+    expect(puedeCrearCampo(1, '', 'numero')).toBe(false);
+    expect(puedeCrearCampo(1, 'Monto en mora', null)).toBe(false);
+    // The first column is a real one.
+    expect(puedeCrearCampo(0, 'x', 'texto')).toBe(true);
+  });
+
+  it('el campo dado a mano va con origen manual y no toca las demás columnas', () => {
+    const iniciales = asignacionesIniciales(analisis);
+    const despues = asignarCampo(iniciales, 1, 'ad_monto');
+    expect(despues[1]).toEqual({ indice: 1, campo: 'ad_monto', origen: 'manual' });
+    expect(despues[0]).toEqual(iniciales[0]);
+    expect(despues[2]).toEqual(iniciales[2]);
+  });
+
+  it('la insignia dice «nuevo» solo mientras la columna conserva el campo creado', () => {
+    const columna = analisis.columnas[1];
+    const conCampo = { indice: 1, campo: 'ad_monto', origen: 'manual' as const };
+    expect(insignia(columna, conCampo, 'ad_monto')).toBe('nuevo');
+    expect(insignia(columna, conCampo, null)).toBe('manual');
+    expect(insignia(columna, { indice: 1, campo: 'titular', origen: 'manual' }, 'ad_monto')).toBe('manual');
   });
 });

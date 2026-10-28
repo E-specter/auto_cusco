@@ -51,7 +51,8 @@ import {
   type SeleccionBorrador,
   type TipoCampo,
 } from '../lib/seleccion';
-import { etiquetaCampo } from '../lib/campos';
+import { archivadosEnUso, avisoDeArchivados, opcionesDeCampos } from '../lib/campos';
+import { llenarSelect, type OpcionDeLista } from './lista-de-campos';
 
 export const EVENTO_SELECCION = 'seleccioncambiada';
 
@@ -130,11 +131,12 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
     estado: q<HTMLElement>('[data-selector-estado]')!,
     problemas: q<HTMLElement>('[data-selector-problemas]')!,
     problemasLista: q<HTMLElement>('[data-selector-problemas-lista]')!,
+    archivados: q<HTMLElement>('[data-selector-archivados]')!,
+    archivadosTexto: q<HTMLElement>('[data-selector-archivados-texto]')!,
     editor: q<HTMLElement>('[data-editor]'),
   };
 
-  const nombresDeCampos = (): string[] =>
-    Object.keys(s.campos).sort((a, b) => etiquetaCampo(a).localeCompare(etiquetaCampo(b)));
+  const nombresDeCampos = (): string[] => Object.keys(s.campos);
 
   const sucio = (): boolean => JSON.stringify(s.borrador) !== s.base;
 
@@ -163,22 +165,11 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
 
   // ---- Small DOM builders -------------------------------------------------------
 
-  function crearSelect(
-    etiqueta: string,
-    opciones: Array<[string, string]>,
-    valor: string,
-    clase: string,
-  ): HTMLSelectElement {
+  function crearSelect(etiqueta: string, opciones: OpcionDeLista[], valor: string, clase: string): HTMLSelectElement {
     const select = document.createElement('select');
     select.className = `input ${clase}`;
     select.setAttribute('aria-label', etiqueta);
-    opciones.forEach(([value, texto]) => {
-      const opcion = document.createElement('option');
-      opcion.value = value;
-      opcion.textContent = texto;
-      opcion.selected = value === valor;
-      select.append(opcion);
-    });
+    llenarSelect(select, opciones, valor);
     return select;
   }
 
@@ -324,6 +315,15 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
       );
     });
 
+    const usados = [
+      ...s.borrador.filtros.map((f) => f.campo),
+      ...(s.borrador.orden ? [s.borrador.orden.campo] : []),
+      ...s.borrador.indicadores.flatMap((i) => (i.campo ? [i.campo] : [])),
+    ];
+    const aviso = avisoDeArchivados(archivadosEnUso(s.campos, usados));
+    el.archivados.hidden = aviso === null;
+    el.archivadosTexto.textContent = aviso ?? '';
+
     el.problemas.hidden = s.problemas.length === 0;
     el.problemasLista.replaceChildren(
       ...s.problemas.map((problema) => {
@@ -429,7 +429,7 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
 
     const campo = crearSelect(
       t('selector.filtro.campo'),
-      [['', t('selector.filtro.campo.elige')], ...nombresDeCampos().map((n): [string, string] => [n, etiquetaCampo(n)])],
+      [['', t('selector.filtro.campo.elige')], ...opcionesDeCampos(s.campos, nombresDeCampos(), filtro.campo)],
       filtro.campo,
       'fila__campo',
     );
@@ -528,16 +528,10 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
   function renderOrden(): void {
     const campo = q<HTMLSelectElement>('[data-orden-campo]');
     if (!campo) return;
-    campo.replaceChildren(
-      ...[['', t('selector.orden.ninguno')] as [string, string], ...nombresDeCampos().map((n): [string, string] => [n, etiquetaCampo(n)])].map(
-        ([value, texto]) => {
-          const opcion = document.createElement('option');
-          opcion.value = value;
-          opcion.textContent = texto;
-          opcion.selected = value === (s.borrador.orden?.campo ?? '');
-          return opcion;
-        },
-      ),
+    llenarSelect(
+      campo,
+      [['', t('selector.orden.ninguno')], ...opcionesDeCampos(s.campos, nombresDeCampos(), s.borrador.orden?.campo ?? null)],
+      s.borrador.orden?.campo ?? '',
     );
     root.querySelectorAll<HTMLButtonElement>('[data-orden-dir]').forEach((boton) => {
       const descendente = boton.dataset.ordenDir === 'desc';
@@ -595,7 +589,7 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
       t('selector.indicador.campo'),
       [
         ['', indicador.funcion === 'conteo' ? t('selector.indicador.sinCampo') : t('selector.filtro.campo.elige')],
-        ...admitidos.map((n): [string, string] => [n, etiquetaCampo(n)]),
+        ...opcionesDeCampos(s.campos, admitidos, indicador.campo),
       ],
       indicador.campo ?? '',
       'fila__campoIndicador',

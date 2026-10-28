@@ -586,3 +586,75 @@ test.describe('la lista de campos dentro del diálogo (T-MAP-F3)', () => {
     });
   }
 });
+
+test.describe('crear un campo adicional desde la carga (RF-64)', () => {
+  const CON_UN_DATO_NUEVO = analisisSintetico([
+    columna(0, 'Pagare', 'coincide', 'pagare'),
+    columna(1, 'Saldo Capital', 'parecido', 'saldo_capital_pendiente'),
+    columna(2, 'Monto en mora', 'sin_coincidencia', null, ['1500.50', '82.00']),
+  ]);
+  const referencia = (page: Page) => dialogo(page).getByRole('button', { name: 'Crear un campo adicional' });
+  const formulario = (page: Page) => dialogo(page).getByRole('group', { name: 'Crear un campo adicional' });
+  const nombreDelCampo = (page: Page) => formulario(page).getByLabel('Nombre del campo');
+
+  async function crearUno(page: Page) {
+    await referencia(page).click();
+    await formulario(page).getByRole('radio', { name: 'Número' }).check();
+    await formulario(page).getByRole('button', { name: 'Crear campo' }).click();
+  }
+
+  test('con una columna por revisar abierta, la fila del campo nuevo sigue a la vista y tiene el foco', async ({ page }) => {
+    const { carga } = await abrir(page, CON_UN_DATO_NUEVO);
+    await alPaso2(page);
+    await expect(dialogo(page).getByRole('button', { name: /^Por revisar/ })).toHaveAttribute('aria-pressed', 'true');
+    await expect(fila(page, 2)).toBeHidden();
+
+    await crearUno(page);
+
+    await expect(fila(page, 2)).toBeVisible();
+    await expect(campoDe(page, 2)).toBeFocused();
+    expect(carga.mapeador.creaciones).toEqual([{ indice: 2, nombre_legible: 'Monto en mora', tipo: 'numero' }]);
+  });
+
+  test('el campo creado queda en el catálogo de la página: el siguiente archivo ya lo trae', async ({ page }) => {
+    await abrir(page, CON_UN_DATO_NUEVO);
+    await alPaso2(page);
+    await crearUno(page);
+    await dialogo(page).locator('[data-mapeo-cancelar]').click();
+    await expect(continuar(page)).toBeVisible();
+
+    await alPaso2(page);
+    await dialogo(page).getByRole('button', { name: /^Todas/ }).click();
+    await campoDe(page, 1).click();
+
+    await expect(fila(page, 1).getByRole('option', { name: 'Monto en mora' })).toBeVisible();
+    await expect(fila(page, 1).locator('.selector-campo__grupo').last()).toHaveText('Campos adicionales');
+  });
+
+  test('un borrador vencido al crear devuelve al paso 1 con el texto de la interfaz', async ({ page }) => {
+    await abrir(page, CON_UN_DATO_NUEVO, {
+      mapeador: { analisis: CON_UN_DATO_NUEVO, pedidos: [], rechazosCrear: [{ estado: 404, cuerpo: codigoDeRechazo(404, 'borrador_no_encontrado').cuerpo }] },
+    });
+    await alPaso2(page);
+
+    await crearUno(page);
+
+    await expect(dialogo(page).locator('[data-paso-marca][aria-current="step"]')).toHaveAttribute('data-paso-marca', '1');
+    await expect(dialogo(page).locator('[data-upload-error]')).toHaveText(
+      'La carga en curso venció, ya se confirmó o no existe. Vuelve a elegir el archivo.',
+    );
+  });
+
+  test('Enter en el nombre crea el campo y no envía el formulario del diálogo', async ({ page }) => {
+    const { carga } = await abrir(page, CON_UN_DATO_NUEVO);
+    await alPaso2(page);
+    await referencia(page).click();
+    await formulario(page).getByRole('radio', { name: 'Texto' }).check();
+
+    await nombreDelCampo(page).press('Enter');
+
+    await expect.poll(() => carga.mapeador.creaciones?.length).toBe(1);
+    await expect(dialogo(page).locator('[data-paso-marca][aria-current="step"]')).toHaveAttribute('data-paso-marca', '2');
+    expect(carga.borradoresCreados).toHaveLength(1);
+  });
+});

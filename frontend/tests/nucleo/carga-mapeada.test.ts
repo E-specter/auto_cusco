@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { ApiError, NetworkError } from '../../src/lib/api';
 import {
+  campoDelError,
   codigoDeError,
   conMarcaDeDetectado,
   esBorradorPerdido,
@@ -157,5 +158,34 @@ describe('las opciones de lectura', () => {
     expect(opcionesQueAplican({ formato: 'xlsx', hojas: ['A', 'B'] })).toEqual({ hoja: true, separador: false, codificacion: false });
     expect(opcionesQueAplican({ formato: 'xlsx', hojas: ['A'] })).toEqual({ hoja: false, separador: false, codificacion: false });
     expect(opcionesQueAplican({ formato: 'csv', hojas: ['datos'] })).toEqual({ hoja: false, separador: true, codificacion: true });
+  });
+});
+
+describe('el campo que choca en un nombre repetido', () => {
+  const choca = {
+    nombre: 'saldo_capital_pendiente',
+    clave_etiqueta: 'campo.saldo_capital_pendiente',
+    tipo: 'numero',
+    obligatorio: false,
+    alias: [],
+    etiqueta: null,
+    adicional: false,
+  };
+
+  it('un campo base se nombra por el diccionario, y el texto lo lleva', () => {
+    const error = rechazo(409, 'nombre_repetido', { campo: choca });
+    expect(campoDelError(error)?.etiquetaVisible).toBe('Saldo de capital pendiente');
+    expect(textoDeError(error, 'red', 'general')).toBe('Ya existe el campo «Saldo de capital pendiente». Elígelo en la lista o usa otro nombre.');
+  });
+
+  it('un adicional se nombra por su etiqueta propia', () => {
+    const error = rechazo(409, 'nombre_repetido', { campo: { ...choca, nombre: 'ad_zona', clave_etiqueta: 'campo.ad_zona', etiqueta: 'Zona de cobranza', adicional: true } });
+    expect(campoDelError(error)?.etiquetaVisible).toBe('Zona de cobranza');
+    expect(textoDeError(error, 'red', 'general')).toContain('«Zona de cobranza»');
+  });
+
+  it('sin campo en el cuerpo no hay nada que nombrar', () => {
+    expect(campoDelError(rechazo(409, 'nombre_repetido'))).toBeNull();
+    expect(campoDelError(new Error('x'))).toBeNull();
   });
 });

@@ -147,3 +147,56 @@
   margin: var(--space-2) 0 0;
   padding-inline-start: var(--space-4);
 }
+
+/* RF-64: create a field from a column. The reference sits under the table, outside it, so it stays when the table is folded. */
+.mapeador__adicionalPregunta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+}
+
+.mapeador__adicionalPanel {
+  margin-block-start: var(--space-2);
+}
+
+.mapeador__adicionalCuerpo {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.mapeador__adicionalCuerpo > .field,
+.mapeador__adicionalCuerpo > .notice,
+.mapeador__adicionalCuerpo > .field__error {
+  margin: 0;
+}
+
+.mapeador__tipo {
+  min-inline-size: 0;
+  padding: 0;
+  border: 0;
+}
+
+.mapeador__tipoOpciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.mapeador__tipoOpcion {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mapeador__adicionalUsar {
+  margin: 0;
+}
+
+.mapeador__adicionalAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}

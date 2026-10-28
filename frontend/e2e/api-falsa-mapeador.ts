@@ -94,18 +94,52 @@ export function validarSintetico(asignaciones: Asignacion[], analisis: Analisis,
   return problemas;
 }
 
+/** An additional field as the catalogue lists it (RF-64): its own label, never a dictionary key. */
+export const campoAdicional = (nombre: string, etiqueta: string): Campo => ({
+  nombre,
+  clave_etiqueta: `campo.${nombre}`,
+  tipo: 'texto',
+  obligatorio: false,
+  alias: [etiqueta],
+  etiqueta,
+  adicional: true,
+});
+
+type Rechazo = { estado: number; cuerpo: unknown };
+
 export interface ApiFalsaMapeador {
   analisis: Analisis;
   pedidos: Asignacion[][];
+  /** What `POST …/campos-adicionales` received, to assert on the call itself. */
+  creaciones?: Array<Esquemas['NuevoCampoAdicionalEntrada']>;
+  /** Refusals of the creation, in order; once spent, it creates. */
+  rechazosCrear?: Rechazo[];
+  /** The catalogue the creation answers with and grows. */
+  catalogo?: Campo[];
 }
 
 /** The validation route, as a handler `montarApi` chains before its 404. */
 export function manejarMapeador(estado: ApiFalsaMapeador): Manejador {
   return async (route: Route, ruta: string, metodo: string) => {
+    if (metodo === 'POST' && /^\/mapeador\/borradores\/\d+\/campos-adicionales$/.test(ruta)) {
+      const entrada = JSON.parse(route.request().postData() ?? '{}') as Esquemas['NuevoCampoAdicionalEntrada'];
+      (estado.creaciones ??= []).push(entrada);
+      const rechazo = estado.rechazosCrear?.shift();
+      if (rechazo) {
+        await route.fulfill({ status: rechazo.estado, contentType: 'application/json', body: JSON.stringify(rechazo.cuerpo) });
+        return true;
+      }
+      const nuevo = campoAdicional(`ad_${entrada.nombre_legible.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`, entrada.nombre_legible);
+      const catalogo = (estado.catalogo ??= [...CAMPOS_SINTETICOS]);
+      catalogo.push(nuevo);
+      const cuerpo: Esquemas['CampoAdicionalCreadoRespuesta'] = { campo: nuevo, campos: [...catalogo] };
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(cuerpo) });
+      return true;
+    }
     if (metodo !== 'POST' || !/^\/mapeador\/borradores\/\d+\/validacion$/.test(ruta)) return false;
     const { asignaciones } = JSON.parse(route.request().postData() ?? '{}') as Esquemas['ValidacionEntrada'];
     estado.pedidos.push(asignaciones);
-    const cuerpo: Esquemas['ValidacionMapeoRespuesta'] = { problemas: validarSintetico(asignaciones, estado.analisis) };
+    const cuerpo: Esquemas['ValidacionMapeoRespuesta'] = { problemas: validarSintetico(asignaciones, estado.analisis, estado.catalogo ?? CAMPOS_SINTETICOS) };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(cuerpo) });
     return true;
   };

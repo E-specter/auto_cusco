@@ -452,6 +452,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     const accesible = [
       t('editorTexto.pieza.variable', { variable }),
       resumen ? `, ${resumen}` : '',
+      variableDe(pieza.nombre)?.archivado ? `, ${t('camposAdicionales.archivado')}` : '',
       conProblema ? t('editorTexto.pieza.conProblema') : '',
       '. ',
       t('editorTexto.pieza.abre'),
@@ -525,6 +526,12 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     const { visible, accesible } = etiquetaPieza(pieza, conProblema);
     const texto = boton.querySelector<HTMLElement>('.editor-texto__piezaTexto')!;
     texto.textContent = visible;
+    if (variableDe(pieza.nombre)?.archivado) {
+      const marca = document.createElement('span');
+      marca.className = 'tag tag--advertencia editor-texto__archivado';
+      marca.textContent = t('camposAdicionales.archivado');
+      texto.append(' ', marca);
+    }
     boton.setAttribute('aria-label', accesible);
     boton.title = visible;
     boton.classList.toggle('editor-texto__pieza--problema', conProblema);
@@ -561,7 +568,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     el.agregar.setAttribute('aria-expanded', 'true');
     const selector = crearSelectorVariable({
       id: `${id}-variable`,
-      variables: catalogo.contexto.variables,
+      variables: catalogo.contexto.variables.filter((v) => !v.archivado),
       contextos: catalogo.contextos,
       onElegir: (nombre) => insertar(nombre),
       onCerrar: () => {
@@ -896,7 +903,10 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     const modos = document.createElement('div');
     modos.className = 'segmented';
     const esVariable = esReferencia(argumento);
-    const compatibles = catalogo.contexto.variables.filter((v) => tipo === null || v.tipo === tipo);
+    const actual = esVariable ? argumento.variable : null;
+    const compatibles = catalogo.contexto.variables.filter(
+      (v) => (tipo === null || v.tipo === tipo) && (!v.archivado || v.nombre === actual),
+    );
 
     const cambiarModo = (aVariable: boolean) => {
       if (aVariable === esReferencia((s.piezas[indiceDe(pieza.id)] as PiezaVariable).funciones[fi].args[pi])) return;
@@ -1285,10 +1295,15 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
       const grupo = document.createElement('optgroup');
       const contexto = catalogo.contextos.find((c) => c.nombre === origen);
       grupo.label = contexto ? nombreTraducido(contexto.clave_nombre, origen) : origen;
-      for (const variable of variables) {
+      for (const variable of variables.filter((v) => !v.archivado || v.nombre === elegida)) {
         const opcion = document.createElement('option');
         opcion.value = variable.nombre;
-        opcion.textContent = `${etiquetaVariable(variable)} (${etiquetaTipo(variable.tipo)})`;
+        const campo = etiquetaVariable(variable);
+        opcion.textContent = variable.archivado
+          ? t('camposAdicionales.archivadoEnLista', { campo })
+          : variable.adicional
+            ? t('camposAdicionales.opcionVariable', { campo, tipo: etiquetaTipo(variable.tipo) })
+            : `${campo} (${etiquetaTipo(variable.tipo)})`;
         grupo.append(opcion);
       }
       return grupo;

@@ -9,6 +9,7 @@
 
 import { ApiError } from './api';
 import type { components } from './contrato-api';
+import { etiquetaDeCampo } from './campos';
 import { t } from './i18n';
 
 type Esquemas = components['schemas'];
@@ -71,8 +72,18 @@ export function textoDeError(error: unknown, red: string, general: string): stri
   const texto = t(clave, {
     hoja: typeof cuerpo.hoja === 'string' ? cuerpo.hoja : '',
     maximo_mb: typeof cuerpo.maximo_mb === 'number' ? cuerpo.maximo_mb : '',
+    campo: campoDelError(error)?.etiquetaVisible ?? '',
   });
   return texto === clave ? general : texto;
+}
+
+type CampoDestino = Esquemas['CampoDestinoRespuesta'];
+
+/** The field a `nombre_repetido` refusal says collides (409), with the name a person reads. */
+export function campoDelError(error: unknown): { campo: CampoDestino; etiquetaVisible: string } | null {
+  const campo = cuerpoDe(error)?.campo as CampoDestino | null | undefined;
+  if (!campo || typeof campo !== 'object' || typeof campo.nombre !== 'string') return null;
+  return { campo, etiquetaVisible: etiquetaDeCampo({ nombre: campo.nombre, etiqueta: campo.etiqueta, clave: campo.clave_etiqueta }) };
 }
 
 /** The sheets a `hoja_inexistente` refusal offers, if it carries them. */

@@ -31,11 +31,11 @@ import MapeadorEncabezados from '../components/MapeadorEncabezados.astro';
 </style>
 
 <script>
-  import { validarMapeo } from '../lib/api-mapeador';
+  import { crearCampoAdicional, validarMapeo } from '../lib/api-mapeador';
   import { EVENTO_MAPEO, montarMapeador, type EstadoMapeo, type OpcionesMapeador } from '../scripts/mapeador-encabezados';
 
   const ventana = window as unknown as {
-    casoMapeador: Pick<OpcionesMapeador, 'analisis' | 'campos'>;
+    casoMapeador: Pick<OpcionesMapeador, 'analisis' | 'campos'> & { conCrearCampo?: boolean };
     controladorPrueba?: unknown;
   };
   const raiz = document.getElementById('mapeador-prueba')!;
@@ -44,11 +44,16 @@ import MapeadorEncabezados from '../components/MapeadorEncabezados.astro';
     const { listo, pendiente } = (evento as CustomEvent<EstadoMapeo>).detail;
     salida.value = listo && !pendiente ? 'listo' : 'no listo';
   });
-  const { analisis, campos } = ventana.casoMapeador;
+  const { analisis, campos, conCrearCampo } = ventana.casoMapeador;
   ventana.controladorPrueba = montarMapeador(raiz, {
     analisis,
     campos,
     validar: (asignaciones, signal) => validarMapeo(analisis.borrador_id, asignaciones, signal),
+    // RF-64: only a case that asks for it gets the reference to create a field.
+    crearCampo: conCrearCampo
+      ? (indice, nombreLegible, tipo, signal) =>
+          crearCampoAdicional(analisis.borrador_id, { indice, nombre_legible: nombreLegible, tipo }, signal)
+      : undefined,
   });
   document.body.dataset.montado = 'true';
 </script>

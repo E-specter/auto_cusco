@@ -23,6 +23,8 @@ import {
   type DefinicionGuardadaRespuesta,
   type ResumenDefinicion,
 } from '../lib/api-definiciones';
+import { obtenerCatalogo } from '../lib/api-texto-enriquecido';
+import { avisoDeArchivados, etiquetaVariable } from '../lib/campos';
 import { guardarArchivo } from '../lib/descargas';
 import { formatDate, formatNumber } from '../lib/format';
 import {
@@ -76,6 +78,7 @@ import {
   textoMotivo,
 } from '../lib/generar-carga-mensajes';
 import { t } from '../lib/i18n';
+import { variablesEnUso } from '../lib/variables-en-uso';
 import { EVENTO_SELECCION, montarSelector, type EstadoSeleccion } from './selector-seleccion';
 import { crearSelectorPatronFecha } from './selector-patron-fecha';
 
@@ -125,6 +128,8 @@ export async function arrancar(): Promise<void> {
     previaErrorTexto: q<HTMLElement>('[data-previa-error-texto]'),
     previaReintentar: q<HTMLButtonElement>('[data-previa-reintentar]'),
     previaContenido: q<HTMLElement>('[data-previa-contenido]'),
+    archivados: q<HTMLElement>('[data-previa-archivados]'),
+    archivadosTexto: q<HTMLElement>('[data-previa-archivados-texto]'),
     cifraDisponibles: q<HTMLElement>('[data-cifra-disponibles]'),
     cifraSolicitados: q<HTMLElement>('[data-cifra-solicitados]'),
     cifraMuestra: q<HTMLElement>('[data-cifra-muestra]'),
@@ -223,7 +228,30 @@ export async function arrancar(): Promise<void> {
     el.campoVersion.hidden = false;
   }
 
+  /**
+   * A definition that still uses an archived field keeps working, and says so over the preview (RF-65).
+   * It is a courtesy: without the catalogue there is no notice, and nothing else changes.
+   */
+  async function pintarArchivados(): Promise<void> {
+    const actual = definicion;
+    let aviso: string | null = null;
+    if (actual) {
+      try {
+        const catalogo = await obtenerCatalogo('cartera');
+        const usadas = variablesEnUso(actual.version.contenido);
+        aviso = avisoDeArchivados(catalogo.contexto.variables.filter((v) => v.archivado && usadas.includes(v.nombre)).map(etiquetaVariable));
+      } catch {
+        aviso = null;
+      }
+    }
+    // The definition may have changed while the catalogue came.
+    if (actual !== definicion) return;
+    el.archivados.hidden = aviso === null;
+    el.archivadosTexto.textContent = aviso ?? '';
+  }
+
   function pintarResumenDefinicion(): void {
+    void pintarArchivados();
     if (!definicion) {
       el.resumen.hidden = true;
       return;

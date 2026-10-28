@@ -257,6 +257,10 @@ import '../styles/columnas.css';
         </div>
         <div class="panel__body cl-form">
           <p class="field__hint" data-previa-envio hidden></p>
+          <p class="notice notice--info" data-previa-archivados hidden>
+            <Icon name="info" size={20} />
+            <span data-previa-archivados-texto></span>
+          </p>
           <div class="cl-politica">
             <p class="field__label" id="cl-muestra-etiqueta" data-i18n="columnas.previa.muestra">Muestra</p>
             <div class="segmented" role="group" aria-labelledby="cl-muestra-etiqueta">
@@ -390,7 +394,8 @@ import '../styles/columnas.css';
     type MuestraTexto,
     type PrevisualizacionTexto,
   } from '../lib/api-texto-enriquecido';
-  import { etiquetaVariable } from '../lib/campos';
+  import { avisoDeArchivados, etiquetaVariable } from '../lib/campos';
+  import { variablesEnUso } from '../lib/variables-en-uso';
   import {
     agregarColumna,
     aDefinicion,
@@ -545,6 +550,8 @@ import '../styles/columnas.css';
     estado: $<HTMLElement>('[data-estado]'),
     guardarHint: $<HTMLElement>('[data-guardar-hint]'),
     previaEstado: $<HTMLElement>('[data-previa-estado]'),
+    previaArchivados: $<HTMLElement>('[data-previa-archivados]'),
+    previaArchivadosTexto: $<HTMLElement>('[data-previa-archivados-texto]'),
     previaSeleccion: $<HTMLElement>('[data-previa-seleccion]'),
     previaAviso: $<HTMLElement>('[data-previa-aviso]'),
     previaContenedor: $<HTMLElement>('[data-previa-contenedor]'),
@@ -627,7 +634,7 @@ import '../styles/columnas.css';
 
   const etiquetaDe = (nombre: string): string => {
     const variable = catalogo?.contexto.variables.find((v) => v.nombre === nombre);
-    return etiquetaVariable({ nombre, clave_nombre: variable?.clave_nombre ?? null });
+    return etiquetaVariable({ nombre, clave_nombre: variable?.clave_nombre ?? null, etiqueta: variable?.etiqueta ?? null });
   };
 
   const nombreVisible = (indice: number): string => {
@@ -1262,6 +1269,14 @@ import '../styles/columnas.css';
     const sinAjuste = criterio?.tipo === 'calculado' && catalogo !== null && criterio.variable_dias !== catalogo.contexto.variable_dias;
     el.sinAjuste.hidden = !sinAjuste;
     el.sinAjusteTexto.textContent = sinAjuste ? t('columnas.version.sinAjuste') : '';
+
+    // The preview still works with an archived field, and says so: it is no longer offered for new uses.
+    const archivadas = catalogo
+      ? catalogo.contexto.variables.filter((v) => v.archivado && variablesEnUso(estado.borrador).includes(v.nombre))
+      : [];
+    const avisoArchivados = avisoDeArchivados(archivadas.map((v) => etiquetaVariable(v)));
+    el.previaArchivados.hidden = avisoArchivados === null;
+    el.previaArchivadosTexto.textContent = avisoArchivados ?? '';
 
     el.versionLinea.textContent = estado.respuesta
       ? t(estado.respuesta.version.usada ? 'columnas.version.lineaUsada' : 'columnas.version.linea', {

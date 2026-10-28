@@ -30,7 +30,8 @@
   color: var(--color-text-muted);
 }
 
-.selector__problemas {
+.selector__problemas,
+.selector__archivados {
   margin: var(--space-4) var(--space-4) 0;
 }
 

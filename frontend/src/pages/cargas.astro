@@ -465,6 +465,7 @@ import '../styles/console.css';
   import {
     confirmarCarga,
     crearBorrador,
+    crearCampoAdicional,
     descartarBorrador,
     obtenerCatalogoMapeador,
     reanalizarBorrador,
@@ -483,7 +484,7 @@ import '../styles/console.css';
     problemasDeLaConfirmacion,
     textoDeError,
   } from '../lib/carga-mapeada';
-  import { etiquetaCampo } from '../lib/campos';
+  import { etiquetaDeCampo as nombreDeCampo } from '../lib/campos';
   import { EVENTO_MAPEO, montarMapeador, type ControladorMapeador, type EstadoMapeo } from '../scripts/mapeador-encabezados';
   import {
     formatBytes,
@@ -1286,8 +1287,7 @@ import '../styles/console.css';
   /** The visible name of a field of the catalogue, never its technical name. */
   function etiquetaDeCampo(nombre: string): string {
     const campo = mapeo.catalogo?.campos.find((c) => c.nombre === nombre);
-    const texto = campo ? t(campo.clave_etiqueta) : '';
-    return campo && texto !== campo.clave_etiqueta ? texto : etiquetaCampo(nombre);
+    return nombreDeCampo({ nombre, etiqueta: campo?.etiqueta, clave: campo?.clave_etiqueta });
   }
 
   function pintarConfirmar(): void {
@@ -1358,6 +1358,17 @@ import '../styles/console.css';
       validar: async (asignaciones, signal) => {
         try {
           return await validarMapeo(analisis.borrador_id, asignaciones, signal);
+        } catch (caught) {
+          if (esBorradorPerdido(caught)) volverAlPaso1(t('mapeador.error.borrador_no_encontrado'));
+          throw caught;
+        }
+      },
+      // RF-64: the page keeps its own copy of the catalogue (the reason to confirm names fields by it) in step with the component's.
+      crearCampo: async (indice, nombreLegible, tipo, signal) => {
+        try {
+          const creado = await crearCampoAdicional(analisis.borrador_id, { indice, nombre_legible: nombreLegible, tipo }, signal);
+          if (mapeo.catalogo) mapeo.catalogo = { ...mapeo.catalogo, campos: creado.campos };
+          return creado;
         } catch (caught) {
           if (esBorradorPerdido(caught)) volverAlPaso1(t('mapeador.error.borrador_no_encontrado'));
           throw caught;

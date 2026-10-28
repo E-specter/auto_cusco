@@ -77,7 +77,8 @@ export function conCargaMapeada(api: ApiFalsa, parcial: Partial<ApiFalsaCargaMap
 
   const catalogo: Esquemas['CatalogoMapeadorRespuesta'] = {
     id: 'sabana_vencida',
-    campos: CAMPOS_SINTETICOS,
+    // A field created from a draft is in the catalogue the next draft starts from.
+    campos: estado.mapeador.catalogo ?? CAMPOS_SINTETICOS,
     codificaciones: ['utf-8', 'latin-1', 'cp1252'],
     separadores: [';', '\t', ','],
   };

@@ -9,29 +9,36 @@
  * place, so a field list never loses the focus while the analyst works.
  */
 
-import { etiquetaCampo } from '../lib/campos';
+import { ApiError } from '../lib/api';
+import { etiquetaCampo, etiquetaDeCampo } from '../lib/campos';
+import { campoDelError, codigoDeError, esBorradorPerdido, textoDeError } from '../lib/carga-mapeada';
 import { formatNumber } from '../lib/format';
 import { t } from '../lib/i18n';
 import {
   aceptar,
   aceptarTodas,
   asignacionesIniciales,
+  asignarCampo,
+  columnasLibres,
   elegir,
   etiquetaColumna,
   insignia,
   modificado,
   pendiente,
   porRevisar,
+  puedeCrearCampo,
   usos,
   type Analisis,
   type Asignacion,
   type Insignia,
   type Problema,
+  type TipoNuevo,
 } from '../lib/mapeador';
 import type { components } from '../lib/contrato-api';
 import { crearSelectorCampo, type OpcionCampo, type SelectorCampo } from './selector-campo';
 
 type CampoDestino = components['schemas']['CampoDestinoRespuesta'];
+type CampoCreado = components['schemas']['CampoAdicionalCreadoRespuesta'];
 
 export const EVENTO_MAPEO = 'mapeocambiado';
 
@@ -53,6 +60,11 @@ export interface OpcionesMapeador {
   campos: readonly CampoDestino[];
   /** Calls `/mapeador/borradores/{id}/validacion`; the component does not know the sheet. */
   validar: (asignaciones: Asignacion[], signal: AbortSignal) => Promise<Problema[]>;
+  /**
+   * RF-64, optional: creates an additional field from a column (`POST …/campos-adicionales`). Without it
+   * there is no reference and no form: another catalogue may not admit additional fields.
+   */
+  crearCampo?: (indice: number, nombreLegible: string, tipo: TipoNuevo, signal: AbortSignal) => Promise<CampoCreado>;
 }
 
 export interface ControladorMapeador {
@@ -64,6 +76,8 @@ export interface ControladorMapeador {
    * shown where they belong, without touching the assignments.
    */
   fijarProblemas(problemas: Problema[]): void;
+  /** The catalogue's new field list (after creating one): keeps everything chosen, unlike `fijarAnalisis`. */
+  fijarCampos(campos: readonly CampoDestino[]): void;
   destruir(): void;
 }
 
@@ -74,12 +88,12 @@ const TONO: Record<Insignia, string> = {
   aceptado: 'vigente',
   sin_coincidencia: 'neutral',
   manual: 'neutral',
+  nuevo: 'info',
 };
 
-/** The visible name of a field: its catalogue key, or the portfolio label as a fallback. */
+/** The visible name of a field: the label of an additional one, its catalogue key, or the portfolio label as a fallback. */
 function etiquetaDe(campo: CampoDestino): string {
-  const texto = t(campo.clave_etiqueta);
-  return texto === campo.clave_etiqueta ? etiquetaCampo(campo.nombre) : texto;
+  return etiquetaDeCampo({ nombre: campo.nombre, etiqueta: campo.etiqueta, clave: campo.clave_etiqueta });
 }
 
 export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): ControladorMapeador {
@@ -102,7 +116,22 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
     advertenciasTitulo: q<HTMLElement>('[data-advertencias-titulo]'),
     advertenciasLista: q<HTMLElement>('[data-advertencias-lista]'),
   };
-  const campos = opciones.campos;
+  const adicional = {
+    raiz: q<HTMLElement>('[data-adicional]'),
+    abrir: q<HTMLButtonElement>('[data-adicional-abrir]'),
+    panel: q<HTMLElement>('[data-adicional-panel]'),
+    columna: q<HTMLSelectElement>('[data-adicional-columna]'),
+    columnaError: q<HTMLElement>('[data-adicional-columna-error]'),
+    ejemplos: q<HTMLElement>('[data-adicional-ejemplos]'),
+    nombre: q<HTMLInputElement>('[data-adicional-nombre]'),
+    nombreError: q<HTMLElement>('[data-adicional-nombre-error]'),
+    usarHueco: q<HTMLElement>('[data-adicional-usar-hueco]'),
+    tipos: [...raiz.querySelectorAll<HTMLInputElement>('[data-adicional-tipo]')],
+    error: q<HTMLElement>('[data-adicional-error]'),
+    cancelar: q<HTMLButtonElement>('[data-adicional-cancelar]'),
+    crear: q<HTMLButtonElement>('[data-adicional-crear]'),
+  };
+  let campos = opciones.campos;
   const campoDe = (nombre: string | null) => campos.find((c) => c.nombre === nombre);
   const etiquetaDeNombre = (nombre: string) => {
     const campo = campoDe(nombre);
@@ -121,6 +150,11 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
     validada: true,
     destruido: false,
     contadorAnunciado: null as number | null,
+    /** Column → the field created from it in this load: its tag says «Campo nuevo» while it keeps it. Lost with a new analysis. */
+    nuevos: new Map<number, string>(),
+    adicionalAbierto: false,
+    creando: false,
+    nombreTocado: false,
   };
 
   const columnaLetra = (indice: number) => etiquetaColumna(indice, s.analisis.formato);
@@ -201,7 +235,7 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
         etiqueta,
         alias: campo.alias,
         texto: otras.length ? t('mapeador.vista.enUso', { campo: etiqueta, columnas: otras.map(columnaLetra).join(' y ') }) : etiqueta,
-        grupo: campo.obligatorio ? 'obligatorios' : 'otros',
+        grupo: campo.obligatorio ? 'obligatorios' : campo.adicional ? 'adicionales' : 'otros',
         // Decision of 2026-10-27.
         deshabilitada: otras.length > 0 && propio !== campo.nombre,
       };
@@ -302,7 +336,7 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
     for (const columna of s.analisis.columnas) {
       const fila = el.filas.querySelector<HTMLTableRowElement>(`[data-fila="${columna.indice}"]`)!;
       const asignacion = asignacionDe(columna.indice);
-      const tipo = insignia(columna, asignacion);
+      const tipo = insignia(columna, asignacion, s.nuevos.get(columna.indice) ?? null);
 
       const tag = fila.querySelector<HTMLElement>('[data-insignia]')!;
       tag.className = `tag tag--${TONO[tipo]}`;
@@ -311,7 +345,9 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
       nota.textContent =
         tipo === 'recordado'
           ? t('mapeador.vista.nota.recordado')
-          : tipo === 'por_revisar' && columna.sugerido
+          : tipo === 'nuevo'
+            ? t('mapeador.vista.nota.nuevo')
+            : tipo === 'por_revisar' && columna.sugerido
             ? t('mapeador.vista.nota.parecido', { campo: etiquetaDeNombre(columna.sugerido) })
             : '';
 
@@ -393,7 +429,198 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
     pintarFilas();
     pintarResumen();
     pintarBarra();
+    pintarAdicional();
   }
+
+  // ---- Create an additional field (RF-64, docs/campos-adicionales-interfaz.md §2) -----------------
+
+  const columnaElegida = (): number | null => (adicional.columna.value === '' ? null : Number(adicional.columna.value));
+  const tipoElegido = (): TipoNuevo | null => (adicional.tipos.find((r) => r.checked)?.value as TipoNuevo | undefined) ?? null;
+  const columnaPorIndice = (indice: number | null) => s.analisis.columnas.find((c) => c.indice === indice);
+
+  function pintarEjemplos(): void {
+    const columna = columnaPorIndice(columnaElegida());
+    adicional.ejemplos.textContent =
+      columna && columna.ejemplos.length > 0 ? t('mapeador.vista.adicional.ejemplos', { ejemplos: columna.ejemplos.join(' · ') }) : '';
+  }
+
+  function pintarBotonCrear(): void {
+    adicional.crear.disabled = s.creando || !puedeCrearCampo(columnaElegida(), adicional.nombre.value, tipoElegido());
+    adicional.crear.dataset.loading = String(s.creando);
+  }
+
+  /** The columns that can still hold a new field, as the list shows them; a column that stopped being free drops out. */
+  function pintarColumnasLibres(): void {
+    const libres = columnasLibres(s.analisis, s.asignaciones);
+    const antes = adicional.columna.value;
+    const opcionesColumna = libres.map((c) => {
+      const opcion = document.createElement('option');
+      opcion.value = String(c.indice);
+      opcion.textContent = t('mapeador.vista.adicional.columnaOpcion', { columna: columnaLetra(c.indice), encabezado: c.encabezado });
+      return opcion;
+    });
+    if (libres.length !== 1) {
+      const elige = document.createElement('option');
+      elige.value = '';
+      elige.textContent = t('mapeador.vista.adicional.columnaElige');
+      opcionesColumna.unshift(elige);
+    }
+    adicional.columna.replaceChildren(...opcionesColumna);
+    adicional.columna.value = libres.some((c) => String(c.indice) === antes) ? antes : libres.length === 1 ? String(libres[0].indice) : '';
+    pintarEjemplos();
+    pintarBotonCrear();
+  }
+
+  function limpiarErroresAdicional(): void {
+    for (const nodo of [adicional.columnaError, adicional.nombreError, adicional.error]) nodo.textContent = '';
+    adicional.usarHueco.replaceChildren();
+    adicional.nombre.removeAttribute('aria-invalid');
+  }
+
+  function pintarAdicional(): void {
+    const hayColumnas = columnasLibres(s.analisis, s.asignaciones).length > 0;
+    adicional.raiz.hidden = !opciones.crearCampo || (!hayColumnas && !s.adicionalAbierto);
+    if (s.adicionalAbierto) pintarColumnasLibres();
+  }
+
+  function abrirAdicional(): void {
+    s.adicionalAbierto = true;
+    s.nombreTocado = false;
+    adicional.panel.hidden = false;
+    adicional.abrir.setAttribute('aria-expanded', 'true');
+    for (const r of adicional.tipos) r.checked = false;
+    limpiarErroresAdicional();
+    pintarColumnasLibres();
+    const unica = columnaElegida();
+    adicional.nombre.value = columnaPorIndice(unica)?.encabezado ?? '';
+    pintarBotonCrear();
+    (unica === null ? adicional.columna : adicional.nombre).focus();
+  }
+
+  function cerrarAdicional(devolverFoco: boolean): void {
+    s.adicionalAbierto = false;
+    adicional.panel.hidden = true;
+    adicional.abrir.setAttribute('aria-expanded', 'false');
+    limpiarErroresAdicional();
+    pintarAdicional();
+    if (devolverFoco) adicional.abrir.focus();
+  }
+
+  /** After assigning a field to a column: the row stays in sight and its list gets the focus. */
+  function mostrarFila(indice: number): void {
+    s.visibles.add(indice);
+    // «Todo listo» folds the table; the new assignment is shown, so it opens.
+    if (el.cuerpo.hidden) {
+      el.cuerpo.hidden = false;
+      el.verColumnas.setAttribute('aria-expanded', 'true');
+    }
+    pintarFilas();
+    const selector = selectores.get(indice);
+    const fila = el.filas.querySelector<HTMLElement>(`[data-fila="${indice}"]`);
+    if (!selector || !fila || fila.hidden || el.cuerpo.hidden) {
+      adicional.abrir.focus();
+      return;
+    }
+    fila.scrollIntoView?.({ block: 'nearest' });
+    selector.input.focus();
+  }
+
+  function usarCampoExistente(indice: number, campo: CampoDestino): void {
+    cambio(asignarCampo(s.asignaciones, indice, campo.nombre));
+    el.anuncioBusqueda.textContent = t('mapeador.vista.adicional.usado', { campo: etiquetaDe(campo), columna: columnaLetra(indice) });
+    cerrarAdicional(false);
+    mostrarFila(indice);
+  }
+
+  function errorAlCrear(error: unknown, indice: number): void {
+    // An expired draft: the page already took the analyst back to the first step.
+    if (esBorradorPerdido(error) || s.destruido) return;
+    const texto = textoDeError(error, t('console.upload.error.network'), t('common.errorBody'));
+    const codigo = codigoDeError(error);
+    const estado = error instanceof ApiError ? error.status : 0;
+    if (estado === 409 && codigo === 'nombre_repetido') {
+      // An additional field the catalogue no longer lists is an archived one: it cannot be chosen, so «Elígelo en la lista» would lie.
+      const colision = campoDelError(error);
+      const archivado = Boolean(colision?.campo.adicional) && !campoDe(colision!.campo.nombre);
+      adicional.nombreError.textContent = archivado
+        ? t('mapeador.vista.adicional.nombreArchivado', { campo: colision!.etiquetaVisible })
+        : texto;
+      adicional.nombre.setAttribute('aria-invalid', 'true');
+      adicional.nombre.focus();
+      const choca = campoDelError(error)?.campo;
+      const enCatalogo = choca ? campoDe(choca.nombre) : undefined;
+      const ocupado = enCatalogo ? (usos(s.asignaciones).get(enCatalogo.nombre) ?? []).some((i) => i !== indice) : true;
+      if (enCatalogo && !ocupado) {
+        const usar = document.createElement('button');
+        usar.type = 'button';
+        usar.className = 'btn btn--sm';
+        usar.dataset.adicionalUsar = '';
+        usar.textContent = t('mapeador.vista.adicional.usar', { campo: etiquetaDe(enCatalogo), columna: columnaLetra(indice) });
+        usar.addEventListener('click', () => usarCampoExistente(indice, enCatalogo));
+        adicional.usarHueco.replaceChildren(usar);
+      }
+    } else if (codigo === 'columna_inexistente') {
+      adicional.columnaError.textContent = texto;
+    } else if (estado === 422 && !codigo) {
+      adicional.nombreError.textContent = t('mapeador.vista.adicional.nombreInvalido');
+      adicional.nombre.setAttribute('aria-invalid', 'true');
+      adicional.nombre.focus();
+    } else {
+      adicional.error.textContent = texto;
+    }
+  }
+
+  let controladorCrear: AbortController | null = null;
+
+  async function crearAdicional(): Promise<void> {
+    const indice = columnaElegida();
+    const tipo = tipoElegido();
+    const nombre = adicional.nombre.value.trim();
+    if (!opciones.crearCampo || s.creando || indice === null || tipo === null || !puedeCrearCampo(indice, nombre, tipo)) return;
+    limpiarErroresAdicional();
+    s.creando = true;
+    pintarBotonCrear();
+    controladorCrear = new AbortController();
+    try {
+      const creado = await opciones.crearCampo(indice, nombre, tipo, controladorCrear.signal);
+      if (s.destruido) return;
+      campos = creado.campos;
+      s.nuevos.set(indice, creado.campo.nombre);
+      cambio(asignarCampo(s.asignaciones, indice, creado.campo.nombre));
+      el.anuncioBusqueda.textContent = t('mapeador.vista.adicional.creado', { campo: etiquetaDe(creado.campo), columna: columnaLetra(indice) });
+      cerrarAdicional(false);
+      mostrarFila(indice);
+    } catch (error) {
+      errorAlCrear(error, indice);
+    } finally {
+      s.creando = false;
+      if (!s.destruido) pintarBotonCrear();
+    }
+  }
+
+  adicional.abrir.addEventListener('click', () => (s.adicionalAbierto ? cerrarAdicional(true) : abrirAdicional()));
+  adicional.cancelar.addEventListener('click', () => cerrarAdicional(true));
+  adicional.crear.addEventListener('click', () => void crearAdicional());
+  adicional.columna.addEventListener('change', () => {
+    adicional.columnaError.textContent = '';
+    if (!s.nombreTocado) adicional.nombre.value = columnaPorIndice(columnaElegida())?.encabezado ?? '';
+    pintarEjemplos();
+    pintarBotonCrear();
+  });
+  adicional.nombre.addEventListener('input', () => {
+    s.nombreTocado = true;
+    adicional.nombreError.textContent = '';
+    adicional.usarHueco.replaceChildren();
+    adicional.nombre.removeAttribute('aria-invalid');
+    pintarBotonCrear();
+  });
+  // The mapper may sit inside a <form> (the upload dialog): Enter here creates the field, never submits that form.
+  adicional.nombre.addEventListener('keydown', (evento) => {
+    if (evento.key !== 'Enter') return;
+    evento.preventDefault();
+    void crearAdicional();
+  });
+  for (const radio of adicional.tipos) radio.addEventListener('change', pintarBotonCrear);
 
   function fijarFiltro(filtro: 'revisar' | 'todas'): void {
     s.filtro = filtro;
@@ -455,6 +682,8 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
     s.problemas = [...analisis.problemas];
     s.validada = true;
     s.contadorAnunciado = null;
+    s.nuevos.clear();
+    if (s.adicionalAbierto) cerrarAdicional(false);
     const revisar = porRevisar(analisis, s.asignaciones, s.problemas);
     const todoListo = revisar.size === 0 && s.problemas.length === 0;
     s.filtro = revisar.size > 0 ? 'revisar' : 'todas';
@@ -496,8 +725,13 @@ export function montarMapeador(raiz: HTMLElement, opciones: OpcionesMapeador): C
       pintar();
       emitir();
     },
+    fijarCampos(lista) {
+      campos = lista;
+      pintar();
+    },
     destruir() {
       s.destruido = true;
+      controladorCrear?.abort();
       document.removeEventListener('languagechange', alCambiarIdioma);
       clearTimeout(temporizador);
       controlador?.abort();

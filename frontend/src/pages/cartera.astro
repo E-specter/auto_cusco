@@ -119,6 +119,10 @@ import '../styles/cartera.css';
           </details>
         </div>
       </div>
+      <div class="notice notice--info productos__archivados" data-cartera-archivados hidden>
+        <Icon name="info" size={20} />
+        <p data-cartera-archivados-texto></p>
+      </div>
       <div data-productos-cuerpo></div>
       <div class="pager" data-pager hidden>
         <button type="button" class="btn btn--sm" data-page-prev>
@@ -153,7 +157,8 @@ import '../styles/cartera.css';
     formatParticipacion,
   } from '../lib/format';
   import { leerIndicador, tipoDe, type TipoCampo } from '../lib/seleccion';
-  import { etiquetaCampo } from '../lib/campos';
+  import { archivadosEnUso, avisoDeArchivados, etiquetaEnCatalogo, opcionesDeCampos, ordenarCampos } from '../lib/campos';
+  import { llenarSelect } from '../scripts/lista-de-campos';
   import {
     EVENTO_SELECCION,
     montarSelector,
@@ -406,17 +411,10 @@ import '../styles/cartera.css';
     const sel = estado.seleccion;
     if (!sel) return;
     const select = $<HTMLSelectElement>('[data-segmento]');
-    const nombres = Object.keys(sel.campos).sort((a, b) => etiquetaCampo(a).localeCompare(etiquetaCampo(b)));
-    select.replaceChildren(
-      ...[['', t('cartera.segmentos.ninguno')], ...nombres.map((n) => [n, etiquetaCampo(n)])].map(
-        ([value, texto]) => {
-          const opcion = document.createElement('option');
-          opcion.value = value;
-          opcion.textContent = texto;
-          opcion.selected = value === (estado.segmento ?? '');
-          return opcion;
-        },
-      ),
+    llenarSelect(
+      select,
+      [['', t('cartera.segmentos.ninguno')], ...opcionesDeCampos(sel.campos, Object.keys(sel.campos), estado.segmento)],
+      estado.segmento ?? '',
     );
   }
 
@@ -516,12 +514,33 @@ import '../styles/cartera.css';
     }
   }
 
+  function marca(clave: string, tono: string): HTMLElement {
+    const tag = document.createElement('span');
+    tag.className = `tag tag--${tono}`;
+    tag.textContent = t(clave);
+    return tag;
+  }
+
+  /** A preview that shows or segments by an archived field says it still works but is no longer offered. */
+  function pintarArchivados(): void {
+    const sel = estado.seleccion;
+    const usados = sel ? [...estado.columnas, ...(estado.segmento ? [estado.segmento] : [])] : [];
+    const aviso = sel ? avisoDeArchivados(archivadosEnUso(sel.campos, usados)) : null;
+    const nodo = $<HTMLElement>('[data-cartera-archivados]');
+    nodo.hidden = aviso === null;
+    $<HTMLElement>('[data-cartera-archivados-texto]').textContent = aviso ?? '';
+  }
+
   function renderColumnas(): void {
     const sel = estado.seleccion;
     if (!sel) return;
     const lista = $<HTMLElement>('[data-columnas-lista]');
     const leyenda = lista.querySelector('legend')!;
-    const nombres = Object.keys(sel.campos).sort((a, b) => etiquetaCampo(a).localeCompare(etiquetaCampo(b)));
+    // An archived field is not offered, unless the analyst already shows it: then it says so.
+    const nombres = ordenarCampos(
+      sel.campos,
+      Object.keys(sel.campos).filter((n) => !sel.campos[n].archivado || estado.columnas.includes(n)),
+    );
     lista.replaceChildren(
       leyenda,
       ...nombres.map((nombre) => {
@@ -542,7 +561,11 @@ import '../styles/cartera.css';
           guardarColumnas();
           pintarProductos();
         });
-        etiqueta.append(casilla, document.createTextNode(etiquetaCampo(nombre)));
+        etiqueta.append(casilla, document.createTextNode(etiquetaEnCatalogo(sel.campos, nombre)));
+        // The mark is a word, never only a colour (RF-34).
+        const campo = sel.campos[nombre];
+        if (campo.archivado) etiqueta.append(marca('camposAdicionales.archivado', 'advertencia'));
+        else if (campo.adicional) etiqueta.append(marca('camposAdicionales.adicional', 'neutral'));
         return etiqueta;
       }),
     );
@@ -593,6 +616,7 @@ import '../styles/cartera.css';
   }
 
   function pintarProductos(): void {
+    pintarArchivados();
     const sel = estado.seleccion;
     const cuerpo = $<HTMLElement>('[data-productos-cuerpo]');
     const cuenta = $<HTMLElement>('[data-productos-cuenta]');
@@ -615,7 +639,7 @@ import '../styles/cartera.css';
     const head = document.createElement('thead');
     const filaHead = document.createElement('tr');
     columnas.forEach((nombre) => {
-      const th = celda('th', etiquetaCampo(nombre), tipoDe(sel.campos, nombre) === 'numero' ? 'num' : '');
+      const th = celda('th', etiquetaEnCatalogo(sel.campos, nombre), tipoDe(sel.campos, nombre) === 'numero' ? 'num' : '');
       th.scope = 'col';
       filaHead.append(th);
     });
