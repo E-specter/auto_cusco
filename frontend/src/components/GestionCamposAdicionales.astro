@@ -1,0 +1,58 @@
+---
+/**
+ * Markup of the dialog that manages the additional fields: rename, archive and reactivate
+ * (docs/campos-adicionales-interfaz.md §4, RF-65). Behaviour lives in `scripts/campos-adicionales-gestion.ts`;
+ * the page renders this and mounts it. The rows are drawn there, once per list.
+ */
+import Icon from './Icon.astro';
+---
+
+<dialog class="dialog dialog--wide" data-dialog="adicionales" aria-labelledby="adicionales-title">
+  <div class="dialog__head">
+    <div>
+      <h2 id="adicionales-title" data-i18n="camposAdicionales.gestion.titulo">Campos adicionales</h2>
+      <p class="muted dialog__intro" data-i18n="camposAdicionales.gestion.intro">
+        Los campos que creaste al subir sábanas. Archivar uno lo quita de las listas; lo que ya lo usa sigue funcionando.
+      </p>
+    </div>
+    <button
+      type="button"
+      class="btn btn--quiet btn--icon"
+      data-close
+      data-i18n-attr="aria-label:common.close,title:common.close"
+      aria-label="Cerrar"
+      title="Cerrar"
+    >
+      <Icon name="x" size={20} />
+    </button>
+  </div>
+
+  <div class="dialog__body adicionales">
+    <p class="field__hint adicionales__estado" role="status" data-adicionales-estado></p>
+    <p class="field__error" role="alert" data-adicionales-error></p>
+
+    <p class="empty" data-adicionales-vacio data-i18n="camposAdicionales.gestion.vacio" hidden>
+      Todavía no hay campos adicionales. Se crean al subir una sábana, desde la revisión de columnas.
+    </p>
+
+    <div class="table-scroll" data-adicionales-tabla hidden>
+      <table class="table table--apilable adicionales__tabla">
+        <caption class="visually-hidden" data-i18n="camposAdicionales.gestion.caption">Campos adicionales del catálogo</caption>
+        <thead>
+          <tr>
+            <th scope="col" data-i18n="camposAdicionales.gestion.col.nombre">Nombre</th>
+            <th scope="col" data-i18n="camposAdicionales.gestion.col.tipo">Tipo</th>
+            <th scope="col" data-i18n="camposAdicionales.gestion.col.origen">Encabezado de origen</th>
+            <th scope="col" data-i18n="camposAdicionales.gestion.col.estado">Estado</th>
+            <th scope="col" data-i18n="camposAdicionales.gestion.col.acciones">Acciones</th>
+          </tr>
+        </thead>
+        <tbody data-adicionales-filas></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dialog__foot">
+    <button type="button" class="btn" data-close data-i18n="camposAdicionales.gestion.cerrar">Cerrar</button>
+  </div>
+</dialog>

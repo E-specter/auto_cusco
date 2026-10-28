@@ -87,3 +87,21 @@ export function crearCampoAdicional(
     conJson('POST', entrada, signal),
   );
 }
+
+// ---- Managing the additional fields (RF-65, T-CA-F2) ------------------------------------------
+
+export type CampoAdicional = Esquemas['CampoAdicionalRespuesta'];
+export type CambioCampoAdicional = Esquemas['CambioCampoAdicionalEntrada'];
+
+/** Every additional field of the catalogue, the archived ones included, in the order the backend keeps. */
+export function listarCamposAdicionales(signal?: AbortSignal): Promise<CampoAdicional[]> {
+  return request<CampoAdicional[]>(`/mapeador/${CATALOGO_SABANA}/campos-adicionales`, { signal });
+}
+
+/** Renames, archives or reactivates one: what is left out does not change, and neither does its technical name. */
+export function cambiarCampoAdicional(nombre: string, cambio: CambioCampoAdicional): Promise<CampoAdicional> {
+  return request<CampoAdicional>(
+    `/mapeador/${CATALOGO_SABANA}/campos-adicionales/${encodeURIComponent(nombre)}`,
+    conJson('PATCH', cambio),
+  );
+}

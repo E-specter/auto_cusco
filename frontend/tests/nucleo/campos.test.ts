@@ -131,4 +131,13 @@ describe('el aviso de un campo archivado en uso', () => {
     );
     expect(avisoDeArchivados([])).toBeNull();
   });
+
+  it('en inglés cita el nombre con las comillas del idioma, no con las fijas del español', () => {
+    setLanguageForTests('en');
+    expect(avisoDeArchivados(['Monto en mora'])).toBe('It uses the archived field “Monto en mora”: it still works, but it is no longer offered.');
+    expect(avisoDeArchivados(['Monto en mora', 'Zona'])).toBe(
+      'It uses the archived fields “Monto en mora”, “Zona”: they still work, but they are no longer offered.',
+    );
+    expect(avisoDeArchivados(['Monto en mora'])).not.toContain('«');
+  });
 });

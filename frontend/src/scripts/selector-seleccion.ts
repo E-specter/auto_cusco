@@ -508,7 +508,19 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
     nota.className = 'fila__nota';
     nota.id = `${root.id || 'selector'}-filtro-${indice}-nota`;
 
-    fila.append(campo, operador, quitar, valores, nota);
+    // A native select cuts «Campo antiguo (archivad…»: the mark also goes outside it, in words (RF-65).
+    let celdaCampo: HTMLElement = campo;
+    if (filtro.campo && s.campos[filtro.campo]?.archivado) {
+      const marca = document.createElement('span');
+      marca.className = 'tag tag--advertencia';
+      marca.dataset.archivado = '';
+      marca.textContent = t('camposAdicionales.archivado');
+      celdaCampo = document.createElement('div');
+      celdaCampo.className = 'fila__campoCaja';
+      celdaCampo.append(campo, marca);
+    }
+
+    fila.append(celdaCampo, operador, quitar, valores, nota);
     return fila;
   }
 

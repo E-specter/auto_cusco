@@ -240,6 +240,17 @@ test.describe('al crear', () => {
     expect(titulos.map((t) => t.trim())).toEqual(['Obligatorios', 'Otros campos', 'Campos adicionales']);
   });
 
+  test('a 1440 px el formulario no se estira: ocupa a lo más 48 rem', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await abrir(page, CON_UN_DATO_NUEVO);
+    await abrirFormulario(page).click();
+
+    const ancho = (await formulario(page).boundingBox())!.width;
+
+    expect(ancho).toBeLessThanOrEqual(48 * 16 + 1);
+    expect(ancho).toBeGreaterThan(300);
+  });
+
   test('si después se elige otro campo, el tag deja de decir «Campo nuevo»', async ({ page }) => {
     await abrir(page, CON_UN_DATO_NUEVO);
     await abrirFormulario(page).click();
@@ -341,7 +352,7 @@ test.describe('los rechazos al crear', () => {
     await crear(page).click();
 
     const error = formulario(page).locator('[data-adicional-nombre-error]');
-    await expect(error).toHaveText('Ya existe el campo archivado «Campo antiguo». Usa otro nombre.');
+    await expect(error).toHaveText('Ya existe el campo archivado «Campo antiguo». Usa otro nombre o reactívalo en Campos adicionales.');
     await expect(error).not.toContainText('Elígelo en la lista');
     await expect(formulario(page).getByRole('button', { name: /^Usar/ })).toHaveCount(0);
     await expect(nombre(page)).toHaveValue('Campo antiguo');
@@ -476,6 +487,8 @@ test.describe('Cartera y el selector', () => {
 
     const fila = page.locator('[data-filtros] > .fila').first();
     await expect(fila.getByLabel('Campo').locator('option:checked')).toHaveText('Campo antiguo (archivado)');
+    // The select cuts the long name, so the mark also goes outside it, in words.
+    await expect(fila.locator('.tag[data-archivado]')).toHaveText('Archivado');
     await expect(page.locator('[data-selector-archivados]')).toBeVisible();
     await expect(page.locator('[data-selector-archivados]')).toHaveText(
       'Usa el campo archivado «Campo antiguo»: sigue funcionando, pero ya no se ofrece.',

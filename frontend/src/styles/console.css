@@ -603,3 +603,51 @@
     grid-template-columns: var(--phi-minor) 1fr;
   }
 }
+
+/* RF-65: the table that manages the additional fields. */
+.adicionales {
+  position: relative;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.adicionales__estado {
+  margin: 0;
+}
+
+/* Without text it takes no room, but it stays in the page and in the accessibility tree: a live region has to be there before it speaks. */
+.adicionales__estado:empty {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* The focus ring of the input in edit would cover the first line of its note. */
+.adicionales__nota,
+.adicionales__tabla .field__error {
+  margin-block-start: var(--space-2);
+}
+
+.adicionales__tabla td,
+.adicionales__tabla th {
+  vertical-align: top;
+}
+
+.adicionales__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.ruler__adicionales {
+  flex: none;
+  margin-inline-start: var(--space-4);
+}
+
+@media (max-width: 63.99rem) {
+  .ruler__adicionales {
+    margin-block-end: var(--space-4);
+  }
+}

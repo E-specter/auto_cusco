@@ -159,6 +159,7 @@
 
 .mapeador__adicionalPanel {
   margin-block-start: var(--space-2);
+  max-inline-size: 48rem;
 }
 
 .mapeador__adicionalCuerpo {

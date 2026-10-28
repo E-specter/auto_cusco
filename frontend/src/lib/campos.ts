@@ -99,7 +99,8 @@ export function archivadosEnUso(campos: Catalogo, usados: Iterable<string>): str
 /** The notice of a preview that uses an archived field: it keeps working, but is no longer offered. */
 export function avisoDeArchivados(etiquetas: readonly string[]): string | null {
   if (etiquetas.length === 0) return null;
-  const lista = etiquetas.map((e) => `«${e}»`).join(', ');
+  // The quotes of a cited name are the language's: «X» in Spanish, “X” in English.
+  const lista = etiquetas.map((e) => t('camposAdicionales.nombreCitado', { campo: e })).join(', ');
   return t(etiquetas.length === 1 ? 'camposAdicionales.avisoArchivado' : 'camposAdicionales.avisoArchivados', { campo: lista });
 }
 

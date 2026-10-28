@@ -9,6 +9,7 @@
 import Shell from '../layouts/Shell.astro';
 import Icon from '../components/Icon.astro';
 import MapeadorEncabezados from '../components/MapeadorEncabezados.astro';
+import GestionCamposAdicionales from '../components/GestionCamposAdicionales.astro';
 import '../styles/console.css';
 ---
 
@@ -42,6 +43,9 @@ import '../styles/console.css';
 
       <div class="ruler__rail">
         <div class="ruler__track" data-ruler role="tablist" aria-labelledby="ruler-title"></div>
+        <button type="button" class="btn ruler__adicionales" data-open-adicionales>
+          <span data-adicionales-n>Campos adicionales (0)</span>
+        </button>
         <button type="button" class="btn btn--primary ruler__action" data-open-upload>
           <Icon name="upload" size={16} />
           <span data-i18n="console.upload.open">Subir sábana</span>
@@ -74,6 +78,9 @@ import '../styles/console.css';
       <button type="button" class="btn btn--primary" data-open-upload data-stand-in-action>
         <Icon name="upload" size={16} />
         <span data-i18n="console.upload.open">Subir sábana</span>
+      </button>
+      <button type="button" class="btn" data-open-adicionales data-stand-in-adicionales>
+        <span data-adicionales-n>Campos adicionales (0)</span>
       </button>
       <button type="button" class="btn btn--primary" data-stand-in-retry hidden>
         <span class="btn__spinner" aria-hidden="true"></span>
@@ -382,6 +389,9 @@ import '../styles/console.css';
     </form>
   </dialog>
 
+  <!-- ---- RF-65: manage the additional fields --------------------------- -->
+  <GestionCamposAdicionales />
+
   <!-- ---- V-8: delete a version ---------------------------------------- -->
   <dialog class="dialog" data-dialog="delete" aria-labelledby="delete-title">
     <form method="dialog" data-delete-form>
@@ -485,6 +495,9 @@ import '../styles/console.css';
     textoDeError,
   } from '../lib/carga-mapeada';
   import { etiquetaDeCampo as nombreDeCampo } from '../lib/campos';
+  import { columnaDeIncidencia } from '../lib/campos-adicionales';
+  import type { CampoAdicional } from '../lib/api-mapeador';
+  import { montarGestion } from '../scripts/campos-adicionales-gestion';
   import { EVENTO_MAPEO, montarMapeador, type ControladorMapeador, type EstadoMapeo } from '../scripts/mapeador-encabezados';
   import {
     formatBytes,
@@ -507,6 +520,8 @@ import '../styles/console.css';
     offset: number;
     /** The version whose background processing we are following, if any. */
     siguiendoId: number | null;
+    /** The additional fields of the catalogue, archived ones too: they name the fields an incidence mentions. */
+    adicionales: readonly CampoAdicional[];
   }
 
   const state: State = {
@@ -516,6 +531,7 @@ import '../styles/console.css';
     severidad: '',
     offset: 0,
     siguiendoId: null,
+    adicionales: [],
   };
 
   const $ = <T extends Element>(selector: string) => document.querySelector<T>(selector);
@@ -977,7 +993,7 @@ import '../styles/console.css';
 
       const columna = document.createElement('td');
       columna.className = 'incidencia__column';
-      appendBreakable(columna, incidencia.columna ?? '—');
+      appendBreakable(columna, columnaDeIncidencia(incidencia.codigo, incidencia.columna, state.adicionales) ?? '—');
 
       const codigo = document.createElement('td');
       codigo.className = 'incidencia__code';
@@ -1096,6 +1112,9 @@ import '../styles/console.css';
     document.querySelectorAll<HTMLButtonElement>('[data-open-upload]').forEach((trigger) => {
       trigger.disabled = offline;
     });
+    document.querySelectorAll<HTMLButtonElement>('[data-open-adicionales]').forEach((trigger) => {
+      trigger.disabled = offline;
+    });
     if (offline) showStandIn('console.offline.title', 'console.offline.body', false);
 
     // The header's pulse polls on its own clock; this call just proved the
@@ -1103,10 +1122,26 @@ import '../styles/console.css';
     document.dispatchEvent(new CustomEvent('healthchanged'));
   }
 
+  let iniciada = false;
+
+  const gestion = montarGestion({
+    dialogo: $<HTMLDialogElement>('[data-dialog="adicionales"]')!,
+    disparadores: [...document.querySelectorAll<HTMLElement>('[data-open-adicionales]')],
+    alCambiar: (campos) => {
+      state.adicionales = campos;
+      // A rename or a new field changes the names the table of incidences shows.
+      if (iniciada) void renderIncidencias();
+    },
+    abrir: (dialogo) => void openWhenFree(dialogo),
+  });
+
   async function boot(): Promise<void> {
     try {
+      // The list never holds the page back: the incidences read without it, and a late list redraws their names.
+      void gestion.recargar();
       await refresh();
       await renderIncidencias();
+      iniciada = true;
       setOffline(false);
     } catch {
       // No modal: the analyst cannot act on this from a dialog, and the page
@@ -1368,6 +1403,8 @@ import '../styles/console.css';
         try {
           const creado = await crearCampoAdicional(analisis.borrador_id, { indice, nombre_legible: nombreLegible, tipo }, signal);
           if (mapeo.catalogo) mapeo.catalogo = { ...mapeo.catalogo, campos: creado.campos };
+          // The new field is in the management list and in the names of the incidences.
+          void gestion.recargar();
           return creado;
         } catch (caught) {
           if (esBorradorPerdido(caught)) volverAlPaso1(t('mapeador.error.borrador_no_encontrado'));
