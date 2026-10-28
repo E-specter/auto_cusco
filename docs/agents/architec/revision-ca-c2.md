@@ -53,7 +53,7 @@ Sábana sintética de 46 000 filas, mejor de 3, antes y después de T-CA-B2: gen
 ## 5. Pendiente
 
 - **T-MAP-F6** (`designer`): espacio duro antes de «›» en los avisos, y quitar la constante `RUTA` sin usar en `mowa-mes-adicionales.spec.ts`.
-- **Linux:** por decisión del usuario no corre WSL; la capa queda para el CI de GitHub, que corre al subir. Sin push todavía.
+- **Linux:** por decisión del usuario no corre WSL; la capa queda para el CI de GitHub. El usuario subió hasta `91fc3d0` y el CI pasó en backend y frontend; de `f562032` en adelante (T-CA-B2, B12, B13 y los cortes de frontend) espera el próximo push.
 - **T-SAB-1:** el `.xlsb` real del 26.10.2026 que dio 400; espera el archivo del usuario.
 - Las migraciones `c8f1a3d6e254` y `e9b3d2a7c561` están aplicadas en `auto_cusco` con permiso del usuario.
 
