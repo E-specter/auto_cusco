@@ -781,3 +781,77 @@ Sobre `d4dafb6` (RF-59 ampliado, RF-64 a RF-66). Incluye las restricciones que a
 **§13 de MOWA MES sobre T-CA-B1:** la prueba de oro del mensaje y las pruebas de la campaña y de la descripción sugerida pasan sin cambiar ningún valor esperado. Solo cambian las firmas. D-CA-3 aprobado.
 
 **Orden:** B4 (corto, ya encargado) → CA-B1 → CA-B2 → MAP-B5. F0 puede empezar con el contrato de B2. architec corre `-ConBase`, la migración de ida y vuelta, WSL y la medición de consulta y generación con 46 000 filas, con y sin adicionales, antes y después de B2.
+
+## 29. Plan del filtro de valores y del orden de los filtros (T-FV-C1), para aprobación de architec
+
+Sobre `51f808b` (RF-67 y RF-68). Antes de cualquier código, necesita la aprobación de architec y el visto bueno de `coordinador_modulo_mowa_mes`, porque la campaña usa el mismo selector y guarda los mismos filtros.
+
+### Contraste con el código
+
+- **La lista de valores ya casi existe.** `RepositorioCarteraPostgres._sentencia_de_segmentar` agrupa un campo con sus cantidades sobre los filtros que recibe y ordena por cantidad descendente, con desempate por valor. Los productos sin valor salen como el grupo `NULL`. Sirve para base y adicional (`adicionales ->> 'ad_x'`). Lo que falta es el umbral, cortar en cuanto se pasa y un endpoint propio.
+- **«(vacío)» es `NULL`.** La ingesta deja `NULL` el texto vacío o nulo (`reglas.py`, `strip()`), y un adicional que la fila no tiene también se lee `NULL`. El texto vacío `""` no existe en la cartera.
+- **Excluir hoy no se puede bien.** Solo hay `en` (`columna.in_(...)`) y `distinto` de un valor. Un `NOT IN` en SQL descartaría también los vacíos, y eso es justo lo que hay que evitar.
+- **`|` dentro de un valor rompe el filtro.** `parsear_filtro` y `leerFiltro` (frontend) parten los valores por `|` sin forma de escaparlo. Hoy casi no pasa, porque el valor se escribe a mano. Con la lista, el analista marca valores reales sin verlos escritos, y uno con `|` se partiría en silencio.
+- **El orden ya se guarda.** `seleccion.filtros` y los filtros de la campaña son arreglos JSONB que conservan el orden, y `selecciones/servicio.py` solo quita los vacíos. La consulta es un AND, así que el orden no cambia el resultado. **Sí cambia** el texto de `descripcion_sugerida` de MOWA MES, que resume los filtros en su orden.
+- **El selector es uno solo.** `SelectorSeleccion.astro` y `scripts/selector-seleccion.ts` se usan en Cartera, Columnas y la campaña de MOWA MES.
+
+### Propuesta
+
+- **P-1, el operador de excluir: `no_en` («no es ninguno de»),** para texto, número y fecha, igual que `en` (uno o más valores).
+  - `en`: `columna IN (valores)`.
+  - `no_en`: `columna IS NULL OR columna NOT IN (valores)`. Un producto sin valor no tiene ninguno de los marcados, así que queda en la selección.
+- **P-2, «(vacío)» dentro de la lista marcada.** Se escribe como un **elemento vacío** en la lista de valores (`ad_tipo:en:Primera asignación|`, o `ad_tipo:no_en:|` para «solo excluir los vacíos»). Es lo único que no puede chocar con un valor real, porque la cartera no tiene `""`.
+  - `en` con vacío: `columna IN (...) OR columna IS NULL`.
+  - `no_en` con vacío: `columna IS NOT NULL AND columna NOT IN (...)`.
+
+  Solo en texto. En número y fecha, un elemento vacío sigue siendo un error (400), como hoy. Lo resume una prueba de propiedad: para cualquier conjunto marcado, `en` y `no_en` parten la cartera sin repetir ni perder productos.
+- **P-3, escapar `|`.** En la sintaxis de valores, `\|` es una barra literal y `\\` una barra invertida, en `parsear_filtro` y en `escribirFiltro`/`leerFiltro`. Antes de B1, architec cuenta en la base las selecciones y campañas guardadas con `\` en un filtro. Si hay alguna, se migran en el mismo corte. Si no, no hace falta migración.
+- **P-4, el endpoint.** `GET /cartera/valores?fecha_corte=…&campo=…&filtro=…`, donde `filtro` lleva los filtros que están encima, con la sintaxis de siempre. El backend no necesita conocer el orden: la pantalla le manda la cascada.
+  - Solo campos de texto, base o adicional, archivados incluidos, para que una selección vieja siga mostrando su lista. Otro tipo responde 400 y una fecha sin versión vigente, 404.
+  - Respuesta: `{campo, umbral, ofrece_lista, valores: [{valor: string | null, cantidad}]}`. `null` es «(vacío)».
+  - **Si se ofrece la lista se decide sobre la fecha entera** (RF-67: «distintos en la fecha de corte»), no sobre lo filtrado. Así un campo no cambia de control según los filtros de arriba. Se calcula con `LIMIT umbral + 1` sobre los distintos, y si se pasa, `ofrece_lista: false` y `valores: []`. Nunca se devuelven valores de un campo que supera el umbral, como nombres, documentos o teléfonos.
+  - La lista contextual es la agrupación de `segmentar` sin el capital, con los filtros de arriba.
+- **P-5, el umbral (RF-32).** Va en `Settings` (`umbral_valores_filtro`, 100 por defecto, de 2 a 1000), una sola fuente, y viaja en la respuesta para que la pantalla no lo duplique. Un umbral editable desde la interfaz no lo pide RF-67, y lo dejo fuera.
+- **P-6, el orden (RF-68).** No cambia la forma del contrato: el orden de `filtros` es el que se guarda.
+  - Se documenta en `selecciones-guardadas.md` y en `consulta-cartera.md` que el orden importa y se conserva.
+  - Pruebas de ida y vuelta con un orden no alfabético, en selecciones y en campañas.
+  - Una prueba de que dos órdenes dan el mismo `total` y los mismos productos.
+- **P-7, el valor marcado que se queda sin productos.** Lo resuelve la pantalla: compara lo marcado con `valores`, y el valor que falta se muestra aparte, con el aviso. El filtro se manda igual, porque `en` con un valor sin productos no rompe nada. El backend no necesita nada propio.
+
+### El supuesto de RF-67, que se le propone al usuario (lo llevo con una recomendación, vía architec)
+
+- **D-FV-1, comparación tal cual.** **Recomiendo confirmarlo.** El valor ya llega con los espacios de los extremos quitados por la ingesta. Unir mayúsculas o tildes obligaría a que `en` y `no_en` comparen distinto que `igual`, y cada consulta llevaría `lower`/`unaccent`, que hoy no se usa. Si el usuario ve «Primera asignación» y «PRIMERA ASIGNACION» como dos valores, lo corrige la sábana, y la lista lo deja a la vista.
+- **D-FV-2, orden por cantidad, de mayor a menor.** **Recomiendo confirmarlo,** con desempate alfabético para que la lista no salte entre llamadas, como ya hace `segmentar`. **«(vacío)» va siempre al final,** con su cantidad: está «como una opción más», pero en un lugar fijo, para encontrarlo. Si el usuario prefiere que se ordene con los demás, cambia una línea.
+
+### MOWA MES (para la §13 de `coordinador_modulo_mowa_mes`)
+
+- `resumen_filtro` necesita `no_en` y el vacío. Propongo `tipo de asignación no es Primera asignación/Segunda asignación` y, con vacío, `… en Primera asignación/(vacío)`, con `una_linea` y el límite de 100 UTF-16 de siempre.
+- Reordenar los filtros cambia la `descripcion_sugerida` de una campaña nueva, porque resume en el orden de la lista. Lo propongo como esperado: es una sugerencia que el usuario edita. Las campañas ya creadas guardan su descripción y no cambian.
+- La campaña guarda los filtros con su sintaxis, así que el escape de P-3 y la migración, si la hay, la alcanzan.
+- Las pruebas de oro del mensaje no deberían cambiar: ningún operador existente cambia de significado.
+
+### Medición (architec, con turno y 46 000 filas sintéticas)
+
+Cada lista abierta es una consulta. Antes de cerrar B2, un script `scripts/medir_valores_filtro.py` mide sobre la sábana sintética de 46 000 filas (`generar_sabana_sintetica.py`), con un campo base de texto de unos 10 valores y un adicional de texto de unos 50:
+
+1. la decisión del umbral (`LIMIT umbral + 1`) sobre la fecha entera;
+2. la lista sin filtros arriba, y con tres;
+3. un campo que supera el umbral (un documento), que tiene que cortar pronto.
+
+**Presupuesto:** menos de 150 ms en el p95 por lista, con las dos consultas. Si no se cumple, la primera opción es guardar en memoria la decisión del umbral por `(carga vigente, campo)`, que no cambia mientras la versión vigente sea la misma. Un índice por adicional no sirve, porque los adicionales son dinámicos.
+
+### Cortes
+
+| Corte | Qué | Depende | Revisión |
+|---|---|---|---|
+| **T-FV-B1** | Núcleo y SQL: `no_en`, el vacío en `en`/`no_en` (solo texto), el escape de `\|`, `resumen_filtro`, la prueba de propiedad de la partición, las de ida y vuelta del orden, y la migración del escape si la cuenta de P-3 la pide. Contrato: el enum de operadores | C1 aprobado | coordinador; **MOWA MES (§13)** |
+| **T-FV-B2** | `GET /cartera/valores`, el umbral en `Settings`, el script de medición y el contrato | B1 | coordinador; architec mide |
+| **T-FV-F0** | Reglas de interfaz (designer): la lista (marcar, incluir o excluir, cantidades, «(vacío)», el valor marcado sin productos) y el reordenamiento (arrastrar, teclado, anuncio para lector de pantalla) | este plan aprobado | usuario, vía architec |
+| **T-FV-F1** | `seleccion.ts`: `no_en`, el elemento vacío (hoy `escribirFiltro` lo descarta con `filter(Boolean)`) y el escape, con Vitest. Sin interfaz | B1 | coordinador |
+| **T-FV-F2** | La lista de valores en `SelectorSeleccion`, en cascada con los filtros de arriba | F0, F1, B2 | designer; MOWA MES, porque la campaña lo usa |
+| **T-FV-F3** | Reordenar los filtros arrastrando y con el teclado, con el orden guardado en la selección y en la campaña | F0, F2 | designer; MOWA MES |
+| **T-FV-C2** | Cierre contra RF-67 y RF-68 | todos | architec |
+
+**Orden:** B1 → B2, con F0 en paralelo desde la aprobación. F1 puede ir apenas entre B1. F2 y F3 son secuenciales porque tocan el mismo componente. architec corre `-ConBase`, la medición de B2 y el Playwright completo en F2 y F3.
+
+**Aprobado por `architec` el 2026-10-28.** Decisiones del usuario del mismo día: D-FV-1, comparación tal cual; D-FV-2, orden por cantidad con desempate alfabético y «(vacío)» al final. P-3: en `auto_cusco` hay 1 selección y 2 campañas guardadas; ninguna tiene «\» en sus filtros (los «|» que tienen son separadores de «es uno de»), así que el escape no necesita migración. B1 arranca con el visto bueno §13 de `coordinador_modulo_mowa_mes`.

@@ -63,7 +63,7 @@
 * **RF-67 — Filtro de valores (etiquetas) en campos de texto:** Permitir filtrar un campo de texto eligiendo, de una lista con sus valores reales, uno o varios valores, en lugar de escribirlos.
   * Aplica automáticamente a cualquier campo de texto de la cartera, base o adicional (RF-64), cuyo número de valores distintos en la fecha de corte no supere un umbral configurable (RF-32; valor inicial: 100). Si lo supera, entonces el filtro sigue como hoy, escribiendo el valor.
   * Cada valor de la lista muestra cuántos productos lo tienen. La lista incluye «(vacío)» para los productos sin valor en ese campo, como una opción más.
-  * **Supuesto (a confirmar con el usuario):** los valores se comparan tal como vienen en la sábana normalizada, sin unir mayúsculas ni tildes distintas, y la lista los ordena por cantidad de productos, de mayor a menor.
+  * **Decidido por el usuario el 2026-10-28:** los valores se comparan tal como vienen en la sábana normalizada, sin unir mayúsculas ni tildes distintas (cada variante aparece con su cantidad), y la lista los ordena por cantidad de productos, de mayor a menor, con desempate alfabético y «(vacío)» siempre al final.
   * Se puede **incluir** los valores marcados (el producto tiene uno de ellos) o **excluirlos** (no tiene ninguno), con un control por filtro.
   * **Lista contextual:** la lista de un filtro muestra solo los valores que quedan con los filtros que están encima de él (RF-68), con sus cantidades calculadas sobre esos productos.
   * Si un valor marcado deja de existir porque cambió un filtro de arriba, entonces queda marcado, aparte, con el aviso de que no hay productos con ese valor; no se desmarca solo.
