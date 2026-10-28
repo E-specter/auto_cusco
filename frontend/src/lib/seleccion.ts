@@ -103,11 +103,16 @@ export function valoresQuePide(operador: string): number | null {
   return 1;
 }
 
-/** The field's operators, as the API lists them, in reading order. */
+/**
+ * The field's operators, as the API lists them, in reading order. A text field puts «es uno de» and «no es
+ * ninguno de» first (RF-67): choosing from its values is what the analyst mostly wants, and the first one is the
+ * default of a new row.
+ */
 export function operadoresPara(campos: Campos, campo: string): string[] {
   const disponibles = campos[campo]?.operadores ?? [];
-  const conocidos = ORDEN_OPERADORES.filter((operador) => disponibles.includes(operador));
-  const otros = disponibles.filter((operador) => !ORDEN_OPERADORES.includes(operador));
+  const orden = tipoDe(campos, campo) === 'texto' ? ['en', 'no_en', ...ORDEN_OPERADORES] : ORDEN_OPERADORES;
+  const conocidos = [...new Set(orden)].filter((operador) => disponibles.includes(operador));
+  const otros = disponibles.filter((operador) => !orden.includes(operador));
   return [...conocidos, ...otros];
 }
 

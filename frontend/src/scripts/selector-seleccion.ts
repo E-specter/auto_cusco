@@ -51,8 +51,9 @@ import {
   type SeleccionBorrador,
   type TipoCampo,
 } from '../lib/seleccion';
-import { archivadosEnUso, avisoDeArchivados, opcionesDeCampos } from '../lib/campos';
+import { archivadosEnUso, avisoDeArchivados, etiquetaEnCatalogo, opcionesDeCampos } from '../lib/campos';
 import { llenarSelect, type OpcionDeLista } from './lista-de-campos';
+import { crearGestorValores } from './selector-valores';
 
 export const EVENTO_SELECCION = 'seleccioncambiada';
 
@@ -137,6 +138,15 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
   };
 
   const nombresDeCampos = (): string[] => Object.keys(s.campos);
+
+  // The list of values of a list filter (RF-67): each filter asks for its own with the ones above it.
+  const valores_ = crearGestorValores({
+    campos: () => s.campos,
+    fecha: () => s.fechaCorte,
+    filtros: () => s.borrador.filtros,
+    alMarcar: () => cambio(),
+    nombreDe: (campo) => etiquetaEnCatalogo(s.campos, campo),
+  });
 
   const sucio = (): boolean => JSON.stringify(s.borrador) !== s.base;
 
@@ -269,6 +279,8 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
   el.fecha.addEventListener('change', () => {
     s.fechaCorte = el.fecha.value || null;
     emitir();
+    // Every list belongs to a date.
+    valores_.sincronizar();
   });
 
   // ---- Marks, status line and actions ------------------------------------------------
@@ -368,6 +380,8 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
     pintarEstado();
     emitir();
     programarRevision();
+    // A change of this filter moves the lists of the ones below it.
+    valores_.sincronizar();
   }
 
   // ---- Live review ------------------------------------------------------------------
@@ -435,8 +449,10 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
     );
     campo.addEventListener('change', () => {
       filtro.campo = campo.value;
+      // A text field starts on «es uno de» (RF-67); another one, on its first operator.
       filtro.operador = operadoresPara(s.campos, filtro.campo)[0] ?? '';
       filtro.valores = valoresPara(filtro.operador);
+      delete filtro.vacio;
       renderFiltros('.fila__campo', indice);
       cambio();
     });
@@ -471,6 +487,8 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
 
     if (!filtro.campo || !filtro.operador || pide === 0) {
       valores.hidden = true;
+    } else if (pide === null && valores_.aplica(filtro)) {
+      valores_.pintar(valores, filtro);
     } else if (pide === null) {
       const lista = document.createElement('textarea');
       lista.className = 'input fila__valor';
@@ -646,6 +664,8 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
     renderIndicadores();
     pintarMarcas();
     pintarEstado();
+    // The rows were drawn again: the lists are asked for (or kept) for the draft now on screen.
+    valores_.sincronizar();
   }
 
   // ---- Editor wiring -----------------------------------------------------------------

@@ -222,6 +222,25 @@ export function consultarCartera(
   return request<PaginaCartera>(`/cartera?${query}`, { signal });
 }
 
+export type ValoresDeCampo = Esquemas['ValoresRespuesta'];
+
+/**
+ * The distinct values of a text field with how many products each has, for the list filter (RF-67). `filtros` are
+ * the complete filters ABOVE the one being edited, so the list is the cascade's. The answer says whether a list is
+ * offered at all (`ofrece_lista`) and the threshold it decided with. A 404 means the date has no current version;
+ * a 400, that the field is not text.
+ */
+export function valoresDeCampo(
+  fechaCorte: string,
+  campo: string,
+  filtros: readonly string[],
+  signal?: AbortSignal,
+): Promise<ValoresDeCampo> {
+  const query = new URLSearchParams({ fecha_corte: fechaCorte, campo });
+  filtros.forEach((filtro) => query.append('filtro', filtro));
+  return request<ValoresDeCampo>(`/cartera/valores?${query}`, { signal });
+}
+
 // ---- Saved selections (docs/selecciones-guardadas.md) ---------------------------
 
 const json = (method: string, cuerpo: unknown, signal?: AbortSignal): RequestInit => ({

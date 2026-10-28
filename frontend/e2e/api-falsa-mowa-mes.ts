@@ -9,6 +9,7 @@
 import type { Page, Route } from '@playwright/test';
 
 import { caracteresQuitados, normalizarGsm7 } from './api-falsa-gsm7';
+import { valoresSobreUmbral } from './api-falsa';
 import type {
   AvisoCampana,
   Campana,
@@ -777,6 +778,9 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
     if (estado.sinRed) return route.abort('connectionrefused');
 
     if (ruta === '/health') return json(route, 200, { api: true, database: true, ok: true });
+
+    // The selector of the campaign is the portfolio's: a text field asks for its values (RF-67). Here none is offered.
+    if (ruta === '/cartera/valores') return json(route, 200, valoresSobreUmbral(url));
 
     if (ruta === '/mowa-mes/configuracion' && metodo === 'GET') {
       return json(route, 200, estado.configuracion);

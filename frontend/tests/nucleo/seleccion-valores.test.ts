@@ -80,12 +80,15 @@ describe('no_en, el operador de excluir', () => {
     expect(valoresQuePide('en')).toBeNull();
   });
 
-  it('va justo después de en en el menú de operadores', () => {
+  it('en un campo de texto, «es uno de» y «no es ninguno de» van primeros del menú; en otro, después de en', () => {
+    const operadores = ['no_vacio', 'contiene', 'no_en', 'igual', 'en', 'vacio', 'mayor'];
     const campos = {
-      region: { tipo: 'texto', operadores: ['no_vacio', 'contiene', 'no_en', 'igual', 'en', 'vacio'], adicional: false, etiqueta: null, archivado: false },
+      region: { tipo: 'texto', operadores, adicional: false, etiqueta: null, archivado: false },
+      dias_atraso: { tipo: 'numero', operadores, adicional: false, etiqueta: null, archivado: false },
     } as Campos;
 
-    expect(operadoresPara(campos, 'region')).toEqual(['igual', 'en', 'no_en', 'contiene', 'vacio', 'no_vacio']);
+    expect(operadoresPara(campos, 'region')).toEqual(['en', 'no_en', 'igual', 'contiene', 'mayor', 'vacio', 'no_vacio']);
+    expect(operadoresPara(campos, 'dias_atraso')).toEqual(['igual', 'en', 'no_en', 'contiene', 'mayor', 'vacio', 'no_vacio']);
   });
 
   it('se escribe y se lee como en', () => {

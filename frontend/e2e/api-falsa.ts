@@ -62,6 +62,8 @@ export interface ApiFalsa {
   campos: Campos;
   /** Answers `GET /cartera/resumen`, given the request URL. */
   resumen: (url: URL) => { estado: number; cuerpo: unknown };
+  /** Answers `GET /cartera/valores` (the list of values of a text field), given the request URL. */
+  valores: (url: URL) => { estado: number; cuerpo: unknown };
   /** Products `GET /cartera` pages through. */
   productos: Array<Record<string, unknown>>;
   /** Saved selections `GET /selecciones` lists. */
@@ -86,8 +88,8 @@ export type Manejador = (route: Route, ruta: string, metodo: string, url: URL) =
 /** A synthetic catalogue: the operational fields plus one text field. */
 export function camposSinteticos(): Campos {
   const base = { adicional: false, etiqueta: null, archivado: false };
-  const numero = { ...base, tipo: 'numero', operadores: ['igual', 'mayor', 'menor', 'entre', 'vacio', 'no_vacio'] };
-  const texto = { ...base, tipo: 'texto', operadores: ['igual', 'distinto', 'en', 'contiene', 'vacio', 'no_vacio'] };
+  const numero = { ...base, tipo: 'numero', operadores: ['igual', 'mayor', 'menor', 'entre', 'en', 'no_en', 'vacio', 'no_vacio'] };
+  const texto = { ...base, tipo: 'texto', operadores: ['igual', 'distinto', 'en', 'no_en', 'contiene', 'vacio', 'no_vacio'] };
   return {
     pagare: texto,
     segmento_financiero: texto,
@@ -168,6 +170,21 @@ export function seleccionGuardada(parcial: Partial<SeleccionGuardada> = {}): Sel
   };
 }
 
+/**
+ * The default answer of `GET /cartera/valores`: the field has more distinct values than the threshold, so no list
+ * is offered and the filter keeps its text area. A spec that is not about the list never notices it.
+ */
+export function valoresSobreUmbral(url: URL): ValoresFalsos {
+  return { campo: url.searchParams.get('campo') ?? '', umbral: 100, ofrece_lista: false, valores: [] };
+}
+
+export interface ValoresFalsos {
+  campo: string;
+  umbral: number;
+  ofrece_lista: boolean;
+  valores: Array<{ valor: string | null; cantidad: number }>;
+}
+
 export function apiVacia(): ApiFalsa {
   return {
     versiones: [],
@@ -178,6 +195,7 @@ export function apiVacia(): ApiFalsa {
     pedidos: [],
     campos: camposSinteticos(),
     resumen: (url) => ({ estado: 200, cuerpo: resumenSintetico(url) }),
+    valores: (url) => ({ estado: 200, cuerpo: valoresSobreUmbral(url) }),
     productos: productosSinteticos(120),
     selecciones: [],
     revision: { aplicable: true, problemas: [] },
@@ -211,6 +229,11 @@ export async function montarApi(page: Page, estado: ApiFalsa): Promise<void> {
     }
 
     if (ruta === '/cartera/campos') return json(route, 200, estado.campos);
+
+    if (ruta === '/cartera/valores') {
+      const respuesta = estado.valores(url);
+      return json(route, respuesta.estado, respuesta.cuerpo);
+    }
 
     if (ruta === '/cartera/resumen') {
       const respuesta = estado.resumen(url);
