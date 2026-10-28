@@ -29,12 +29,20 @@ class Operador(StrEnum):
     CONTIENE = "contiene"
     EMPIEZA_CON = "empieza_con"
     EN = "en"
+    NO_EN = "no_en"  # «no es ninguno de»: un producto sin valor queda incluido
     ENTRE = "entre"
     VACIO = "vacio"
     NO_VACIO = "no_vacio"
 
 
-_COMUNES = (Operador.IGUAL, Operador.DISTINTO, Operador.EN, Operador.VACIO, Operador.NO_VACIO)
+_COMUNES = (
+    Operador.IGUAL,
+    Operador.DISTINTO,
+    Operador.EN,
+    Operador.NO_EN,
+    Operador.VACIO,
+    Operador.NO_VACIO,
+)
 _ORDENABLES = (
     Operador.MAYOR,
     Operador.MAYOR_IGUAL,
@@ -50,6 +58,9 @@ OPERADORES_POR_TIPO: dict[TipoDato, frozenset[Operador]] = {
     TipoDato.BOOLEANO: frozenset((Operador.IGUAL, Operador.VACIO, Operador.NO_VACIO)),
 }
 
+# Los operadores de lista (uno o mas valores, con elemento vacio posible en un texto).
+OPERADORES_DE_LISTA = frozenset((Operador.EN, Operador.NO_EN))
+
 # Cuantos valores necesita cada operador. None = uno o mas.
 VALORES_POR_OPERADOR: dict[Operador, int | None] = {
     Operador.IGUAL: 1,
@@ -61,6 +72,7 @@ VALORES_POR_OPERADOR: dict[Operador, int | None] = {
     Operador.CONTIENE: 1,
     Operador.EMPIEZA_CON: 1,
     Operador.EN: None,
+    Operador.NO_EN: None,
     Operador.ENTRE: 2,
     Operador.VACIO: 0,
     Operador.NO_VACIO: 0,
@@ -79,6 +91,14 @@ class Funcion(StrEnum):
 
 @dataclass(frozen=True)
 class Filtro:
+    """Un filtro. `valores` lleva los valores ya convertidos al tipo del campo.
+
+    En `en` y `no_en` de un campo de TEXTO, `None` es un ELEMENTO VACIO de la lista: «(vacio)», el
+    producto sin valor (en la cartera el texto vacio es siempre NULL, nunca ""). Va en cualquier
+    posicion y se conserva en el orden en que se escribio. En ningun otro operador ni tipo es
+    valido.
+    """
+
     campo: str
     operador: Operador
     valores: tuple[Any, ...] = ()

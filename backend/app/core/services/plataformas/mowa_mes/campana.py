@@ -126,7 +126,12 @@ def huella_de(datos: DatosSpeech) -> str:
     return huella_speech(datos.partes)
 
 
+VACIO = "(vacío)"  # el elemento vacio de una lista (`None` en el filtro), nunca «None»
+
+
 def _texto(valor: Any) -> str:
+    if valor is None:
+        return VACIO
     return valor.isoformat() if isinstance(valor, date) else str(valor)
 
 
@@ -147,13 +152,18 @@ def resumen_filtro(filtro: Filtro, catalogo: CatalogoCartera) -> str:
         return f"{valores[0]} <= {campo} <= {valores[1]}"
     if filtro.operador is Operador.EN:
         return f"{campo} en {'/'.join(valores)}"
+    if filtro.operador is Operador.NO_EN:
+        return f"{campo} no es {'/'.join(valores)}"
     if filtro.operador is Operador.CONTIENE:
         return f"{campo} contiene {valores[0]}"
     if filtro.operador is Operador.EMPIEZA_CON:
         return f"{campo} empieza con {valores[0]}"
     if filtro.operador is Operador.VACIO:
         return f"sin {campo}"
-    return f"con {campo}"
+    if filtro.operador is Operador.NO_VACIO:
+        return f"con {campo}"
+    # Un operador nuevo tiene que traer su frase: no cae en «con» sin que nadie lo vea.
+    raise ValueError(f"El operador {filtro.operador!r} no tiene resumen")
 
 
 def descripcion_sugerida(filtros: Sequence[Filtro], catalogo: CatalogoCartera) -> str:

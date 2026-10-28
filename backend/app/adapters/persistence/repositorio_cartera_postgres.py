@@ -24,9 +24,11 @@ from sqlalchemy import (
     FromClause,
     Numeric,
     Select,
+    and_,
     cast,
     column,
     func,
+    or_,
     select,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -73,6 +75,30 @@ def _expresion_adicional(nombre: str, tipo: TipoDato) -> ColumnElement:
     return texto
 
 
+def _condicion_de_lista(
+    columna: ColumnElement, valores: Sequence[Any], excluir: bool
+) -> ColumnElement[bool]:
+    """`en` y `no_en`, con el elemento vacio (`None`) como NULL.
+
+    - `en`: `IN (reales)`, o `IN (reales) OR IS NULL` con vacio; solo el vacio: `IS NULL`.
+    - `no_en`: `IS NULL OR NOT IN (reales)` (un producto sin valor no tiene ninguno de los
+      marcados); con vacio, `IS NOT NULL AND NOT IN (reales)`; solo el vacio: `IS NOT NULL`.
+
+    Con y sin el vacio, `en` y `no_en` parten la cartera: sin repetir ni perder productos.
+    """
+    reales = [v for v in valores if v is not None]
+    con_vacio = len(reales) != len(valores)
+    if not excluir:
+        if not reales:
+            return columna.is_(None)
+        return or_(columna.in_(reales), columna.is_(None)) if con_vacio else columna.in_(reales)
+    if not reales:
+        return columna.is_not(None)
+    if con_vacio:
+        return and_(columna.is_not(None), columna.not_in(reales))
+    return or_(columna.is_(None), columna.not_in(reales))
+
+
 def _condicion(filtro: Filtro, columnas: Mapping[str, ColumnElement]) -> ColumnElement[bool]:
     columna = columnas[filtro.campo]
     valores = filtro.valores
@@ -93,8 +119,8 @@ def _condicion(filtro: Filtro, columnas: Mapping[str, ColumnElement]) -> ColumnE
             return columna.icontains(valores[0], autoescape=True)
         case Operador.EMPIEZA_CON:
             return columna.istartswith(valores[0], autoescape=True)
-        case Operador.EN:
-            return columna.in_(valores)
+        case Operador.EN | Operador.NO_EN:
+            return _condicion_de_lista(columna, valores, excluir=filtro.operador is Operador.NO_EN)
         case Operador.ENTRE:
             return columna.between(valores[0], valores[1])
         case Operador.VACIO:

@@ -26,7 +26,14 @@ Todos reciben `fecha_corte` en formato `AAAA-MM-DD` y aceptan los mismos filtros
   ?filtro=segmento_financiero:igual:1. Preventiva
   ?filtro=dias_atraso:entre:0|30&filtro=telefono:no_vacio
   ?filtro=region:en:CUSCO SUR|TACNA
+  ?filtro=region:no_en:CUSCO SUR|TACNA
+  ?filtro=region:no_en:CUSCO SUR|
   ```
+
+  - **`no_en` («no es ninguno de»)** es lo contrario de `en`, con uno o más valores y para texto, número y fecha. Un producto **sin valor queda incluido**: no tiene ninguno de los marcados. En SQL, `columna IS NULL OR columna NOT IN (...)`.
+  - **«(vacío)» en la lista.** Un **elemento vacío** de la lista de `en` o `no_en` es el producto sin valor (en la cartera el texto vacío es siempre `NULL`, nunca `""`): `region:en:CUSCO SUR|` es «CUSCO SUR o sin región», y `region:no_en:|` es «con región». La lista puede ser solo el vacío (`region:en:`). Con vacío, `en` es `IN (...) OR IS NULL` y `no_en`, `IS NOT NULL AND NOT IN (...)`. Solo en campos de **texto**: en número y fecha un elemento vacío sigue dando 400. Con y sin el vacío, `en` y `no_en` **parten la cartera**, sin repetir ni perder productos (lo comprueba una prueba de propiedad).
+  - **Escape.** `\|` es una barra `|` literal dentro de un valor y `\\` una barra invertida. Es **tolerante**: una `\` seguida de cualquier otro carácter, o al final, queda literal (no da 400), así que un filtro guardado con una barra suelta se lee igual que siempre.
+  - **El orden importa y se conserva.** Los filtros son un AND, así que el orden no cambia el resultado (el mismo `total` y los mismos productos), pero sí el orden en que se guardan y se muestran, y la `descripcion_sugerida` de una campaña de MOWA MES, que los resume en su orden.
 
 - **Orden:** parámetro `orden` con el nombre del campo, o con un guion delante para descendente: `orden=-saldo_capital_pendiente`. Los nulos van siempre al final. El desempate es por pagaré, así la paginación no repite ni salta productos.
 - **Paginación:** `limite` (1 a 5000, por defecto 50) y `desplazamiento`.
@@ -42,8 +49,8 @@ Los campos salen del catálogo de la sábana, así que no pueden desalinearse co
 
 | Tipo | Operadores |
 |---|---|
-| texto | igual, distinto, contiene, empieza_con, en, vacio, no_vacio |
-| numero | igual, distinto, mayor, mayor_igual, menor, menor_igual, entre, en, vacio, no_vacio |
+| texto | igual, distinto, contiene, empieza_con, en, no_en, vacio, no_vacio |
+| numero | igual, distinto, mayor, mayor_igual, menor, menor_igual, entre, en, no_en, vacio, no_vacio |
 | fecha | los mismos que numero |
 | booleano | igual, vacio, no_vacio |
 

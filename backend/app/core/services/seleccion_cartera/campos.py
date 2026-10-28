@@ -16,6 +16,7 @@ from typing import Any
 
 from app.core.entities.campos_adicionales import CampoAdicional, TipoAdicional
 from app.core.entities.cartera import (
+    OPERADORES_DE_LISTA,
     OPERADORES_POR_TIPO,
     VALORES_POR_OPERADOR,
     ConsultaInvalida,
@@ -195,6 +196,13 @@ class CatalogoCartera:
                 f"se recibieron {len(filtro.valores)}"
             )
         for valor in filtro.valores:
+            if valor is None:
+                # El elemento vacio de una lista (`Filtro`): solo `en`/`no_en` de un texto.
+                if filtro.operador not in OPERADORES_DE_LISTA or tipo is not TipoDato.TEXTO:
+                    raise ConsultaInvalida(
+                        "El valor vacio solo se admite en 'en' y 'no_en' de un campo de texto"
+                    )
+                continue
             if isinstance(valor, datetime):
                 raise ConsultaInvalida("Las fechas de cartera no llevan hora")
             if isinstance(valor, str) and tipo is not TipoDato.TEXTO:

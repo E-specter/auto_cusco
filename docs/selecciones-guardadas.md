@@ -7,7 +7,7 @@ Una selección es lo que el analista armó para elegir productos en la pantalla 
 | Parte | Formato |
 |---|---|
 | `nombre` | Texto de 1 a 120 caracteres. Único, sin distinguir mayúsculas ni espacios en los extremos |
-| `filtros` | Lista de filtros en la sintaxis de `/cartera`: `campo:operador:valor` |
+| `filtros` | Lista de filtros en la sintaxis de `/cartera`: `campo:operador:valor`. **El orden importa y se conserva:** el que se guarda es el que se lee (RF-68); no cambia el resultado (es un AND), pero sí el orden en que se muestran y el resumen de una campaña. Un valor con `|` va escapado (`\|`) y un elemento vacío en `en`/`no_en` es «(vacío)» |
 | `orden` | `campo` o `-campo`, opcional |
 | `cantidad` | El n del top n, de 1 a 120 000, opcional |
 | `indicadores` | Lista en la sintaxis de RF-27: `nombre:funcion:campo` |
