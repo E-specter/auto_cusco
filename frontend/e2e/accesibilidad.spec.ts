@@ -450,7 +450,8 @@ for (const tema of ['light', 'dark'] as const) {
       await expect(page.locator('[data-renombrar-error]')).toContainText('Ya hay una definición con ese nombre');
       // The button went from off to on: its colour transition runs even with reduced motion, and axe
       // would read it half way. Wait for every transition to finish, not for a fixed time.
-      await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+      // A transition that is cancelled or replaced before it ends rejects `finished`; that is not a failure to wait for.
+      await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))));
       await sinViolaciones(page);
     });
 
