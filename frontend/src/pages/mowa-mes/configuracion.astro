@@ -454,7 +454,8 @@ import '../../styles/mowa-mes-speech-v2.css';
 </Shell>
 
 <script>
-  import { ApiError, NetworkError } from '../../lib/api';
+  import { ApiError, NetworkError, mensajeDeError } from '../../lib/api';
+  import { $, ocupado } from '../../lib/dom';
   import {
     crearExcepcion,
     crearSpeech,
@@ -535,8 +536,6 @@ import '../../styles/mowa-mes-speech-v2.css';
   const ANIO_MINIMO = 1900;
   const ANIO_MAXIMO = 2999;
 
-  const $ = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
-
   const estado = {
     configuracion: null as ConfiguracionMowaMes | null,
     supervisionGuardada: null as ConfiguracionSupervision | null,
@@ -577,20 +576,9 @@ import '../../styles/mowa-mes-speech-v2.css';
 
   // ---- Shared helpers -----------------------------------------------------------
 
-  function mensajeDeError(error: unknown): string {
-    if (error instanceof NetworkError) return t('console.upload.error.network');
-    if (error instanceof ApiError && error.detail) return error.detail;
-    return t('common.errorBody');
-  }
-
   function mostrarError(error: unknown): void {
     $<HTMLElement>('[data-error-body]').textContent = mensajeDeError(error);
     void openWhenFree(dialogos.error);
-  }
-
-  function ocupado(boton: HTMLButtonElement, si: boolean): void {
-    boton.dataset.loading = String(si);
-    boton.disabled = si;
   }
 
   /** A status line that says what just happened, then gets out of the way. */

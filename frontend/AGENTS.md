@@ -26,3 +26,5 @@ Consult these guides before working on related tasks:
 Antes de escribir un helper en una página, busca aquí si ya existe:
 
 - `lib/paginacion.ts`: `paginar` y `PaginaLocal`, paginación en el cliente de filas que la página ya tiene (no llama a la API). Los paginadores con desplazamientos del servidor (Cartera, Cargas, seguimiento) no son esto.
+- `lib/dom.ts`: `$` (con `!`), `ocupado` (botón cargando) y `appendBreakable` (identificador con `<wbr>` tras cada `_`), para los scripts de las páginas. `cargas.astro` conserva su propio `$`, que devuelve `null`.
+- `mensajeDeError` en `lib/api.ts`, junto a `ApiError`: la frase para el usuario ante un fallo (red, `detail` del servidor o genérica). `lib/generar-carga-mensajes.ts` tiene otra, con los códigos del motor, a propósito.

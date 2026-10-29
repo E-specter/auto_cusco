@@ -11,6 +11,7 @@
  */
 
 import type { components } from './contrato-api';
+import { t } from './i18n';
 
 export const API_BASE = import.meta.env.PUBLIC_API_URL || '/api';
 
@@ -83,6 +84,16 @@ export class NetworkError extends Error {
     super('network');
     this.name = 'NetworkError';
   }
+}
+
+/**
+ * What to tell the user about a failed call: the network sentence when the API never answered, the
+ * server's own `detail` when it did, and a generic sentence otherwise.
+ */
+export function mensajeDeError(error: unknown): string {
+  if (error instanceof NetworkError) return t('console.upload.error.network');
+  if (error instanceof ApiError && error.detail) return error.detail;
+  return t('common.errorBody');
 }
 
 /**

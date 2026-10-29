@@ -15,13 +15,13 @@
 
 import {
   ApiError,
-  NetworkError,
   actualizarSeleccion,
   crearSeleccion,
   eliminarSeleccion,
   listarCampos,
   listarSelecciones,
   listarVersiones,
+  mensajeDeError,
   revisarSeleccion,
   type Campos,
   type SeleccionEntrada,
@@ -29,6 +29,7 @@ import {
   type Version,
 } from '../lib/api';
 import { openWhenFree } from '../lib/dialogs';
+import { ocupado } from '../lib/dom';
 import { formatDate } from '../lib/format';
 import { t } from '../lib/i18n';
 import {
@@ -806,17 +807,6 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
   root.querySelectorAll<HTMLElement>('[data-cerrar]').forEach((boton) => {
     boton.addEventListener('click', () => boton.closest('dialog')?.close());
   });
-
-  function mensajeDeError(error: unknown): string {
-    if (error instanceof NetworkError) return t('console.upload.error.network');
-    if (error instanceof ApiError && error.detail) return error.detail;
-    return t('common.errorBody');
-  }
-
-  function ocupado(boton: HTMLButtonElement, si: boolean): void {
-    boton.dataset.loading = String(si);
-    boton.disabled = si;
-  }
 
   /** After a save: reread the shared list, since others may have changed it. */
   async function trasGuardar(guardada: SeleccionGuardada): Promise<void> {

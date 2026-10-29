@@ -441,7 +441,8 @@ import '../../styles/mowa-mes.css';
 </Shell>
 
 <script>
-  import { ApiError, NetworkError } from '../../lib/api';
+  import { ApiError, NetworkError, mensajeDeError } from '../../lib/api';
+  import { $, appendBreakable, ocupado } from '../../lib/dom';
   import {
     crearCampana,
     descargarArchivoCampana,
@@ -489,8 +490,6 @@ import '../../styles/mowa-mes.css';
   /** Same debounce the speech and portfolio screens use. */
   const ESPERA_PREVISUALIZACION = 400;
 
-  const $ = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
-
   const estado = {
     seleccion: null as EstadoSeleccion | null,
     supervisionConfigurada: null as ConfiguracionSupervision | null,
@@ -520,20 +519,9 @@ import '../../styles/mowa-mes.css';
 
   // ---- Shared helpers -----------------------------------------------------------
 
-  function mensajeDeError(error: unknown): string {
-    if (error instanceof NetworkError) return t('console.upload.error.network');
-    if (error instanceof ApiError && error.detail) return error.detail;
-    return t('common.errorBody');
-  }
-
   function mostrarError(texto: string): void {
     $<HTMLElement>('[data-error-body]').textContent = texto;
     void openWhenFree(dialogos.error);
-  }
-
-  function ocupado(boton: HTMLButtonElement, si: boolean): void {
-    boton.dataset.loading = String(si);
-    boton.disabled = si;
   }
 
   function botonIcono(etiqueta: string, direccion: 'arriba' | 'abajo'): HTMLButtonElement {
@@ -565,20 +553,6 @@ import '../../styles/mowa-mes.css';
     if (columna) nodo.dataset.etiqueta = columna;
     if (etiqueta === 'th') nodo.scope = 'row';
     return nodo;
-  }
-
-  /**
-   * Write a snake_case identifier with break opportunities at its underscores,
-   * same as the ingestion issues table: left alone it splits mid-word in a
-   * narrow cell.
-   */
-  function appendBreakable(nodo: HTMLElement, valor: string): void {
-    const partes = valor.split('_');
-    partes.forEach((parte, indice) => {
-      const ultima = indice === partes.length - 1;
-      nodo.append(ultima ? parte : `${parte}_`);
-      if (!ultima) nodo.append(document.createElement('wbr'));
-    });
   }
 
   function vacio(texto: string): HTMLElement {

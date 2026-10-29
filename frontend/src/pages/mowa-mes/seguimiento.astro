@@ -237,7 +237,8 @@ import '../../styles/mowa-mes.css';
 </Shell>
 
 <script>
-  import { ApiError, NetworkError } from '../../lib/api';
+  import { ApiError, NetworkError, mensajeDeError } from '../../lib/api';
+  import { $, ocupado } from '../../lib/dom';
   import {
     consumoLimite,
     descargarArchivoCampana,
@@ -277,8 +278,6 @@ import '../../styles/mowa-mes.css';
   const POR_PAGINA_CAMPANAS = 20;
   const POR_PAGINA_EXCLUSIONES = 50;
 
-  const $ = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
-
   const estado = {
     mes: mesDe(new Date()),
     consumo: null as ConsumoLimite | null,
@@ -302,20 +301,9 @@ import '../../styles/mowa-mes.css';
 
   // ---- Shared helpers -----------------------------------------------------------
 
-  function mensajeDeError(error: unknown): string {
-    if (error instanceof NetworkError) return t('console.upload.error.network');
-    if (error instanceof ApiError && error.detail) return error.detail;
-    return t('common.errorBody');
-  }
-
   function mostrarError(error: unknown): void {
     $<HTMLElement>('[data-error-body]').textContent = mensajeDeError(error);
     void openWhenFree(dialogos.error);
-  }
-
-  function ocupado(boton: HTMLButtonElement, si: boolean): void {
-    boton.dataset.loading = String(si);
-    boton.disabled = si;
   }
 
   function avisar(nodo: HTMLElement, texto: string): void {

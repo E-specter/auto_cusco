@@ -377,7 +377,8 @@ import '../styles/columnas.css';
 </Shell>
 
 <script>
-  import { ApiError, NetworkError } from '../lib/api';
+  import { ApiError, NetworkError, mensajeDeError } from '../lib/api';
+  import { $ } from '../lib/dom';
   import {
     guardarBorrador,
     listarDefiniciones,
@@ -466,7 +467,6 @@ import '../styles/columnas.css';
   import { EVENTO_SELECCION, montarSelector, type EstadoSeleccion } from '../scripts/selector-seleccion';
   import { EVENTO_VARIANTES, montarVariantes, type ControladorVariantes, type EstadoVariantes } from '../scripts/variantes-segmento';
 
-  const $ = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
   const CONTEXTO = 'cartera';
   const TIPOS: readonly TipoSalida[] = ['texto', 'numero', 'fecha', 'financiero'];
   const ESPERA_PREVIA = 500;
@@ -570,12 +570,6 @@ import '../styles/columnas.css';
   });
 
   // ---- Helpers ------------------------------------------------------------------------------
-
-  function mensajeDeError(error: unknown): string {
-    if (error instanceof NetworkError) return t('console.upload.error.network');
-    if (error instanceof ApiError && error.detail) return error.detail;
-    return t('common.errorBody');
-  }
 
   function mostrarError(error: unknown): void {
     $<HTMLElement>('[data-error-body]').textContent = mensajeDeError(error);

@@ -148,6 +148,7 @@ import '../styles/cartera.css';
     type PaginaCartera,
     type Resumen,
   } from '../lib/api';
+  import { $ } from '../lib/dom';
   import { applyTranslations, t } from '../lib/i18n';
   import {
     formatDate,
@@ -178,8 +179,6 @@ import '../styles/cartera.css';
     'saldo_capital_pendiente',
     'monto_cuota',
   ];
-
-  const $ = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
 
   const estado = {
     seleccion: null as EstadoSeleccion | null,

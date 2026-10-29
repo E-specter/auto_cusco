@@ -16,8 +16,10 @@ import {
   eliminarVersion,
   listarIncidencias,
   listarVersiones,
+  mensajeDeError,
   subirSabana,
 } from '../../src/lib/api';
+import { t } from '../../src/lib/i18n';
 
 /** Stand in for `fetch` with a fixed answer, and record how it was called. */
 function responderCon(estado: number, cuerpo: unknown = {}): ReturnType<typeof vi.fn> {
@@ -216,5 +218,22 @@ describe('cuerpo del error', () => {
     const fallo = (await listarVersiones().catch((error: unknown) => error)) as ApiError;
 
     expect(fallo.cuerpo).toBeNull();
+  });
+});
+
+describe('mensajeDeError (lo que se le dice al usuario)', () => {
+  it('sin respuesta del servidor: la frase de red', () => {
+    expect(mensajeDeError(new NetworkError())).toBe(t('console.upload.error.network'));
+  });
+
+  it('con respuesta del servidor: su propio motivo, no una frase genérica', () => {
+    const error = new ApiError(409, 'Solo una version terminada puede ser vigente', null);
+    expect(mensajeDeError(error)).toBe('Solo una version terminada puede ser vigente');
+  });
+
+  it('un ApiError sin motivo y cualquier otro error: la frase genérica', () => {
+    expect(mensajeDeError(new ApiError(500, '', null))).toBe(t('common.errorBody'));
+    expect(mensajeDeError(new Error('boom'))).toBe(t('common.errorBody'));
+    expect(mensajeDeError('texto')).toBe(t('common.errorBody'));
   });
 });
