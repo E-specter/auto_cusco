@@ -1,40 +1,25 @@
-"""Division de la carga en archivos (RF-MM-11).
+"""Division de la carga de MES en archivos (RF-MM-11).
 
-Primero por cantidad de filas, contando la supervision dentro del primer archivo.
-Despues se escribe cada tramo y se mide su tamano real: si pasa del maximo de
-bytes, se parte en tantos pedazos como haga falta y se vuelve a medir. Cada
-archivo conserva el orden de la carga.
+El algoritmo es el comun (`core/services/division_archivos.py`); aqui se arman las entidades de
+MES con su resultado. Los maximos (registros y bytes por archivo, `entities/mowa_mes.py`) los trae
+la configuracion de la campana. La supervision va al inicio de la carga, asi que cuenta dentro del
+primer archivo.
 """
 
-import math
 from collections.abc import Callable, Sequence
 
-from app.core.entities.mowa_mes_campana import (
-    ArchivoCarga,
-    ArchivoDemasiadoGrande,
-    ArchivoPrevisto,
-    FilaCarga,
-)
+from app.core.entities.mowa_mes_campana import ArchivoCarga, ArchivoPrevisto, FilaCarga
+from app.core.services import division_archivos
+from app.core.services.division_archivos import tramos_por_filas as tramos_por_filas
 
 EscritorArchivo = Callable[[Sequence[FilaCarga]], bytes]
-
-
-def tramos_por_filas(total: int, maximo: int) -> list[tuple[int, int]]:
-    """Rangos [inicio, fin) de hasta `maximo` filas cada uno."""
-    if maximo < 1:
-        raise ValueError("El maximo de filas por archivo debe ser positivo")
-    return [(inicio, min(inicio + maximo, total)) for inicio in range(0, total, maximo)]
 
 
 def previstos_por_filas(filas: Sequence[FilaCarga], maximo: int) -> list[ArchivoPrevisto]:
     """Estimacion sin escribir: al crear pueden salir mas archivos por el limite de bytes."""
     return [
-        ArchivoPrevisto(
-            numero=numero,
-            filas=fin - inicio,
-            supervision=sum(1 for fila in filas[inicio:fin] if fila.supervision),
-        )
-        for numero, (inicio, fin) in enumerate(tramos_por_filas(len(filas), maximo), start=1)
+        ArchivoPrevisto(numero=t.numero, filas=t.filas, supervision=t.supervision)
+        for t in division_archivos.previstos_por_filas(filas, maximo)
     ]
 
 
@@ -44,35 +29,13 @@ def dividir(
     maximo_bytes: int,
     escribir: EscritorArchivo,
 ) -> list[ArchivoCarga]:
-    tramos: list[tuple[Sequence[FilaCarga], bytes]] = []
-    for inicio, fin in tramos_por_filas(len(filas), maximo_filas):
-        tramos.extend(_por_bytes(filas[inicio:fin], maximo_bytes, escribir))
+    tramos = division_archivos.dividir(filas, escribir, maximo_filas, maximo_bytes)
     return [
         ArchivoCarga(
             numero=numero,
-            filas=len(tramo),
-            supervision=sum(1 for fila in tramo if fila.supervision),
-            contenido=contenido,
+            filas=len(tramo.filas),
+            supervision=tramo.supervision,
+            contenido=tramo.contenido,
         )
-        for numero, (tramo, contenido) in enumerate(tramos, start=1)
+        for numero, tramo in enumerate(tramos, start=1)
     ]
-
-
-def _por_bytes(
-    tramo: Sequence[FilaCarga], maximo_bytes: int, escribir: EscritorArchivo
-) -> list[tuple[Sequence[FilaCarga], bytes]]:
-    contenido = escribir(tramo)
-    if len(contenido) <= maximo_bytes:
-        return [(tramo, contenido)]
-    if len(tramo) == 1:
-        raise ArchivoDemasiadoGrande(
-            f"Una sola fila ocupa {len(contenido)} bytes, mas que el maximo de {maximo_bytes}"
-        )
-    # Una estimacion por proporcion evita partir a la mitad una y otra vez; si un
-    # pedazo sigue pasando, se vuelve a partir.
-    pedazos = max(2, math.ceil(len(contenido) / maximo_bytes))
-    tamano = math.ceil(len(tramo) / pedazos)
-    resultado: list[tuple[Sequence[FilaCarga], bytes]] = []
-    for inicio in range(0, len(tramo), tamano):
-        resultado.extend(_por_bytes(tramo[inicio : inicio + tamano], maximo_bytes, escribir))
-    return resultado

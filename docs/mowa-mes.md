@@ -99,7 +99,7 @@ Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6
 | Recorrido paginado compartido (C-2) | `app/core/services/seleccion_cartera/recorrido.py` (`SeleccionPaginada`, antes privada en `generacion_cargas/servicio.py`) |
 | Entidades | `app/core/entities/mowa_mes_campana.py` |
 | Caso de uso | `app/core/services/plataformas/mowa_mes/campana.py` (`CampanasMowaMesService`, `evaluar_producto`, `huella_speech`, `descripcion_sugerida`) |
-| División | `app/core/services/plataformas/mowa_mes/division.py` |
+| División | `app/core/services/plataformas/mowa_mes/division.py`: arma `ArchivoCarga` y `ArchivoPrevisto` con el algoritmo común de `app/core/services/division_archivos.py` (T-MM-C10, L-B9) |
 | Archivo `.xlsx` | `app/adapters/output/plataformas/mowa_mes/archivo_carga.py` (sobre el exportador XLSX) |
 | Persistencia | `app/adapters/persistence/repositorio_campanas_mowa_mes_postgres.py`, migración `7a91278726ae` |
 | API | `app/api/mowa_mes_campanas.py` |
@@ -190,6 +190,7 @@ El costo de la importación pasó de unos 0,9 s a unos 2,4 s, que sigue siendo d
 |---|---|
 | `tests/test_mowa_mes_campana.py` | Núcleo: exclusiones en orden, largo, segmento, supervisión, WhatsApp, límite, huella, división al crear, opciones, reporte |
 | `tests/test_mowa_mes_division.py` | Núcleo de la división y adaptador `.xlsx` (releído con openpyxl) |
+| `tests/test_division_archivos.py` | La división común, sin ninguna plataforma: tope de filas, corte por bytes medidos, corte recursivo y orden |
 | `tests/test_mowa_mes_conciliacion.py` | Núcleo de la conciliación y la normalización |
 | `tests/test_lector_reporte_mowa_mes.py` | Adaptador del reporte, con archivos generados en memoria |
 | `tests/test_codigos_mowa_mes.py` | Contrato: catálogo ↔ i18n del frontend |

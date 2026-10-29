@@ -13,6 +13,8 @@ from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 
+# Se reexporta con el mismo nombre: la API y las pruebas de MES lo importan de aqui.
+from app.core.entities.division_archivos import ArchivoDemasiadoGrande as ArchivoDemasiadoGrande
 from app.core.entities.gestiones_digitales import Supervisor
 from app.core.entities.mowa_mes import (
     CampoConfiguracion,
@@ -347,10 +349,6 @@ class CampanaNoEncontrada(Exception):
 class ArchivoNoEncontrado(Exception):
     def __init__(self, campana_id: int, numero: int) -> None:
         super().__init__(f"La campana {campana_id} no tiene el archivo {numero}")
-
-
-class ArchivoDemasiadoGrande(Exception):
-    """Una sola fila ya supera el tamano maximo: no hay division posible."""
 
 
 def _contar(valores) -> dict:

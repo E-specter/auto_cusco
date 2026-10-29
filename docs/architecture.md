@@ -72,6 +72,8 @@ La configuración (reglas de transformación, formatos, criterios de filtrado) s
 
 **El teléfono de RF-02** (9 dígitos que empiezan con 9) se define una sola vez en `backend/app/core/entities/telefono.py` (`numero_valido`, `TELEFONO_VALIDO`, `LARGO_TELEFONO`). La usan la ingesta de la sábana (`normalizar_telefono`), la supervisión, el WhatsApp de contacto de MOWA MES y `enlace_whatsapp` del motor de texto, que no importa de `gestiones_digitales` (lo comprueba `tests/test_texto_enriquecido_arquitectura.py`; T-MM-C10, L-B4).
 
+**La división de una carga en archivos** (por filas y por bytes medidos) es un servicio común, `backend/app/core/services/division_archivos.py` (`dividir`, `previstos_por_filas`, `tramos_por_filas`), con sus entidades en `core/entities/division_archivos.py`. No sabe de ninguna plataforma: recibe el escritor del archivo y los máximos, y cada conector arma sus propias entidades con el resultado. MOWA MES lo usa desde `plataformas/mowa_mes/division.py` con los máximos de su configuración (RF-MM-11); un conector nuevo con tope de registros o de tamaño lo reutiliza sin copiarlo (RF-31; T-MM-C10, L-B9).
+
 ## Stack tecnológico
 
 | Capa | Tecnología | Estado |
