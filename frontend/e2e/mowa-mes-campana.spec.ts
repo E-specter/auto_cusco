@@ -546,7 +546,7 @@ test.describe('F6-A: paginación de la previsualización (RF-MM-26)', () => {
 
     const numeros = page.locator('.mm-muestra__tabla tbody tr td:first-child');
     const paginador = page.getByRole('group', { name: 'Paginación de la muestra' });
-    const rango = paginador.locator('[data-rango]');
+    const rango = paginador.locator('[data-page-range]');
 
     await expect(numeros).toHaveCount(10);
     await expect(numeros.first()).toHaveText('900000001');
@@ -581,13 +581,13 @@ test.describe('F6-A: paginación de la previsualización (RF-MM-26)', () => {
 
     const paginador = page.getByRole('group', { name: 'Paginación de las exclusiones' });
     const siguiente = paginador.getByRole('button', { name: 'Siguientes' });
-    await expect(paginador.locator('[data-rango]')).toHaveText('1–10 de 100');
+    await expect(paginador.locator('[data-page-range]')).toHaveText('1–10 de 100');
     await siguiente.click();
     // Still enabled: the focus stays where the analyst left it.
     await expect(siguiente).toBeFocused();
     for (let i = 0; i < 8; i++) await siguiente.click();
 
-    await expect(paginador.locator('[data-rango]')).toHaveText('91–100 de 100');
+    await expect(paginador.locator('[data-page-range]')).toHaveText('91–100 de 100');
     await expect(siguiente).toBeDisabled();
     await expect(page.locator('.mm-exclusiones__tabla tbody tr')).toHaveCount(10);
     await expect(page.getByRole('cell', { name: `${'0'.repeat(14)}2099` })).toBeVisible();
@@ -630,8 +630,8 @@ test.describe('F6-A: paginación de la previsualización (RF-MM-26)', () => {
     api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaPaginada(11, 11) }];
     await page.getByLabel('WhatsApp de la campaña').fill('900000555');
 
-    await expect(page.locator('[data-muestra-pager] [data-rango]')).toHaveText('1–10 de 11');
-    await expect(page.locator('[data-exclusiones-pager] [data-rango]')).toHaveText('1–10 de 11');
+    await expect(page.locator('[data-muestra-pager] [data-page-range]')).toHaveText('1–10 de 11');
+    await expect(page.locator('[data-exclusiones-pager] [data-page-range]')).toHaveText('1–10 de 11');
   });
 
   test('al recalcular, las dos tablas vuelven a la página 1 y el foco no se mueve del campo', async ({ page }) => {
@@ -644,15 +644,15 @@ test.describe('F6-A: paginación de la previsualización (RF-MM-26)', () => {
     const exclusiones = page.getByRole('group', { name: 'Paginación de las exclusiones' });
     await muestra.getByRole('button', { name: 'Siguientes' }).click();
     await exclusiones.getByRole('button', { name: 'Siguientes' }).click();
-    await expect(muestra.locator('[data-rango]')).toHaveText('11–20 de 20');
-    await expect(exclusiones.locator('[data-rango]')).toHaveText('11–20 de 30');
+    await expect(muestra.locator('[data-page-range]')).toHaveText('11–20 de 20');
+    await expect(exclusiones.locator('[data-page-range]')).toHaveText('11–20 de 30');
 
     api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaPaginada(20, 30) }];
     const whatsapp = page.getByLabel('WhatsApp de la campaña');
     await whatsapp.fill('900000555');
 
-    await expect(muestra.locator('[data-rango]')).toHaveText('1–10 de 20');
-    await expect(exclusiones.locator('[data-rango]')).toHaveText('1–10 de 30');
+    await expect(muestra.locator('[data-page-range]')).toHaveText('1–10 de 20');
+    await expect(exclusiones.locator('[data-page-range]')).toHaveText('1–10 de 30');
     await expect(page.locator('.mm-muestra__tabla tbody tr td:first-child').first()).toHaveText('900000001');
     await expect(whatsapp).toBeFocused();
     expect(pedidosDePrevisualizacion(api).length).toBeGreaterThanOrEqual(2);
@@ -672,7 +672,7 @@ test.describe('F6-A: paginación de la previsualización (RF-MM-26)', () => {
     await expect(page.locator('[data-exclusiones-total]')).toHaveText('250 in total');
     await expect(page.locator('[data-exclusiones-truncadas]')).toContainText('Showing the first 100 of 250.');
     await expect(page.getByRole('group', { name: 'Exclusions pagination' })).toBeVisible();
-    await expect(page.locator('[data-muestra-pager] [data-rango]')).toHaveText('1–10 of 20');
+    await expect(page.locator('[data-muestra-pager] [data-page-range]')).toHaveText('1–10 of 20');
     await expect(
       page.getByRole('group', { name: 'Sample pagination' }).getByRole('button', { name: 'Next' }),
     ).toBeEnabled();

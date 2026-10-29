@@ -436,18 +436,6 @@
   }
 }
 
-.incidencias__pager {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  padding: var(--space-3) var(--space-4);
-  border-block-start: var(--color-border-hairline) solid var(--color-border);
-  background-color: var(--color-surface);
-  font-size: var(--text-xs);
-}
-
 /* ---- Dialog internals ---------------------------------------------------- */
 
 .dialog--wide {

@@ -74,7 +74,7 @@ test.describe('S1: listado de campañas', () => {
     await expect(filas.first().getByRole('cell', { name: '14.09 · 21:00' })).toBeVisible();
     await expect(page.locator('[data-campanas-cuenta]')).toHaveText('25 campañas');
     const paginador = page.locator('[data-campanas-pager]');
-    await expect(paginador.locator('[data-rango]')).toHaveText('1–20 de 25');
+    await expect(paginador.locator('[data-page-range]')).toHaveText('1–20 de 25');
 
     // RF-41: the detail never folds supervision into the products.
     await expect(page.getByRole('heading', { name: 'Campaña 25' })).toBeVisible();
@@ -85,7 +85,7 @@ test.describe('S1: listado de campañas', () => {
     await paginador.getByRole('button', { name: 'Siguientes' }).click();
 
     await expect(filas).toHaveCount(5);
-    await expect(paginador.locator('[data-rango]')).toHaveText('21–25 de 25');
+    await expect(paginador.locator('[data-page-range]')).toHaveText('21–25 de 25');
     expect(pedidosA(api, 'GET', '/mowa-mes/campanas').map((p) => parametro(p.ruta, 'desplazamiento'))).toEqual([
       '0',
       '20',
@@ -363,7 +363,7 @@ test.describe('S7: exclusiones', () => {
 
     const paginador = page.locator('[data-exclusiones-pager]');
     await paginador.getByRole('button', { name: 'Siguientes' }).click();
-    await expect(paginador.locator('[data-rango]')).toHaveText('51–100 de 120');
+    await expect(paginador.locator('[data-page-range]')).toHaveText('51–100 de 120');
 
     await page.getByLabel('Motivo', { exact: true }).selectOption('telefono_invalido');
 

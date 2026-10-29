@@ -616,15 +616,44 @@
    The foot of a paged table: previous, the range in mono, next. */
 
 .pager {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
-  flex-wrap: wrap;
   padding: var(--space-3) var(--space-4);
   border-block-start: var(--color-border-hairline) solid var(--color-border);
   background-color: var(--color-surface);
   font-size: var(--text-xs);
+}
+
+.pager__rango {
+  margin: 0;
+  text-align: center;
+}
+
+/* On a narrow screen the range goes on top, centred, and the two buttons under it, one at each end:
+   the buttons never wrap on their own. */
+@media (max-width: 30rem) {
+  .pager {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      'rango rango'
+      'prev next';
+  }
+
+  .pager__rango {
+    grid-area: rango;
+  }
+
+  .pager > [data-page-prev] {
+    grid-area: prev;
+    justify-self: start;
+  }
+
+  .pager > [data-page-next] {
+    grid-area: next;
+    justify-self: end;
+  }
 }
 
 /* ---- Stackable table ------------------------------------------------------

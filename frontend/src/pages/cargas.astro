@@ -144,12 +144,12 @@ import '../styles/console.css';
         </p>
       </div>
 
-      <div class="incidencias__pager" data-pager hidden>
+      <div class="pager" data-pager hidden>
         <button type="button" class="btn btn--sm" data-page-prev>
           <Icon name="chevron-left" size={16} />
           <span data-i18n="console.incidencias.prev">Anteriores</span>
         </button>
-        <p class="mono muted" data-page-range></p>
+        <p class="mono muted pager__rango" data-page-range aria-live="polite"></p>
         <button type="button" class="btn btn--sm" data-page-next>
           <span data-i18n="console.incidencias.next">Siguientes</span>
           <Icon name="chevron-right" size={16} />
@@ -471,6 +471,7 @@ import '../styles/console.css';
     type Version,
   } from '../lib/api';
   import { appendBreakable } from '../lib/dom';
+  import { pintarPaginador } from '../lib/paginacion';
   import { applyTranslations, t } from '../lib/i18n';
   import { openWhenFree } from '../lib/dialogs';
   import {
@@ -912,19 +913,11 @@ import '../styles/console.css';
 
     host.append(buildIncidenciasTable(page.incidencias));
 
-    const showPager = page.total > PAGE_SIZE;
-    pager.hidden = !showPager;
-    if (showPager) {
-      const from = state.offset + 1;
-      const to = Math.min(state.offset + page.incidencias.length, page.total);
-      $<HTMLElement>('[data-page-range]')!.textContent = t('console.incidencias.range', {
-        desde: formatNumber(from),
-        hasta: formatNumber(to),
-        total: formatNumber(page.total),
-      });
-      $<HTMLButtonElement>('[data-page-prev]')!.disabled = state.offset === 0;
-      $<HTMLButtonElement>('[data-page-next]')!.disabled = to >= page.total;
-    }
+    pintarPaginador(pager, {
+      desde: state.offset + 1,
+      hasta: Math.min(state.offset + page.incidencias.length, page.total),
+      total: page.total,
+    });
   }
 
   /**

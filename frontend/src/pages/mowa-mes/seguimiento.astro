@@ -92,13 +92,13 @@ import '../../styles/mowa-mes.css';
         <div data-campanas>
           <p class="empty" data-i18n="common.loading">Cargando</p>
         </div>
-        <div class="pager" data-campanas-pager hidden>
-          <button type="button" class="btn btn--sm" data-anterior>
+        <div class="pager" data-pager data-campanas-pager hidden>
+          <button type="button" class="btn btn--sm" data-page-prev>
             <Icon name="chevron-left" size={16} />
             <span data-i18n="console.incidencias.prev">Anteriores</span>
           </button>
-          <p class="mono muted" data-rango></p>
-          <button type="button" class="btn btn--sm" data-siguiente>
+          <p class="mono muted pager__rango" data-page-range aria-live="polite"></p>
+          <button type="button" class="btn btn--sm" data-page-next>
             <span data-i18n="console.incidencias.next">Siguientes</span>
             <Icon name="chevron-right" size={16} />
           </button>
@@ -176,13 +176,13 @@ import '../../styles/mowa-mes.css';
               <p class="mono muted mm-nota" data-exclusiones-cuenta aria-live="polite"></p>
             </div>
             <div data-exclusiones></div>
-            <div class="pager" data-exclusiones-pager hidden>
-              <button type="button" class="btn btn--sm" data-anterior>
+            <div class="pager" data-pager data-exclusiones-pager hidden>
+              <button type="button" class="btn btn--sm" data-page-prev>
                 <Icon name="chevron-left" size={16} />
                 <span data-i18n="console.incidencias.prev">Anteriores</span>
               </button>
-              <p class="mono muted" data-rango></p>
-              <button type="button" class="btn btn--sm" data-siguiente>
+              <p class="mono muted pager__rango" data-page-range aria-live="polite"></p>
+              <button type="button" class="btn btn--sm" data-page-next>
                 <span data-i18n="console.incidencias.next">Siguientes</span>
                 <Icon name="chevron-right" size={16} />
               </button>
@@ -239,6 +239,7 @@ import '../../styles/mowa-mes.css';
 <script>
   import { ApiError, NetworkError, mensajeDeError } from '../../lib/api';
   import { $, ocupado } from '../../lib/dom';
+  import { pintarPaginador } from '../../lib/paginacion';
   import { celda, celdaDeFila, cifra, tabla, vacio } from '../../lib/tabla-dom';
   import {
     consumoLimite,
@@ -369,21 +370,14 @@ import '../../styles/mowa-mes.css';
           .join('  ·  ');
   }
 
-  function pintarPaginador(
-    paginador: HTMLElement,
-    pagina: { total: number; limite: number; desplazamiento: number },
+  /** The API pages by offset: the range of what came back, out of the total. */
+  function pintarPaginas(
+    raiz: HTMLElement,
+    pagina: { total: number; desplazamiento: number },
     enPagina: number,
   ): void {
     const rango = rangoPagina(pagina.desplazamiento, enPagina, pagina.total);
-    paginador.hidden = pagina.total <= pagina.limite || !rango;
-    if (!rango) return;
-    paginador.querySelector<HTMLElement>('[data-rango]')!.textContent = t('console.incidencias.range', {
-      desde: formatNumber(rango.desde),
-      hasta: formatNumber(rango.hasta),
-      total: formatNumber(pagina.total),
-    });
-    paginador.querySelector<HTMLButtonElement>('[data-anterior]')!.disabled = pagina.desplazamiento === 0;
-    paginador.querySelector<HTMLButtonElement>('[data-siguiente]')!.disabled = rango.hasta >= pagina.total;
+    pintarPaginador(raiz, rango && { ...rango, total: pagina.total });
   }
 
   // ---- Monthly limit -----------------------------------------------------------
@@ -520,7 +514,7 @@ import '../../styles/mowa-mes.css';
     });
 
     host.append(envoltorio);
-    pintarPaginador(paginador, pagina, pagina.campanas.length);
+    pintarPaginas(paginador, pagina, pagina.campanas.length);
   }
 
   async function cargarCampanas(): Promise<void> {
@@ -541,8 +535,8 @@ import '../../styles/mowa-mes.css';
   }
 
   const paginadorCampanas = $<HTMLElement>('[data-campanas-pager]');
-  paginadorCampanas.querySelector('[data-anterior]')!.addEventListener('click', () => void moverCampanas(-1));
-  paginadorCampanas.querySelector('[data-siguiente]')!.addEventListener('click', () => void moverCampanas(1));
+  paginadorCampanas.querySelector('[data-page-prev]')!.addEventListener('click', () => void moverCampanas(-1));
+  paginadorCampanas.querySelector('[data-page-next]')!.addEventListener('click', () => void moverCampanas(1));
 
   // ---- Selected campaign -------------------------------------------------------
 
@@ -950,7 +944,7 @@ import '../../styles/mowa-mes.css';
       cuerpo.append(fila);
     });
     host.append(envoltorio);
-    pintarPaginador(paginador, pagina, pagina.exclusiones.length);
+    pintarPaginas(paginador, pagina, pagina.exclusiones.length);
   }
 
   async function cargarExclusiones(): Promise<void> {
@@ -981,11 +975,11 @@ import '../../styles/mowa-mes.css';
   });
 
   const paginadorExclusiones = $<HTMLElement>('[data-exclusiones-pager]');
-  paginadorExclusiones.querySelector('[data-anterior]')!.addEventListener('click', () => {
+  paginadorExclusiones.querySelector('[data-page-prev]')!.addEventListener('click', () => {
     estado.desplazamientoExclusiones = Math.max(0, estado.desplazamientoExclusiones - POR_PAGINA_EXCLUSIONES);
     void recargarExclusiones();
   });
-  paginadorExclusiones.querySelector('[data-siguiente]')!.addEventListener('click', () => {
+  paginadorExclusiones.querySelector('[data-page-next]')!.addEventListener('click', () => {
     estado.desplazamientoExclusiones += POR_PAGINA_EXCLUSIONES;
     void recargarExclusiones();
   });

@@ -211,7 +211,7 @@ for (const tema of ['light', 'dark'] as const) {
 
       // Second page: the previous button on, the next one disabled.
       await page.getByRole('group', { name: 'Paginación de la muestra' }).getByRole('button', { name: 'Siguientes' }).click();
-      await expect(page.locator('[data-muestra-pager] [data-rango]')).toHaveText('11–20 de 20');
+      await expect(page.locator('[data-muestra-pager] [data-page-range]')).toHaveText('11–20 de 20');
       await sinViolaciones(page);
     });
 

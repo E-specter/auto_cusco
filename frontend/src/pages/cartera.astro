@@ -129,7 +129,7 @@ import '../styles/cartera.css';
           <Icon name="chevron-left" size={16} />
           <span data-i18n="console.incidencias.prev">Anteriores</span>
         </button>
-        <p class="mono muted" data-page-range></p>
+        <p class="mono muted pager__rango" data-page-range aria-live="polite"></p>
         <button type="button" class="btn btn--sm" data-page-next>
           <span data-i18n="console.incidencias.next">Siguientes</span>
           <Icon name="chevron-right" size={16} />
@@ -149,6 +149,7 @@ import '../styles/cartera.css';
     type Resumen,
   } from '../lib/api';
   import { $ } from '../lib/dom';
+  import { pintarPaginador } from '../lib/paginacion';
   import { celda, vacio } from '../lib/tabla-dom';
   import { applyTranslations, t } from '../lib/i18n';
   import {
@@ -650,18 +651,11 @@ import '../styles/cartera.css';
     scroll.append(tabla);
     cuerpo.replaceChildren(scroll);
 
-    pager.hidden = total <= PAGINA;
-    if (!pager.hidden) {
-      const desde = estado.desplazamiento + 1;
-      const hasta = Math.min(estado.desplazamiento + estado.pagina.productos.length, total);
-      $<HTMLElement>('[data-page-range]').textContent = t('console.incidencias.range', {
-        desde: formatNumber(desde),
-        hasta: formatNumber(hasta),
-        total: formatNumber(total),
-      });
-      $<HTMLButtonElement>('[data-page-prev]').disabled = estado.desplazamiento === 0;
-      $<HTMLButtonElement>('[data-page-next]').disabled = hasta >= total;
-    }
+    pintarPaginador(pager, {
+      desde: estado.desplazamiento + 1,
+      hasta: Math.min(estado.desplazamiento + estado.pagina.productos.length, total),
+      total,
+    });
   }
 
   $<HTMLButtonElement>('[data-page-prev]').addEventListener('click', () => {
