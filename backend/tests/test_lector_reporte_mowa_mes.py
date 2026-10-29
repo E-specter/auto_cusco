@@ -65,6 +65,17 @@ def test_cabeceras_con_mayusculas_tildes_espacios_y_otro_orden() -> None:
     assert (fila.mes_id, fila.fecha_envio, fila.usuario) == (70001, "14/09/26", "usuario_sintetico")
 
 
+@pytest.mark.parametrize("posicion", range(len(COLUMNAS_REPORTE)))
+def test_cada_columna_se_encuentra_con_mayusculas_tildes_y_espacios_dobles(posicion) -> None:
+    cabeceras = list(COLUMNAS_REPORTE)
+    columna = cabeceras[posicion].upper().replace("ENVIO", "ENVÍO")
+    cabeceras[posicion] = "  " + columna.replace(" ", "   ") + "  "
+
+    (fila,) = LectorReporteMowaMes().leer(_xlsx(cabeceras, FILA))
+
+    assert fila == LectorReporteMowaMes().leer(_xlsx(COLUMNAS_REPORTE, FILA))[0]
+
+
 def test_celular_y_dni_guardados_como_numero_vuelven_a_texto() -> None:
     valores = [70001.0, 900000101, "ZZPRUEBA", "14/09/26", 1234567, "enviado", "Nro. LARGO", "u"]
 

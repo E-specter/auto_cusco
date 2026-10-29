@@ -10,20 +10,15 @@ archivo en Excel pueden quedar como numero; se vuelven texto sin decimales, y un
 """
 
 import io
-import unicodedata
 from datetime import date, datetime
 from typing import Any
 
 from python_calamine import CalamineError, CalamineWorkbook
 
 from app.core.entities.mowa_mes_reporte import COLUMNAS_REPORTE, FilaReporte, ReporteInvalido
+from app.core.services.mapeador.similitud import normalizar_cabecera
 
 LARGO_DNI = 8
-
-
-def _normalizar_cabecera(valor: Any) -> str:
-    texto = unicodedata.normalize("NFD", str(valor or "").strip().lower())
-    return " ".join("".join(c for c in texto if not unicodedata.combining(c)).split())
 
 
 def _vacia(celda: Any) -> bool:
@@ -78,7 +73,7 @@ class LectorReporteMowaMes:
         indice = next((i for i, f in enumerate(filas) if any(not _vacia(c) for c in f)), None)
         if indice is None:
             raise ReporteInvalido("La hoja no tiene cabecera ni filas")
-        cabeceras = [_normalizar_cabecera(c) for c in filas[indice]]
+        cabeceras = [normalizar_cabecera(str(c or "")) for c in filas[indice]]
         faltan = [nombre for nombre in COLUMNAS_REPORTE if nombre not in cabeceras]
         if faltan:
             raise ReporteInvalido(f"Faltan columnas del reporte de enviados: {', '.join(faltan)}")
