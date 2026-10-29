@@ -496,6 +496,17 @@
   overflow-wrap: anywhere;
 }
 
+/* A figure that is not an amount — pending, unavailable — is text: read at text size and muted
+   rather than set in the numeral style above. */
+.stat__value.muted {
+  font-family: var(--font-primary);
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: normal;
+  line-height: 1.3;
+  color: var(--color-text-muted);
+}
+
 .stat__label {
   font-family: var(--font-primary);
   font-size: var(--text-xs);

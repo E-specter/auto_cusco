@@ -559,18 +559,6 @@
   margin-block-start: var(--space-1);
 }
 
-/* Costs (RF-MM-24). A figure that is not an amount — "Pendiente del reporte",
-   "No disponible" — is text, so it is read at text size and muted rather than
-   set in the numeral style of a `.stat__value`. */
-.stat__value.muted {
-  font-family: var(--font-primary);
-  font-size: var(--text-base);
-  font-weight: 600;
-  letter-spacing: normal;
-  line-height: 1.3;
-  color: var(--color-text-muted);
-}
-
 .mm-conciliacion__costo {
   font-size: var(--text-sm);
 }
