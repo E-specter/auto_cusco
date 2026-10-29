@@ -41,6 +41,8 @@ MARCADOR_CAMPANA = "[campana]"  # la campana todavia no existe al previsualizar 
 
 _NOMBRES = tuple(v.nombre for v in VARIABLES_PLANTILLA)
 _VARIABLE = re.compile(r"\{([^{}]*)\}")
+# No es el saneador de exportadores/comunes.py: este conserva tildes, la enie y espacios
+# (RF-MM-25) y el comun pasa a ASCII.
 _PROHIBIDOS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 _VALIDAS = ", ".join("{" + nombre + "}" for nombre in _NOMBRES)
 # Variables cuyo valor sale de como se divida la carga: el nombre previsto es una estimacion.

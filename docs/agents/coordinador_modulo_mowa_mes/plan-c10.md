@@ -159,6 +159,8 @@ Coincide con lo que estimó C9 (§C.3): limpieza barata, lector y división, uno
 
 ## 7. E4, una decisión nueva para el usuario: el saneador del nombre de archivo
 
+**Decidido: A (usuario, 2026-10-29).**
+
 **Contexto.** C9 lo dio por duplicado, y no lo es: son dos políticas.
 - Los archivos de MES se nombran con la plantilla del usuario (RF-MM-25). El saneador de MES solo quita lo que Windows prohíbe y los caracteres de control, así que un nombre como «Campaña_Preventiva 1.xlsx», sintético, queda tal cual.
 - El saneador común es para los archivos de las definiciones y para las cabeceras HTTP. Pasa a ASCII, cambia los espacios por `_` y corta en 80 caracteres.

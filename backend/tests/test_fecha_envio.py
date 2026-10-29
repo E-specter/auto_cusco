@@ -25,6 +25,7 @@ from app.core.services.contextos_texto import RegistroContextos, contexto_carter
 from app.core.services.fecha_envio import (
     EnvioDeCarga,
     FechaEnvioAnterior,
+    fecha_en_lima,
     hoy_en_lima,
     resolver_fecha_envio,
 )
@@ -57,6 +58,15 @@ def test_hoy_en_lima_es_la_fecha_de_lima_aunque_en_utc_ya_sea_manana(monkeypatch
     monkeypatch.setattr(modulo, "ahora_en_lima", lambda: datetime(2026, 10, 22, 3, 0, tzinfo=UTC))
 
     assert hoy_en_lima() == date(2026, 10, 21)
+
+
+def test_fecha_en_lima_pasa_un_momento_con_zona_a_lima() -> None:
+    assert fecha_en_lima(datetime(2026, 10, 22, 3, 0, tzinfo=UTC)) == date(2026, 10, 21)
+    assert fecha_en_lima(datetime(2026, 10, 22, 5, 0, tzinfo=UTC)) == date(2026, 10, 22)
+
+
+def test_fecha_en_lima_toma_un_momento_sin_zona_como_hora_de_lima() -> None:
+    assert fecha_en_lima(datetime(2026, 10, 22, 3, 0)) == date(2026, 10, 22)
 
 
 def test_hoy_en_lima_pasa_de_dia_a_las_cero_horas_de_lima(monkeypatch) -> None:

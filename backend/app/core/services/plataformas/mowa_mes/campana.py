@@ -57,7 +57,8 @@ from app.core.entities.mowa_mes_costo import PlantillaInvalida
 from app.core.ports.repositorio_campanas_mowa_mes_port import RepositorioCampanasMowaMesPort
 from app.core.ports.repositorio_mowa_mes_port import RepositorioMowaMesPort
 from app.core.ports.repositorio_supervision_port import RepositorioSupervisionPort
-from app.core.services.calendario.servicio import ZONA, ahora_en_lima
+from app.core.services.calendario.servicio import ahora_en_lima
+from app.core.services.fecha_envio import fecha_en_lima
 from app.core.services.gestiones_digitales import supervision
 from app.core.services.plataformas.mowa_mes import (
     costos,
@@ -189,11 +190,6 @@ def descripcion_sugerida(filtros: Sequence[Filtro], catalogo: CatalogoCartera) -
     while largo_utf16(corte) > LARGO_MAXIMO_DESCRIPCION - 3:  # recorta de a un caracter entero
         corte = corte[:-1]
     return corte + "..."
-
-
-def fecha_en_lima(momento: datetime) -> date:
-    """Una fecha y hora sin zona se toma como hora de Lima."""
-    return momento.date() if momento.tzinfo is None else momento.astimezone(ZONA).date()
 
 
 def _vacio(valor: Any) -> bool:

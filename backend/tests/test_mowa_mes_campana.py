@@ -437,6 +437,16 @@ def test_el_limite_se_imputa_al_mes_de_la_fecha_de_envio() -> None:
     assert (armada.consumo.mes, armada.consumo.esta_campana) == (date(2026, 10, 1), 6)
 
 
+def test_un_envio_con_zona_se_pasa_a_lima_antes_de_imputar_el_mes() -> None:
+    servicio, campanas, _ = armar_servicio([producto(1)])
+
+    # 03:00 UTC del 1 de octubre son las 22:00 del 30 de septiembre en Lima.
+    armada = servicio.previsualizar(peticion(envios=(datetime(2026, 10, 1, 3, 0, tzinfo=UTC),)))
+
+    assert campanas.meses_consultados == [date(2026, 9, 1)]
+    assert armada.fecha_envio == date(2026, 9, 30)
+
+
 def test_superar_el_limite_se_advierte_y_crear_exige_confirmacion() -> None:
     servicio, campanas, _ = armar_servicio([producto(1)], cargados_mes=2_499_995)
 

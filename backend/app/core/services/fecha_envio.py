@@ -17,7 +17,7 @@ El nucleo de segmentacion no conoce la fecha de envio: recibe los dias ya ajusta
 
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -39,11 +39,16 @@ VARIABLES_DE_ENVIO: dict[str, TipoValor] = {
 Reloj = Callable[[], date]
 
 
+def fecha_en_lima(momento: datetime) -> date:
+    """La fecha de un momento en America/Lima. Uno sin zona se toma como hora de Lima."""
+    return momento.date() if momento.tzinfo is None else momento.astimezone(ZONA).date()
+
+
 def hoy_en_lima() -> date:
     """La fecha de hoy en America/Lima, aunque el servidor corra en otra zona (o en UTC, donde ya
     puede ser «manana»). Es la unica forma de preguntar «hoy» en una carga: nada de `date.today()`.
     """
-    return ahora_en_lima().astimezone(ZONA).date()
+    return fecha_en_lima(ahora_en_lima())
 
 
 class FechaEnvioAnterior(Exception):
