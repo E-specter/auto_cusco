@@ -51,7 +51,7 @@ class ReportesMowaMesService:
         self, campana_id: int, nombre_archivo: str, contenido: bytes, reemplazar: bool = False
     ) -> EstadoConciliacion:
         self._campana(campana_id)
-        filas = self._lector.leer(contenido)
+        filas = self._lector.leer(contenido, nombre_archivo)
         por_id: dict[int, list[FilaReporte]] = defaultdict(list)
         for fila in filas:
             por_id[fila.mes_id].append(fila)

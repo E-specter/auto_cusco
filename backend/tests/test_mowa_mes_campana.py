@@ -601,7 +601,7 @@ class LectorFalso:
     def __init__(self, filas):
         self.filas = filas
 
-    def leer(self, contenido):
+    def leer(self, contenido, nombre_archivo):
         return tuple(self.filas)
 
 

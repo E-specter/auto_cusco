@@ -1,6 +1,8 @@
 """Pruebas del lector del reporte de enviados de MES (RF-MM-20), con archivos en memoria."""
 
 import io
+import re
+import zipfile
 
 import openpyxl
 import pytest
@@ -110,3 +112,102 @@ def test_un_id_que_no_es_numero() -> None:
 def test_un_archivo_que_no_es_hoja_de_calculo() -> None:
     with pytest.raises(ReporteInvalido, match="legible"):
         LectorReporteMowaMes().leer(b"esto no es un xlsx")
+
+
+# --- Sobre el lector general (T-MM-C10, L-B7): lo de siempre, con los textos de siempre ---------
+
+
+def _libro(*hojas: tuple[str, list[list]]) -> bytes:
+    libro = openpyxl.Workbook()
+    libro.remove(libro.active)
+    for nombre, filas in hojas:
+        hoja = libro.create_sheet(nombre)
+        for fila in filas:
+            hoja.append(fila)
+    buffer = io.BytesIO()
+    libro.save(buffer)
+    return buffer.getvalue()
+
+
+def _reescrito(contenido: bytes, cambiar) -> bytes:
+    origen = zipfile.ZipFile(io.BytesIO(contenido))
+    salida = io.BytesIO()
+    with zipfile.ZipFile(salida, "w") as destino:
+        for nombre in origen.namelist():
+            destino.writestr(nombre, cambiar(nombre, origen.read(nombre)))
+    return salida.getvalue()
+
+
+def _sin_hojas(nombre: str, datos: bytes) -> bytes:
+    if nombre != "xl/workbook.xml":
+        return datos
+    return re.sub(rb"<sheets>.*</sheets>", b"<sheets></sheets>", datos, flags=re.S)
+
+
+def test_toma_la_primera_hoja_aunque_haya_otra_llamada_vencida() -> None:
+    contenido = _libro(
+        ("Hoja1", [list(COLUMNAS_REPORTE), FILA]), ("VENCIDA", [["otra", "cosa"], [1, 2]])
+    )
+
+    (fila,) = LectorReporteMowaMes().leer(contenido, "reporte.xlsx")
+
+    assert fila.mes_id == 70001
+
+
+def test_la_primera_hoja_vacia_no_se_salta_a_otra() -> None:
+    contenido = _libro(("Vacia", []), ("Hoja1", [list(COLUMNAS_REPORTE), FILA]))
+
+    with pytest.raises(ReporteInvalido, match="no tiene cabecera ni filas"):
+        LectorReporteMowaMes().leer(contenido, "reporte.xlsx")
+
+
+def test_un_csv_sigue_siendo_un_reporte_invalido() -> None:
+    salto = chr(10)
+    csv = ";".join(COLUMNAS_REPORTE) + salto + ";".join(str(v) for v in FILA) + salto
+
+    with pytest.raises(ReporteInvalido, match="hoja de calculo legible"):
+        LectorReporteMowaMes().leer(csv.encode("utf-8"), "reporte.csv")
+
+
+def test_un_json_sigue_siendo_un_reporte_invalido() -> None:
+    with pytest.raises(ReporteInvalido, match="hoja de calculo legible"):
+        LectorReporteMowaMes().leer(b'[{"id": 1}]', "reporte.json")
+
+
+def test_un_archivo_vacio_no_es_legible() -> None:
+    with pytest.raises(ReporteInvalido, match="hoja de calculo legible"):
+        LectorReporteMowaMes().leer(b"", "reporte.xlsx")
+
+
+def test_una_hoja_que_no_se_puede_leer_conserva_su_texto() -> None:
+    contenido = _reescrito(
+        _xlsx(COLUMNAS_REPORTE, FILA),
+        lambda nombre, datos: b"<roto" if nombre == "xl/worksheets/sheet1.xml" else datos,
+    )
+
+    with pytest.raises(ReporteInvalido, match="^No se pudo leer la primera hoja del archivo$"):
+        LectorReporteMowaMes().leer(contenido, "reporte.xlsx")
+
+
+def test_un_libro_sin_hojas_conserva_su_texto() -> None:
+    contenido = _reescrito(
+        _xlsx(COLUMNAS_REPORTE, FILA),
+        _sin_hojas,
+    )
+
+    with pytest.raises(ReporteInvalido, match="^El archivo no tiene hojas$"):
+        LectorReporteMowaMes().leer(contenido, "reporte.xlsx")
+
+
+def test_el_nombre_es_opcional_y_da_lo_mismo_que_reporte_xlsx() -> None:
+    contenido = _xlsx(COLUMNAS_REPORTE, FILA)
+
+    assert LectorReporteMowaMes().leer(contenido) == LectorReporteMowaMes().leer(
+        contenido, "reporte.xlsx"
+    )
+
+
+def test_un_xlsx_con_otra_extension_se_rechaza_con_el_texto_de_siempre() -> None:
+    # Es lo unico que cambia a proposito (declarado): antes el nombre no se miraba.
+    with pytest.raises(ReporteInvalido, match="hoja de calculo legible"):
+        LectorReporteMowaMes().leer(_xlsx(COLUMNAS_REPORTE, FILA), "reporte.csv")

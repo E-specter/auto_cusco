@@ -1,25 +1,31 @@
-"""Lector del reporte "Campanas de enviados" de MES (RF-MM-20), con python-calamine.
+"""Lector del reporte "Campanas de enviados" de MES (RF-MM-20), sobre el lector general (RF-57).
 
-Toma la primera hoja, busca la cabecera en la primera fila con datos y exige las
-8 columnas de RF-MM-20 (sin distinguir mayusculas, tildes ni espacios de los
-extremos). Si falta alguna o no hay filas, rechaza el archivo con el motivo.
+El archivo lo lee `LectorTablaPort`; aqui se toma la primera hoja, se exigen las 8 columnas de
+RF-MM-20 (sin distinguir mayusculas, tildes ni espacios de los extremos) y se le da su tipo a cada
+valor. Si falta alguna columna o no hay filas, rechaza el archivo con el motivo. Solo acepta una
+hoja de calculo: un CSV o un JSON es un reporte invalido.
 
 Tipos: MES entrega `celular` y `dni` como texto, pero si alguien abre y guarda el
 archivo en Excel pueden quedar como numero; se vuelven texto sin decimales, y un
 `dni` numerico de hasta 8 digitos recupera los ceros a la izquierda.
 """
 
-import io
 from datetime import date, datetime
 from typing import Any
 
-from python_calamine import CalamineError, CalamineWorkbook
-
+from app.adapters.input.lector_tabla import LectorTabla
+from app.core.entities.lectura_tabla import OpcionesLectura, TablaLeida
 from app.core.entities.mowa_mes_reporte import COLUMNAS_REPORTE, FilaReporte, ReporteInvalido
-from app.core.entities.valores import vacia
+from app.core.entities.sabana import ArchivoIlegible, HojaVacia
+from app.core.ports.lector_tabla_port import LectorTablaPort
 from app.core.services.mapeador.similitud import normalizar_cabecera
 
 LARGO_DNI = 8
+NOMBRE_POR_DEFECTO = "reporte.xlsx"
+
+_NO_LEGIBLE = "El archivo no es una hoja de calculo legible"
+_SIN_HOJAS = "El archivo no tiene hojas"
+_HOJA_NO_LEIBLE = "No se pudo leer la primera hoja del archivo"
 
 
 def _entero_como_texto(valor: Any) -> str:
@@ -52,43 +58,41 @@ def _mes_id(valor: Any, fila: int) -> int:
     return int(texto)
 
 
-class LectorReporteMowaMes:
-    def leer(self, contenido: bytes) -> tuple[FilaReporte, ...]:
-        try:
-            libro = CalamineWorkbook.from_filelike(io.BytesIO(contenido))
-        except CalamineError as exc:
-            raise ReporteInvalido("El archivo no es una hoja de calculo legible") from exc
-        try:
-            if not libro.sheet_names:
-                raise ReporteInvalido("El archivo no tiene hojas")
-            filas = libro.get_sheet_by_index(0).to_python(skip_empty_area=False)
-        except CalamineError as exc:
-            raise ReporteInvalido("No se pudo leer la primera hoja del archivo") from exc
-        finally:
-            libro.close()
+def _motivo(error: ArchivoIlegible) -> str:
+    """El texto de siempre para lo que el lector general rechaza (se reconoce por su mensaje)."""
+    mensaje = str(error)
+    if mensaje.startswith("No se pudo leer la hoja"):
+        return _HOJA_NO_LEIBLE
+    if mensaje.endswith("no tiene hojas"):
+        return _SIN_HOJAS
+    return _NO_LEGIBLE
 
-        indice = next((i for i, f in enumerate(filas) if any(not vacia(c) for c in f)), None)
-        if indice is None:
-            raise ReporteInvalido("La hoja no tiene cabecera ni filas")
-        cabeceras = [normalizar_cabecera(str(c or "")) for c in filas[indice]]
+
+class LectorReporteMowaMes:
+    def __init__(self, lector: LectorTablaPort | None = None) -> None:
+        self._lector = lector or LectorTabla()
+
+    def leer(
+        self, contenido: bytes, nombre_archivo: str = NOMBRE_POR_DEFECTO
+    ) -> tuple[FilaReporte, ...]:
+        tabla = self._tabla(contenido, nombre_archivo)
+        cabeceras = [normalizar_cabecera(str(c or "")) for c in tabla.cabeceras]
         faltan = [nombre for nombre in COLUMNAS_REPORTE if nombre not in cabeceras]
         if faltan:
             raise ReporteInvalido(f"Faltan columnas del reporte de enviados: {', '.join(faltan)}")
         posicion = {nombre: cabeceras.index(nombre) for nombre in COLUMNAS_REPORTE}
 
         resultado: list[FilaReporte] = []
-        for numero, celdas in enumerate(filas[indice + 1 :], start=indice + 2):
-            if all(vacia(c) for c in celdas):
-                continue
+        for cruda in tabla.filas:
 
-            def celda(nombre: str, celdas=celdas) -> Any:
+            def celda(nombre: str, celdas=cruda.celdas) -> Any:
                 i = posicion[nombre]
                 return celdas[i] if i < len(celdas) else None
 
             resultado.append(
                 FilaReporte(
-                    fila=numero,
-                    mes_id=_mes_id(celda("id"), numero),
+                    fila=cruda.numero_fila,
+                    mes_id=_mes_id(celda("id"), cruda.numero_fila),
                     celular=_entero_como_texto(celda("celular")),
                     mensaje="" if celda("mensaje") is None else str(celda("mensaje")),
                     fecha_envio=_fecha(celda("fecha de envio")),
@@ -101,3 +105,19 @@ class LectorReporteMowaMes:
         if not resultado:
             raise ReporteInvalido("El reporte no tiene filas")
         return tuple(resultado)
+
+    def _tabla(self, contenido: bytes, nombre_archivo: str) -> TablaLeida:
+        """La primera hoja del archivo (RF-MM-20); el lector general prefiere `VENCIDA`."""
+        try:
+            tabla = self._lector.leer(contenido, nombre_archivo)
+            if tabla.hojas and tabla.hoja != tabla.hojas[0]:
+                tabla = self._lector.leer(
+                    contenido, nombre_archivo, OpcionesLectura(hoja=tabla.hojas[0])
+                )
+        except HojaVacia as exc:
+            raise ReporteInvalido("La hoja no tiene cabecera ni filas") from exc
+        except ArchivoIlegible as exc:
+            raise ReporteInvalido(_motivo(exc)) from exc
+        if not tabla.formato.es_hoja_de_calculo:
+            raise ReporteInvalido(_NO_LEGIBLE)
+        return tabla
