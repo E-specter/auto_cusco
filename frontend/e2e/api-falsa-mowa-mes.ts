@@ -34,6 +34,7 @@ import type {
   SpeechNuevoEntrada,
   VersionSpeech,
 } from '../src/lib/api-mowa-mes';
+import { json, siguiente } from './apoyo';
 
 type Respuesta = { estado: number; cuerpo?: unknown };
 
@@ -722,9 +723,6 @@ export function apiMowaMes(): ApiFalsaMowaMes {
   };
 }
 
-const json = (route: Route, estado: number, cuerpo: unknown) =>
-  route.fulfill({ status: estado, contentType: 'application/json', body: JSON.stringify(cuerpo) });
-
 /** FastAPI's validation answer: `detail` is a list of objects, not a sentence. */
 const invalido = (route: Route, campo: string, mensaje: string) =>
   json(route, 422, { detail: [{ loc: ['body', campo], msg: mensaje, type: 'value_error' }] });
@@ -738,10 +736,6 @@ const enRango = (valor: unknown, minimo: number, maximo: number) =>
 /** The rate and template the campaign endpoints read from the saved configuration. */
 function contextoDe(estado: ApiFalsaMowaMes): ContextoCostos {
   return { tarifa: estado.configuracion.tarifa_sms, plantilla: estado.configuracion.plantilla_nombre_archivo };
-}
-
-function siguiente(cola: Respuesta[]): Respuesta | undefined {
-  return cola.length > 1 ? cola.shift() : cola[0];
 }
 
 /** Same numbering rule as the backend: one sequence, procedencia by procedencia. */

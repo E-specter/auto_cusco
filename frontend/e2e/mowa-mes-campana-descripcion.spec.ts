@@ -9,11 +9,9 @@
  * so the fallback is the real path there. Every text is synthetic.
  */
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-import type { Campos, SeleccionGuardada, Version } from '../src/lib/api';
 import type { PeticionCampanaEntrada } from '../src/lib/api-mowa-mes';
-import { camposSinteticos, seleccionGuardada, version } from './api-falsa';
 import {
   acortarDescripcion,
   apiMowaMes,
@@ -21,6 +19,7 @@ import {
   previsualizacionCampanaSintetica,
   type ApiFalsaMowaMes,
 } from './api-falsa-mowa-mes';
+import { montarSeleccion } from './apoyo-seleccion';
 
 const RUTA = '/mowa-mes/campana';
 const SUGERIDA = 'CajaCusco 9 <= dias atraso <= 30';
@@ -30,25 +29,6 @@ const FALLO_VACIO = 'No se pudo copiar la descripción sugerida. Escríbela en e
 const PEGADO_CORTADO = 'Se pegó solo lo que cabe: los primeros 100 caracteres.';
 
 test.use({ timezoneId: 'America/Lima', reducedMotion: 'reduce' });
-
-const json = (route: Route, estado: number, cuerpo: unknown) =>
-  route.fulfill({ status: estado, contentType: 'application/json', body: JSON.stringify(cuerpo) });
-
-/** The compact selector's own calls, layered over the module's mock (as in mowa-mes-campana.spec.ts). */
-async function montarSeleccion(page: Page): Promise<void> {
-  const versiones: Version[] = [version({ fecha_corte: '2026-09-13', vigente: true })];
-  const campos: Campos = camposSinteticos();
-  const selecciones: SeleccionGuardada[] = [seleccionGuardada({ id: 1, nombre: 'Preventiva top 1000', cantidad: 1000 })];
-  await page.route('**/api/**', async (route) => {
-    const url = new URL(route.request().url());
-    const ruta = url.pathname.replace(/^\/api/, '');
-    const metodo = route.request().method();
-    if (ruta === '/cargas' && metodo === 'GET') return json(route, 200, versiones);
-    if (ruta === '/cartera/campos') return json(route, 200, campos);
-    if (ruta === '/selecciones' && metodo === 'GET') return json(route, 200, selecciones);
-    return route.fallback();
-  });
-}
 
 function entradaMinima(): PeticionCampanaEntrada {
   return {

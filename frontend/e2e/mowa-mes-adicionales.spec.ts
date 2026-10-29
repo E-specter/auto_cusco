@@ -10,11 +10,9 @@
  * `CAPTURAS_F11`: if set, the new states are also saved there as screenshots, light and dark, for the review.
  */
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import type { Campos, SeleccionGuardada, Version } from '../src/lib/api';
 import type { Exclusion, PeticionCampanaEntrada } from '../src/lib/api-mowa-mes';
-import { camposSinteticos, seleccionGuardada, version } from './api-falsa';
 import {
   apiMowaMes,
   montarApiMowaMes,
@@ -23,6 +21,8 @@ import {
 } from './api-falsa-mowa-mes';
 import { apiSpeechV2, montarApiSpeechV2, versionV2Sintetica, type ApiFalsaSpeechV2 } from './api-falsa-speech-v2';
 import { apiTextoEnriquecidoVacia, variablesAdicionalesSinteticas } from './api-falsa-texto-enriquecido';
+import { json } from './apoyo';
+import { montarSeleccion } from './apoyo-seleccion';
 
 const REGLAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 const CAPTURAS = process.env.CAPTURAS_F11;
@@ -65,9 +65,6 @@ async function sinViolaciones(page: Page): Promise<void> {
   const resumen = resultado.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
   expect(resumen).toEqual([]);
 }
-
-const json = (route: Route, estado: number, cuerpo: unknown) =>
-  route.fulfill({ status: estado, contentType: 'application/json', body: JSON.stringify(cuerpo) });
 
 // ---- Follow-up -------------------------------------------------------------------------------
 
@@ -161,22 +158,6 @@ function entradaMinima(): PeticionCampanaEntrada {
     programacion: 'hora_determinada',
     envios: ['2026-09-14T09:00:00-05:00'],
   };
-}
-
-/** The compact selector's own calls, layered over the module's mock (as in mowa-mes-campana.spec.ts). */
-async function montarSeleccion(page: Page): Promise<void> {
-  const versiones: Version[] = [version({ fecha_corte: '2026-09-13', vigente: true })];
-  const campos: Campos = camposSinteticos();
-  const selecciones: SeleccionGuardada[] = [seleccionGuardada({ id: 1, nombre: 'Preventiva top 1000', cantidad: 1000 })];
-  await page.route('**/api/**', async (route) => {
-    const url = new URL(route.request().url());
-    const ruta = url.pathname.replace(/^\/api/, '');
-    const metodo = route.request().method();
-    if (ruta === '/cargas' && metodo === 'GET') return json(route, 200, versiones);
-    if (ruta === '/cartera/campos') return json(route, 200, campos);
-    if (ruta === '/selecciones' && metodo === 'GET') return json(route, 200, selecciones);
-    return route.fallback();
-  });
 }
 
 /** The campaign page with the preview scripted: `parcial` overrides what the fake builds (exclusions, archived fields). */

@@ -11,10 +11,10 @@
  * Every value is invented: no sheet, name, document or phone from the real
  * data reaches a test (/AGENTS.md). Phones use the synthetic 900000xxx range.
  */
-import type { Route } from '@playwright/test';
 
 import type { components } from '../src/lib/contrato-api';
 import type { Manejador } from './api-falsa';
+import { json } from './apoyo';
 
 type Esquemas = components['schemas'];
 type Catalogo = Esquemas['CatalogoRespuesta'];
@@ -311,9 +311,6 @@ export function apiTextoEnriquecidoVacia(): ApiFalsaTextoEnriquecido {
   };
   return estado;
 }
-
-const json = (route: Route, estado: number, cuerpo: unknown) =>
-  route.fulfill({ status: estado, contentType: 'application/json', body: JSON.stringify(cuerpo) });
 
 /**
  * The engine's routes, as a handler `montarApi` chains before its 404

@@ -9,7 +9,7 @@
  * problems, a segment with nothing is refused, and a preview gives each segment's maximum length,
  * its level or the reason it has none. Every value is invented.
  */
-import type { Page, Route } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 import type { LargoSegmento, PartesSpeech, VersionSpeech } from '../src/lib/api-mowa-mes';
 import type { BorradorV2, ExpresionSegmentoEntrada, ProblemaSpeech } from '../src/lib/mowa-mes-speech-v2';
@@ -18,6 +18,7 @@ import { caracteresQuitados, normalizarGsm7 } from './api-falsa-gsm7';
 import type { ApiFalsaMowaMes } from './api-falsa-mowa-mes';
 import type { ApiFalsaTextoEnriquecido, } from './api-falsa-texto-enriquecido';
 import { manejarTextoEnriquecido } from './api-falsa-texto-enriquecido';
+import { json } from './apoyo';
 
 type Esquemas = components['schemas'];
 type ExpresionRespuesta = Esquemas['ExpresionSegmentoRespuesta'];
@@ -33,9 +34,6 @@ export interface ApiFalsaSpeechV2 {
 export function apiSpeechV2(): ApiFalsaSpeechV2 {
   return { pedidos: [], respuestasCrear: [] };
 }
-
-const json = (route: Route, estado: number, cuerpo: unknown) =>
-  route.fulfill({ status: estado, contentType: 'application/json', body: JSON.stringify(cuerpo) });
 
 const texto = (valor: string): NodoGuardado => ({ tipo: 'texto', valor });
 const variable = (nombre: string, funciones: Array<{ nombre: string; args: Array<string | number> }> = [], obligatoria = false): NodoGuardado => ({

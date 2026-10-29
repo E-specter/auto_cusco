@@ -6,7 +6,7 @@
  * picker, so it needs the general `/cartera`, `/cargas` and `/selecciones`
  * routes alongside the module's own. Playwright resolves overlapping
  * `page.route` handlers most-recently-registered first, so `montarSeleccion`
- * below is registered AFTER `montarApiMowaMes` and answers only the handful
+ * (`apoyo-seleccion.ts`) is registered AFTER `montarApiMowaMes` and answers only the handful
  * of routes the compact selector calls, falling back to the module's mock
  * for everything else — neither fake file is modified.
  *
@@ -14,11 +14,10 @@
  * MES ids in 99xxxxxxx.
  */
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-import type { Campos, SeleccionGuardada, Version } from '../src/lib/api';
 import type { CodigoMowaMes, CreacionCampanaEntrada, PeticionCampanaEntrada } from '../src/lib/api-mowa-mes';
-import { camposSinteticos, seleccionGuardada, version } from './api-falsa';
+import { seleccionGuardada } from './api-falsa';
 import {
   apiMowaMes,
   campanaDesdeEntrada,
@@ -26,28 +25,11 @@ import {
   previsualizacionCampanaSintetica,
   type ApiFalsaMowaMes,
 } from './api-falsa-mowa-mes';
+import { montarSeleccion, seleccionFalsa, type SeleccionFalsa } from './apoyo-seleccion';
 
 const RUTA = '/mowa-mes/campana';
 
 test.use({ timezoneId: 'America/Lima' });
-
-interface SeleccionFalsa {
-  versiones: Version[];
-  campos: Campos;
-  selecciones: SeleccionGuardada[];
-}
-
-function seleccionFalsa(parcial: Partial<SeleccionFalsa> = {}): SeleccionFalsa {
-  return {
-    versiones: [version({ fecha_corte: '2026-09-13', vigente: true })],
-    campos: camposSinteticos(),
-    selecciones: [seleccionGuardada({ id: 1, nombre: 'Preventiva top 1000', cantidad: 1000 })],
-    ...parcial,
-  };
-}
-
-const json = (route: Route, estado: number, cuerpo: unknown) =>
-  route.fulfill({ status: estado, contentType: 'application/json', body: JSON.stringify(cuerpo) });
 
 /** A minimal, fully-typed request body, for building a preview or campaign fixture. */
 function entradaMinima(cantidad = 1000): PeticionCampanaEntrada {
@@ -66,21 +48,6 @@ function entradaMinima(cantidad = 1000): PeticionCampanaEntrada {
 
 const cifra = (page: Page, host: string, etiqueta: string) =>
   page.locator(host).locator('.stat', { hasText: etiqueta }).locator('.stat__value');
-
-/** The compact selector's own calls, layered over the module's mock. */
-async function montarSeleccion(page: Page, sel: SeleccionFalsa): Promise<void> {
-  await page.route('**/api/**', async (route) => {
-    const url = new URL(route.request().url());
-    const ruta = url.pathname.replace(/^\/api/, '');
-    const metodo = route.request().method();
-
-    if (ruta === '/cargas' && metodo === 'GET') return json(route, 200, sel.versiones);
-    if (ruta === '/cartera/campos') return json(route, 200, sel.campos);
-    if (ruta === '/selecciones' && metodo === 'GET') return json(route, 200, sel.selecciones);
-
-    return route.fallback();
-  });
-}
 
 async function abrir(page: Page, api: ApiFalsaMowaMes, sel: SeleccionFalsa = seleccionFalsa()): Promise<void> {
   await montarApiMowaMes(page, api);

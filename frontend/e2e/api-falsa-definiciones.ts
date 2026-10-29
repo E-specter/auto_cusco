@@ -21,6 +21,7 @@ import type {
 } from '../src/lib/api-definiciones';
 import type { components } from '../src/lib/contrato-api';
 import type { Manejador } from './api-falsa';
+import { json, siguiente } from './apoyo';
 
 type Contenido = components['schemas']['ContenidoGuardadoRespuesta'];
 type ColumnaGuardada = components['schemas']['ColumnaGuardadaRespuesta'];
@@ -256,9 +257,6 @@ function respuestaDe(d: DefinicionFalsa, version: VersionFalsa = vigente(d)): De
   };
 }
 
-const json = (route: Route, estado: number, cuerpo: unknown) =>
-  route.fulfill({ status: estado, contentType: 'application/json', body: JSON.stringify(cuerpo) });
-
 const noExiste = (route: Route, codigo: string, detalle: string) =>
   json(route, 404, { detail: detalle, codigo });
 
@@ -268,10 +266,6 @@ const invalida = (route: Route, problemas: ProblemaDefinicion[]) =>
     codigo: 'definicion_invalida',
     problemas,
   });
-
-function siguiente(cola: Respuesta[]): Respuesta | undefined {
-  return cola.length > 1 ? cola.shift() : cola[0];
-}
 
 /** Anything under `/definiciones-columnas`; false for any other route. */
 export function manejadorDefiniciones(estado: ApiFalsaDefiniciones): Manejador {

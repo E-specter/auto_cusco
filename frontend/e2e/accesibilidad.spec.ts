@@ -7,10 +7,9 @@
  * a keyboard pass; it replaces the part that gets forgotten between releases.
  */
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-import type { Campos, SeleccionGuardada, Version } from '../src/lib/api';
-import { ARCHIVO_SINTETICO, apiVacia, camposSinteticos, montarApi, seleccionGuardada, version } from './api-falsa';
+import { ARCHIVO_SINTETICO, apiVacia, montarApi, seleccionGuardada, version } from './api-falsa';
 import { codigoDeRechazo, conCargaMapeada, type ApiFalsaCargaMapeada } from './api-falsa-carga-mapeada';
 import { analisisSintetico, columna } from './api-falsa-mapeador';
 import {
@@ -26,6 +25,7 @@ import { apiDefiniciones, definicionFalsa, manejadorDefiniciones } from './api-f
 import { apiTextoEnriquecidoVacia, manejarTextoEnriquecido } from './api-falsa-texto-enriquecido';
 import { apiSpeechV2, montarApiSpeechV2, versionV2Sintetica } from './api-falsa-speech-v2';
 import { v1ConBorrados, v2ConBorrados } from './fixtures-gsm7';
+import { montarSeleccion } from './apoyo-seleccion';
 
 const REGLAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
@@ -45,30 +45,6 @@ async function sinViolaciones(page: Page): Promise<void> {
     (v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`,
   );
   expect(resumen).toEqual([]);
-}
-
-/**
- * The compact selector's own calls for `/mowa-mes/campana`, layered over the
- * module's mock (registered after `montarApiMowaMes`, so it runs first and
- * falls back to it for everything else — see mowa-mes-campana.spec.ts).
- */
-async function montarSeleccionCampana(page: Page): Promise<void> {
-  const json = (route: Route, estado: number, cuerpo: unknown) =>
-    route.fulfill({ status: estado, contentType: 'application/json', body: JSON.stringify(cuerpo) });
-  const versiones: Version[] = [version({ fecha_corte: '2026-09-13', vigente: true })];
-  const campos: Campos = camposSinteticos();
-  const selecciones: SeleccionGuardada[] = [
-    seleccionGuardada({ id: 1, nombre: 'Preventiva top 1000', cantidad: 1000 }),
-  ];
-  await page.route('**/api/**', async (route) => {
-    const url = new URL(route.request().url());
-    const ruta = url.pathname.replace(/^\/api/, '');
-    const metodo = route.request().method();
-    if (ruta === '/cargas' && metodo === 'GET') return json(route, 200, versiones);
-    if (ruta === '/cartera/campos') return json(route, 200, campos);
-    if (ruta === '/selecciones' && metodo === 'GET') return json(route, 200, selecciones);
-    return route.fallback();
-  });
 }
 
 /**
@@ -194,7 +170,7 @@ for (const tema of ['light', 'dark'] as const) {
         },
       ];
       await montarApiMowaMes(page, api);
-      await montarSeleccionCampana(page);
+      await montarSeleccion(page);
       await page.goto('/mowa-mes/campana');
       await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 1000' });
       await expect(page.locator('[data-limite-excedido]')).toBeVisible();
@@ -205,7 +181,7 @@ for (const tema of ['light', 'dark'] as const) {
       const api = apiMowaMes();
       api.respuestas.previsualizarCampana = [{ estado: 200, cuerpo: previaConTablasPaginadas() }];
       await montarApiMowaMes(page, api);
-      await montarSeleccionCampana(page);
+      await montarSeleccion(page);
       await page.goto('/mowa-mes/campana');
       await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 1000' });
       await expect(page.locator('[data-exclusiones-truncadas]')).toBeVisible();
@@ -260,7 +236,7 @@ for (const tema of ['light', 'dark'] as const) {
     test('campaña de MOWA MES, con el nombre estimado, el costo y el error de la plantilla', async ({ page }) => {
       const api = apiMowaMes();
       await montarApiMowaMes(page, api);
-      await montarSeleccionCampana(page);
+      await montarSeleccion(page);
       await page.goto('/mowa-mes/campana');
       await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 1000' });
       await expect(page.locator('[data-nombre-primer-archivo]')).toContainText('[campana]');
@@ -337,7 +313,7 @@ test('mowa-mes campaña: diálogo del límite mensual con error', async ({ page 
     },
   ];
   await montarApiMowaMes(page, api);
-  await montarSeleccionCampana(page);
+  await montarSeleccion(page);
   await page.goto('/mowa-mes/campana');
   await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 1000' });
   await page.getByRole('button', { name: 'Crear campaña' }).click();

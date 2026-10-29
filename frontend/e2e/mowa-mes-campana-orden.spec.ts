@@ -5,16 +5,14 @@
  * carries the filters in another order than the selection, and a suggested description that does not follow it.
  * Every name and value is synthetic.
  */
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import type { Campos, SeleccionGuardada, Version } from '../src/lib/api';
 import { camposSinteticos, seleccionGuardada, version } from './api-falsa';
 import { apiMowaMes, montarApiMowaMes, type ApiFalsaMowaMes } from './api-falsa-mowa-mes';
+import { json } from './apoyo';
 
 test.use({ timezoneId: 'America/Lima', reducedMotion: 'reduce' });
-
-const json = (route: Route, estado: number, cuerpo: unknown) =>
-  route.fulfill({ status: estado, contentType: 'application/json', body: JSON.stringify(cuerpo) });
 
 const DIAS = 'dias_atraso:mayor:30';
 const REGION = 'region:igual:TACNA';

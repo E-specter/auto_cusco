@@ -3,11 +3,11 @@
  * them (`GET` and `PATCH …/campos-adicionales`, T-CA-B2). A name is unique among all of them, archived ones
  * included, and the technical name never changes. Every name is synthetic.
  */
-import type { Route } from '@playwright/test';
 
 import type { components } from '../src/lib/contrato-api';
 import type { Manejador } from './api-falsa';
 import { campoAdicional } from './api-falsa-mapeador';
+import { json } from './apoyo';
 
 type Esquemas = components['schemas'];
 export type CampoAdicionalFalso = Esquemas['CampoAdicionalRespuesta'];
@@ -36,9 +36,6 @@ export const adicionalFalso = (nombre: string, nombreLegible: string, parcial: P
 export function apiAdicionales(campos: CampoAdicionalFalso[] = []): ApiFalsaAdicionales {
   return { campos, cambios: [], rechazos: [], sinLista: false, lecturas: 0 };
 }
-
-const json = (route: Route, status: number, body: unknown) =>
-  route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
 const normalizar = (texto: string) => texto.normalize('NFD').replace(/\p{M}/gu, '').trim().toLowerCase();
 

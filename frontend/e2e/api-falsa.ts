@@ -14,6 +14,7 @@ import type {
   SeleccionGuardada,
   Version,
 } from '../src/lib/api';
+import { json, siguiente } from './apoyo';
 
 /**
  * Fake responses are typed against the real contract, so a fake the backend
@@ -201,14 +202,6 @@ export function apiVacia(): ApiFalsa {
     revision: { aplicable: true, problemas: [] },
     respuestasCrearSeleccion: [],
   };
-}
-
-const json = (route: Route, estado: number, cuerpo: unknown) =>
-  route.fulfill({ status: estado, contentType: 'application/json', body: JSON.stringify(cuerpo) });
-
-/** Take the next scripted answer, repeating the last one once exhausted. */
-function siguiente<T>(cola: T[]): T | undefined {
-  return cola.length > 1 ? cola.shift() : cola[0];
 }
 
 /**

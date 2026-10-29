@@ -3,7 +3,7 @@
  * re-reading, the validation and `POST /cargas/desde-borrador`. A confirmation answers like `POST /cargas`
  * did (`api.respuestasSubida`) unless a test queues its own. Every file, header and field is synthetic.
  */
-import { expect, type Page, type Route } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 import type { components } from '../src/lib/contrato-api';
 import type { ApiFalsa, Manejador } from './api-falsa';
@@ -15,6 +15,7 @@ import {
   type Analisis,
   type ApiFalsaMapeador,
 } from './api-falsa-mapeador';
+import { json } from './apoyo';
 
 type Esquemas = components['schemas'];
 type Respuesta = { estado: number; cuerpo?: unknown };
@@ -50,9 +51,6 @@ export interface ApiFalsaCargaMapeada {
 export function codigoDeRechazo(estado: number, codigo: string, datos: Record<string, unknown> = {}): Respuesta {
   return { estado, cuerpo: { detail: `Rechazo de prueba: ${codigo}`, codigo, ...datos } };
 }
-
-const json = (route: Route, status: number, body: unknown) =>
-  route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
 /**
  * Chains the two-step upload's routes onto `api` and returns the state to steer and inspect them. The

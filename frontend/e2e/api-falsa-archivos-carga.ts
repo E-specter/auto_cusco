@@ -10,10 +10,10 @@
  *
  * It is a *handler* so it chains with the other fakes (`api.manejadores = [...]` in `api-falsa.ts`).
  */
-import type { Route } from '@playwright/test';
 
 import type { FormatoDisponible, OpcionFormato, PeticionGeneracion, PrevisualizacionCarga } from '../src/lib/generar-carga';
 import type { Manejador } from './api-falsa';
+import { json, siguiente } from './apoyo';
 
 export type Respuesta = { estado: number; cuerpo?: unknown };
 
@@ -162,13 +162,6 @@ function rechazoDeFechaEnvio(peticion: PeticionGeneracion | null) {
     fecha_envio: peticion.fecha_envio,
     fecha_corte: peticion.fecha_corte,
   };
-}
-
-const json = (route: Route, estado: number, cuerpo: unknown) =>
-  route.fulfill({ status: estado, contentType: 'application/json', body: JSON.stringify(cuerpo) });
-
-function siguiente(cola: Respuesta[]): Respuesta | undefined {
-  return cola.length > 1 ? cola.shift() : cola[0];
 }
 
 const TIPOS = { xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', csv: 'text/csv', json: 'application/json' };
