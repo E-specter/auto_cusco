@@ -152,7 +152,7 @@ Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6
 | advertencia | `mensaje_excede_150`, `documento_no_estandar`, `limite_mensual_excedido`, `id_sin_correspondencia` |
 | error | `falta_whatsapp`, `sin_supervisores`, `sin_productos_cargables`, `version_v1_retirada` |
 
-El frontend traduce cada uno con la clave plana `mowaMes.codigo.<codigo>` en `frontend/src/i18n/es.json` y `en.json`; `tests/test_codigos_mowa_mes.py` falla si falta alguna. Las agrega `dev_frontend_modulo_mowa_mes`.
+El frontend traduce cada uno con la clave plana `mowaMes.codigo.<codigo>` en `frontend/src/i18n/es.json` y `en.json`; `tests/test_codigos_mowa_mes.py` falla si falta alguna, y nombra la clave y el idioma. El recorrido de los diccionarios lo da `tests/ayudas/espejo_i18n.py` (`assert_cubre(enum, prefijo)`), que puede usar cualquier otra prueba espejo (T-MM-C10, L-B6). Las agrega `dev_frontend_modulo_mowa_mes`.
 
 ## 13. Rendimiento (medido el 2026-09-14)
 
