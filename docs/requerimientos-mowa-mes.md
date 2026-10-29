@@ -188,7 +188,7 @@ Formato confirmado con el ejemplo de carga (sección 7).
 
 Estructura confirmada con el ejemplo de reporte (sección 7).
 
-* **RF-MM-20 — Importar el reporte de enviados:** Permitir importar el reporte "Campañas de enviados" descargado de MES, en `.xlsx`, validando que traiga estas columnas:
+* **RF-MM-20 — Importar el reporte de enviados:** Permitir importar el reporte "Campañas de enviados" descargado de MES, en cualquiera de los formatos de la sábana (RF-57 de `atomics-requirements.md`), validando que traiga estas columnas:
 
   | Columna | Contenido |
   |---|---|
@@ -202,6 +202,8 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
   | `usuario` | usuario emisor (observado: `mgi_kontactus`) |
 
   * Si falta una columna o la hoja no tiene filas, entonces se rechaza con el motivo.
+  * El formato se reconoce por el contenido del archivo y se lee con las opciones por defecto del lector de la sábana, sin opciones en pantalla: si es un libro con varias hojas, se lee la primera; si es CSV, el separador y la codificación se detectan solos.
+  * Si el archivo no se puede leer en ninguno de esos formatos, entonces se rechaza con el mismo motivo que daría la carga de una sábana.
 * **RF-MM-21 — Asociar el reporte a la campaña:** Asociar cada reporte importado a una campaña del sistema, identificada en MES por su `id`.
   * Una campaña del sistema puede tener varios `id` de MES si su carga se dividió en varios archivos.
   * Si un mismo archivo de reporte trae varios `id` de MES, entonces cada `id` se asocia a la campaña elegida y se muestra su conteo por separado; si un `id` no coincide con ninguna fila cargada de la campaña, se advierte, porque probablemente es de otra campaña.
@@ -238,6 +240,8 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Retiro del editor de dos partes (fase M3) | Ahora: las versiones nuevas son solo v2; las v1 siguen usándose en solo lectura y se convierten a v2 para personalizarlas (RF-MM-17) | Usuario (2026-10-19), consultado por architec |
 | Feriados (S-MM-4) | La regla registra de por sí los 16 feriados nacionales de ley (contrastados con los calendarios de 2026 y 2027); los días no laborables adicionales se registran a mano, quedan guardados y los ven todos (RF-MM-08). Si se aprueba un feriado nuevo o el traslado a lunes, se ajusta la regla | Usuario (2026-10-26), consultado por architec |
 | Largo de la descripción (S-MM-3) y botón «Copiar» | 100 caracteres, el límite del formulario de MES; la sugerida se acorta por filtros enteros; un botón copia la descripción para pegarla en MES; una sola línea, con los saltos cambiados por un espacio (RF-MM-04) | Usuario (2026-10-27), consultado por architec; la línea única, a pregunta de coordinador_modulo_mowa_mes |
+| Formatos del reporte de enviados | Los mismos que la sábana (RF-57), reconocidos solos y con las opciones por defecto; sin opciones de lectura en pantalla. Si el reporte real lo pidiera, se agregan después (RF-MM-20) | Usuario (2026-10-29), consultado por architec (E2) |
+| Dónde se configuran los supervisores y el calendario laboral | Fuera de MOWA MES: en dos pantallas comunes de la sección «Configuración» del menú, porque sirven a todos los canales (RF-37 a RF-41, RF-MM-08). La configuración de MOWA MES queda con lo propio del conector y enlaza a ellas | Usuario (2026-10-29), consultado por architec (E1) |
 
 ## 7. Evidencia de los ejemplos
 
@@ -291,3 +295,8 @@ Queda abierto S-MM-1: depende de información externa (qué ofrece MES), no de u
 **2026-10-27**
 - **RF existentes ampliados:** RF-MM-04 (descripción de campaña): largo máximo de 100 caracteres, la sugerida se acorta por filtros enteros, y un botón «Copiar» al costado del campo. Decisión y pedido del usuario; cierra el supuesto S-MM-3.
 - **RF existentes ampliados:** RF-MM-04: la descripción es de una sola línea, como el campo de MES; los saltos de línea se cambian por un espacio en la pantalla y en la API. Decisión del usuario.
+
+**2026-10-29**
+- **RF existentes ampliados:** RF-MM-20 (importar el reporte de enviados): acepta los formatos de la sábana (RF-57), reconocidos por su contenido y con las opciones por defecto, en lugar de solo `.xlsx`. Decisión del usuario (E2), con la limpieza de duplicados T-MM-C10.
+- **Decisión registrada en la sección 6:** supervisores y calendario laboral se configuran en pantallas comunes de la sección «Configuración» (E1). No cambia el texto de ningún RF.
+- **Nota de numeración:** sin renumerar, como el resto del módulo.
