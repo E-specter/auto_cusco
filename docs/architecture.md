@@ -64,6 +64,10 @@ Este principio es la razón por la que el motor de reglas de mapeo y expresión 
 
 **Implementación de referencia (Fase 0):** `backend/app/` ya sigue esta convención — `core/{entities,ports,services}` para el núcleo, `adapters/{input,output,persistence}` para la infraestructura, y `api/` para los routers HTTP. El caso de uso `health` (`core/services/health_service.py` + `core/ports/health_port.py` + `adapters/persistence/postgres_health_adapter.py` + `api/health.py`) es la vertical slice de referencia que deben replicar los casos de uso reales a partir de la Fase 1. Detalle de comandos y convenciones en `backend/AGENTS.md`.
 
+**Funciones chicas comunes del núcleo (`backend/app/core/entities/`).** Una función que usan varios módulos o adaptadores vive una sola vez aquí, y no se copia en cada uno (RF-31; T-MM-C10, L-B1):
+- `valores.py`: `vacia(valor)`, `None` o un texto en blanco. La usan los lectores de tablas (`adapters/input/celdas.py`), la segmentación y el conector MOWA MES.
+- `nombres.py`: `normalizar_nombre(nombre)`, sin espacios en los extremos y en minúsculas (`casefold`). Es la clave de unicidad (`nombre_normalizado`, y con ella el 409) de las selecciones, las definiciones de carga y las versiones de speech: cambiarla cambia qué nombres chocan.
+
 La configuración (reglas de transformación, formatos, criterios de filtrado) se prioriza sobre valores rígidos en código (RF-32), y el sistema debe poder incorporar nuevas plataformas, formatos de archivo y reglas de negocio sin modificaciones significativas en los módulos existentes (RF-31, RF-33).
 
 ## Stack tecnológico

@@ -12,6 +12,7 @@ from sqlalchemy.engine import Row
 from sqlalchemy.exc import IntegrityError
 
 from app.adapters.persistence.modelos import Seleccion
+from app.core.entities.nombres import normalizar_nombre
 from app.core.entities.selecciones import (
     DatosSeleccion,
     NombreDeSeleccionRepetido,
@@ -21,10 +22,6 @@ from app.core.ports.repositorio_selecciones_port import RepositorioSeleccionesPo
 
 _SELECCION = Seleccion.__table__
 _RESTRICCION_NOMBRE = "uq_seleccion_nombre_normalizado"
-
-
-def normalizar_nombre(nombre: str) -> str:
-    return nombre.strip().casefold()
 
 
 def _valores(datos: DatosSeleccion) -> dict[str, Any]:

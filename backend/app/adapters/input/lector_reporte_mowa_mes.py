@@ -16,13 +16,10 @@ from typing import Any
 from python_calamine import CalamineError, CalamineWorkbook
 
 from app.core.entities.mowa_mes_reporte import COLUMNAS_REPORTE, FilaReporte, ReporteInvalido
+from app.core.entities.valores import vacia
 from app.core.services.mapeador.similitud import normalizar_cabecera
 
 LARGO_DNI = 8
-
-
-def _vacia(celda: Any) -> bool:
-    return celda is None or (isinstance(celda, str) and not celda.strip())
 
 
 def _entero_como_texto(valor: Any) -> str:
@@ -70,7 +67,7 @@ class LectorReporteMowaMes:
         finally:
             libro.close()
 
-        indice = next((i for i, f in enumerate(filas) if any(not _vacia(c) for c in f)), None)
+        indice = next((i for i, f in enumerate(filas) if any(not vacia(c) for c in f)), None)
         if indice is None:
             raise ReporteInvalido("La hoja no tiene cabecera ni filas")
         cabeceras = [normalizar_cabecera(str(c or "")) for c in filas[indice]]
@@ -81,7 +78,7 @@ class LectorReporteMowaMes:
 
         resultado: list[FilaReporte] = []
         for numero, celdas in enumerate(filas[indice + 1 :], start=indice + 2):
-            if all(_vacia(c) for c in celdas):
+            if all(vacia(c) for c in celdas):
                 continue
 
             def celda(nombre: str, celdas=celdas) -> Any:

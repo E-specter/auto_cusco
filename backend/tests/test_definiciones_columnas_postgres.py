@@ -31,7 +31,8 @@ from app.adapters.persistence.repositorio_cargas_postgres import RepositorioCarg
 from app.adapters.persistence.repositorio_definiciones_postgres import (
     RepositorioDefinicionesPostgres,
 )
-from app.core.entities.definiciones_columnas import NombreDeDefinicionRepetido, normalizar_nombre
+from app.core.entities.definiciones_columnas import NombreDeDefinicionRepetido
+from app.core.entities.nombres import normalizar_nombre
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService
 from app.main import app
 from tests.test_generacion_cargas_postgres import PRODUCTOS, _sabana

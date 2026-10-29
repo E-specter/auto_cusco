@@ -18,8 +18,8 @@ from app.core.entities.definiciones_columnas import (
     NombreDeDefinicionRepetido,
     ResumenDefinicion,
     VersionDefinicion,
-    normalizar_nombre,
 )
+from app.core.entities.nombres import normalizar_nombre
 from app.core.ports.repositorio_definiciones_port import RepositorioDefinicionesPort
 
 _DEFINICION = DefinicionCargaGuardada.__table__

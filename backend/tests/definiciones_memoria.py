@@ -14,8 +14,8 @@ from app.core.entities.definiciones_columnas import (
     NombreDeDefinicionRepetido,
     ResumenDefinicion,
     VersionDefinicion,
-    normalizar_nombre,
 )
+from app.core.entities.nombres import normalizar_nombre
 
 
 class RepositorioEnMemoria:

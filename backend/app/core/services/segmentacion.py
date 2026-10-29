@@ -19,6 +19,7 @@ from app.core.entities.segmentacion import (
     Segmentacion,
     SegmentacionInvalida,
 )
+from app.core.entities.valores import vacia
 
 
 def dias_ajustados(
@@ -49,16 +50,12 @@ def _numero(valor: Any) -> int | Decimal | None:
     return valor
 
 
-def _vacio(valor: Any) -> bool:
-    return valor is None or (isinstance(valor, str) and not valor.strip())
-
-
 def segmento_de(segmentacion: Segmentacion, producto: Mapping[str, Any]) -> str | None:
     """Clave del segmento del producto, o None si no cae en ninguno (o no tiene el dato)."""
     criterio = segmentacion.criterio
     if isinstance(criterio, CriterioCampo):
         valor = producto.get(criterio.campo)
-        return None if _vacio(valor) else str(valor)
+        return None if vacia(valor) else str(valor)
     rango = rango_de(_numero(producto.get(criterio.variable_dias)), criterio.tabla)
     return None if rango is None else rango.clave
 

@@ -17,6 +17,7 @@ from app.core.entities.mowa_mes import (
     Segmento,
     VersionSpeech,
 )
+from app.core.entities.nombres import normalizar_nombre
 from app.core.ports.repositorio_mowa_mes_port import RepositorioMowaMesPort
 from app.core.services.texto_enriquecido.serializacion import (
     expresion_a_dict,
@@ -27,10 +28,6 @@ _CONFIGURACION = MowaMesConfiguracion.__table__
 _SPEECH = MowaMesSpeechVersion.__table__
 _RESTRICCION_NOMBRE = "uq_mowa_mes_speech_version_nombre_normalizado"
 _FILA_CONFIGURACION = 1
-
-
-def normalizar_nombre(nombre: str) -> str:
-    return nombre.strip().casefold()
 
 
 def _partes_a_json(partes: tuple[PartesSegmento, ...]) -> list[dict[str, str]]:

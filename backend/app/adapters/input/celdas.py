@@ -3,9 +3,7 @@ recorta una fila."""
 
 from typing import Any
 
-
-def vacia(celda: Any) -> bool:
-    return celda is None or (isinstance(celda, str) and celda.strip() == "")
+from app.core.entities.valores import vacia
 
 
 def recortar(celdas: list[Any]) -> list[Any]:

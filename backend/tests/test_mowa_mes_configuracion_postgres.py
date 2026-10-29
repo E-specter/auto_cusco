@@ -24,13 +24,13 @@ from app.adapters.persistence.modelos import (
 from app.adapters.persistence.repositorio_calendario_postgres import RepositorioCalendarioPostgres
 from app.adapters.persistence.repositorio_mowa_mes_postgres import (
     RepositorioMowaMesPostgres,
-    normalizar_nombre,
 )
 from app.adapters.persistence.repositorio_supervision_postgres import (
     RepositorioSupervisionPostgres,
 )
 from app.core.entities.calendario import ExcepcionCalendario, ExcepcionRepetida, TipoExcepcion
 from app.core.entities.mowa_mes import DatosSpeech
+from app.core.entities.nombres import normalizar_nombre
 from app.main import app
 from tests.test_speech_original import speech_del_documento
 

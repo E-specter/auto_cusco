@@ -54,6 +54,7 @@ from app.core.entities.mowa_mes_campana import (
     una_linea,
 )
 from app.core.entities.mowa_mes_costo import PlantillaInvalida
+from app.core.entities.valores import vacia
 from app.core.ports.repositorio_campanas_mowa_mes_port import RepositorioCampanasMowaMesPort
 from app.core.ports.repositorio_mowa_mes_port import RepositorioMowaMesPort
 from app.core.ports.repositorio_supervision_port import RepositorioSupervisionPort
@@ -192,10 +193,6 @@ def descripcion_sugerida(filtros: Sequence[Filtro], catalogo: CatalogoCartera) -
     return corte + "..."
 
 
-def _vacio(valor: Any) -> bool:
-    return valor is None or (isinstance(valor, str) and not valor.strip())
-
-
 LARGOS_DOCUMENTO_ESTANDAR = (8, 11)  # RF-MM-10: DNI de 8 o RUC de 11
 _TIPOS_DOCUMENTO_ESTANDAR = ("dni", "ruc")
 
@@ -224,10 +221,10 @@ def evaluar_producto(
     """
     pagare = str(producto["pagare"])
     telefono = producto.get("telefono")
-    if _vacio(telefono) or not supervision.numero_valido(str(telefono)):
+    if vacia(telefono) or not supervision.numero_valido(str(telefono)):
         return Exclusion(pagare, CodigoMowaMes.TELEFONO_INVALIDO)
     documento = producto.get("documento_numero")
-    if _vacio(documento):
+    if vacia(documento):
         return Exclusion(pagare, CodigoMowaMes.FALTA_DOCUMENTO)
     dias = producto.get("dias_atraso")
     dias_ajustados = (
@@ -239,7 +236,7 @@ def evaluar_producto(
     # Una v1 siempre necesita el titular y la fecha; una v2, solo si la expresion del segmento usa
     # la variable (RF-MM-13). El orden de las exclusiones no cambia.
     titular = producto.get("titular")
-    if constructor.usa_titular(rango.segmento) and _vacio(titular):
+    if constructor.usa_titular(rango.segmento) and vacia(titular):
         return Exclusion(pagare, CodigoMowaMes.FALTA_TITULAR)
     vencimiento = producto.get("fecha_vencimiento_cuota")
     if constructor.usa_vencimiento(rango.segmento) and vencimiento is None:
@@ -247,7 +244,7 @@ def evaluar_producto(
     # D-CA-2: un campo adicional vacio que el speech lee dejaria un hueco en el SMS. Va antes del
     # WhatsApp y de los 160; uno vacio que el segmento no usa no excluye nada.
     adicionales = {n: producto.get(n) for n in constructor.adicionales_usados(rango.segmento)}
-    faltan = tuple(n for n, valor in adicionales.items() if _vacio(valor))
+    faltan = tuple(n for n, valor in adicionales.items() if vacia(valor))
     if faltan:
         return Exclusion(pagare, CodigoMowaMes.FALTA_CAMPO_ADICIONAL, campos=faltan)
     if constructor.requiere_whatsapp_faltante(rango.segmento):

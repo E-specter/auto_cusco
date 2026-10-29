@@ -39,7 +39,6 @@ from app.adapters.persistence.repositorio_campanas_mowa_mes_postgres import (
 from app.adapters.persistence.repositorio_cargas_postgres import RepositorioCargasPostgres
 from app.adapters.persistence.repositorio_mowa_mes_postgres import (
     RepositorioMowaMesPostgres,
-    normalizar_nombre,
 )
 from app.adapters.persistence.repositorio_supervision_postgres import (
     RepositorioSupervisionPostgres,
@@ -47,6 +46,7 @@ from app.adapters.persistence.repositorio_supervision_postgres import (
 from app.core.entities.gestiones_digitales import ConfiguracionSupervision, Supervisor
 from app.core.entities.mowa_mes import CodigoMowaMes, DatosSpeech, PartesSegmento
 from app.core.entities.mowa_mes_reporte import COLUMNAS_REPORTE, FilaReporte
+from app.core.entities.nombres import normalizar_nombre
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService
 from app.core.services.plataformas.mowa_mes.campana import huella_speech
 from app.core.services.texto_enriquecido.gsm7 import largo_gsm7

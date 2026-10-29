@@ -21,11 +21,6 @@ MAXIMO_COLUMNAS = 100
 MAXIMO_VARIANTES = 50
 
 
-def normalizar_nombre(nombre: str) -> str:
-    """Sin espacios en los extremos y en minusculas: la unicidad no distingue mayusculas."""
-    return nombre.strip().casefold()
-
-
 @dataclass(frozen=True)
 class VersionDefinicion:
     """Una version: `contenido` es la forma JSON canonica, sin el nombre."""

@@ -16,8 +16,8 @@ from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.modelos import Seleccion
 from app.adapters.persistence.repositorio_selecciones_postgres import (
     RepositorioSeleccionesPostgres,
-    normalizar_nombre,
 )
+from app.core.entities.nombres import normalizar_nombre
 from app.core.entities.selecciones import DatosSeleccion, NombreDeSeleccionRepetido
 from app.main import app
 

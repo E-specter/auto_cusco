@@ -25,9 +25,9 @@ from app.core.entities.definiciones_columnas import (
     ResumenDefinicion,
     VersionDefinicion,
     VersionNoEncontrada,
-    normalizar_nombre,
 )
 from app.core.entities.mapeo import DefinicionCarga
+from app.core.entities.nombres import normalizar_nombre
 from app.core.entities.texto_enriquecido import CodigoTexto, Problema
 from app.core.ports.repositorio_definiciones_port import RepositorioDefinicionesPort
 from app.core.services.mapeo_campos.diagnostico import diagnosticar_leida
