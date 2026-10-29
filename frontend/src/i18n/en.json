@@ -570,7 +570,7 @@
   "mowaMes.seguimiento.reporte.archivo": "Report file",
   "mowaMes.seguimiento.reporte.elegir": "Choose file",
   "mowaMes.seguimiento.reporte.sinArchivo": "No file chosen",
-  "mowaMes.seguimiento.reporte.hint": "The .xlsx you download from MES, up to 32 MB.",
+  "mowaMes.seguimiento.reporte.hint": "The report you download from MES, as Excel (.xlsx, .xlsb, .xls, .ods), CSV (.csv, .tsv, .txt) or JSON, up to 32 MB.",
   "mowaMes.seguimiento.reporte.importar": "Import report",
   "mowaMes.seguimiento.reporte.importado": "Report imported.",
   "mowaMes.seguimiento.reporte.error.archivo": "Choose the report file.",

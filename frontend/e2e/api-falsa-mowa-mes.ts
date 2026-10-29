@@ -225,6 +225,14 @@ export function previsualizacionSintetica(
 
 // ---- Costs and file names (T-MM-F6, B8's contract) ----------------------------------
 
+/** The formats the report accepts (RF-57): the sheet's, recognised by the general reader. */
+export const FORMATOS_REPORTE = ['.xlsx', '.xlsb', '.xls', '.ods', '.csv', '.tsv', '.txt', '.json'] as const;
+
+/** The file name a multipart body carries, or `null` when it names none. */
+function nombreSubido(cuerpo: unknown): string | null {
+  return typeof cuerpo === 'string' ? (cuerpo.match(/filename="([^"]*)"/)?.[1] ?? null) : null;
+}
+
 /** What the API stores by default (RF-MM-23, RF-MM-25). Amounts travel as text, 4 decimals. */
 export const TARIFA_POR_DEFECTO = '0.0200';
 export const PLANTILLA_POR_DEFECTO = 'mowa_mes_campana_{campana}_{archivo}_de_{total}';
@@ -979,6 +987,10 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       if (resto === '/reportes' && metodo === 'POST') {
         const guion = siguiente(estado.respuestas.importarReporte);
         if (guion) return json(route, guion.estado, guion.cuerpo ?? {});
+        const nombre = nombreSubido(cuerpo);
+        if (nombre !== null && !FORMATOS_REPORTE.some((extension) => nombre.toLowerCase().endsWith(extension))) {
+          return json(route, 400, { detail: `El formato de ${nombre} no es reconocido: usa ${FORMATOS_REPORTE.join(', ')}` });
+        }
         const conciliacion = conciliacionSintetica(
           id,
           campana.tarifa_sms === null

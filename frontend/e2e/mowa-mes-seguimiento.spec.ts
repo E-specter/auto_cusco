@@ -251,6 +251,83 @@ test.describe('S5: id sin correspondencia', () => {
   });
 });
 
+test.describe('RF-57: el reporte llega en cualquiera de los formatos de la sábana', () => {
+  const ACCEPT = '.xlsx,.xlsb,.xls,.ods,.csv,.tsv,.txt,.json';
+  const CSV = {
+    name: 'REPORTE_SINTETICO.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('id;estado;numero\n990000001;enviado;900000001\n'),
+  };
+
+  test('el campo ofrece los ocho formatos y el hint los nombra', async ({ page }) => {
+    await abrir(page, apiMowaMes());
+
+    await expect(page.getByLabel('Archivo del reporte')).toHaveAttribute('accept', ACCEPT);
+    await expect(page.locator('#mm-reporte-hint')).toHaveText(
+      'El reporte que descargas de MES, en Excel (.xlsx, .xlsb, .xls, .ods), CSV (.csv, .tsv, .txt) o JSON, hasta 32 MB.',
+    );
+  });
+
+  test('en inglés el hint también nombra los ocho formatos', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    await montarApiMowaMes(page, apiMowaMes());
+    await page.goto(RUTA);
+
+    await expect(page.locator('#mm-reporte-hint')).toHaveText(
+      'The report you download from MES, as Excel (.xlsx, .xlsb, .xls, .ods), CSV (.csv, .tsv, .txt) or JSON, up to 32 MB.',
+    );
+  });
+
+  test('importar un .csv: se muestra su nombre, viaja tal cual y la conciliación se pinta', async ({ page }) => {
+    const api = apiMowaMes();
+    await abrir(page, api);
+
+    await page.getByLabel('Archivo del reporte').setInputFiles(CSV);
+    await expect(page.locator('[data-reporte-nombre]')).toHaveText('REPORTE_SINTETICO.csv');
+    await page.getByRole('button', { name: 'Importar reporte' }).click();
+
+    await expect(page.getByText('Reporte importado.')).toBeVisible();
+    await expect(page.locator('[data-reporte-error]')).toBeEmpty();
+    const subida = pedidosA(api, 'POST', '/mowa-mes/campanas/1/reportes');
+    expect(subida).toHaveLength(1);
+    expect(String(subida[0].cuerpo)).toContain('filename="REPORTE_SINTETICO.csv"');
+    await expect(page.locator('.mm-conciliacion__tabla tr[data-grupo="total"]').getByRole('cell').nth(1)).toHaveText('952');
+  });
+
+  for (const extension of ['.xlsx', '.xlsb', '.xls', '.ods', '.csv', '.tsv', '.txt', '.json']) {
+    test(`la API falsa acepta ${extension}`, async ({ page }) => {
+      const api = apiMowaMes();
+      await abrir(page, api);
+
+      await page.getByLabel('Archivo del reporte').setInputFiles({
+        name: `REPORTE_SINTETICO${extension}`,
+        mimeType: 'application/octet-stream',
+        buffer: Buffer.from('reporte sintetico de prueba'),
+      });
+      await page.getByRole('button', { name: 'Importar reporte' }).click();
+
+      await expect(page.getByText('Reporte importado.')).toBeVisible();
+    });
+  }
+
+  test('un formato fuera de la lista lo rechaza la API y el motivo sale junto al archivo', async ({ page }) => {
+    await abrir(page, apiMowaMes());
+
+    await page.getByLabel('Archivo del reporte').setInputFiles({
+      name: 'REPORTE_SINTETICO.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('no es un reporte'),
+    });
+    await page.getByRole('button', { name: 'Importar reporte' }).click();
+
+    await expect(page.locator('[data-reporte-error]')).toContainText('El formato de REPORTE_SINTETICO.pdf no es reconocido');
+    await expect(page.getByLabel('Archivo del reporte')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByText('Reporte importado.')).toBeHidden();
+  });
+});
+
 test.describe('S6: reportes rechazados', () => {
   test('un 400 muestra el motivo del servidor junto al archivo', async ({ page }) => {
     const api = apiMowaMes();

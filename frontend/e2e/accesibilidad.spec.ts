@@ -164,6 +164,19 @@ for (const tema of ['light', 'dark'] as const) {
       await sinViolaciones(page);
     });
 
+    test('seguimiento de MOWA MES, con un .csv elegido y el hint de los formatos del reporte', async ({ page }) => {
+      await montarApiMowaMes(page, apiMowaMes());
+      await page.goto('/mowa-mes/seguimiento');
+      await page.getByLabel('Archivo del reporte').setInputFiles({
+        name: 'REPORTE_SINTETICO.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('id;estado;numero\n990000001;enviado;900000001\n'),
+      });
+      await expect(page.locator('[data-reporte-nombre]')).toHaveText('REPORTE_SINTETICO.csv');
+      await expect(page.locator('#mm-reporte-hint')).toContainText('.csv');
+      await sinViolaciones(page);
+    });
+
     test('campaña de MOWA MES, con la previsualización y el aviso del límite excedido', async ({ page }) => {
       const api = apiMowaMes();
       api.respuestas.previsualizarCampana = [
