@@ -343,6 +343,32 @@ Las tres primeras atacan lo único que el uso real muestra: el seguimiento no se
 | **Conciliación y API**: `conciliacion.py`, `reportes.py`, `api/mowa_mes.py` (775 líneas) y `api/mowa_mes_campanas.py` (1054) | `api/respuestas.py` y `api/errores.py` ya son compartidos | No duplica. La clave número+DNI+mensaje y los estados son de MES | Cada conector trae los suyos | **Dejar.** Una tabla común de «excepción → HTTP» sería prematura con un solo conector | — |
 | **Selección en la campaña**: el cableado de `EVENTO_SELECCION` (`campana.astro:1556-1584`) y `seleccionUsable` (`campana.astro:632`) | El mismo cableado en `columnas.astro` y en `scripts/generar-carga.ts:835-872`; `motivoInactivo` está en `lib/generar-carga.ts` | Unas 30 líneas en 3 pantallas, y la misma lógica con otros textos | Sí | **Dejar** el componente. Extraer el cableado y el motivo, sin el texto, si se toca una cuarta vez | 2, riesgo bajo-medio |
 
+**Estado de la tabla al 2026-10-29, después de T-MM-C10** (detalle en [revision-c10.md](revision-c10.md)):
+
+| Fila de C.1 | Estado |
+|---|---|
+| Lector del reporte | Hecho: `53fa0fa` (L-B7, sobre `LectorTablaPort`) y `73e72b1` (L-B8, los formatos de la sábana, E2-A). Cierra también H-3 de B. D-2, el tope de 32 MB, sigue abierto: L-B8 no lo cambia |
+| Columnas fijas del reporte | Hecho: `ab68a25` (L-B3, `normalizar_cabecera` del mapeador). La exigencia exacta de las columnas se queda |
+| División por límites | Hecho: `c832f26` (L-B9, `core/services/division_archivos.py`) |
+| Plantilla del nombre de archivo | Fuera hasta un segundo canal. El saneador NO era una copia: se quedan los dos (E4-A, comentario en `616cd80`) |
+| `resumen_filtro` | Sin hacer: no entró en C10 |
+| `enlace_whatsapp` | Hecho: `f73bc82` (L-B4, el del motor; `numero_valido` en `core/entities/telefono.py`) |
+| Archivo de carga | Se deja, como decía la tabla |
+| GSM-7 | Backend: hecho, `168a29a` (L-B5, la conciliación usa `sin_marcas`). Frontend: fuera hasta otro SMS |
+| Segmentos y calendario | Hecho: `616cd80` (L-B2, `fecha_en_lima` junto a `hoy_en_lima`) |
+| Supervisores y calendario en la pantalla | Hecho: `46af2e7` (L-F7, `/supervisores` y `/calendario`, E1-A) |
+| Costos y tarifa | Se deja hasta un segundo SMS |
+| Catálogos de códigos y espejo i18n | Hecho: `e466b08` (L-B6, `tests/ayudas/espejo_i18n.py`) y `a0e17cf` (L-F4, `traducirPorPrefijo`) |
+| Copias chicas del backend | Hecho: `b9e4206` (L-B1, `valores.py` y `nombres.py`) |
+| Helpers de DOM del frontend | Hecho: `2293745` (L-F1), `3f6e421` (L-F2, `conJson`) y `f68445c` (L-F3, `paginar`) |
+| Paginador y tablas | Hecho: `2f6b6cd` (L-F9) y `b9cf1e9` (L-F10), E3-A |
+| Cáscara de página en CSS | Hecho: `fff021d` (L-F11, `.page`) y `5de6bfa` (L-F6, `.stat__value.muted`) |
+| API falsas de e2e | Hecho: `52742b7` (L-F5) |
+| Persistencia de campañas | Se deja hasta un segundo canal |
+| Versiones de speech | Se deja hasta un segundo canal |
+| Conciliación y API | Se deja |
+| Selección en la campaña | Se deja |
+
 ### C.2 Las extracciones más rentables
 
 Ordenadas por beneficio sobre costo, con el riesgo bajo primero:

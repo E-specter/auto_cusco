@@ -1,5 +1,7 @@
 # Plan de la limpieza de duplicados de C9 (T-MM-C10)
 
+> **Estado: cerrado el 2026-10-29.** Los 20 cortes están en `main`, de `616cd80` a `fff021d`. La revisión de cierre, con los hashes, las desviaciones y la verificación, está en [revision-c10.md](revision-c10.md).
+>
 > **Escrito el 2026-10-29 sobre `101e153`.** Es solo el plan: no hay código hasta que lo apruebe `architec`.
 >
 > **Decisión del usuario:** lo copiado y lo mal ubicado de C9 ([recapitulacion-c9.md](recapitulacion-c9.md) §C) se corrige antes del pulido de experiencia. Elecciones del 2026-10-29:
