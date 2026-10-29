@@ -70,6 +70,8 @@ Este principio es la razón por la que el motor de reglas de mapeo y expresión 
 
 La configuración (reglas de transformación, formatos, criterios de filtrado) se prioriza sobre valores rígidos en código (RF-32), y el sistema debe poder incorporar nuevas plataformas, formatos de archivo y reglas de negocio sin modificaciones significativas en los módulos existentes (RF-31, RF-33).
 
+**El teléfono de RF-02** (9 dígitos que empiezan con 9) se define una sola vez en `backend/app/core/entities/telefono.py` (`numero_valido`, `TELEFONO_VALIDO`, `LARGO_TELEFONO`). La usan la ingesta de la sábana (`normalizar_telefono`), la supervisión, el WhatsApp de contacto de MOWA MES y `enlace_whatsapp` del motor de texto, que no importa de `gestiones_digitales` (lo comprueba `tests/test_texto_enriquecido_arquitectura.py`; T-MM-C10, L-B4).
+
 ## Stack tecnológico
 
 | Capa | Tecnología | Estado |

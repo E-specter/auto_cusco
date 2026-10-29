@@ -54,6 +54,7 @@ from app.core.entities.mowa_mes_campana import (
     una_linea,
 )
 from app.core.entities.mowa_mes_costo import PlantillaInvalida
+from app.core.entities.telefono import numero_valido
 from app.core.entities.valores import vacia
 from app.core.ports.repositorio_campanas_mowa_mes_port import RepositorioCampanasMowaMesPort
 from app.core.ports.repositorio_mowa_mes_port import RepositorioMowaMesPort
@@ -221,7 +222,7 @@ def evaluar_producto(
     """
     pagare = str(producto["pagare"])
     telefono = producto.get("telefono")
-    if vacia(telefono) or not supervision.numero_valido(str(telefono)):
+    if vacia(telefono) or not numero_valido(str(telefono)):
         return Exclusion(pagare, CodigoMowaMes.TELEFONO_INVALIDO)
     documento = producto.get("documento_numero")
     if vacia(documento):

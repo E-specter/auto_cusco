@@ -34,7 +34,6 @@ from app.core.entities.mowa_mes import (
     LARGO_MAXIMO,
     LARGO_MAXIMO_NOMBRE_SPEECH,
     LARGO_TITULAR,
-    PREFIJO_WHATSAPP,
     RANGOS_SEGMENTO,
     VARIABLE_WHATSAPP,
     CodigoMowaMes,
@@ -48,6 +47,7 @@ from app.core.entities.mowa_mes import (
     ProblemaSpeech,
     Segmento,
 )
+from app.core.entities.telefono import numero_valido
 from app.core.entities.texto_enriquecido import (
     LIMITES,
     ArgumentoVariable,
@@ -62,10 +62,10 @@ from app.core.entities.texto_enriquecido import (
     Problema,
     TipoValor,
 )
-from app.core.services.gestiones_digitales.supervision import numero_valido
 from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.texto_enriquecido import evaluador
 from app.core.services.texto_enriquecido.evaluador import Compilada
+from app.core.services.texto_enriquecido.funciones.enlaces import enlace_whatsapp
 from app.core.services.texto_enriquecido.gsm7 import (
     a_gsm7,
     grafemas_borrados,
@@ -134,10 +134,6 @@ def adicionales_usados_en(
         n for nodo in expresion.nodos if isinstance(nodo, NodoVariable) for n in _leidas_por(nodo)
     )
     return tuple(n for n in dict.fromkeys(leidas) if n in adicionales)
-
-
-def enlace_whatsapp(numero: str) -> str:
-    return f"{PREFIJO_WHATSAPP}{numero}"
 
 
 def usa_whatsapp(partes: PartesSegmento) -> bool:

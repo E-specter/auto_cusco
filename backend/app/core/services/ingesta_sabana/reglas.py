@@ -15,6 +15,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any, Generic, TypeVar
 
 from app.core.entities.sabana import Aviso, Documento, Severidad, TipoDocumento
+from app.core.entities.telefono import TELEFONO_VALIDO
 
 # La normalizacion de cabeceras vive en el mapeador (RF-63): la ingesta la importa de ahi, sin
 # copia. `normalizar_cabecera` se reexporta para quien la pedia desde `reglas`.
@@ -26,7 +27,6 @@ T = TypeVar("T")
 _TEXTOS_NULOS = frozenset({"", "null"})
 _SOLO_DIGITOS = re.compile(r"[0-9]+")
 _ENTERO_CON_CERO_DECIMAL = re.compile(r"([0-9]+)\.0+")
-_TELEFONO_VALIDO = re.compile(r"9[0-9]{8}")
 _FECHA_DMY = re.compile(r"([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})")
 
 PREFIJOS_RUC = frozenset({"10", "15", "16", "17", "20"})
@@ -160,7 +160,7 @@ def normalizar_telefono(valor: Any) -> Resultado[str]:
     if es_vacio(valor):
         return Resultado(None, Aviso("telefono_vacio", Severidad.ADVERTENCIA, "Telefono vacio"))
     texto = _entero_como_texto(valor)
-    if texto and _TELEFONO_VALIDO.fullmatch(texto):
+    if texto and TELEFONO_VALIDO.fullmatch(texto):
         return Resultado(texto)
     largo = len(texto) if texto else 0
     return Resultado(

@@ -19,12 +19,7 @@ from app.core.entities.gestiones_digitales import (
     SupervisionInvalida,
     Supervisor,
 )
-from app.core.services.ingesta_sabana.reglas import normalizar_telefono
-
-
-def numero_valido(numero: str) -> bool:
-    """El mismo criterio de telefono que la ingesta (RF-02, regla N-4), sin corregir nada."""
-    return normalizar_telefono(numero).valor == numero
+from app.core.entities.telefono import numero_valido
 
 
 def limpiar(configuracion: ConfiguracionSupervision) -> ConfiguracionSupervision:

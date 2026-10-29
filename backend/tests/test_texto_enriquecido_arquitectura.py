@@ -54,3 +54,11 @@ def test_el_nucleo_compartido_del_texto_no_importa_de_los_modulos_de_plataforma(
             assert not modulo.startswith("app.core.services.plataformas"), (
                 f"{ruta.name} importa {modulo}"
             )
+
+
+def test_el_motor_no_importa_de_gestiones_digitales() -> None:
+    """El telefono de RF-02 vive en `core/entities/telefono.py`; el motor no depende de un modulo
+    de dominio (T-MM-C10, L-B4)."""
+    for ruta in _archivos():
+        for modulo in _importaciones(ruta):
+            assert "gestiones_digitales" not in modulo, f"{ruta.name} importa {modulo}"

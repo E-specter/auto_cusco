@@ -1,14 +1,12 @@
 """Enlaces (seccion 6): el de WhatsApp a partir de un telefono valido (RF-02)."""
 
+from app.core.entities.telefono import LARGO_TELEFONO, numero_valido
 from app.core.entities.texto_enriquecido import PREFIJO_WHATSAPP, CodigoTexto, TipoValor
-from app.core.services.gestiones_digitales.supervision import numero_valido
 
 from .base import Funcion, Parametro, ValorInvalido
 
-LARGO_TELEFONO = 9  # 9 digitos que empiezan con 9 (RF-02)
 
-
-def _enlace_whatsapp(telefono: str, prefijo: str) -> str:
+def enlace_whatsapp(telefono: str, prefijo: str = PREFIJO_WHATSAPP) -> str:
     if not numero_valido(telefono):
         raise ValorInvalido(
             CodigoTexto.TELEFONO_INVALIDO,
@@ -27,7 +25,7 @@ FUNCIONES = (
         "enlaces",
         (TipoValor.TEXTO,),
         TipoValor.TEXTO,
-        _enlace_whatsapp,
+        enlace_whatsapp,
         (
             Parametro(
                 "prefijo",
