@@ -177,4 +177,5 @@ Coincide con lo que estimó C9 (§C.3): limpieza barata, lector y división, uno
 
 - Hasta que haya un segundo canal: la plantilla del nombre, las tablas de campañas y las versiones de speech.
 - El pulido de experiencia de C9 (P-1 a P-5): va después de esta limpieza.
+- Para esa pasada de pulido: en `/supervisores`, los botones ↑ y ↓ siempre presentes, con el del borde `disabled`, el mismo criterio de «Subir/Bajar» de F3. Hoy cambian de lugar entre filas porque el que no puede moverse se oculta (`visibility: hidden`). Venía así desde la configuración, así que no es un defecto de L-F7.
 - La corrección de C9 sobre D-1 va en `recapitulacion-c9.md`, en este mismo commit.

@@ -1,8 +1,10 @@
 ---
 /**
  * MOWA MES configuration (T-MM-F4): what every campaign starts from. The
- * connector's monthly limit and WhatsApp contact, the default supervisors, the
- * speech versions with their worst-case length, and the working-day calendar.
+ * connector's monthly limit, WhatsApp contact, rate and file-name template, and
+ * the speech versions with their worst-case length. The default supervisors
+ * and the working-day calendar are shared by every connector: `/supervisores`
+ * and `/calendario`.
  *
  * Every panel saves on its own: they are independent settings, and a failed
  * save in one must not throw away edits in another. Like the other operating
@@ -17,7 +19,7 @@ import '../../styles/mowa-mes-speech-v2.css';
 
 <Shell
   title="Configuración de MOWA MES — auto_cusco"
-  description="Límite mensual, WhatsApp de contacto, supervisores por defecto, versiones de speech y calendario laboral del conector SMS de MOWA MES."
+  description="Límite mensual, WhatsApp de contacto, tarifa, plantilla del nombre de los archivos y versiones de speech del conector SMS de MOWA MES."
 >
   <div class="mm">
     <header class="mm__head">
@@ -40,191 +42,145 @@ import '../../styles/mowa-mes-speech-v2.css';
     </section>
 
     <div class="mm__contenido" data-contenido hidden>
-      <div class="mm__grid">
-        <!-- ---- Platform: monthly limit and WhatsApp contact ------------------ -->
-        <section class="panel" aria-labelledby="mm-plataforma-title">
-          <div class="panel__head">
-            <h2 class="panel__title" id="mm-plataforma-title" data-i18n="mowaMes.plataforma.title">Plataforma</h2>
-            <p class="mono muted mm__meta" data-plataforma-meta></p>
+      <!-- Transition: the supervisors and the calendar moved out of this screen (T-MM-C10, E1-A). -->
+      <p class="notice notice--info" data-pantallas-nuevas>
+        <Icon name="info" size={20} />
+        <span>
+          <span data-i18n="mowaMes.config.pantallasNuevas">Los supervisores y el calendario laboral ahora tienen su propia pantalla, en Configuración:</span>
+          {' '}<a href="/supervisores" data-i18n="nav.supervisores">Supervisores</a> · <a href="/calendario" data-i18n="nav.calendario">Calendario laboral</a>.
+        </span>
+      </p>
+
+      <!-- ---- Platform: monthly limit and WhatsApp contact ------------------ -->
+      <section class="panel" aria-labelledby="mm-plataforma-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="mm-plataforma-title" data-i18n="mowaMes.plataforma.title">Plataforma</h2>
+          <p class="mono muted mm__meta" data-plataforma-meta></p>
+        </div>
+        <form class="panel__body mm-plataforma" data-form-plataforma novalidate>
+          <div class="field">
+            <label class="field__label" for="mm-limite" data-i18n="mowaMes.plataforma.limite">Límite mensual de SMS</label>
+            <input
+              class="input"
+              id="mm-limite"
+              name="limite_mensual"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              max="1000000000"
+              step="1"
+              required
+              aria-describedby="mm-limite-hint"
+            />
+            <p class="field__hint" id="mm-limite-hint" data-limite-hint></p>
           </div>
-          <form class="panel__body mm-form" data-form-plataforma novalidate>
-            <div class="field">
-              <label class="field__label" for="mm-limite" data-i18n="mowaMes.plataforma.limite">Límite mensual de SMS</label>
-              <input
-                class="input"
-                id="mm-limite"
-                name="limite_mensual"
-                type="number"
-                inputmode="numeric"
-                min="1"
-                max="1000000000"
-                step="1"
-                required
-                aria-describedby="mm-limite-hint"
-              />
-              <p class="field__hint" id="mm-limite-hint" data-limite-hint></p>
-            </div>
 
-            <div class="field">
-              <label class="field__label" for="mm-registros" data-i18n="mowaMes.plataforma.registros">Filas por archivo</label>
-              <input
-                class="input"
-                id="mm-registros"
-                name="registros_por_archivo"
-                type="number"
-                inputmode="numeric"
-                min="1"
-                max="50000"
-                step="1"
-                required
-                aria-describedby="mm-registros-hint"
-              />
-              <p class="field__hint" id="mm-registros-hint" data-registros-hint></p>
-            </div>
-
-            <div class="field">
-              <label class="field__label" for="mm-bytes" data-i18n="mowaMes.plataforma.bytes">Tamaño máximo por archivo (bytes)</label>
-              <input
-                class="input"
-                id="mm-bytes"
-                name="bytes_por_archivo"
-                type="number"
-                inputmode="numeric"
-                min="100000"
-                max="2000000"
-                step="1"
-                required
-                aria-describedby="mm-bytes-hint"
-              />
-              <p class="field__hint" id="mm-bytes-hint" data-bytes-hint></p>
-            </div>
-
-            <div class="field">
-              <label class="field__label" for="mm-whatsapp" data-i18n="mowaMes.plataforma.whatsapp">WhatsApp de contacto</label>
-              <input
-                class="input"
-                id="mm-whatsapp"
-                name="whatsapp_contacto"
-                type="text"
-                inputmode="numeric"
-                autocomplete="off"
-                maxlength="20"
-                aria-describedby="mm-whatsapp-hint"
-              />
-              <p class="field__hint" id="mm-whatsapp-hint" data-i18n="mowaMes.plataforma.whatsapp.hint">
-                Número de 9 dígitos. El speech lo convierte en https://wa.me/+51 y el número.
-              </p>
-            </div>
-
-            <div class="field">
-              <label class="field__label" for="mm-tarifa" data-i18n="mowaMes.plataforma.tarifa">Tarifa por SMS (S/)</label>
-              <input
-                class="input mono"
-                id="mm-tarifa"
-                name="tarifa_sms"
-                type="text"
-                inputmode="decimal"
-                autocomplete="off"
-                maxlength="12"
-                aria-describedby="mm-tarifa-hint mm-tarifa-error"
-              />
-              <p class="field__hint" id="mm-tarifa-hint" data-i18n="mowaMes.plataforma.tarifa.hint">
-                Decimal de 0 en adelante, con hasta 4 decimales (por ejemplo 0.02). Cada campaña guarda la tarifa vigente al crearse.
-              </p>
-              <p class="field__error" id="mm-tarifa-error" data-tarifa-error role="alert"></p>
-            </div>
-
-            <div class="field">
-              <label class="field__label" for="mm-plantilla" data-i18n="mowaMes.plataforma.plantilla">Nombre de los archivos</label>
-              <input
-                class="input mono"
-                id="mm-plantilla"
-                name="plantilla_nombre_archivo"
-                type="text"
-                autocomplete="off"
-                spellcheck="false"
-                aria-describedby="mm-plantilla-hint mm-plantilla-ejemplo mm-plantilla-error"
-              />
-              <div class="mm-variables" role="group" data-i18n-attr="aria-label:mowaMes.plantilla.variables" aria-label="Variables de la plantilla" data-plantilla-variables></div>
-              <p class="field__hint" id="mm-plantilla-hint" data-i18n="mowaMes.plataforma.plantilla.hint">
-                Es la plantilla de cada campaña nueva; en la campaña se puede cambiar solo para ella.
-              </p>
-              <div class="mm-nombre-archivo" id="mm-plantilla-ejemplo" data-plantilla-ejemplo></div>
-              <p class="field__error" id="mm-plantilla-error" data-plantilla-error role="alert"></p>
-            </div>
-
-            <p class="notice notice--warning" data-sin-whatsapp hidden>
-              <Icon name="triangle-alert" size={20} />
-              <span data-i18n="mowaMes.plataforma.sinWhatsapp">
-                Sin WhatsApp de contacto, los segmentos del speech que lo usan no se pueden generar.
-              </span>
-            </p>
-
-            <p class="field__error" data-plataforma-error role="alert"></p>
-
-            <div class="mm-form__foot">
-              <button type="submit" class="btn btn--primary" data-plataforma-guardar>
-                <span class="btn__spinner" aria-hidden="true"></span>
-                <span class="btn__label" data-i18n="mowaMes.plataforma.guardar">Guardar plataforma</span>
-              </button>
-              <p class="mono muted" data-plataforma-estado role="status"></p>
-            </div>
-          </form>
-        </section>
-
-        <!-- ---- Default supervisors ------------------------------------------ -->
-        <section class="panel" aria-labelledby="mm-supervisores-title">
-          <div class="panel__head">
-            <h2 class="panel__title" id="mm-supervisores-title" data-i18n="mowaMes.supervisores.title">Supervisores por defecto</h2>
+          <div class="field">
+            <label class="field__label" for="mm-registros" data-i18n="mowaMes.plataforma.registros">Filas por archivo</label>
+            <input
+              class="input"
+              id="mm-registros"
+              name="registros_por_archivo"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              max="50000"
+              step="1"
+              required
+              aria-describedby="mm-registros-hint"
+            />
+            <p class="field__hint" id="mm-registros-hint" data-registros-hint></p>
           </div>
-          <form class="panel__body mm-form" data-form-supervisores novalidate>
-            <p class="notice notice--warning" data-sin-supervisores hidden>
-              <Icon name="triangle-alert" size={20} />
-              <span data-i18n="mowaMes.supervisores.vacio">
-                No hay supervisores configurados. Sin supervisores no se puede crear ninguna campaña.
-              </span>
+
+          <div class="field">
+            <label class="field__label" for="mm-bytes" data-i18n="mowaMes.plataforma.bytes">Tamaño máximo por archivo (bytes)</label>
+            <input
+              class="input"
+              id="mm-bytes"
+              name="bytes_por_archivo"
+              type="number"
+              inputmode="numeric"
+              min="100000"
+              max="2000000"
+              step="1"
+              required
+              aria-describedby="mm-bytes-hint"
+            />
+            <p class="field__hint" id="mm-bytes-hint" data-bytes-hint></p>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="mm-whatsapp" data-i18n="mowaMes.plataforma.whatsapp">WhatsApp de contacto</label>
+            <input
+              class="input"
+              id="mm-whatsapp"
+              name="whatsapp_contacto"
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              maxlength="20"
+              aria-describedby="mm-whatsapp-hint"
+            />
+            <p class="field__hint" id="mm-whatsapp-hint" data-i18n="mowaMes.plataforma.whatsapp.hint">
+              Número de 9 dígitos. El speech lo convierte en https://wa.me/+51 y el número.
             </p>
+          </div>
 
-            <fieldset class="mm-grupo">
-              <legend class="field__label" data-i18n="mowaMes.supervisores.procedencias">Procedencias, en orden</legend>
-              <p class="field__hint" data-i18n="mowaMes.supervisores.procedencias.hint">
-                Los documentos se numeran desde 00000001: primero los de la primera procedencia, luego los de la siguiente.
-              </p>
-              <ol class="mm-lista" data-procedencias></ol>
-              <button type="button" class="btn btn--sm" data-agregar-procedencia>
-                <Icon name="plus" size={16} />
-                <span data-i18n="mowaMes.supervisores.agregarProcedencia">Agregar procedencia</span>
-              </button>
-            </fieldset>
-
-            <fieldset class="mm-grupo">
-              <legend class="field__label" data-i18n="mowaMes.supervisores.lista">Supervisores</legend>
-              <div data-supervisores></div>
-              <button type="button" class="btn btn--sm" data-agregar-supervisor>
-                <Icon name="plus" size={16} />
-                <span data-i18n="mowaMes.supervisores.agregar">Agregar supervisor</span>
-              </button>
-            </fieldset>
-
-            <p class="field__hint" data-documentos-pendientes hidden data-i18n="mowaMes.supervisores.documentosPendientes">
-              Hay cambios sin guardar: los documentos se reasignan al guardar.
+          <div class="field">
+            <label class="field__label" for="mm-tarifa" data-i18n="mowaMes.plataforma.tarifa">Tarifa por SMS (S/)</label>
+            <input
+              class="input mono"
+              id="mm-tarifa"
+              name="tarifa_sms"
+              type="text"
+              inputmode="decimal"
+              autocomplete="off"
+              maxlength="12"
+              aria-describedby="mm-tarifa-hint mm-tarifa-error"
+            />
+            <p class="field__hint" id="mm-tarifa-hint" data-i18n="mowaMes.plataforma.tarifa.hint">
+              Decimal de 0 en adelante, con hasta 4 decimales (por ejemplo 0.02). Cada campaña guarda la tarifa vigente al crearse.
             </p>
+            <p class="field__error" id="mm-tarifa-error" data-tarifa-error role="alert"></p>
+          </div>
 
-            <p class="field__error" data-supervisores-error role="alert"></p>
+          <div class="field mm-plataforma__plantilla">
+            <label class="field__label" for="mm-plantilla" data-i18n="mowaMes.plataforma.plantilla">Nombre de los archivos</label>
+            <input
+              class="input mono"
+              id="mm-plantilla"
+              name="plantilla_nombre_archivo"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              aria-describedby="mm-plantilla-hint mm-plantilla-ejemplo mm-plantilla-error"
+            />
+            <div class="mm-variables" role="group" data-i18n-attr="aria-label:mowaMes.plantilla.variables" aria-label="Variables de la plantilla" data-plantilla-variables></div>
+            <p class="field__hint" id="mm-plantilla-hint" data-i18n="mowaMes.plataforma.plantilla.hint">
+              Es la plantilla de cada campaña nueva; en la campaña se puede cambiar solo para ella.
+            </p>
+            <div class="mm-nombre-archivo" id="mm-plantilla-ejemplo" data-plantilla-ejemplo></div>
+            <p class="field__error" id="mm-plantilla-error" data-plantilla-error role="alert"></p>
+          </div>
 
-            <div class="mm-form__foot">
-              <button type="submit" class="btn btn--primary" data-supervisores-guardar>
-                <span class="btn__spinner" aria-hidden="true"></span>
-                <span class="btn__label" data-i18n="mowaMes.supervisores.guardar">Guardar supervisores</span>
-              </button>
-              <button type="button" class="btn" data-supervisores-descartar data-i18n="mowaMes.descartar">
-                Descartar cambios
-              </button>
-              <p class="mono muted" data-supervisores-estado role="status"></p>
-            </div>
-          </form>
-        </section>
-      </div>
+          <p class="notice notice--warning" data-sin-whatsapp hidden>
+            <Icon name="triangle-alert" size={20} />
+            <span data-i18n="mowaMes.plataforma.sinWhatsapp">
+              Sin WhatsApp de contacto, los segmentos del speech que lo usan no se pueden generar.
+            </span>
+          </p>
+
+          <p class="field__error" data-plataforma-error role="alert"></p>
+
+          <div class="mm-form__foot">
+            <button type="submit" class="btn btn--primary" data-plataforma-guardar>
+              <span class="btn__spinner" aria-hidden="true"></span>
+              <span class="btn__label" data-i18n="mowaMes.plataforma.guardar">Guardar plataforma</span>
+            </button>
+            <p class="mono muted" data-plataforma-estado role="status"></p>
+          </div>
+        </form>
+      </section>
 
       <!-- ---- Speech versions ----------------------------------------------- -->
       <section class="panel mm-speech" aria-labelledby="mm-speech-title">
@@ -340,101 +296,11 @@ import '../../styles/mowa-mes-speech-v2.css';
           <p class="mono muted" data-speech-estado role="status"></p>
         </form>
       </section>
-
-      <!-- ---- Working-day calendar ------------------------------------------- -->
-      <section class="panel mm-calendario" aria-labelledby="mm-calendario-title">
-        <div class="panel__head">
-          <h2 class="panel__title" id="mm-calendario-title" data-i18n="mowaMes.calendario.title">Calendario laboral</h2>
-          <div class="row mm-calendario__anio">
-            <button
-              type="button"
-              class="btn btn--sm btn--icon"
-              data-anio-anterior
-              data-i18n-attr="aria-label:mowaMes.calendario.anioAnterior,title:mowaMes.calendario.anioAnterior"
-              aria-label="Año anterior"
-              title="Año anterior"
-            >
-              <Icon name="chevron-left" size={16} />
-            </button>
-            <output class="mono mm-calendario__valor" data-anio aria-live="polite"></output>
-            <button
-              type="button"
-              class="btn btn--sm btn--icon"
-              data-anio-siguiente
-              data-i18n-attr="aria-label:mowaMes.calendario.anioSiguiente,title:mowaMes.calendario.anioSiguiente"
-              aria-label="Año siguiente"
-              title="Año siguiente"
-            >
-              <Icon name="chevron-right" size={16} />
-            </button>
-          </div>
-        </div>
-
-        <div class="panel__body mm-form">
-          <p class="mm-calendario__siguiente" data-siguiente-dia></p>
-          <p class="field__hint" data-i18n="mowaMes.calendario.intro">
-            Días gestionables: de lunes a viernes, sin feriados. Los feriados de ley se calculan solos; aquí registras los días no laborables decretados y los feriados que un año no aplican.
-          </p>
-
-          <div data-calendario></div>
-
-          <div class="mm-form__foot">
-            <button type="button" class="btn btn--primary" data-agregar-dia>
-              <Icon name="calendar-plus" size={16} />
-              <span data-i18n="mowaMes.calendario.agregar">Agregar día no laborable</span>
-            </button>
-          </div>
-        </div>
-      </section>
     </div>
   </div>
 
   <!-- Icons for rows the script builds: rendered once here, cloned per row. -->
-  <template data-icono-arriba><Icon name="arrow-up" size={16} /></template>
-  <template data-icono-abajo><Icon name="arrow-down" size={16} /></template>
   <template data-icono-borrados><Icon name="triangle-alert" size={16} /></template>
-
-  <!-- ---- Exception: an added day or a law holiday withdrawn -------------- -->
-  <dialog class="dialog" data-dialog="excepcion" aria-labelledby="mm-excepcion-title">
-    <form method="dialog" data-form-excepcion novalidate>
-      <div class="dialog__head">
-        <div>
-          <h2 id="mm-excepcion-title" data-excepcion-titulo></h2>
-          <p class="muted dialog__intro" data-excepcion-intro></p>
-        </div>
-        <button
-          type="button"
-          class="btn btn--quiet btn--icon"
-          data-close
-          data-i18n-attr="aria-label:common.close,title:common.close"
-          aria-label="Cerrar"
-          title="Cerrar"
-        >
-          <Icon name="x" size={20} />
-        </button>
-      </div>
-
-      <div class="dialog__body mm-form">
-        <div class="field">
-          <label class="field__label" for="mm-excepcion-fecha" data-i18n="mowaMes.calendario.fecha">Fecha</label>
-          <input class="input" id="mm-excepcion-fecha" type="date" required />
-        </div>
-        <div class="field">
-          <label class="field__label" for="mm-excepcion-descripcion" data-excepcion-descripcion-label></label>
-          <input class="input" id="mm-excepcion-descripcion" type="text" maxlength="200" required autocomplete="off" />
-        </div>
-        <p class="field__error" data-excepcion-error role="alert"></p>
-      </div>
-
-      <div class="dialog__foot">
-        <button type="button" class="btn" data-close data-i18n="common.cancel">Cancelar</button>
-        <button type="submit" class="btn btn--primary">
-          <span class="btn__spinner" aria-hidden="true"></span>
-          <span class="btn__label" data-excepcion-confirmar></span>
-        </button>
-      </div>
-    </form>
-  </dialog>
 
   <!-- ---- Generic failure ---------------------------------------------- -->
   <dialog class="dialog" data-dialog="error" aria-labelledby="mm-error-title">
@@ -457,36 +323,26 @@ import '../../styles/mowa-mes-speech-v2.css';
   import { ApiError, NetworkError, mensajeDeError } from '../../lib/api';
   import { $, ocupado } from '../../lib/dom';
   import {
-    crearExcepcion,
     crearSpeech,
     editarSpeech,
-    eliminarExcepcion,
     guardarConfiguracion,
-    guardarSupervision,
-    listarFeriados,
     listarSpeech,
     obtenerConfiguracion,
-    obtenerSupervision,
     previsualizarPlantillaNombre,
     previsualizarSpeech,
-    siguienteDiaGestionable,
     type ConfiguracionMowaMes,
-    type ConfiguracionSupervision,
-    type DiaNoLaborable,
-    type Feriados,
     type LargoSegmento,
     type PartesEntrada,
     type PrevisualizacionSpeech,
-    type TipoExcepcion,
     type VersionSpeech,
   } from '../../lib/api-mowa-mes';
   import { openWhenFree } from '../../lib/dialogs';
   import { notaVariablesDesconocidas, pintarBotonesDeVariables } from '../../lib/mowa-mes-plantilla';
-  import { formatBytes, formatDate, formatDateTime, formatNumber, parseApiDate } from '../../lib/format';
+  import { formatBytes, formatDateTime, formatNumber } from '../../lib/format';
   import { obtenerComoV2, problemasDeErrorSpeech } from '../../lib/api-speech-v2';
   import { SEPARADOR_BORRADOS, elementosBorrados, type CaracterQuitado } from '../../lib/mowa-mes-gsm7';
   import { avisoDeCamposArchivados } from '../../lib/mowa-mes-seguimiento';
-  import { applyTranslations, locale, t } from '../../lib/i18n';
+  import { applyTranslations, t } from '../../lib/i18n';
   import {
     entradaDeExpresiones,
     esV2,
@@ -506,41 +362,26 @@ import '../../styles/mowa-mes-speech-v2.css';
     type EstadoVariantes,
   } from '../../scripts/variantes-segmento';
   import {
-    accionDia,
-    borradorDeSupervision,
     borradorDesdeVersion,
     campoDeError,
-    entradaSupervision,
     modoGuardado,
-    moverElemento,
     nivelDeFila,
-    problemasSupervision,
     rangoSegmento,
-    renombrarProcedencia,
     resumenNiveles,
     RANGOS_CONFIGURACION,
     problemasConfiguracion,
-    supervisionCambio,
-    textoDeProblemaSupervision,
     textoDeRango,
     tarifaEditable,
     tarifaNormalizada,
     type CampoConfiguracion,
     traducirCodigo,
-    type BorradorSupervision,
-    type ProblemaSupervision,
   } from '../../lib/mowa-mes';
 
   /** Long enough to let a sentence be typed, short enough to feel live. */
   const ESPERA_PREVISUALIZACION = 400;
-  const ANIO_MINIMO = 1900;
-  const ANIO_MAXIMO = 2999;
 
   const estado = {
     configuracion: null as ConfiguracionMowaMes | null,
-    supervisionGuardada: null as ConfiguracionSupervision | null,
-    supervision: { procedencias: [], supervisores: [] } as BorradorSupervision,
-    problemas: [] as ProblemaSupervision[],
     versiones: [] as VersionSpeech[],
     versionId: null as number | null,
     borrador: [] as PartesEntrada[],
@@ -560,13 +401,9 @@ import '../../styles/mowa-mes-speech-v2.css';
     /** What the editor last said about the open content: gates saving. */
     v2Editor: { pendiente: false, valida: true },
     largosV2: [] as LargoSegmento[],
-    anio: new Date().getFullYear(),
-    feriados: null as Feriados | null,
-    siguienteDia: null as string | null,
   };
 
   const dialogos = {
-    excepcion: $<HTMLDialogElement>('[data-dialog="excepcion"]'),
     error: $<HTMLDialogElement>('[data-dialog="error"]'),
   };
 
@@ -587,34 +424,6 @@ import '../../styles/mowa-mes-speech-v2.css';
     window.setTimeout(() => {
       if (nodo.textContent === t(clave)) nodo.textContent = '';
     }, 4000);
-  }
-
-  function boton(clave: string, clase = 'btn btn--sm', icono?: string): HTMLButtonElement {
-    const nodo = document.createElement('button');
-    nodo.type = 'button';
-    nodo.className = clase;
-    nodo.textContent = t(clave);
-    if (icono) nodo.dataset.icono = icono;
-    return nodo;
-  }
-
-  function botonIcono(etiqueta: string, direccion: 'arriba' | 'abajo'): HTMLButtonElement {
-    const nodo = document.createElement('button');
-    nodo.type = 'button';
-    nodo.className = 'btn btn--sm btn--icon mm-mover';
-    nodo.setAttribute('aria-label', etiqueta);
-    nodo.title = etiqueta;
-    // The lucide icon is rendered by Astro in a template; the label carries the meaning.
-    const plantilla = $<HTMLTemplateElement>(`template[data-icono-${direccion}]`);
-    nodo.append(plantilla.content.cloneNode(true));
-    return nodo;
-  }
-
-  function vacio(clave: string): HTMLElement {
-    const bloque = document.createElement('p');
-    bloque.className = 'empty';
-    bloque.textContent = t(clave);
-    return bloque;
   }
 
   // ---- Platform ----------------------------------------------------------------
@@ -817,335 +626,6 @@ import '../../styles/mowa-mes-speech-v2.css';
       } else {
         error.textContent = mensajeDeError(caido);
       }
-    } finally {
-      ocupado(guardar, false);
-    }
-  });
-
-  // ---- Supervisors -------------------------------------------------------------
-
-  const formSupervisores = $<HTMLFormElement>('[data-form-supervisores]');
-
-  function problemaEn(tipo: ProblemaSupervision['tipo'], indice: number): boolean {
-    return estado.problemas.some((p) => p.tipo === tipo && 'indice' in p && p.indice === indice);
-  }
-
-  function marcarInvalido(control: HTMLElement, invalido: boolean): void {
-    if (invalido) control.setAttribute('aria-invalid', 'true');
-    else control.removeAttribute('aria-invalid');
-  }
-
-  function pintarProcedencias(foco?: number): void {
-    const lista = $<HTMLOListElement>('[data-procedencias]');
-    lista.replaceChildren();
-    const total = estado.supervision.procedencias.length;
-
-    estado.supervision.procedencias.forEach((nombre, indice) => {
-      const item = document.createElement('li');
-      item.className = 'mm-fila';
-
-      const numero = document.createElement('span');
-      numero.className = 'mono muted mm-fila__orden';
-      numero.textContent = String(indice + 1);
-      numero.setAttribute('aria-hidden', 'true');
-
-      const input = document.createElement('input');
-      input.className = 'input mm-fila__texto';
-      input.type = 'text';
-      input.maxLength = 80;
-      input.value = nombre;
-      input.dataset.procedencia = String(indice);
-      input.setAttribute('aria-label', t('mowaMes.supervisores.procedencia', { n: indice + 1 }));
-      marcarInvalido(
-        input,
-        ['procedencia_vacia', 'procedencia_larga', 'procedencia_repetida'].some((tipo) =>
-          problemaEn(tipo as ProblemaSupervision['tipo'], indice),
-        ),
-      );
-      input.addEventListener('input', () => {
-        estado.supervision = renombrarProcedencia(estado.supervision, indice, input.value);
-        cambioSupervision({ repintarSupervisores: true });
-      });
-
-      const subir = botonIcono(t('mowaMes.supervisores.subirProcedencia', { n: indice + 1 }), 'arriba');
-      subir.disabled = indice === 0;
-      subir.addEventListener('click', () => {
-        estado.supervision = {
-          ...estado.supervision,
-          procedencias: moverElemento(estado.supervision.procedencias, indice, -1),
-        };
-        cambioSupervision({ repintarTodo: true, focoProcedencia: indice - 1 });
-      });
-
-      const bajar = botonIcono(t('mowaMes.supervisores.bajarProcedencia', { n: indice + 1 }), 'abajo');
-      bajar.disabled = indice === total - 1;
-      bajar.addEventListener('click', () => {
-        estado.supervision = {
-          ...estado.supervision,
-          procedencias: moverElemento(estado.supervision.procedencias, indice, 1),
-        };
-        cambioSupervision({ repintarTodo: true, focoProcedencia: indice + 1 });
-      });
-
-      const quitar = boton('mowaMes.quitar', 'btn btn--sm btn--danger');
-      quitar.setAttribute('aria-label', t('mowaMes.supervisores.quitarProcedencia', { n: indice + 1 }));
-      quitar.addEventListener('click', () => {
-        estado.supervision = {
-          ...estado.supervision,
-          procedencias: estado.supervision.procedencias.filter((_, i) => i !== indice),
-        };
-        cambioSupervision({ repintarTodo: true });
-      });
-
-      const acciones = document.createElement('span');
-      acciones.className = 'mm-fila__acciones';
-      acciones.append(subir, bajar, quitar);
-
-      item.append(numero, input, acciones);
-      lista.append(item);
-    });
-
-    if (foco !== undefined) {
-      lista.querySelector<HTMLElement>(`[data-procedencia="${foco}"]`)?.focus();
-    }
-  }
-
-  function pintarSupervisores(foco?: number): void {
-    const host = $<HTMLElement>('[data-supervisores]');
-    host.replaceChildren();
-
-    if (estado.supervision.supervisores.length === 0) {
-      host.append(vacio('mowaMes.supervisores.ninguno'));
-      return;
-    }
-
-    const guardada = estado.supervisionGuardada;
-    const sinCambios = guardada ? !supervisionCambio(guardada, estado.supervision) : false;
-    const total = estado.supervision.supervisores.length;
-
-    const scroll = document.createElement('div');
-    scroll.className = 'table-scroll';
-    const tabla = document.createElement('table');
-    tabla.className = 'table mm-supervisores__tabla table--apilable';
-
-    const cabeza = document.createElement('thead');
-    const filaCabeza = document.createElement('tr');
-    (
-      [
-        ['mowaMes.supervisores.col.orden', 'num'],
-        ['mowaMes.supervisores.col.numero', ''],
-        ['mowaMes.supervisores.col.procedencia', ''],
-        ['mowaMes.supervisores.col.documento', ''],
-        ['mowaMes.supervisores.col.acciones', ''],
-      ] as const
-    ).forEach(([clave, clase]) => {
-      const celda = document.createElement('th');
-      celda.scope = 'col';
-      if (clase) celda.className = clase;
-      celda.textContent = t(clave);
-      filaCabeza.append(celda);
-    });
-    cabeza.append(filaCabeza);
-
-    const cuerpo = document.createElement('tbody');
-    estado.supervision.supervisores.forEach((supervisor, indice) => {
-      const fila = document.createElement('tr');
-
-      const orden = document.createElement('td');
-      orden.className = 'num';
-      orden.dataset.etiqueta = t('mowaMes.supervisores.col.orden');
-      orden.textContent = String(indice + 1);
-
-      const celdaNumero = document.createElement('td');
-      celdaNumero.dataset.etiqueta = t('mowaMes.supervisores.col.numero');
-      const numero = document.createElement('input');
-      numero.className = 'input mm-supervisores__numero';
-      numero.type = 'text';
-      numero.inputMode = 'numeric';
-      numero.autocomplete = 'off';
-      numero.maxLength = 20;
-      numero.value = supervisor.numero;
-      numero.dataset.supervisor = String(indice);
-      numero.setAttribute('aria-label', t('mowaMes.supervisores.numero', { n: indice + 1 }));
-      marcarInvalido(numero, problemaEn('numero_vacio', indice));
-      numero.addEventListener('input', () => {
-        estado.supervision.supervisores[indice] = { ...supervisor, numero: numero.value };
-        supervisor.numero = numero.value;
-        cambioSupervision({});
-      });
-      celdaNumero.append(numero);
-
-      const celdaProcedencia = document.createElement('td');
-      celdaProcedencia.dataset.etiqueta = t('mowaMes.supervisores.col.procedencia');
-      const select = document.createElement('select');
-      select.className = 'input';
-      select.setAttribute('aria-label', t('mowaMes.supervisores.procedenciaDe', { n: indice + 1 }));
-      const opciones = [...estado.supervision.procedencias];
-      if (!opciones.includes(supervisor.procedencia)) opciones.unshift(supervisor.procedencia);
-      opciones.forEach((nombre) => {
-        const opcion = document.createElement('option');
-        opcion.value = nombre;
-        opcion.textContent = nombre.trim() === '' ? t('mowaMes.supervisores.sinNombre') : nombre;
-        select.append(opcion);
-      });
-      select.value = supervisor.procedencia;
-      marcarInvalido(select, problemaEn('procedencia_desconocida', indice));
-      select.addEventListener('change', () => {
-        estado.supervision.supervisores[indice] = { ...supervisor, procedencia: select.value };
-        supervisor.procedencia = select.value;
-        cambioSupervision({ repintarSupervisores: true, focoSupervisor: indice });
-      });
-      celdaProcedencia.append(select);
-
-      const documento = document.createElement('td');
-      documento.className = 'mono';
-      documento.dataset.etiqueta = t('mowaMes.supervisores.col.documento');
-      // The document is a consequence of numero/procedencia, not typed
-      // directly: it rises to the top of the stacked block with them in view.
-      documento.dataset.orden = '1';
-      documento.textContent = sinCambios ? (guardada?.supervisores[indice]?.documento ?? '—') : '—';
-
-      const acciones = document.createElement('td');
-      acciones.dataset.etiqueta = t('mowaMes.supervisores.col.acciones');
-      const envoltorio = document.createElement('span');
-      envoltorio.className = 'mm-fila__acciones';
-      const subir = botonIcono(t('mowaMes.supervisores.subir', { n: indice + 1 }), 'arriba');
-      subir.disabled = indice === 0;
-      subir.addEventListener('click', () => {
-        estado.supervision = {
-          ...estado.supervision,
-          supervisores: moverElemento(estado.supervision.supervisores, indice, -1),
-        };
-        cambioSupervision({ repintarSupervisores: true });
-      });
-      const bajar = botonIcono(t('mowaMes.supervisores.bajar', { n: indice + 1 }), 'abajo');
-      bajar.disabled = indice === total - 1;
-      bajar.addEventListener('click', () => {
-        estado.supervision = {
-          ...estado.supervision,
-          supervisores: moverElemento(estado.supervision.supervisores, indice, 1),
-        };
-        cambioSupervision({ repintarSupervisores: true });
-      });
-      const quitar = boton('mowaMes.quitar', 'btn btn--sm btn--danger');
-      quitar.setAttribute('aria-label', t('mowaMes.supervisores.quitar', { n: indice + 1 }));
-      quitar.addEventListener('click', () => {
-        estado.supervision = {
-          ...estado.supervision,
-          supervisores: estado.supervision.supervisores.filter((_, i) => i !== indice),
-        };
-        cambioSupervision({ repintarSupervisores: true });
-      });
-      envoltorio.append(subir, bajar, quitar);
-      acciones.append(envoltorio);
-
-      fila.append(orden, celdaNumero, celdaProcedencia, documento, acciones);
-      cuerpo.append(fila);
-    });
-
-    tabla.append(cabeza, cuerpo);
-    scroll.append(tabla);
-    host.append(scroll);
-
-    if (foco !== undefined) {
-      host.querySelector<HTMLElement>(`[data-supervisor="${foco}"]`)?.focus();
-    }
-  }
-
-  /**
-   * Repaint what an edit affects. Typing never rebuilds the field being typed
-   * in, so the caret stays put; structural changes rebuild their list.
-   */
-  function cambioSupervision(opciones: {
-    repintarTodo?: boolean;
-    repintarSupervisores?: boolean;
-    focoProcedencia?: number;
-    focoSupervisor?: number;
-  }): void {
-    $<HTMLElement>('[data-supervisores-error]').textContent = '';
-    estado.problemas = [];
-    if (opciones.repintarTodo) pintarProcedencias(opciones.focoProcedencia);
-    if (opciones.repintarTodo || opciones.repintarSupervisores) {
-      pintarSupervisores(opciones.focoSupervisor);
-    } else {
-      // A typed number changes no structure, but the documents column must stop
-      // claiming numbers that the save is going to reassign.
-      pintarDocumentos();
-    }
-    pintarEstadoSupervision();
-  }
-
-  function pintarDocumentos(): void {
-    const guardada = estado.supervisionGuardada;
-    const sinCambios = guardada ? !supervisionCambio(guardada, estado.supervision) : false;
-    document
-      .querySelectorAll<HTMLTableRowElement>('.mm-supervisores__tabla tbody tr')
-      .forEach((fila, indice) => {
-        const celda = fila.cells[3];
-        if (celda) celda.textContent = sinCambios ? (guardada?.supervisores[indice]?.documento ?? '—') : '—';
-      });
-  }
-
-  function pintarEstadoSupervision(): void {
-    const guardada = estado.supervisionGuardada;
-    const cambio = guardada ? supervisionCambio(guardada, estado.supervision) : false;
-    $<HTMLElement>('[data-documentos-pendientes]').hidden = !cambio;
-    $<HTMLButtonElement>('[data-supervisores-descartar]').disabled = !cambio;
-    $<HTMLElement>('[data-sin-supervisores]').hidden = (guardada?.supervisores.length ?? 0) > 0;
-  }
-
-  function pintarSupervision(): void {
-    pintarProcedencias();
-    pintarSupervisores();
-    pintarEstadoSupervision();
-  }
-
-  $<HTMLButtonElement>('[data-agregar-procedencia]').addEventListener('click', () => {
-    estado.supervision = {
-      ...estado.supervision,
-      procedencias: [...estado.supervision.procedencias, ''],
-    };
-    cambioSupervision({ repintarTodo: true, focoProcedencia: estado.supervision.procedencias.length - 1 });
-  });
-
-  $<HTMLButtonElement>('[data-agregar-supervisor]').addEventListener('click', () => {
-    const procedencia = estado.supervision.procedencias[0] ?? '';
-    estado.supervision = {
-      ...estado.supervision,
-      supervisores: [...estado.supervision.supervisores, { numero: '', procedencia }],
-    };
-    cambioSupervision({ repintarSupervisores: true, focoSupervisor: estado.supervision.supervisores.length - 1 });
-  });
-
-  $<HTMLButtonElement>('[data-supervisores-descartar]').addEventListener('click', () => {
-    if (!estado.supervisionGuardada) return;
-    estado.supervision = borradorDeSupervision(estado.supervisionGuardada);
-    cambioSupervision({ repintarTodo: true });
-  });
-
-  formSupervisores.addEventListener('submit', async (evento) => {
-    evento.preventDefault();
-    const error = $<HTMLElement>('[data-supervisores-error]');
-    error.textContent = '';
-
-    estado.problemas = problemasSupervision(estado.supervision);
-    if (estado.problemas.length > 0) {
-      pintarProcedencias();
-      pintarSupervisores();
-      error.textContent = estado.problemas.map(textoDeProblemaSupervision).join(' ');
-      formSupervisores.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
-      return;
-    }
-
-    const guardar = $<HTMLButtonElement>('[data-supervisores-guardar]');
-    ocupado(guardar, true);
-    try {
-      estado.supervisionGuardada = await guardarSupervision(entradaSupervision(estado.supervision));
-      estado.supervision = borradorDeSupervision(estado.supervisionGuardada);
-      pintarSupervision();
-      avisar($<HTMLElement>('[data-supervisores-estado]'), 'mowaMes.guardado');
-    } catch (caido) {
-      error.textContent = mensajeDeError(caido);
     } finally {
       ocupado(guardar, false);
     }
@@ -1810,234 +1290,6 @@ import '../../styles/mowa-mes-speech-v2.css';
     }
   });
 
-  // ---- Calendar ----------------------------------------------------------------
-
-  const formExcepcion = $<HTMLFormElement>('[data-form-excepcion]');
-  const inputFecha = $<HTMLInputElement>('#mm-excepcion-fecha');
-  const inputDescripcion = $<HTMLInputElement>('#mm-excepcion-descripcion');
-  let tipoExcepcion: TipoExcepcion = 'agregado';
-
-  function diaDeLaSemana(fecha: string): string {
-    return new Intl.DateTimeFormat(locale(), { weekday: 'long' }).format(parseApiDate(fecha));
-  }
-
-  function pintarCalendario(): void {
-    $<HTMLElement>('[data-anio]').textContent = String(estado.anio);
-    $<HTMLButtonElement>('[data-anio-anterior]').disabled = estado.anio <= ANIO_MINIMO;
-    $<HTMLButtonElement>('[data-anio-siguiente]').disabled = estado.anio >= ANIO_MAXIMO;
-    $<HTMLElement>('[data-siguiente-dia]').textContent = estado.siguienteDia
-      ? t('mowaMes.calendario.siguiente', { fecha: formatDate(estado.siguienteDia), dia: diaDeLaSemana(estado.siguienteDia) })
-      : '';
-
-    const host = $<HTMLElement>('[data-calendario]');
-    host.replaceChildren();
-    const feriados = estado.feriados;
-    if (!feriados) return;
-
-    if (feriados.dias.length === 0) {
-      host.append(vacio('mowaMes.calendario.vacio'));
-      return;
-    }
-
-    const scroll = document.createElement('div');
-    scroll.className = 'table-scroll';
-    const tabla = document.createElement('table');
-    tabla.className = 'table mm-calendario__tabla';
-
-    const cabeza = document.createElement('thead');
-    const filaCabeza = document.createElement('tr');
-    [
-      'mowaMes.calendario.col.fecha',
-      'mowaMes.calendario.col.dia',
-      'mowaMes.calendario.col.descripcion',
-      'mowaMes.calendario.col.origen',
-      'mowaMes.calendario.col.accion',
-    ].forEach((clave) => {
-      const celda = document.createElement('th');
-      celda.scope = 'col';
-      celda.textContent = t(clave);
-      filaCabeza.append(celda);
-    });
-    cabeza.append(filaCabeza);
-
-    const cuerpo = document.createElement('tbody');
-    [...feriados.dias]
-      .sort((a, b) => a.fecha.localeCompare(b.fecha))
-      .forEach((dia) => cuerpo.append(filaDia(dia)));
-
-    tabla.append(cabeza, cuerpo);
-    scroll.append(tabla);
-    host.append(scroll);
-  }
-
-  function filaDia(dia: DiaNoLaborable): HTMLTableRowElement {
-    const fila = document.createElement('tr');
-    fila.dataset.retirado = String(dia.retirado);
-
-    const fecha = document.createElement('th');
-    fecha.scope = 'row';
-    fecha.className = 'mono';
-    fecha.textContent = formatDate(dia.fecha);
-
-    const semana = document.createElement('td');
-    semana.textContent = diaDeLaSemana(dia.fecha);
-
-    const descripcion = document.createElement('td');
-    descripcion.className = 'mm-calendario__descripcion';
-    descripcion.textContent = dia.descripcion;
-
-    const origen = document.createElement('td');
-    const tag = document.createElement('span');
-    if (dia.origen === 'agregado') {
-      tag.className = 'tag tag--info';
-      tag.textContent = t('mowaMes.calendario.origen.agregado');
-    } else if (dia.retirado) {
-      tag.className = 'tag tag--advertencia';
-      tag.textContent = t('mowaMes.calendario.origen.retirado');
-    } else {
-      tag.className = 'tag tag--neutral';
-      tag.textContent = t('mowaMes.calendario.origen.ley');
-    }
-    origen.append(tag);
-
-    const accion = document.createElement('td');
-    const tipo = accionDia(dia);
-    const control = boton(
-      `mowaMes.calendario.accion.${tipo}`,
-      tipo === 'retirar' ? 'btn btn--sm' : 'btn btn--sm btn--danger',
-    );
-    control.setAttribute(
-      'aria-label',
-      t(`mowaMes.calendario.accion.${tipo}.aria`, { fecha: formatDate(dia.fecha) }),
-    );
-    control.addEventListener('click', () => {
-      if (tipo === 'retirar') abrirExcepcion('retirado', dia);
-      else void quitarExcepcion(dia, control);
-    });
-    accion.append(control);
-
-    fila.append(fecha, semana, descripcion, origen, accion);
-    return fila;
-  }
-
-  async function quitarExcepcion(dia: DiaNoLaborable, control: HTMLButtonElement): Promise<void> {
-    ocupado(control, true);
-    try {
-      await eliminarExcepcion(dia.fecha);
-      await recargarCalendario();
-    } catch (caido) {
-      ocupado(control, false);
-      mostrarError(caido);
-    }
-  }
-
-  function abrirExcepcion(tipo: TipoExcepcion, dia?: DiaNoLaborable): void {
-    tipoExcepcion = tipo;
-    formExcepcion.reset();
-    $<HTMLElement>('[data-excepcion-error]').textContent = '';
-    [inputFecha, inputDescripcion].forEach((control) => control.removeAttribute('aria-invalid'));
-
-    const agregar = tipo === 'agregado';
-    $<HTMLElement>('[data-excepcion-titulo]').textContent = agregar
-      ? t('mowaMes.calendario.dialogo.agregar')
-      : t('mowaMes.calendario.dialogo.retirar', { descripcion: dia?.descripcion ?? '' });
-    $<HTMLElement>('[data-excepcion-intro]').textContent = t(
-      agregar ? 'mowaMes.calendario.dialogo.agregarIntro' : 'mowaMes.calendario.dialogo.retirarIntro',
-    );
-    $<HTMLElement>('[data-excepcion-descripcion-label]').textContent = t(
-      agregar ? 'mowaMes.calendario.descripcion' : 'mowaMes.calendario.motivo',
-    );
-    $<HTMLElement>('[data-excepcion-confirmar]').textContent = t(
-      agregar ? 'mowaMes.calendario.confirmar.agregar' : 'mowaMes.calendario.confirmar.retirar',
-    );
-
-    // A withdrawn holiday is always the one clicked; only an added day picks its date.
-    inputFecha.value = dia?.fecha ?? '';
-    inputFecha.readOnly = !agregar;
-    if (agregar) {
-      inputFecha.min = `${estado.anio}-01-01`;
-      inputFecha.max = `${estado.anio}-12-31`;
-    } else {
-      inputFecha.removeAttribute('min');
-      inputFecha.removeAttribute('max');
-    }
-
-    void openWhenFree(dialogos.excepcion).then(() => (agregar ? inputFecha : inputDescripcion).focus());
-  }
-
-  formExcepcion.addEventListener('input', () => {
-    $<HTMLElement>('[data-excepcion-error]').textContent = '';
-  });
-
-  formExcepcion.addEventListener('submit', async (evento) => {
-    evento.preventDefault();
-    const error = $<HTMLElement>('[data-excepcion-error]');
-    error.textContent = '';
-    [inputFecha, inputDescripcion].forEach((control) => control.removeAttribute('aria-invalid'));
-
-    if (!inputFecha.value) {
-      error.textContent = t('mowaMes.calendario.error.fecha');
-      inputFecha.setAttribute('aria-invalid', 'true');
-      inputFecha.focus();
-      return;
-    }
-    const descripcion = inputDescripcion.value.trim();
-    if (!descripcion) {
-      error.textContent = t('mowaMes.calendario.error.descripcion');
-      inputDescripcion.setAttribute('aria-invalid', 'true');
-      inputDescripcion.focus();
-      return;
-    }
-
-    const confirmar = formExcepcion.querySelector<HTMLButtonElement>('button[type="submit"]')!;
-    ocupado(confirmar, true);
-    try {
-      await crearExcepcion({ fecha: inputFecha.value, tipo: tipoExcepcion, descripcion });
-      dialogos.excepcion.close();
-      estado.anio = parseApiDate(inputFecha.value).getFullYear();
-      await recargarCalendario();
-    } catch (caido) {
-      if (caido instanceof ApiError && caido.status === 409) {
-        error.textContent = t('mowaMes.calendario.error.repetida');
-      } else {
-        error.textContent = mensajeDeError(caido);
-      }
-    } finally {
-      ocupado(confirmar, false);
-    }
-  });
-
-  $<HTMLButtonElement>('[data-agregar-dia]').addEventListener('click', () => abrirExcepcion('agregado'));
-
-  async function recargarCalendario(): Promise<void> {
-    const [feriados, siguiente] = await Promise.all([
-      listarFeriados(estado.anio),
-      siguienteDiaGestionable(),
-    ]);
-    estado.feriados = feriados;
-    estado.siguienteDia = siguiente.fecha;
-    pintarCalendario();
-  }
-
-  async function cambiarAnio(delta: -1 | 1): Promise<void> {
-    const anio = Math.min(ANIO_MAXIMO, Math.max(ANIO_MINIMO, estado.anio + delta));
-    if (anio === estado.anio) return;
-    estado.anio = anio;
-    $<HTMLElement>('[data-anio]').textContent = String(anio);
-    try {
-      const feriados = await listarFeriados(anio);
-      // A quick double click may have moved on; paint only the year still in view.
-      if (estado.anio !== anio) return;
-      estado.feriados = feriados;
-      pintarCalendario();
-    } catch (caido) {
-      mostrarError(caido);
-    }
-  }
-
-  $<HTMLButtonElement>('[data-anio-anterior]').addEventListener('click', () => void cambiarAnio(-1));
-  $<HTMLButtonElement>('[data-anio-siguiente]').addEventListener('click', () => void cambiarAnio(1));
-
   // ---- Boot --------------------------------------------------------------------
 
   function sinConexion(si: boolean): void {
@@ -2048,26 +1300,13 @@ import '../../styles/mowa-mes-speech-v2.css';
 
   async function arrancar(): Promise<void> {
     try {
-      const [configuracion, supervision, versiones, feriados, siguiente] = await Promise.all([
-        obtenerConfiguracion(),
-        obtenerSupervision(),
-        listarSpeech(),
-        listarFeriados(estado.anio),
-        siguienteDiaGestionable(),
-      ]);
+      const [configuracion, versiones] = await Promise.all([obtenerConfiguracion(), listarSpeech()]);
 
       estado.configuracion = configuracion;
-      estado.supervisionGuardada = supervision;
-      estado.supervision = borradorDeSupervision(supervision);
       estado.versiones = versiones;
-      estado.feriados = feriados;
-      estado.anio = feriados.anio;
-      estado.siguienteDia = siguiente.fecha;
 
       sinConexion(false);
       pintarPlataforma();
-      pintarSupervision();
-      pintarCalendario();
       // The original comes first in the list; a fresh screen starts from it.
       elegirVersion(versiones[0]?.id ?? null);
     } catch (caido) {
@@ -2095,10 +1334,8 @@ import '../../styles/mowa-mes-speech-v2.css';
     applyTranslations();
     pintarMetaPlataforma();
     void revisarPlantilla(0);
-    pintarSupervision();
     pintarVersiones();
     pintarSpeech();
-    pintarCalendario();
   });
 
   void arrancar();

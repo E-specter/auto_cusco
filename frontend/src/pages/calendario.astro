@@ -1,0 +1,468 @@
+---
+/**
+ * Working-day calendar (RF-MM-08): the days that are not manageable besides weekends. The law
+ * holidays are computed by the API; here the analyst records the decreed non-working days and the
+ * holidays that a year does not observe. Shared by every connector, so it lives outside `/mowa-mes`.
+ */
+import Shell from '../layouts/Shell.astro';
+import Icon from '../components/Icon.astro';
+import '../styles/calendario.css';
+---
+
+<Shell
+  title="Calendario laboral — auto_cusco"
+  description="Días gestionables: de lunes a viernes, sin feriados. Registra los días no laborables decretados y los feriados que un año no aplican."
+>
+  <div class="calendario">
+    <header class="calendario__head">
+      <h1 class="calendario__title" data-i18n="nav.calendario">Calendario laboral</h1>
+      <p class="calendario__intro" data-i18n="calendario.intro">
+        Días gestionables: de lunes a viernes, sin feriados. Los feriados de ley se calculan solos; aquí registras los días no laborables decretados y los feriados que un año no aplican.
+      </p>
+    </header>
+
+    <section class="standIn" data-offline hidden aria-labelledby="ca-offline-title">
+      <h2 class="standIn__title" id="ca-offline-title" data-i18n="console.offline.title">Sin conexión con la API</h2>
+      <p class="standIn__body" data-i18n="console.offline.body">
+        No se pudo contactar con el backend. Comprueba que esté en marcha y vuelve a intentarlo.
+      </p>
+      <button type="button" class="btn btn--primary" data-reintentar>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span class="btn__label" data-i18n="console.offline.retry">Reintentar</span>
+      </button>
+    </section>
+
+    <div class="calendario__contenido" data-contenido hidden>
+      <!-- ---- Working-day calendar ------------------------------------------- -->
+      <section class="panel" aria-labelledby="ca-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="ca-title" data-i18n="calendario.title">Feriados y días no laborables</h2>
+          <div class="row calendario__anio">
+            <button
+              type="button"
+              class="btn btn--sm btn--icon"
+              data-anio-anterior
+              data-i18n-attr="aria-label:calendario.anioAnterior,title:calendario.anioAnterior"
+              aria-label="Año anterior"
+              title="Año anterior"
+            >
+              <Icon name="chevron-left" size={16} />
+            </button>
+            <output class="mono calendario__valor" data-anio aria-live="polite"></output>
+            <button
+              type="button"
+              class="btn btn--sm btn--icon"
+              data-anio-siguiente
+              data-i18n-attr="aria-label:calendario.anioSiguiente,title:calendario.anioSiguiente"
+              aria-label="Año siguiente"
+              title="Año siguiente"
+            >
+              <Icon name="chevron-right" size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div class="panel__body calendario-form">
+          <p class="calendario__siguiente" data-siguiente-dia></p>
+
+          <div data-calendario></div>
+
+          <div class="calendario-form__foot">
+            <button type="button" class="btn btn--primary" data-agregar-dia>
+              <Icon name="calendar-plus" size={16} />
+              <span data-i18n="calendario.agregar">Agregar día no laborable</span>
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ---- Exception: an added day or a law holiday withdrawn -------------- -->
+  <dialog class="dialog" data-dialog="excepcion" aria-labelledby="ca-excepcion-title">
+    <form method="dialog" data-form-excepcion novalidate>
+      <div class="dialog__head">
+        <div>
+          <h2 id="ca-excepcion-title" data-excepcion-titulo></h2>
+          <p class="muted dialog__intro" data-excepcion-intro></p>
+        </div>
+        <button
+          type="button"
+          class="btn btn--quiet btn--icon"
+          data-close
+          data-i18n-attr="aria-label:common.close,title:common.close"
+          aria-label="Cerrar"
+          title="Cerrar"
+        >
+          <Icon name="x" size={20} />
+        </button>
+      </div>
+
+      <div class="dialog__body calendario-form">
+        <div class="field">
+          <label class="field__label" for="ca-excepcion-fecha" data-i18n="calendario.fecha">Fecha</label>
+          <input class="input" id="ca-excepcion-fecha" type="date" required />
+        </div>
+        <div class="field">
+          <label class="field__label" for="ca-excepcion-descripcion" data-excepcion-descripcion-label></label>
+          <input class="input" id="ca-excepcion-descripcion" type="text" maxlength="200" required autocomplete="off" />
+        </div>
+        <p class="field__error" data-excepcion-error role="alert"></p>
+      </div>
+
+      <div class="dialog__foot">
+        <button type="button" class="btn" data-close data-i18n="common.cancel">Cancelar</button>
+        <button type="submit" class="btn btn--primary">
+          <span class="btn__spinner" aria-hidden="true"></span>
+          <span class="btn__label" data-excepcion-confirmar></span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ---- Generic failure ---------------------------------------------- -->
+  <dialog class="dialog" data-dialog="error" aria-labelledby="ca-error-title">
+    <div class="dialog__head">
+      <h2 id="ca-error-title" data-i18n="common.error">Algo salió mal</h2>
+    </div>
+    <div class="dialog__body">
+      <p class="notice notice--danger">
+        <Icon name="circle-alert" size={20} />
+        <span data-error-body></span>
+      </p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn btn--primary" data-close data-i18n="common.close">Cerrar</button>
+    </div>
+  </dialog>
+</Shell>
+
+<script>
+  import { ApiError, NetworkError, mensajeDeError } from '../lib/api';
+  import {
+    crearExcepcion,
+    eliminarExcepcion,
+    listarFeriados,
+    siguienteDiaGestionable,
+    type DiaNoLaborable,
+    type Feriados,
+    type TipoExcepcion,
+  } from '../lib/api-calendario';
+  import { accionDia } from '../lib/calendario';
+  import { $, ocupado } from '../lib/dom';
+  import { openWhenFree } from '../lib/dialogs';
+  import { formatDate, parseApiDate } from '../lib/format';
+  import { applyTranslations, locale, t } from '../lib/i18n';
+
+  const ANIO_MINIMO = 1900;
+  const ANIO_MAXIMO = 2999;
+
+  const estado = {
+    anio: new Date().getFullYear(),
+    feriados: null as Feriados | null,
+    siguienteDia: null as string | null,
+  };
+
+  const dialogos = {
+    excepcion: $<HTMLDialogElement>('[data-dialog="excepcion"]'),
+    error: $<HTMLDialogElement>('[data-dialog="error"]'),
+  };
+
+  document.querySelectorAll<HTMLElement>('[data-close]').forEach((boton) => {
+    boton.addEventListener('click', () => boton.closest('dialog')?.close());
+  });
+
+  // ---- Shared helpers -----------------------------------------------------------
+
+  function mostrarError(error: unknown): void {
+    $<HTMLElement>('[data-error-body]').textContent = mensajeDeError(error);
+    void openWhenFree(dialogos.error);
+  }
+
+  function boton(clave: string, clase = 'btn btn--sm'): HTMLButtonElement {
+    const nodo = document.createElement('button');
+    nodo.type = 'button';
+    nodo.className = clase;
+    nodo.textContent = t(clave);
+    return nodo;
+  }
+
+  function vacio(clave: string): HTMLElement {
+    const bloque = document.createElement('p');
+    bloque.className = 'empty';
+    bloque.textContent = t(clave);
+    return bloque;
+  }
+
+  // ---- Calendar ----------------------------------------------------------------
+
+  const formExcepcion = $<HTMLFormElement>('[data-form-excepcion]');
+  const inputFecha = $<HTMLInputElement>('#ca-excepcion-fecha');
+  const inputDescripcion = $<HTMLInputElement>('#ca-excepcion-descripcion');
+  let tipoExcepcion: TipoExcepcion = 'agregado';
+
+  function diaDeLaSemana(fecha: string): string {
+    return new Intl.DateTimeFormat(locale(), { weekday: 'long' }).format(parseApiDate(fecha));
+  }
+
+  function pintarCalendario(): void {
+    $<HTMLElement>('[data-anio]').textContent = String(estado.anio);
+    $<HTMLButtonElement>('[data-anio-anterior]').disabled = estado.anio <= ANIO_MINIMO;
+    $<HTMLButtonElement>('[data-anio-siguiente]').disabled = estado.anio >= ANIO_MAXIMO;
+    $<HTMLElement>('[data-siguiente-dia]').textContent = estado.siguienteDia
+      ? t('calendario.siguiente', { fecha: formatDate(estado.siguienteDia), dia: diaDeLaSemana(estado.siguienteDia) })
+      : '';
+
+    const host = $<HTMLElement>('[data-calendario]');
+    host.replaceChildren();
+    const feriados = estado.feriados;
+    if (!feriados) return;
+
+    if (feriados.dias.length === 0) {
+      host.append(vacio('calendario.vacio'));
+      return;
+    }
+
+    const scroll = document.createElement('div');
+    scroll.className = 'table-scroll';
+    const tabla = document.createElement('table');
+    tabla.className = 'table calendario__tabla';
+
+    const cabeza = document.createElement('thead');
+    const filaCabeza = document.createElement('tr');
+    [
+      'calendario.col.fecha',
+      'calendario.col.dia',
+      'calendario.col.descripcion',
+      'calendario.col.origen',
+      'calendario.col.accion',
+    ].forEach((clave) => {
+      const celda = document.createElement('th');
+      celda.scope = 'col';
+      celda.textContent = t(clave);
+      filaCabeza.append(celda);
+    });
+    cabeza.append(filaCabeza);
+
+    const cuerpo = document.createElement('tbody');
+    [...feriados.dias]
+      .sort((a, b) => a.fecha.localeCompare(b.fecha))
+      .forEach((dia) => cuerpo.append(filaDia(dia)));
+
+    tabla.append(cabeza, cuerpo);
+    scroll.append(tabla);
+    host.append(scroll);
+  }
+
+  function filaDia(dia: DiaNoLaborable): HTMLTableRowElement {
+    const fila = document.createElement('tr');
+    fila.dataset.retirado = String(dia.retirado);
+
+    const fecha = document.createElement('th');
+    fecha.scope = 'row';
+    fecha.className = 'mono';
+    fecha.textContent = formatDate(dia.fecha);
+
+    const semana = document.createElement('td');
+    semana.textContent = diaDeLaSemana(dia.fecha);
+
+    const descripcion = document.createElement('td');
+    descripcion.className = 'calendario__descripcion';
+    descripcion.textContent = dia.descripcion;
+
+    const origen = document.createElement('td');
+    const tag = document.createElement('span');
+    if (dia.origen === 'agregado') {
+      tag.className = 'tag tag--info';
+      tag.textContent = t('calendario.origen.agregado');
+    } else if (dia.retirado) {
+      tag.className = 'tag tag--advertencia';
+      tag.textContent = t('calendario.origen.retirado');
+    } else {
+      tag.className = 'tag tag--neutral';
+      tag.textContent = t('calendario.origen.ley');
+    }
+    origen.append(tag);
+
+    const accion = document.createElement('td');
+    const tipo = accionDia(dia);
+    const control = boton(
+      `calendario.accion.${tipo}`,
+      tipo === 'retirar' ? 'btn btn--sm' : 'btn btn--sm btn--danger',
+    );
+    control.setAttribute(
+      'aria-label',
+      t(`calendario.accion.${tipo}.aria`, { fecha: formatDate(dia.fecha) }),
+    );
+    control.addEventListener('click', () => {
+      if (tipo === 'retirar') abrirExcepcion('retirado', dia);
+      else void quitarExcepcion(dia, control);
+    });
+    accion.append(control);
+
+    fila.append(fecha, semana, descripcion, origen, accion);
+    return fila;
+  }
+
+  async function quitarExcepcion(dia: DiaNoLaborable, control: HTMLButtonElement): Promise<void> {
+    ocupado(control, true);
+    try {
+      await eliminarExcepcion(dia.fecha);
+      await recargarCalendario();
+    } catch (caido) {
+      ocupado(control, false);
+      mostrarError(caido);
+    }
+  }
+
+  function abrirExcepcion(tipo: TipoExcepcion, dia?: DiaNoLaborable): void {
+    tipoExcepcion = tipo;
+    formExcepcion.reset();
+    $<HTMLElement>('[data-excepcion-error]').textContent = '';
+    [inputFecha, inputDescripcion].forEach((control) => control.removeAttribute('aria-invalid'));
+
+    const agregar = tipo === 'agregado';
+    $<HTMLElement>('[data-excepcion-titulo]').textContent = agregar
+      ? t('calendario.dialogo.agregar')
+      : t('calendario.dialogo.retirar', { descripcion: dia?.descripcion ?? '' });
+    $<HTMLElement>('[data-excepcion-intro]').textContent = t(
+      agregar ? 'calendario.dialogo.agregarIntro' : 'calendario.dialogo.retirarIntro',
+    );
+    $<HTMLElement>('[data-excepcion-descripcion-label]').textContent = t(
+      agregar ? 'calendario.descripcion' : 'calendario.motivo',
+    );
+    $<HTMLElement>('[data-excepcion-confirmar]').textContent = t(
+      agregar ? 'calendario.confirmar.agregar' : 'calendario.confirmar.retirar',
+    );
+
+    // A withdrawn holiday is always the one clicked; only an added day picks its date.
+    inputFecha.value = dia?.fecha ?? '';
+    inputFecha.readOnly = !agregar;
+    if (agregar) {
+      inputFecha.min = `${estado.anio}-01-01`;
+      inputFecha.max = `${estado.anio}-12-31`;
+    } else {
+      inputFecha.removeAttribute('min');
+      inputFecha.removeAttribute('max');
+    }
+
+    void openWhenFree(dialogos.excepcion).then(() => (agregar ? inputFecha : inputDescripcion).focus());
+  }
+
+  formExcepcion.addEventListener('input', () => {
+    $<HTMLElement>('[data-excepcion-error]').textContent = '';
+  });
+
+  formExcepcion.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    const error = $<HTMLElement>('[data-excepcion-error]');
+    error.textContent = '';
+    [inputFecha, inputDescripcion].forEach((control) => control.removeAttribute('aria-invalid'));
+
+    if (!inputFecha.value) {
+      error.textContent = t('calendario.error.fecha');
+      inputFecha.setAttribute('aria-invalid', 'true');
+      inputFecha.focus();
+      return;
+    }
+    const descripcion = inputDescripcion.value.trim();
+    if (!descripcion) {
+      error.textContent = t('calendario.error.descripcion');
+      inputDescripcion.setAttribute('aria-invalid', 'true');
+      inputDescripcion.focus();
+      return;
+    }
+
+    const confirmar = formExcepcion.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    ocupado(confirmar, true);
+    try {
+      await crearExcepcion({ fecha: inputFecha.value, tipo: tipoExcepcion, descripcion });
+      dialogos.excepcion.close();
+      estado.anio = parseApiDate(inputFecha.value).getFullYear();
+      await recargarCalendario();
+    } catch (caido) {
+      if (caido instanceof ApiError && caido.status === 409) {
+        error.textContent = t('calendario.error.repetida');
+      } else {
+        error.textContent = mensajeDeError(caido);
+      }
+    } finally {
+      ocupado(confirmar, false);
+    }
+  });
+
+  $<HTMLButtonElement>('[data-agregar-dia]').addEventListener('click', () => abrirExcepcion('agregado'));
+
+  async function recargarCalendario(): Promise<void> {
+    const [feriados, siguiente] = await Promise.all([
+      listarFeriados(estado.anio),
+      siguienteDiaGestionable(),
+    ]);
+    estado.feriados = feriados;
+    estado.siguienteDia = siguiente.fecha;
+    pintarCalendario();
+  }
+
+  async function cambiarAnio(delta: -1 | 1): Promise<void> {
+    const anio = Math.min(ANIO_MAXIMO, Math.max(ANIO_MINIMO, estado.anio + delta));
+    if (anio === estado.anio) return;
+    estado.anio = anio;
+    $<HTMLElement>('[data-anio]').textContent = String(anio);
+    try {
+      const feriados = await listarFeriados(anio);
+      // A quick double click may have moved on; paint only the year still in view.
+      if (estado.anio !== anio) return;
+      estado.feriados = feriados;
+      pintarCalendario();
+    } catch (caido) {
+      mostrarError(caido);
+    }
+  }
+
+  $<HTMLButtonElement>('[data-anio-anterior]').addEventListener('click', () => void cambiarAnio(-1));
+  $<HTMLButtonElement>('[data-anio-siguiente]').addEventListener('click', () => void cambiarAnio(1));
+
+  // ---- Boot --------------------------------------------------------------------
+
+  function sinConexion(si: boolean): void {
+    $<HTMLElement>('[data-offline]').hidden = !si;
+    $<HTMLElement>('[data-contenido]').hidden = si;
+    document.dispatchEvent(new CustomEvent('healthchanged'));
+  }
+
+  async function arrancar(): Promise<void> {
+    try {
+      const [feriados, siguiente] = await Promise.all([listarFeriados(estado.anio), siguienteDiaGestionable()]);
+      estado.feriados = feriados;
+      estado.anio = feriados.anio;
+      estado.siguienteDia = siguiente.fecha;
+      sinConexion(false);
+      pintarCalendario();
+    } catch (caido) {
+      if (caido instanceof NetworkError) {
+        sinConexion(true);
+      } else {
+        sinConexion(false);
+        mostrarError(caido);
+      }
+    }
+  }
+
+  const reintentar = $<HTMLButtonElement>('[data-reintentar]');
+  reintentar.addEventListener('click', async () => {
+    ocupado(reintentar, true);
+    try {
+      await arrancar();
+    } finally {
+      ocupado(reintentar, false);
+    }
+  });
+
+  // A language switch repaints what the script drew.
+  document.addEventListener('languagechange', () => {
+    applyTranslations();
+    pintarCalendario();
+  });
+
+  void arrancar();
+</script>

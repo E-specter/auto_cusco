@@ -17,7 +17,6 @@ import {
 } from './api-falsa-mowa-mes';
 
 const RUTA = '/mowa-mes/configuracion';
-const ANIO = new Date().getFullYear();
 
 /** Requests to exactly `ruta` (query ignored); a trailing `/` matches any id under it. */
 const pedidosA = (api: ApiFalsaMowaMes, metodo: string, ruta: string) =>
@@ -34,14 +33,25 @@ async function abrir(page: Page, api: ApiFalsaMowaMes): Promise<void> {
 }
 
 test.describe('carga inicial', () => {
-  test('muestra plataforma, supervisores, speech y calendario', async ({ page }) => {
+  test('muestra plataforma y speech, y avisa dónde están ahora los supervisores y el calendario', async ({ page }) => {
     const api = apiMowaMes();
     await abrir(page, api);
 
     await expect(page.getByLabel('Límite mensual de SMS')).toHaveValue('2500000');
     await expect(page.getByLabel('WhatsApp de contacto')).toHaveValue('900000999');
-    await expect(page.getByLabel('Número del supervisor 1')).toHaveValue('900000101');
-    await expect(page.getByRole('cell', { name: '00000002' })).toBeVisible();
+
+    // The supervisors and the calendar moved out (T-MM-C10, L-F7): a notice links to their screens.
+    const aviso = page.locator('[data-pantallas-nuevas]');
+    await expect(aviso).toHaveClass(/notice--info/);
+    // The whole text, with the space between the colon and the first link (Astro drops the whitespace
+    // between a span and a link unless the markup says it).
+    await expect(aviso).toHaveText(
+      'Los supervisores y el calendario laboral ahora tienen su propia pantalla, en Configuración: Supervisores · Calendario laboral.',
+    );
+    await expect(aviso.getByRole('link', { name: 'Supervisores' })).toHaveAttribute('href', '/supervisores');
+    await expect(aviso.getByRole('link', { name: 'Calendario laboral' })).toHaveAttribute('href', '/calendario');
+    await expect(page.getByLabel('Número del supervisor 1')).toHaveCount(0);
+    await expect(page.locator('[data-calendario]')).toHaveCount(0);
 
     // RF-MM-19 corregido: con el Speech original, 9 a 30 mide 156 y se advierte.
     const fila = page.locator('[data-speech-filas] tr[data-segmento="9_a_30"]');
@@ -55,10 +65,6 @@ test.describe('carga inicial', () => {
     );
     await expect(page.locator('[data-speech-resumen]')).toHaveAttribute('role', 'status');
     await expect(page.locator('[data-speech-resumen]')).toHaveText('1 segmento pasa de 150 caracteres.');
-
-    await expect(page.getByRole('rowheader', { name: new RegExp(`01 ene\\.? ${ANIO}`) })).toBeVisible();
-    await expect(page.getByText('Retirado este año')).toBeVisible();
-    await expect(page.getByText(/Siguiente día gestionable desde hoy/)).toBeVisible();
   });
 
   test('sin conexión con la API muestra el aviso en vez de paneles vacíos', async ({ page }) => {
@@ -246,6 +252,49 @@ test.describe('plataforma', () => {
   });
 });
 
+test.describe('plataforma: la tarjeta ocupa todo el ancho y sus campos van en una rejilla', () => {
+  const caja = async (locator: ReturnType<Page['locator']>) => (await locator.boundingBox())!;
+
+  test('a 1280 px: tres columnas, el nombre de los archivos y el guardado en su propia fila', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await abrir(page, apiMowaMes());
+
+    const panel = await caja(page.locator('section[aria-labelledby="mm-plataforma-title"]'));
+    const contenido = await caja(page.locator('[data-contenido]'));
+    expect(Math.abs(panel.width - contenido.width)).toBeLessThanOrEqual(1);
+
+    const [limite, registros, bytes, whatsapp, tarifa] = await Promise.all(
+      ['#mm-limite', '#mm-registros', '#mm-bytes', '#mm-whatsapp', '#mm-tarifa'].map((id) => caja(page.locator(id))),
+    );
+    // Three columns: the first three share a row, the next two start the second one.
+    expect(Math.abs(limite.y - registros.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(limite.y - bytes.y)).toBeLessThanOrEqual(1);
+    expect(registros.x).toBeGreaterThan(limite.x + limite.width - 1);
+    expect(bytes.x).toBeGreaterThan(registros.x + registros.width - 1);
+    expect(whatsapp.y).toBeGreaterThan(limite.y + limite.height);
+    expect(Math.abs(whatsapp.y - tarifa.y)).toBeLessThanOrEqual(1);
+
+    // The template takes the whole row, under the others; the save button goes under everything.
+    const campoPlantilla = await caja(page.locator('.mm-plataforma__plantilla'));
+    expect(campoPlantilla.y).toBeGreaterThan(whatsapp.y + whatsapp.height - 1);
+    expect(campoPlantilla.width).toBeGreaterThan(limite.width * 2.5);
+    const guardar = await caja(page.getByRole('button', { name: 'Guardar plataforma' }));
+    expect(guardar.y).toBeGreaterThan(campoPlantilla.y + campoPlantilla.height - 1);
+  });
+
+  test('a 360 px: una columna y sin desbordar la página', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 900 });
+    await abrir(page, apiMowaMes());
+
+    const limite = await caja(page.locator('#mm-limite'));
+    const registros = await caja(page.locator('#mm-registros'));
+    expect(registros.y).toBeGreaterThan(limite.y + limite.height);
+    expect(Math.abs(registros.x - limite.x)).toBeLessThanOrEqual(1);
+    const desborde = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(desborde).toBeLessThanOrEqual(0);
+  });
+});
+
 test.describe('límites por archivo (C1b, RF-MM-11)', () => {
   test('se muestran y guardan bajando los límites de la plataforma', async ({ page }) => {
     const api = apiMowaMes();
@@ -283,149 +332,8 @@ test.describe('límites por archivo (C1b, RF-MM-11)', () => {
   });
 });
 
-test.describe('supervisores', () => {
-  test('agrega un supervisor y guarda la lista completa, con los documentos que asigna la API', async ({ page }) => {
-    const api = apiMowaMes();
-    await abrir(page, api);
-
-    await page.getByRole('button', { name: 'Agregar supervisor' }).click();
-    await expect(page.getByText('Hay cambios sin guardar: los documentos se reasignan al guardar.')).toBeVisible();
-    await page.getByLabel('Número del supervisor 3').fill('900000103');
-    await page.getByLabel('Procedencia del supervisor 3').selectOption('Procedencia A');
-    await page.getByRole('button', { name: 'Guardar supervisores' }).click();
-
-    await expect(page.getByText('Guardado.')).toBeVisible();
-    expect(pedidosA(api, 'PUT', '/supervisores')[0].cuerpo).toEqual({
-      procedencias: ['Procedencia A', 'Procedencia B'],
-      supervisores: [
-        { numero: '900000101', procedencia: 'Procedencia A' },
-        { numero: '900000102', procedencia: 'Procedencia B' },
-        { numero: '900000103', procedencia: 'Procedencia A' },
-      ],
-    });
-    // La numeración es de la API: primero Procedencia A, luego Procedencia B.
-    await expect(page.locator('.mm-supervisores__tabla tbody tr').nth(2).getByRole('cell', { name: '00000002' })).toBeVisible();
-  });
-
-  test('renombrar una procedencia arrastra a sus supervisores', async ({ page }) => {
-    const api = apiMowaMes();
-    await abrir(page, api);
-
-    await page.getByLabel('Procedencia 1', { exact: true }).fill('Procedencia C');
-    await expect(page.getByLabel('Procedencia del supervisor 1')).toHaveValue('Procedencia C');
-  });
-
-  test('un supervisor sin número se señala antes de llamar a la API', async ({ page }) => {
-    const api = apiMowaMes();
-    await abrir(page, api);
-
-    await page.getByRole('button', { name: 'Agregar supervisor' }).click();
-    await page.getByRole('button', { name: 'Guardar supervisores' }).click();
-
-    await expect(page.getByText('El supervisor 3 no tiene número.')).toBeVisible();
-    await expect(page.getByLabel('Número del supervisor 3')).toHaveAttribute('aria-invalid', 'true');
-    expect(pedidosA(api, 'PUT', '/supervisores')).toEqual([]);
-  });
-
-  test('una procedencia de más de 60 caracteres dice el máximo, en español y en inglés', async ({ page }) => {
-    const api = apiMowaMes();
-    await abrir(page, api);
-
-    await page.getByRole('textbox', { name: 'Procedencia 1', exact: true }).fill('x'.repeat(61));
-    await page.getByRole('button', { name: 'Guardar supervisores' }).click();
-
-    await expect(page.getByText('La procedencia 1 pasa de 60 caracteres.')).toBeVisible();
-    expect(pedidosA(api, 'PUT', '/supervisores')).toEqual([]);
-
-    const en = apiMowaMes();
-    const paginaEn = await page.context().newPage();
-    await paginaEn.addInitScript(() => {
-      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
-    });
-    await montarApiMowaMes(paginaEn, en);
-    await paginaEn.goto(RUTA);
-    await expect(paginaEn.getByRole('heading', { name: 'MOWA MES settings' })).toBeVisible();
-    await paginaEn.getByRole('textbox', { name: 'Origin 1', exact: true }).fill('x'.repeat(61));
-    await paginaEn.getByRole('button', { name: 'Save supervisors' }).click();
-    await expect(paginaEn.getByText('Origin 1 is longer than 60 characters.')).toBeVisible();
-    await paginaEn.close();
-  });
-
-  test('sin supervisores guardados avisa que no se podrá crear ninguna campaña', async ({ page }) => {
-    const api = apiMowaMes();
-    api.supervision = { procedencias: ['Procedencia A'], supervisores: [] };
-    await abrir(page, api);
-
-    await expect(page.getByText('Sin supervisores no se puede crear ninguna campaña.', { exact: false })).toBeVisible();
-  });
-});
-
-test.describe('calendario', () => {
-  test('un feriado de ley se retira con una excepción, nunca se borra', async ({ page }) => {
-    const api = apiMowaMes();
-    await abrir(page, api);
-
-    const fila = page.getByRole('row', { name: /Día del Trabajo/ });
-    await fila.getByRole('button', { name: /Retirar el feriado/ }).click();
-
-    const dialogo = page.getByRole('dialog', { name: 'Retirar «Día del Trabajo» este año' });
-    // The date is the holiday clicked: read-only, and it looks it (sunken, unlike the editable motive).
-    const fecha = dialogo.locator('input[type="date"]');
-    await expect(fecha).not.toBeEditable();
-    const fondo = (campo: typeof fecha) => campo.evaluate((e) => getComputedStyle(e).backgroundColor);
-    expect(await fondo(fecha)).not.toBe(await fondo(dialogo.getByLabel('Motivo')));
-    await dialogo.getByLabel('Motivo').fill('Decreto sintético');
-    await dialogo.getByRole('button', { name: 'Retirar feriado' }).click();
-
-    await expect(dialogo).toBeHidden();
-    await expect(fila.getByText('Retirado este año')).toBeVisible();
-    expect(pedidosA(api, 'POST', '/calendario/excepciones')[0].cuerpo).toEqual({
-      fecha: `${ANIO}-05-01`,
-      tipo: 'retirado',
-      descripcion: 'Decreto sintético',
-    });
-    expect(pedidosA(api, 'DELETE', '/calendario/excepciones')).toEqual([]);
-  });
-
-  test('un día agregado se quita borrando su excepción', async ({ page }) => {
-    const api = apiMowaMes();
-    await abrir(page, api);
-
-    await page.getByRole('button', { name: /Quitar el día no laborable/ }).click();
-
-    await expect(page.getByRole('row', { name: /Día no laborable sintético/ })).toHaveCount(0);
-    expect(pedidosA(api, 'DELETE', '/calendario/excepciones/').map((p) => p.ruta)).toEqual([
-      `/calendario/excepciones/${ANIO}-12-24`,
-    ]);
-  });
-
-  test('una fecha que ya tiene excepción responde 409 y se explica en el diálogo', async ({ page }) => {
-    const api = apiMowaMes();
-    api.respuestas.crearExcepcion = [{ estado: 409, cuerpo: { detail: 'repetida' } }];
-    await abrir(page, api);
-
-    await page.getByRole('button', { name: 'Agregar día no laborable' }).click();
-    const dialogo = page.getByRole('dialog', { name: 'Agregar un día no laborable' });
-    await dialogo.getByLabel('Fecha').fill(`${ANIO}-11-02`);
-    await dialogo.getByLabel('Descripción').fill('Día sintético');
-    await dialogo.getByRole('button', { name: 'Agregar día' }).click();
-
-    await expect(dialogo.getByText('Esa fecha ya tiene una excepción registrada.')).toBeVisible();
-  });
-
-  test('cambia de año', async ({ page }) => {
-    const api = apiMowaMes();
-    await abrir(page, api);
-
-    await page.getByRole('button', { name: 'Año siguiente' }).click();
-
-    await expect(page.locator('[data-anio]')).toHaveText(String(ANIO + 1));
-    await expect(page.getByRole('rowheader', { name: new RegExp(`01 ene\\.? ${ANIO + 1}`) })).toBeVisible();
-  });
-});
-
 test.describe('anchos (T-MM-F5, hallazgos 1 y 2)', () => {
-  test('a 360 px, las tablas de speech y supervisores se apilan sin desbordar la página', async ({ page }) => {
+  test('a 360 px, la tabla de speech se apila sin desbordar la página', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 900 });
     const api = apiMowaMes();
     await abrir(page, api);
@@ -453,18 +361,6 @@ test.describe('anchos (T-MM-F5, hallazgos 1 y 2)', () => {
     );
     expect(largoEtiqueta).toContain('Largo máximo');
     await sinDesbordeHorizontal(filaSpeech.locator('[data-largo]'));
-
-    // The supervisors table stacks below 48rem (`.table--apilable`):
-    // Procedencia and Documento, cut off before F5, are now full rows.
-    const filaSupervisor = page.locator('.mm-supervisores__tabla tbody tr').first();
-    const procedenciaEtiqueta = await filaSupervisor
-      .locator('select')
-      .evaluateHandle((el) => el.closest('td'))
-      .then((handle) => handle.evaluate((td) => getComputedStyle(td as Element, '::before').content));
-    expect(procedenciaEtiqueta).toContain('Procedencia');
-    await sinDesbordeHorizontal(filaSupervisor.locator('select'));
-    const celdaDocumento = filaSupervisor.locator('td').filter({ hasText: '00000001' });
-    await sinDesbordeHorizontal(celdaDocumento);
   });
 });
 
@@ -526,6 +422,18 @@ test.describe('idioma', () => {
     const fila = page.locator('[data-speech-filas] tr[data-segmento="9_a_30"]');
     await expect(fila.getByText('Over 150')).toBeVisible();
     await expect(fila.getByText(/longer than 150 characters/)).toBeVisible();
+  });
+
+  test('en inglés el aviso de las pantallas nuevas dice el texto completo, con el espacio antes del primer enlace', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    await montarApiMowaMes(page, apiMowaMes());
+    await page.goto(RUTA);
+
+    await expect(page.locator('[data-pantallas-nuevas]')).toHaveText(
+      'Supervisors and the working calendar now have their own screens, under Configuration: Supervisors · Working calendar.',
+    );
   });
 });
 

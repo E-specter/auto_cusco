@@ -45,6 +45,15 @@ describe('estructura de la navegación', () => {
     expect(NAVEGACION.map((s) => s.id)).toEqual(['flujo', 'canales', 'configuracion']);
   });
 
+  it('la configuración lista las columnas, los supervisores y el calendario, en ese orden (L-F7)', () => {
+    const configuracion = NAVEGACION.find((s) => s.id === 'configuracion')!;
+    expect(configuracion.entradas.map((e) => (e.tipo === 'enlace' ? e.enlace.ruta : e.modulo.prefijo))).toEqual([
+      '/columnas',
+      '/supervisores',
+      '/calendario',
+    ]);
+  });
+
   it('cada ruta apunta a una página que existe', () => {
     const rutas = rutasDeNavegacion();
 

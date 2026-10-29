@@ -5,7 +5,14 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-import { apiVacia, montarApi, productosSinteticos, version } from './api-falsa';
+import {
+  apiSupervisionCalendario,
+  apiVacia,
+  montarApi,
+  montarApiSupervisionCalendario,
+  productosSinteticos,
+  version,
+} from './api-falsa';
 
 async function abrirCartera(page: Page): Promise<void> {
   const api = apiVacia();
@@ -74,6 +81,48 @@ test.describe('secciones', () => {
       'href',
       '/generar-carga',
     );
+  });
+});
+
+test.describe('configuración: pantallas compartidas por todos los conectores (T-MM-C10, L-F7)', () => {
+  const seccion = (page: Page) => page.getByRole('navigation', { name: 'Secciones' }).getByRole('list', { name: 'Configuración' });
+
+  test('muestra las tres entradas en su orden, con la ruta de cada una', async ({ page }) => {
+    await abrirCartera(page);
+
+    await expect(seccion(page).getByRole('link')).toHaveText(['Columnas de carga', 'Supervisores', 'Calendario laboral']);
+    await expect(seccion(page).getByRole('link', { name: 'Supervisores' })).toHaveAttribute('href', '/supervisores');
+    await expect(seccion(page).getByRole('link', { name: 'Calendario laboral' })).toHaveAttribute('href', '/calendario');
+  });
+
+  test('en /supervisores marca Supervisores como activa y ninguna otra', async ({ page }) => {
+    await montarApiSupervisionCalendario(page, apiSupervisionCalendario());
+    await page.goto('/supervisores');
+    await expect(page.getByLabel('Número del supervisor 1')).toBeVisible();
+
+    await expect(seccion(page).getByRole('link', { name: 'Supervisores' })).toHaveAttribute('aria-current', 'page');
+    await expect(seccion(page).getByRole('link', { name: 'Calendario laboral' })).not.toHaveAttribute('aria-current', 'page');
+    await expect(seccion(page).getByRole('link', { name: 'Columnas de carga' })).not.toHaveAttribute('aria-current', 'page');
+  });
+
+  test('en /calendario marca Calendario laboral como activa y ninguna otra', async ({ page }) => {
+    await montarApiSupervisionCalendario(page, apiSupervisionCalendario());
+    await page.goto('/calendario');
+    await expect(page.locator('[data-anio]')).not.toBeEmpty();
+
+    await expect(seccion(page).getByRole('link', { name: 'Calendario laboral' })).toHaveAttribute('aria-current', 'page');
+    await expect(seccion(page).getByRole('link', { name: 'Supervisores' })).not.toHaveAttribute('aria-current', 'page');
+  });
+
+  test('en inglés las dos entradas se traducen', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    await montarApiSupervisionCalendario(page, apiSupervisionCalendario());
+    await page.goto('/supervisores');
+
+    const enlaces = page.getByRole('navigation', { name: 'Sections' }).getByRole('list', { name: 'Configuration' }).getByRole('link');
+    await expect(enlaces).toHaveText(['Load columns', 'Supervisors', 'Working calendar']);
   });
 });
 

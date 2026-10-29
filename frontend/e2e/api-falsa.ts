@@ -14,6 +14,8 @@ import type {
   SeleccionGuardada,
   Version,
 } from '../src/lib/api';
+import type { ConfiguracionSupervision, ConfiguracionSupervisionEntrada } from '../src/lib/api-supervision';
+import type { DiaNoLaborable, ExcepcionEntrada } from '../src/lib/api-calendario';
 import { json, siguiente } from './apoyo';
 
 /**
@@ -346,3 +348,177 @@ export const ARCHIVO_SINTETICO = {
   mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   buffer: Buffer.from('contenido sintetico de prueba'),
 };
+
+// ---- Default supervisors and working-day calendar (shared by every connector) ----------------------------
+
+type RespuestaGuionada = { estado: number; cuerpo?: unknown };
+
+/** RF-02: 9 digits starting with 9. */
+export const esTelefono = (valor: string) => /^9\d{8}$/.test(valor);
+
+/** Three law holidays, one of them withdrawn this year, and one added day. */
+export function diasSinteticos(anio: number): DiaNoLaborable[] {
+  return [
+    { fecha: `${anio}-01-01`, descripcion: 'Año Nuevo', origen: 'ley', retirado: false },
+    { fecha: `${anio}-05-01`, descripcion: 'Día del Trabajo', origen: 'ley', retirado: false },
+    { fecha: `${anio}-06-07`, descripcion: 'Batalla de Arica', origen: 'ley', retirado: true },
+    { fecha: `${anio}-12-24`, descripcion: 'Día no laborable sintético', origen: 'agregado', retirado: false },
+  ];
+}
+
+/** What `/supervisores` and `/calendario/*` answer from; any connector's fake can carry it. */
+export interface EstadoSupervisionCalendario {
+  supervision: ConfiguracionSupervision;
+  /** Non-working days per year; missing years get `diasSinteticos`. */
+  dias: Map<number, DiaNoLaborable[]>;
+  siguienteDia: string;
+  /** Scripted answers, in order; the last one repeats. Empty means "behave". */
+  respuestas: { guardarSupervision: RespuestaGuionada[]; crearExcepcion: RespuestaGuionada[] };
+}
+
+export function estadoSupervisionCalendario(): EstadoSupervisionCalendario {
+  return {
+    supervision: {
+      procedencias: ['Procedencia A', 'Procedencia B'],
+      supervisores: [
+        { numero: '900000101', procedencia: 'Procedencia A', documento: '00000001' },
+        { numero: '900000102', procedencia: 'Procedencia B', documento: '00000002' },
+      ],
+    },
+    dias: new Map(),
+    siguienteDia: '2026-09-14',
+    respuestas: { guardarSupervision: [], crearExcepcion: [] },
+  };
+}
+
+/** Same numbering rule as the backend: one sequence, procedencia by procedencia. */
+function conDocumentos(entrada: ConfiguracionSupervisionEntrada): ConfiguracionSupervision {
+  let secuencia = 0;
+  const documentos = new Map<number, string>();
+  entrada.procedencias.forEach((procedencia) => {
+    entrada.supervisores.forEach((s, indice) => {
+      if (s.procedencia === procedencia) documentos.set(indice, String(++secuencia).padStart(8, '0'));
+    });
+  });
+  return {
+    procedencias: entrada.procedencias,
+    supervisores: entrada.supervisores.map((s, i) => ({ ...s, documento: documentos.get(i) ?? '' })),
+  };
+}
+
+/** The routes of `/supervisores` and `/calendario/*`; `false` for any other, so the next handler tries. */
+export function manejadorSupervisionCalendario(estado: EstadoSupervisionCalendario): Manejador {
+  return async (route, ruta, metodo, url) => {
+    const cuerpo = (): unknown => JSON.parse(route.request().postData() ?? 'null');
+
+    if (ruta === '/supervisores' && metodo === 'GET') return (await json(route, 200, estado.supervision), true);
+    if (ruta === '/supervisores' && metodo === 'PUT') {
+      const guion = siguiente(estado.respuestas.guardarSupervision);
+      if (guion) return (await json(route, guion.estado, guion.cuerpo ?? {}), true);
+      // Same checks as the API, after trimming: procedencias present, unique and
+      // named; every supervisor's number valid and its procedencia listed.
+      const recibida = cuerpo() as ConfiguracionSupervisionEntrada;
+      const entrada: ConfiguracionSupervisionEntrada = {
+        procedencias: recibida.procedencias.map((p) => p.trim()),
+        supervisores: recibida.supervisores.map((s) => ({ numero: s.numero.trim(), procedencia: s.procedencia.trim() })),
+      };
+      const claves = entrada.procedencias.map((p) => p.toLowerCase());
+      if (claves.length === 0 || claves.some((p) => p === '') || new Set(claves).size !== claves.length) {
+        return (await json(route, 400, { detail: 'Las procedencias deben tener nombre y no repetirse' }), true);
+      }
+      const desconocido = entrada.supervisores.find((s) => !entrada.procedencias.includes(s.procedencia));
+      if (desconocido) {
+        return (await json(route, 400, { detail: `La procedencia ${desconocido.procedencia} no esta en la lista` }), true);
+      }
+      const invalidoTelefono = entrada.supervisores.find((s) => !esTelefono(s.numero));
+      if (invalidoTelefono) {
+        return (await json(route, 400, { detail: `El numero ${invalidoTelefono.numero} no cumple RF-02` }), true);
+      }
+      estado.supervision = conDocumentos(entrada);
+      return (await json(route, 200, estado.supervision), true);
+    }
+
+    if (ruta === '/calendario/feriados' && metodo === 'GET') {
+      const anio = Number(url.searchParams.get('anio') ?? 2026);
+      if (!estado.dias.has(anio)) estado.dias.set(anio, diasSinteticos(anio));
+      return (await json(route, 200, { anio, dias: estado.dias.get(anio) }), true);
+    }
+    if (ruta === '/calendario/siguiente-dia-gestionable') {
+      return (await json(route, 200, { desde: url.searchParams.get('desde') ?? '2026-09-13', fecha: estado.siguienteDia }), true);
+    }
+    if (ruta === '/calendario/excepciones' && metodo === 'POST') {
+      const guion = siguiente(estado.respuestas.crearExcepcion);
+      if (guion) return (await json(route, guion.estado, guion.cuerpo ?? {}), true);
+      const recibida = cuerpo() as ExcepcionEntrada;
+      const entrada = { ...recibida, descripcion: recibida.descripcion.trim() };
+      const anio = Number(entrada.fecha.slice(0, 4));
+      const dias = estado.dias.get(anio) ?? diasSinteticos(anio);
+      const delDia = dias.find((d) => d.fecha === entrada.fecha);
+      // The rule decides what an exception can mean: withdraw only a law holiday,
+      // add only a day that is not one; a date already carrying one is a 409.
+      if (entrada.tipo === 'retirado' && delDia?.origen !== 'ley') {
+        return (await json(route, 400, { detail: 'Solo se retira un feriado de ley' }), true);
+      }
+      if (entrada.tipo === 'agregado' && delDia?.origen === 'ley') {
+        return (await json(route, 400, { detail: 'La fecha ya es un feriado de ley' }), true);
+      }
+      if (delDia && (delDia.origen === 'agregado' || delDia.retirado)) {
+        return (await json(route, 409, { detail: 'La fecha ya tiene una excepcion' }), true);
+      }
+      estado.dias.set(
+        anio,
+        entrada.tipo === 'retirado'
+          ? dias.map((d) => (d.fecha === entrada.fecha ? { ...d, retirado: true } : d))
+          : [...dias, { fecha: entrada.fecha, descripcion: entrada.descripcion, origen: 'agregado', retirado: false }],
+      );
+      return (await json(route, 201, { ...entrada, creado_en: '2026-09-13T12:00:00-05:00' }), true);
+    }
+    const excepcion = ruta.match(/^\/calendario\/excepciones\/(\d{4}-\d{2}-\d{2})$/);
+    if (excepcion && metodo === 'DELETE') {
+      const fecha = excepcion[1];
+      const anio = Number(fecha.slice(0, 4));
+      const dias = estado.dias.get(anio) ?? diasSinteticos(anio);
+      if (!dias.some((d) => d.fecha === fecha && (d.origen === 'agregado' || d.retirado))) {
+        return (await json(route, 404, { detail: `No hay una excepcion el ${fecha}` }), true);
+      }
+      estado.dias.set(
+        anio,
+        dias
+          .filter((d) => !(d.fecha === fecha && d.origen === 'agregado'))
+          .map((d) => (d.fecha === fecha ? { ...d, retirado: false } : d)),
+      );
+      return (await route.fulfill({ status: 204, body: '' }), true);
+    }
+
+    return false;
+  };
+}
+
+/** A fake of just these two screens: `/health`, their routes, and a loud 404 for anything else. */
+export interface ApiFalsaSupervisionCalendario extends EstadoSupervisionCalendario {
+  /** When true, every call fails at the network level. */
+  sinRed: boolean;
+  /** Requests the page made, with their JSON bodies, for asserting on the call. */
+  pedidos: Array<{ metodo: string; ruta: string; cuerpo: unknown }>;
+}
+
+export function apiSupervisionCalendario(): ApiFalsaSupervisionCalendario {
+  return { ...estadoSupervisionCalendario(), sinRed: false, pedidos: [] };
+}
+
+export async function montarApiSupervisionCalendario(page: Page, estado: ApiFalsaSupervisionCalendario): Promise<void> {
+  const rutas = manejadorSupervisionCalendario(estado);
+  await page.route('**/api/**', async (route) => {
+    const pedido = route.request();
+    const url = new URL(pedido.url());
+    const ruta = url.pathname.replace(/^\/api/, '');
+    const metodo = pedido.method();
+    const texto = pedido.postData();
+    estado.pedidos.push({ metodo, ruta: `${ruta}${url.search}`, cuerpo: texto ? JSON.parse(texto) : null });
+
+    if (estado.sinRed) return route.abort('connectionrefused');
+    if (ruta === '/health') return json(route, 200, { api: true, database: true, ok: true });
+    if (await rutas(route, ruta, metodo, url)) return;
+    return json(route, 404, { detail: `sin ruta falsa para ${metodo} ${ruta}` });
+  });
+}

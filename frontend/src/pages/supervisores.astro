@@ -1,0 +1,559 @@
+---
+/**
+ * Default supervisors (RF-MM-04): the procedencias in order and the supervisors of each, which every
+ * campaign starts from. Shared by every connector, so it lives outside `/mowa-mes`.
+ *
+ * Saves on its own. The document numbers (00000001, ...) are assigned by the API on saving, in the
+ * order of the procedencias, so the column only claims numbers that the saved list actually has.
+ */
+import Shell from '../layouts/Shell.astro';
+import Icon from '../components/Icon.astro';
+import '../styles/supervisores.css';
+---
+
+<Shell
+  title="Supervisores — auto_cusco"
+  description="Supervisores por defecto de las campañas: procedencias en orden y el número de cada supervisor."
+>
+  <div class="supervisores">
+    <header class="supervisores__head">
+      <h1 class="supervisores__title" data-i18n="nav.supervisores">Supervisores</h1>
+      <p class="supervisores__intro" data-i18n="supervisores.intro">
+        Los supervisores que se asignan por defecto a cada campaña de MOWA MES.
+      </p>
+    </header>
+
+    <section class="standIn" data-offline hidden aria-labelledby="sv-offline-title">
+      <h2 class="standIn__title" id="sv-offline-title" data-i18n="console.offline.title">Sin conexión con la API</h2>
+      <p class="standIn__body" data-i18n="console.offline.body">
+        No se pudo contactar con el backend. Comprueba que esté en marcha y vuelve a intentarlo.
+      </p>
+      <button type="button" class="btn btn--primary" data-reintentar>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span class="btn__label" data-i18n="console.offline.retry">Reintentar</span>
+      </button>
+    </section>
+
+    <div class="supervisores__contenido" data-contenido hidden>
+      <!-- ---- Default supervisors ---------------------------------------- -->
+      <section class="panel" aria-labelledby="sv-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="sv-title" data-i18n="supervisores.title">Supervisores por defecto</h2>
+        </div>
+        <form class="panel__body supervisores-form" data-form-supervisores novalidate>
+          <p class="notice notice--warning" data-sin-supervisores hidden>
+            <Icon name="triangle-alert" size={20} />
+            <span data-i18n="supervisores.vacio">
+              No hay supervisores configurados. Sin supervisores no se puede crear ninguna campaña.
+            </span>
+          </p>
+
+          <fieldset class="supervisores-grupo">
+            <legend class="field__label" data-i18n="supervisores.procedencias">Procedencias, en orden</legend>
+            <p class="field__hint" data-i18n="supervisores.procedencias.hint">
+              Los documentos se numeran desde 00000001: primero los de la primera procedencia, luego los de la siguiente.
+            </p>
+            <ol class="supervisores-lista" data-procedencias></ol>
+            <button type="button" class="btn btn--sm" data-agregar-procedencia>
+              <Icon name="plus" size={16} />
+              <span data-i18n="supervisores.agregarProcedencia">Agregar procedencia</span>
+            </button>
+          </fieldset>
+
+          <fieldset class="supervisores-grupo">
+            <legend class="field__label" data-i18n="supervisores.lista">Supervisores</legend>
+            <div data-supervisores></div>
+            <button type="button" class="btn btn--sm" data-agregar-supervisor>
+              <Icon name="plus" size={16} />
+              <span data-i18n="supervisores.agregar">Agregar supervisor</span>
+            </button>
+          </fieldset>
+
+          <p class="field__hint" data-documentos-pendientes hidden data-i18n="supervisores.documentosPendientes">
+            Hay cambios sin guardar: los documentos se reasignan al guardar.
+          </p>
+
+          <p class="field__error" data-supervisores-error role="alert"></p>
+
+          <div class="supervisores-form__foot">
+            <button type="submit" class="btn btn--primary" data-supervisores-guardar>
+              <span class="btn__spinner" aria-hidden="true"></span>
+              <span class="btn__label" data-i18n="supervisores.guardar">Guardar supervisores</span>
+            </button>
+            <button type="button" class="btn" data-supervisores-descartar data-i18n="mowaMes.descartar">
+              Descartar cambios
+            </button>
+            <p class="mono muted" data-supervisores-estado role="status"></p>
+          </div>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <!-- Icons for rows the script builds: rendered once here, cloned per row. -->
+  <template data-icono-arriba><Icon name="arrow-up" size={16} /></template>
+  <template data-icono-abajo><Icon name="arrow-down" size={16} /></template>
+
+  <!-- ---- Generic failure ---------------------------------------------- -->
+  <dialog class="dialog" data-dialog="error" aria-labelledby="sv-error-title">
+    <div class="dialog__head">
+      <h2 id="sv-error-title" data-i18n="common.error">Algo salió mal</h2>
+    </div>
+    <div class="dialog__body">
+      <p class="notice notice--danger">
+        <Icon name="circle-alert" size={20} />
+        <span data-error-body></span>
+      </p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn btn--primary" data-close data-i18n="common.close">Cerrar</button>
+    </div>
+  </dialog>
+</Shell>
+
+<script>
+  import { NetworkError, mensajeDeError } from '../lib/api';
+  import { guardarSupervision, obtenerSupervision, type ConfiguracionSupervision } from '../lib/api-supervision';
+  import { $, ocupado } from '../lib/dom';
+  import { openWhenFree } from '../lib/dialogs';
+  import { applyTranslations, t } from '../lib/i18n';
+  import {
+    borradorDeSupervision,
+    entradaSupervision,
+    moverElemento,
+    problemasSupervision,
+    renombrarProcedencia,
+    supervisionCambio,
+    textoDeProblemaSupervision,
+    type BorradorSupervision,
+    type ProblemaSupervision,
+  } from '../lib/supervision';
+
+  const estado = {
+    supervisionGuardada: null as ConfiguracionSupervision | null,
+    supervision: { procedencias: [], supervisores: [] } as BorradorSupervision,
+    problemas: [] as ProblemaSupervision[],
+  };
+
+  const dialogos = {
+    error: $<HTMLDialogElement>('[data-dialog="error"]'),
+  };
+
+  document.querySelectorAll<HTMLElement>('[data-close]').forEach((boton) => {
+    boton.addEventListener('click', () => boton.closest('dialog')?.close());
+  });
+
+  // ---- Shared helpers -----------------------------------------------------------
+
+  function mostrarError(error: unknown): void {
+    $<HTMLElement>('[data-error-body]').textContent = mensajeDeError(error);
+    void openWhenFree(dialogos.error);
+  }
+
+  /** A status line that says what just happened, then gets out of the way. */
+  function avisar(nodo: HTMLElement, clave: string): void {
+    nodo.textContent = t(clave);
+    window.setTimeout(() => {
+      if (nodo.textContent === t(clave)) nodo.textContent = '';
+    }, 4000);
+  }
+
+  function boton(clave: string, clase = 'btn btn--sm'): HTMLButtonElement {
+    const nodo = document.createElement('button');
+    nodo.type = 'button';
+    nodo.className = clase;
+    nodo.textContent = t(clave);
+    return nodo;
+  }
+
+  function botonIcono(etiqueta: string, direccion: 'arriba' | 'abajo'): HTMLButtonElement {
+    const nodo = document.createElement('button');
+    nodo.type = 'button';
+    nodo.className = 'btn btn--sm btn--icon supervisores-mover';
+    nodo.setAttribute('aria-label', etiqueta);
+    nodo.title = etiqueta;
+    // The lucide icon is rendered by Astro in a template; the label carries the meaning.
+    const plantilla = $<HTMLTemplateElement>(`template[data-icono-${direccion}]`);
+    nodo.append(plantilla.content.cloneNode(true));
+    return nodo;
+  }
+
+  function vacio(clave: string): HTMLElement {
+    const bloque = document.createElement('p');
+    bloque.className = 'empty';
+    bloque.textContent = t(clave);
+    return bloque;
+  }
+
+  // ---- Supervisors -------------------------------------------------------------
+
+  const formSupervisores = $<HTMLFormElement>('[data-form-supervisores]');
+
+  function problemaEn(tipo: ProblemaSupervision['tipo'], indice: number): boolean {
+    return estado.problemas.some((p) => p.tipo === tipo && 'indice' in p && p.indice === indice);
+  }
+
+  function marcarInvalido(control: HTMLElement, invalido: boolean): void {
+    if (invalido) control.setAttribute('aria-invalid', 'true');
+    else control.removeAttribute('aria-invalid');
+  }
+
+  function pintarProcedencias(foco?: number): void {
+    const lista = $<HTMLOListElement>('[data-procedencias]');
+    lista.replaceChildren();
+    const total = estado.supervision.procedencias.length;
+
+    estado.supervision.procedencias.forEach((nombre, indice) => {
+      const item = document.createElement('li');
+      item.className = 'supervisores-fila';
+
+      const numero = document.createElement('span');
+      numero.className = 'mono muted supervisores-fila__orden';
+      numero.textContent = String(indice + 1);
+      numero.setAttribute('aria-hidden', 'true');
+
+      const input = document.createElement('input');
+      input.className = 'input supervisores-fila__texto';
+      input.type = 'text';
+      input.maxLength = 80;
+      input.value = nombre;
+      input.dataset.procedencia = String(indice);
+      input.setAttribute('aria-label', t('supervisores.procedencia', { n: indice + 1 }));
+      marcarInvalido(
+        input,
+        ['procedencia_vacia', 'procedencia_larga', 'procedencia_repetida'].some((tipo) =>
+          problemaEn(tipo as ProblemaSupervision['tipo'], indice),
+        ),
+      );
+      input.addEventListener('input', () => {
+        estado.supervision = renombrarProcedencia(estado.supervision, indice, input.value);
+        cambioSupervision({ repintarSupervisores: true });
+      });
+
+      const subir = botonIcono(t('supervisores.subirProcedencia', { n: indice + 1 }), 'arriba');
+      subir.disabled = indice === 0;
+      subir.addEventListener('click', () => {
+        estado.supervision = {
+          ...estado.supervision,
+          procedencias: moverElemento(estado.supervision.procedencias, indice, -1),
+        };
+        cambioSupervision({ repintarTodo: true, focoProcedencia: indice - 1 });
+      });
+
+      const bajar = botonIcono(t('supervisores.bajarProcedencia', { n: indice + 1 }), 'abajo');
+      bajar.disabled = indice === total - 1;
+      bajar.addEventListener('click', () => {
+        estado.supervision = {
+          ...estado.supervision,
+          procedencias: moverElemento(estado.supervision.procedencias, indice, 1),
+        };
+        cambioSupervision({ repintarTodo: true, focoProcedencia: indice + 1 });
+      });
+
+      const quitar = boton('mowaMes.quitar', 'btn btn--sm btn--danger');
+      quitar.setAttribute('aria-label', t('supervisores.quitarProcedencia', { n: indice + 1 }));
+      quitar.addEventListener('click', () => {
+        estado.supervision = {
+          ...estado.supervision,
+          procedencias: estado.supervision.procedencias.filter((_, i) => i !== indice),
+        };
+        cambioSupervision({ repintarTodo: true });
+      });
+
+      const acciones = document.createElement('span');
+      acciones.className = 'supervisores-fila__acciones';
+      acciones.append(subir, bajar, quitar);
+
+      item.append(numero, input, acciones);
+      lista.append(item);
+    });
+
+    if (foco !== undefined) {
+      lista.querySelector<HTMLElement>(`[data-procedencia="${foco}"]`)?.focus();
+    }
+  }
+
+  function pintarSupervisores(foco?: number): void {
+    const host = $<HTMLElement>('[data-supervisores]');
+    host.replaceChildren();
+
+    if (estado.supervision.supervisores.length === 0) {
+      host.append(vacio('supervisores.ninguno'));
+      return;
+    }
+
+    const guardada = estado.supervisionGuardada;
+    const sinCambios = guardada ? !supervisionCambio(guardada, estado.supervision) : false;
+    const total = estado.supervision.supervisores.length;
+
+    const scroll = document.createElement('div');
+    scroll.className = 'table-scroll';
+    const tabla = document.createElement('table');
+    tabla.className = 'table supervisores__tabla table--apilable';
+
+    const cabeza = document.createElement('thead');
+    const filaCabeza = document.createElement('tr');
+    (
+      [
+        ['supervisores.col.orden', 'num'],
+        ['supervisores.col.numero', ''],
+        ['supervisores.col.procedencia', ''],
+        ['supervisores.col.documento', ''],
+        ['supervisores.col.acciones', ''],
+      ] as const
+    ).forEach(([clave, clase]) => {
+      const celda = document.createElement('th');
+      celda.scope = 'col';
+      if (clase) celda.className = clase;
+      celda.textContent = t(clave);
+      filaCabeza.append(celda);
+    });
+    cabeza.append(filaCabeza);
+
+    const cuerpo = document.createElement('tbody');
+    estado.supervision.supervisores.forEach((supervisor, indice) => {
+      const fila = document.createElement('tr');
+
+      const orden = document.createElement('td');
+      orden.className = 'num';
+      orden.dataset.etiqueta = t('supervisores.col.orden');
+      orden.textContent = String(indice + 1);
+
+      const celdaNumero = document.createElement('td');
+      celdaNumero.dataset.etiqueta = t('supervisores.col.numero');
+      const numero = document.createElement('input');
+      numero.className = 'input supervisores__numero';
+      numero.type = 'text';
+      numero.inputMode = 'numeric';
+      numero.autocomplete = 'off';
+      numero.maxLength = 20;
+      numero.value = supervisor.numero;
+      numero.dataset.supervisor = String(indice);
+      numero.setAttribute('aria-label', t('supervisores.numero', { n: indice + 1 }));
+      marcarInvalido(numero, problemaEn('numero_vacio', indice));
+      numero.addEventListener('input', () => {
+        estado.supervision.supervisores[indice] = { ...supervisor, numero: numero.value };
+        supervisor.numero = numero.value;
+        cambioSupervision({});
+      });
+      celdaNumero.append(numero);
+
+      const celdaProcedencia = document.createElement('td');
+      celdaProcedencia.dataset.etiqueta = t('supervisores.col.procedencia');
+      const select = document.createElement('select');
+      select.className = 'input';
+      select.setAttribute('aria-label', t('supervisores.procedenciaDe', { n: indice + 1 }));
+      const opciones = [...estado.supervision.procedencias];
+      if (!opciones.includes(supervisor.procedencia)) opciones.unshift(supervisor.procedencia);
+      opciones.forEach((nombre) => {
+        const opcion = document.createElement('option');
+        opcion.value = nombre;
+        opcion.textContent = nombre.trim() === '' ? t('supervisores.sinNombre') : nombre;
+        select.append(opcion);
+      });
+      select.value = supervisor.procedencia;
+      marcarInvalido(select, problemaEn('procedencia_desconocida', indice));
+      select.addEventListener('change', () => {
+        estado.supervision.supervisores[indice] = { ...supervisor, procedencia: select.value };
+        supervisor.procedencia = select.value;
+        cambioSupervision({ repintarSupervisores: true, focoSupervisor: indice });
+      });
+      celdaProcedencia.append(select);
+
+      const documento = document.createElement('td');
+      documento.className = 'mono';
+      documento.dataset.etiqueta = t('supervisores.col.documento');
+      // The document is a consequence of numero/procedencia, not typed
+      // directly: it rises to the top of the stacked block with them in view.
+      documento.dataset.orden = '1';
+      documento.textContent = sinCambios ? (guardada?.supervisores[indice]?.documento ?? '—') : '—';
+
+      const acciones = document.createElement('td');
+      acciones.dataset.etiqueta = t('supervisores.col.acciones');
+      const envoltorio = document.createElement('span');
+      envoltorio.className = 'supervisores-fila__acciones';
+      const subir = botonIcono(t('supervisores.subir', { n: indice + 1 }), 'arriba');
+      subir.disabled = indice === 0;
+      subir.addEventListener('click', () => {
+        estado.supervision = {
+          ...estado.supervision,
+          supervisores: moverElemento(estado.supervision.supervisores, indice, -1),
+        };
+        cambioSupervision({ repintarSupervisores: true });
+      });
+      const bajar = botonIcono(t('supervisores.bajar', { n: indice + 1 }), 'abajo');
+      bajar.disabled = indice === total - 1;
+      bajar.addEventListener('click', () => {
+        estado.supervision = {
+          ...estado.supervision,
+          supervisores: moverElemento(estado.supervision.supervisores, indice, 1),
+        };
+        cambioSupervision({ repintarSupervisores: true });
+      });
+      const quitar = boton('mowaMes.quitar', 'btn btn--sm btn--danger');
+      quitar.setAttribute('aria-label', t('supervisores.quitar', { n: indice + 1 }));
+      quitar.addEventListener('click', () => {
+        estado.supervision = {
+          ...estado.supervision,
+          supervisores: estado.supervision.supervisores.filter((_, i) => i !== indice),
+        };
+        cambioSupervision({ repintarSupervisores: true });
+      });
+      envoltorio.append(subir, bajar, quitar);
+      acciones.append(envoltorio);
+
+      fila.append(orden, celdaNumero, celdaProcedencia, documento, acciones);
+      cuerpo.append(fila);
+    });
+
+    tabla.append(cabeza, cuerpo);
+    scroll.append(tabla);
+    host.append(scroll);
+
+    if (foco !== undefined) {
+      host.querySelector<HTMLElement>(`[data-supervisor="${foco}"]`)?.focus();
+    }
+  }
+
+  /**
+   * Repaint what an edit affects. Typing never rebuilds the field being typed
+   * in, so the caret stays put; structural changes rebuild their list.
+   */
+  function cambioSupervision(opciones: {
+    repintarTodo?: boolean;
+    repintarSupervisores?: boolean;
+    focoProcedencia?: number;
+    focoSupervisor?: number;
+  }): void {
+    $<HTMLElement>('[data-supervisores-error]').textContent = '';
+    estado.problemas = [];
+    if (opciones.repintarTodo) pintarProcedencias(opciones.focoProcedencia);
+    if (opciones.repintarTodo || opciones.repintarSupervisores) {
+      pintarSupervisores(opciones.focoSupervisor);
+    } else {
+      // A typed number changes no structure, but the documents column must stop
+      // claiming numbers that the save is going to reassign.
+      pintarDocumentos();
+    }
+    pintarEstadoSupervision();
+  }
+
+  function pintarDocumentos(): void {
+    const guardada = estado.supervisionGuardada;
+    const sinCambios = guardada ? !supervisionCambio(guardada, estado.supervision) : false;
+    document
+      .querySelectorAll<HTMLTableRowElement>('.supervisores__tabla tbody tr')
+      .forEach((fila, indice) => {
+        const celda = fila.cells[3];
+        if (celda) celda.textContent = sinCambios ? (guardada?.supervisores[indice]?.documento ?? '—') : '—';
+      });
+  }
+
+  function pintarEstadoSupervision(): void {
+    const guardada = estado.supervisionGuardada;
+    const cambio = guardada ? supervisionCambio(guardada, estado.supervision) : false;
+    $<HTMLElement>('[data-documentos-pendientes]').hidden = !cambio;
+    $<HTMLButtonElement>('[data-supervisores-descartar]').disabled = !cambio;
+    $<HTMLElement>('[data-sin-supervisores]').hidden = (guardada?.supervisores.length ?? 0) > 0;
+  }
+
+  function pintarSupervision(): void {
+    pintarProcedencias();
+    pintarSupervisores();
+    pintarEstadoSupervision();
+  }
+
+  $<HTMLButtonElement>('[data-agregar-procedencia]').addEventListener('click', () => {
+    estado.supervision = {
+      ...estado.supervision,
+      procedencias: [...estado.supervision.procedencias, ''],
+    };
+    cambioSupervision({ repintarTodo: true, focoProcedencia: estado.supervision.procedencias.length - 1 });
+  });
+
+  $<HTMLButtonElement>('[data-agregar-supervisor]').addEventListener('click', () => {
+    const procedencia = estado.supervision.procedencias[0] ?? '';
+    estado.supervision = {
+      ...estado.supervision,
+      supervisores: [...estado.supervision.supervisores, { numero: '', procedencia }],
+    };
+    cambioSupervision({ repintarSupervisores: true, focoSupervisor: estado.supervision.supervisores.length - 1 });
+  });
+
+  $<HTMLButtonElement>('[data-supervisores-descartar]').addEventListener('click', () => {
+    if (!estado.supervisionGuardada) return;
+    estado.supervision = borradorDeSupervision(estado.supervisionGuardada);
+    cambioSupervision({ repintarTodo: true });
+  });
+
+  formSupervisores.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    const error = $<HTMLElement>('[data-supervisores-error]');
+    error.textContent = '';
+
+    estado.problemas = problemasSupervision(estado.supervision);
+    if (estado.problemas.length > 0) {
+      pintarProcedencias();
+      pintarSupervisores();
+      error.textContent = estado.problemas.map(textoDeProblemaSupervision).join(' ');
+      formSupervisores.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+      return;
+    }
+
+    const guardar = $<HTMLButtonElement>('[data-supervisores-guardar]');
+    ocupado(guardar, true);
+    try {
+      estado.supervisionGuardada = await guardarSupervision(entradaSupervision(estado.supervision));
+      estado.supervision = borradorDeSupervision(estado.supervisionGuardada);
+      pintarSupervision();
+      avisar($<HTMLElement>('[data-supervisores-estado]'), 'mowaMes.guardado');
+    } catch (caido) {
+      error.textContent = mensajeDeError(caido);
+    } finally {
+      ocupado(guardar, false);
+    }
+  });
+
+  // ---- Boot --------------------------------------------------------------------
+
+  function sinConexion(si: boolean): void {
+    $<HTMLElement>('[data-offline]').hidden = !si;
+    $<HTMLElement>('[data-contenido]').hidden = si;
+    document.dispatchEvent(new CustomEvent('healthchanged'));
+  }
+
+  async function arrancar(): Promise<void> {
+    try {
+      const supervision = await obtenerSupervision();
+      estado.supervisionGuardada = supervision;
+      estado.supervision = borradorDeSupervision(supervision);
+      sinConexion(false);
+      pintarSupervision();
+    } catch (caido) {
+      if (caido instanceof NetworkError) {
+        sinConexion(true);
+      } else {
+        sinConexion(false);
+        mostrarError(caido);
+      }
+    }
+  }
+
+  const reintentar = $<HTMLButtonElement>('[data-reintentar]');
+  reintentar.addEventListener('click', async () => {
+    ocupado(reintentar, true);
+    try {
+      await arrancar();
+    } finally {
+      ocupado(reintentar, false);
+    }
+  });
+
+  // A language switch repaints what the script drew, keeping every draft.
+  document.addEventListener('languagechange', () => {
+    applyTranslations();
+    pintarSupervision();
+  });
+
+  void arrancar();
+</script>

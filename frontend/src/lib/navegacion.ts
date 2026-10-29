@@ -97,7 +97,11 @@ export const NAVEGACION: SeccionNav[] = [
     id: 'configuracion',
     i18n: 'nav.seccion.configuracion',
     texto: 'Configuración',
-    entradas: [{ tipo: 'enlace', enlace: { ruta: '/columnas', i18n: 'nav.columnas', texto: 'Columnas de carga' } }],
+    entradas: [
+      { tipo: 'enlace', enlace: { ruta: '/columnas', i18n: 'nav.columnas', texto: 'Columnas de carga' } },
+      { tipo: 'enlace', enlace: { ruta: '/supervisores', i18n: 'nav.supervisores', texto: 'Supervisores' } },
+      { tipo: 'enlace', enlace: { ruta: '/calendario', i18n: 'nav.calendario', texto: 'Calendario laboral' } },
+    ],
   },
 ];
 

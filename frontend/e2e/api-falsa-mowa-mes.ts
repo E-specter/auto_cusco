@@ -9,7 +9,13 @@
 import type { Page, Route } from '@playwright/test';
 
 import { caracteresQuitados, normalizarGsm7 } from './api-falsa-gsm7';
-import { valoresSobreUmbral } from './api-falsa';
+import {
+  esTelefono,
+  estadoSupervisionCalendario,
+  manejadorSupervisionCalendario,
+  valoresSobreUmbral,
+  type EstadoSupervisionCalendario,
+} from './api-falsa';
 import type {
   AvisoCampana,
   Campana,
@@ -21,10 +27,6 @@ import type {
   PeticionCampanaEntrada,
   PrevisualizacionCampana,
   ConfiguracionMowaMes,
-  ConfiguracionSupervision,
-  ConfiguracionSupervisionEntrada,
-  DiaNoLaborable,
-  ExcepcionEntrada,
   PartesEntrada,
   PartesSpeech,
   PrevisualizacionSpeech,
@@ -219,16 +221,6 @@ export function previsualizacionSintetica(
   });
 
   return { whatsapp, largo_advertencia: 150, largo_maximo: 160, problemas, segmentos, campos_archivados: [] };
-}
-
-/** Three law holidays, one of them withdrawn this year, and one added day. */
-export function diasSinteticos(anio: number): DiaNoLaborable[] {
-  return [
-    { fecha: `${anio}-01-01`, descripcion: 'Año Nuevo', origen: 'ley', retirado: false },
-    { fecha: `${anio}-05-01`, descripcion: 'Día del Trabajo', origen: 'ley', retirado: false },
-    { fecha: `${anio}-06-07`, descripcion: 'Batalla de Arica', origen: 'ley', retirado: true },
-    { fecha: `${anio}-12-24`, descripcion: 'Día no laborable sintético', origen: 'agregado', retirado: false },
-  ];
 }
 
 // ---- Costs and file names (T-MM-F6, B8's contract) ----------------------------------
@@ -648,13 +640,9 @@ export function campanaDesdeEntrada(
   };
 }
 
-export interface ApiFalsaMowaMes {
+export interface ApiFalsaMowaMes extends EstadoSupervisionCalendario {
   configuracion: ConfiguracionMowaMes;
-  supervision: ConfiguracionSupervision;
   versiones: VersionSpeech[];
-  /** Non-working days per year; missing years get `diasSinteticos`. */
-  dias: Map<number, DiaNoLaborable[]>;
-  siguienteDia: string;
   /** Campaigns `GET /mowa-mes/campanas` pages through, most recent first. */
   campanas: Campana[];
   /** Exclusions per campaign id. */
@@ -664,12 +652,10 @@ export interface ApiFalsaMowaMes {
   /** Answers `GET /mowa-mes/limite-mensual` for a month. */
   consumo: (mes: string) => ConsumoParcial;
   /** Scripted answers, in order; the last one repeats. Empty means "behave". */
-  respuestas: {
+  respuestas: EstadoSupervisionCalendario['respuestas'] & {
     guardarConfiguracion: Respuesta[];
-    guardarSupervision: Respuesta[];
     crearSpeech: Respuesta[];
     editarSpeech: Respuesta[];
-    crearExcepcion: Respuesta[];
     importarReporte: Respuesta[];
     previsualizarCampana: Respuesta[];
     crearCampana: Respuesta[];
@@ -682,7 +668,9 @@ export interface ApiFalsaMowaMes {
 }
 
 export function apiMowaMes(): ApiFalsaMowaMes {
+  const compartido = estadoSupervisionCalendario();
   return {
+    ...compartido,
     configuracion: {
       limite_mensual: 2_500_000,
       registros_por_archivo: 50_000,
@@ -693,26 +681,16 @@ export function apiMowaMes(): ApiFalsaMowaMes {
       plantilla_nombre_archivo: PLANTILLA_POR_DEFECTO,
       variables_plantilla: VARIABLES_PLANTILLA,
     },
-    supervision: {
-      procedencias: ['Procedencia A', 'Procedencia B'],
-      supervisores: [
-        { numero: '900000101', procedencia: 'Procedencia A', documento: '00000001' },
-        { numero: '900000102', procedencia: 'Procedencia B', documento: '00000002' },
-      ],
-    },
     versiones: [speechOriginal()],
-    dias: new Map(),
-    siguienteDia: '2026-09-14',
     campanas: [campanaSintetica()],
     exclusiones: new Map([[1, exclusionesSinteticas(20)]]),
     conciliaciones: new Map(),
     consumo: (mes) => consumoSintetico(mes),
     respuestas: {
+      ...compartido.respuestas,
       guardarConfiguracion: [],
-      guardarSupervision: [],
       crearSpeech: [],
       editarSpeech: [],
-      crearExcepcion: [],
       importarReporte: [],
       previsualizarCampana: [],
       crearCampana: [],
@@ -727,9 +705,6 @@ export function apiMowaMes(): ApiFalsaMowaMes {
 const invalido = (route: Route, campo: string, mensaje: string) =>
   json(route, 422, { detail: [{ loc: ['body', campo], msg: mensaje, type: 'value_error' }] });
 
-/** RF-02: 9 digits starting with 9. */
-const esTelefono = (valor: string) => /^9\d{8}$/.test(valor);
-
 const enRango = (valor: unknown, minimo: number, maximo: number) =>
   typeof valor === 'number' && Number.isInteger(valor) && valor >= minimo && valor <= maximo;
 
@@ -738,26 +713,12 @@ function contextoDe(estado: ApiFalsaMowaMes): ContextoCostos {
   return { tarifa: estado.configuracion.tarifa_sms, plantilla: estado.configuracion.plantilla_nombre_archivo };
 }
 
-/** Same numbering rule as the backend: one sequence, procedencia by procedencia. */
-function conDocumentos(entrada: ConfiguracionSupervisionEntrada): ConfiguracionSupervision {
-  let secuencia = 0;
-  const documentos = new Map<number, string>();
-  entrada.procedencias.forEach((procedencia) => {
-    entrada.supervisores.forEach((s, indice) => {
-      if (s.procedencia === procedencia) documentos.set(indice, String(++secuencia).padStart(8, '0'));
-    });
-  });
-  return {
-    procedencias: entrada.procedencias,
-    supervisores: entrada.supervisores.map((s, i) => ({ ...s, documento: documentos.get(i) ?? '' })),
-  };
-}
-
 /**
  * Route every `/api` call to `estado`. Anything not handled answers 404 so a
  * missing fake fails loudly instead of reaching a real server.
  */
 export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Promise<void> {
+  const supervisionYCalendario = manejadorSupervisionCalendario(estado);
   await page.route('**/api/**', async (route) => {
     const pedido = route.request();
     const url = new URL(pedido.url());
@@ -864,32 +825,8 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       return json(route, 200, { plantilla, nombres_ejemplo: nombresDeEjemplo(plantilla) });
     }
 
-    if (ruta === '/supervisores' && metodo === 'GET') return json(route, 200, estado.supervision);
-    if (ruta === '/supervisores' && metodo === 'PUT') {
-      const guion = siguiente(estado.respuestas.guardarSupervision);
-      if (guion) return json(route, guion.estado, guion.cuerpo ?? {});
-      // Same checks as the API, after trimming: procedencias present, unique and
-      // named; every supervisor's number valid and its procedencia listed.
-      const recibida = cuerpo as ConfiguracionSupervisionEntrada;
-      const entrada: ConfiguracionSupervisionEntrada = {
-        procedencias: recibida.procedencias.map((p) => p.trim()),
-        supervisores: recibida.supervisores.map((s) => ({ numero: s.numero.trim(), procedencia: s.procedencia.trim() })),
-      };
-      const claves = entrada.procedencias.map((p) => p.toLowerCase());
-      if (claves.length === 0 || claves.some((p) => p === '') || new Set(claves).size !== claves.length) {
-        return json(route, 400, { detail: 'Las procedencias deben tener nombre y no repetirse' });
-      }
-      const desconocido = entrada.supervisores.find((s) => !entrada.procedencias.includes(s.procedencia));
-      if (desconocido) {
-        return json(route, 400, { detail: `La procedencia ${desconocido.procedencia} no esta en la lista` });
-      }
-      const invalidoTelefono = entrada.supervisores.find((s) => !esTelefono(s.numero));
-      if (invalidoTelefono) {
-        return json(route, 400, { detail: `El numero ${invalidoTelefono.numero} no cumple RF-02` });
-      }
-      estado.supervision = conDocumentos(entrada);
-      return json(route, 200, estado.supervision);
-    }
+    // The default supervisors and the working-day calendar are shared by every connector (`api-falsa.ts`).
+    if (await supervisionYCalendario(route, ruta, metodo, url)) return;
 
     if (ruta === '/mowa-mes/speech' && metodo === 'GET') return json(route, 200, estado.versiones);
     if (ruta === '/mowa-mes/speech' && metodo === 'POST') {
@@ -925,58 +862,6 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       if (!actual) return json(route, 404, { detail: 'No existe la version' });
       if (!actual.editable) return json(route, 409, { detail: 'La version ya se uso y no se modifica' });
       return json(route, 404, { detail: 'sin ruta falsa para editar una v2 aqui: la contesta api-falsa-speech-v2' });
-    }
-
-    if (ruta === '/calendario/feriados' && metodo === 'GET') {
-      const anio = Number(url.searchParams.get('anio') ?? 2026);
-      if (!estado.dias.has(anio)) estado.dias.set(anio, diasSinteticos(anio));
-      return json(route, 200, { anio, dias: estado.dias.get(anio) });
-    }
-    if (ruta === '/calendario/siguiente-dia-gestionable') {
-      return json(route, 200, { desde: url.searchParams.get('desde') ?? '2026-09-13', fecha: estado.siguienteDia });
-    }
-    if (ruta === '/calendario/excepciones' && metodo === 'POST') {
-      const guion = siguiente(estado.respuestas.crearExcepcion);
-      if (guion) return json(route, guion.estado, guion.cuerpo ?? {});
-      const recibida = cuerpo as ExcepcionEntrada;
-      const entrada = { ...recibida, descripcion: recibida.descripcion.trim() };
-      const anio = Number(entrada.fecha.slice(0, 4));
-      const dias = estado.dias.get(anio) ?? diasSinteticos(anio);
-      const delDia = dias.find((d) => d.fecha === entrada.fecha);
-      // The rule decides what an exception can mean: withdraw only a law holiday,
-      // add only a day that is not one; a date already carrying one is a 409.
-      if (entrada.tipo === 'retirado' && delDia?.origen !== 'ley') {
-        return json(route, 400, { detail: 'Solo se retira un feriado de ley' });
-      }
-      if (entrada.tipo === 'agregado' && delDia?.origen === 'ley') {
-        return json(route, 400, { detail: 'La fecha ya es un feriado de ley' });
-      }
-      if (delDia && (delDia.origen === 'agregado' || delDia.retirado)) {
-        return json(route, 409, { detail: 'La fecha ya tiene una excepcion' });
-      }
-      estado.dias.set(
-        anio,
-        entrada.tipo === 'retirado'
-          ? dias.map((d) => (d.fecha === entrada.fecha ? { ...d, retirado: true } : d))
-          : [...dias, { fecha: entrada.fecha, descripcion: entrada.descripcion, origen: 'agregado', retirado: false }],
-      );
-      return json(route, 201, { ...entrada, creado_en: '2026-09-13T12:00:00-05:00' });
-    }
-    const excepcion = ruta.match(/^\/calendario\/excepciones\/(\d{4}-\d{2}-\d{2})$/);
-    if (excepcion && metodo === 'DELETE') {
-      const fecha = excepcion[1];
-      const anio = Number(fecha.slice(0, 4));
-      const dias = estado.dias.get(anio) ?? diasSinteticos(anio);
-      if (!dias.some((d) => d.fecha === fecha && (d.origen === 'agregado' || d.retirado))) {
-        return json(route, 404, { detail: `No hay una excepcion el ${fecha}` });
-      }
-      estado.dias.set(
-        anio,
-        dias
-          .filter((d) => !(d.fecha === fecha && d.origen === 'agregado'))
-          .map((d) => (d.fecha === fecha ? { ...d, retirado: false } : d)),
-      );
-      return route.fulfill({ status: 204, body: '' });
     }
 
     // ---- Follow-up -----------------------------------------------------------------

@@ -1,0 +1,146 @@
+/*
+ * Default supervisors (/supervisores).
+ *
+ * Global for the same reason as console.css: the rows are built by the page script at runtime.
+ * Shared by every connector, so nothing here carries the MOWA MES prefix.
+ */
+
+.supervisores {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-inline-size: var(--shell-max);
+  margin-inline: auto;
+  padding: var(--space-4) var(--shell-gutter) var(--space-6);
+}
+
+.supervisores__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.supervisores__title {
+  font-size: var(--text-lg);
+  font-weight: 800;
+  line-height: var(--leading-heading);
+  letter-spacing: var(--tracking-heading);
+  text-wrap: balance;
+}
+
+.supervisores__intro {
+  max-inline-size: 70ch;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.supervisores__contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ---- Forms inside panels ------------------------------------------------- */
+
+.supervisores-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+.supervisores-form__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.supervisores-form__foot > p:empty {
+  display: none;
+}
+
+.supervisores-grupo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  padding: 0;
+  border: 0;
+}
+
+.supervisores-grupo > :not(legend, button) {
+  align-self: stretch;
+}
+
+.supervisores-grupo > legend {
+  margin-block-end: var(--space-1);
+}
+
+/* ---- Ordered procedencias (shared with the campaign's own supervisors) ---------- */
+
+.supervisores-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.supervisores-fila {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.supervisores-fila__orden {
+  min-inline-size: 2ch;
+  text-align: end;
+}
+
+.supervisores-fila__acciones {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.supervisores-fila > .supervisores-fila__acciones {
+  grid-column: 2;
+}
+
+@media (min-width: 48rem) {
+  .supervisores-fila {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .supervisores-fila > .supervisores-fila__acciones {
+    grid-column: auto;
+  }
+}
+
+/* A move that cannot happen keeps its slot, so the row's buttons stay aligned. */
+.supervisores-mover:disabled {
+  visibility: hidden;
+}
+
+/* ---- Supervisors table ------------------------------------------------------- */
+
+.supervisores__tabla td {
+  vertical-align: middle;
+}
+
+.supervisores__tabla .input {
+  min-inline-size: 11ch;
+}
+
+/* A fixed width belongs to the row layout above 48rem; stacked below it, the
+   input takes the same full-width block as the rest of the row. */
+@media (min-width: 48rem) {
+  .supervisores__numero {
+    inline-size: 14ch;
+  }
+}

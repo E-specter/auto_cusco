@@ -12,6 +12,7 @@ import Shell from '../../layouts/Shell.astro';
 import Icon from '../../components/Icon.astro';
 import SelectorSeleccion from '../../components/SelectorSeleccion.astro';
 import '../../styles/mowa-mes.css';
+import '../../styles/supervisores.css';
 ---
 
 <Shell
@@ -274,7 +275,7 @@ import '../../styles/mowa-mes.css';
               <div data-supervisores-lista></div>
               <button type="button" class="btn btn--sm" data-agregar-supervisor>
                 <Icon name="plus" size={16} />
-                <span data-i18n="mowaMes.supervisores.agregar">Agregar supervisor</span>
+                <span data-i18n="supervisores.agregar">Agregar supervisor</span>
               </button>
             </div>
           </div>
@@ -448,13 +449,10 @@ import '../../styles/mowa-mes.css';
     descargarArchivoCampana,
     listarSpeech,
     obtenerConfiguracion,
-    obtenerSupervision,
     previsualizarCampana,
-    siguienteDiaGestionable,
     type ArchivoCampana,
     type Campana,
     type ConfiguracionMowaMes,
-    type ConfiguracionSupervision,
     type PrevisualizacionCampana,
     type ProgramacionCampana,
     type VersionSpeech,
@@ -477,7 +475,10 @@ import '../../styles/mowa-mes.css';
     type ProgramacionBorrador,
     type SupervisorBorrador,
   } from '../../lib/mowa-mes-campana';
-  import { campoDeError, moverElemento, traducirCodigo } from '../../lib/mowa-mes';
+  import { siguienteDiaGestionable } from '../../lib/api-calendario';
+  import { obtenerSupervision, type ConfiguracionSupervision } from '../../lib/api-supervision';
+  import { campoDeError, traducirCodigo } from '../../lib/mowa-mes';
+  import { moverElemento } from '../../lib/supervision';
   import { paginar, type PaginaLocal } from '../../lib/paginacion';
   import { notaVariablesDesconocidas, pintarBotonesDeVariables } from '../../lib/mowa-mes-plantilla';
   import { avisoDeCamposArchivados, leerResumenDescarga, listaDeCampos, nombreArchivo } from '../../lib/mowa-mes-seguimiento';
@@ -527,7 +528,7 @@ import '../../styles/mowa-mes.css';
   function botonIcono(etiqueta: string, direccion: 'arriba' | 'abajo'): HTMLButtonElement {
     const nodo = document.createElement('button');
     nodo.type = 'button';
-    nodo.className = 'btn btn--sm btn--icon mm-mover';
+    nodo.className = 'btn btn--sm btn--icon supervisores-mover';
     nodo.setAttribute('aria-label', etiqueta);
     nodo.title = etiqueta;
     const plantilla = $<HTMLTemplateElement>(`template[data-icono-${direccion}]`);
@@ -707,15 +708,15 @@ import '../../styles/mowa-mes.css';
     const procedencias = estado.supervisionConfigurada?.procedencias ?? [];
 
     if (estado.supervisoresPropios.length === 0) {
-      host.append(vacio(t('mowaMes.supervisores.ninguno')));
+      host.append(vacio(t('supervisores.ninguno')));
       return;
     }
 
-    const { envoltorio, cuerpo } = tabla('mm-supervisores__tabla', [
-      [t('mowaMes.supervisores.col.orden'), true],
-      [t('mowaMes.supervisores.col.numero'), false],
-      [t('mowaMes.supervisores.col.procedencia'), false],
-      [t('mowaMes.supervisores.col.acciones'), false],
+    const { envoltorio, cuerpo } = tabla('supervisores__tabla', [
+      [t('supervisores.col.orden'), true],
+      [t('supervisores.col.numero'), false],
+      [t('supervisores.col.procedencia'), false],
+      [t('supervisores.col.acciones'), false],
     ]);
 
     estado.supervisoresPropios.forEach((supervisor, indice) => {
@@ -723,13 +724,13 @@ import '../../styles/mowa-mes.css';
       const fila = document.createElement('tr');
 
       const numero = document.createElement('input');
-      numero.className = 'input mm-supervisores__numero';
+      numero.className = 'input supervisores__numero';
       numero.type = 'text';
       numero.inputMode = 'numeric';
       numero.autocomplete = 'off';
       numero.maxLength = 20;
       numero.value = supervisor.numero;
-      numero.setAttribute('aria-label', t('mowaMes.supervisores.numero', { n: indice + 1 }));
+      numero.setAttribute('aria-label', t('supervisores.numero', { n: indice + 1 }));
       numero.addEventListener('input', () => {
         estado.supervisoresPropios[indice] = { ...supervisor, numero: numero.value };
         programarPrevisualizacion();
@@ -737,13 +738,13 @@ import '../../styles/mowa-mes.css';
 
       const select = document.createElement('select');
       select.className = 'input';
-      select.setAttribute('aria-label', t('mowaMes.supervisores.procedenciaDe', { n: indice + 1 }));
+      select.setAttribute('aria-label', t('supervisores.procedenciaDe', { n: indice + 1 }));
       const opciones = [...procedencias];
       if (!opciones.includes(supervisor.procedencia)) opciones.unshift(supervisor.procedencia);
       opciones.forEach((nombre) => {
         const opcion = document.createElement('option');
         opcion.value = nombre;
-        opcion.textContent = nombre.trim() === '' ? t('mowaMes.supervisores.sinNombre') : nombre;
+        opcion.textContent = nombre.trim() === '' ? t('supervisores.sinNombre') : nombre;
         select.append(opcion);
       });
       select.value = supervisor.procedencia;
@@ -752,7 +753,7 @@ import '../../styles/mowa-mes.css';
         programarPrevisualizacion();
       });
 
-      const subir = botonIcono(t('mowaMes.supervisores.subir', { n: indice + 1 }), 'arriba');
+      const subir = botonIcono(t('supervisores.subir', { n: indice + 1 }), 'arriba');
       subir.disabled = indice === 0;
       subir.addEventListener('click', () => {
         estado.supervisoresPropios = moverElemento(estado.supervisoresPropios, indice, -1);
@@ -760,7 +761,7 @@ import '../../styles/mowa-mes.css';
         programarPrevisualizacion();
       });
 
-      const bajar = botonIcono(t('mowaMes.supervisores.bajar', { n: indice + 1 }), 'abajo');
+      const bajar = botonIcono(t('supervisores.bajar', { n: indice + 1 }), 'abajo');
       bajar.disabled = indice === total - 1;
       bajar.addEventListener('click', () => {
         estado.supervisoresPropios = moverElemento(estado.supervisoresPropios, indice, 1);
@@ -768,7 +769,7 @@ import '../../styles/mowa-mes.css';
         programarPrevisualizacion();
       });
 
-      const quitar = botonQuitar(t('mowaMes.supervisores.quitar', { n: indice + 1 }));
+      const quitar = botonQuitar(t('supervisores.quitar', { n: indice + 1 }));
       quitar.addEventListener('click', () => {
         estado.supervisoresPropios = estado.supervisoresPropios.filter((_, i) => i !== indice);
         pintarSupervisoresPropios();
@@ -777,7 +778,7 @@ import '../../styles/mowa-mes.css';
 
       const acciones = document.createElement('td');
       const envoltorioAcciones = document.createElement('span');
-      envoltorioAcciones.className = 'mm-fila__acciones';
+      envoltorioAcciones.className = 'supervisores-fila__acciones';
       envoltorioAcciones.append(subir, bajar, quitar);
       acciones.append(envoltorioAcciones);
 
@@ -792,7 +793,7 @@ import '../../styles/mowa-mes.css';
 
     host.append(envoltorio);
     if (foco !== undefined) {
-      host.querySelectorAll<HTMLInputElement>('.mm-supervisores__numero')[foco]?.focus();
+      host.querySelectorAll<HTMLInputElement>('.supervisores__numero')[foco]?.focus();
     }
   }
 
@@ -831,10 +832,10 @@ import '../../styles/mowa-mes.css';
     lista.replaceChildren();
     estado.fechasMultiples.forEach((valor, indice) => {
       const item = document.createElement('li');
-      item.className = 'mm-fila';
+      item.className = 'supervisores-fila';
 
       const input = document.createElement('input');
-      input.className = 'input mono mm-fila__texto';
+      input.className = 'input mono supervisores-fila__texto';
       input.type = 'datetime-local';
       input.value = valor;
       input.setAttribute('aria-label', t('mowaMes.campana.programacion.fechaN', { n: indice + 1 }));
@@ -852,7 +853,7 @@ import '../../styles/mowa-mes.css';
       });
 
       const acciones = document.createElement('span');
-      acciones.className = 'mm-fila__acciones';
+      acciones.className = 'supervisores-fila__acciones';
       acciones.append(quitar);
 
       item.append(input, acciones);

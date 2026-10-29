@@ -1,9 +1,11 @@
 /*
  * MOWA MES connector screens.
  *
- * Global for the same reason as console.css: supervisor rows, speech parts
- * and calendar days are built by the page script at runtime. Every class is
- * prefixed `mm` so nothing here reaches another screen.
+ * Global for the same reason as console.css: speech parts, campaign rows and
+ * follow-up tables are built by the page script at runtime. Every class is
+ * prefixed `mm` so nothing here reaches another screen. The default
+ * supervisors and the working-day calendar, shared by every connector, have
+ * their own sheets: `supervisores.css`, `calendario.css`.
  */
 
 .mm {
@@ -42,26 +44,37 @@
   gap: var(--space-4);
 }
 
-.mm__grid {
+.mm__meta {
+  font-size: var(--text-xs);
+}
+
+/* The links of the transition notice (configuration): the notice's own colour, underlined. The
+   default link colour does not hold its contrast on the info wash. */
+[data-pantallas-nuevas] a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* ---- Platform ----------------------------------------------------------------
+   The settings sit in a grid that fills the row: three columns at 1280 px, one at 360. The file-name
+   template, with its chips and its two previews, takes the whole row; so do the notices and the save
+   button, which goes under everything. */
+
+.mm-plataforma {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
   align-items: start;
-  gap: var(--space-4);
-}
-
-@media (min-width: 64rem) {
-  /* The golden split: the short settings on the narrow side, the list that
-     grows on the wide one. */
-  .mm__grid {
-    grid-template-columns: var(--phi-minor) 1fr;
-  }
-}
-
-.mm__grid > .panel {
+  gap: var(--space-3) var(--space-4);
   min-inline-size: 0;
 }
 
-.mm__meta {
-  font-size: var(--text-xs);
+.mm-plataforma > :not(.field),
+.mm-plataforma__plantilla {
+  grid-column: 1 / -1;
+}
+
+.mm-plataforma > .field {
+  min-inline-size: 0;
 }
 
 /* ---- Forms inside panels ------------------------------------------------- */
@@ -100,72 +113,6 @@
 
 .mm-grupo > legend {
   margin-block-end: var(--space-1);
-}
-
-/* ---- Ordered procedencias --------------------------------------------------- */
-
-.mm-lista {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: 0;
-  list-style: none;
-}
-
-.mm-fila {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.mm-fila__orden {
-  min-inline-size: 2ch;
-  text-align: end;
-}
-
-.mm-fila__acciones {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.mm-fila > .mm-fila__acciones {
-  grid-column: 2;
-}
-
-@media (min-width: 48rem) {
-  .mm-fila {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-
-  .mm-fila > .mm-fila__acciones {
-    grid-column: auto;
-  }
-}
-
-/* A move that cannot happen keeps its slot, so the row's buttons stay aligned. */
-.mm-mover:disabled {
-  visibility: hidden;
-}
-
-/* ---- Supervisors table ------------------------------------------------------- */
-
-.mm-supervisores__tabla td {
-  vertical-align: middle;
-}
-
-.mm-supervisores__tabla .input {
-  min-inline-size: 11ch;
-}
-
-/* A fixed width belongs to the row layout above 48rem; stacked below it, the
-   input takes the same full-width block as the rest of the row. */
-@media (min-width: 48rem) {
-  .mm-supervisores__numero {
-    inline-size: 14ch;
-  }
 }
 
 /* ---- Speech ------------------------------------------------------------------ */
@@ -319,30 +266,6 @@
   padding-inline-start: var(--space-4);
 }
 
-/* ---- Calendar ----------------------------------------------------------------- */
-
-.mm-calendario__anio {
-  gap: var(--space-1);
-}
-
-.mm-calendario__valor {
-  min-inline-size: 5ch;
-  text-align: center;
-  font-weight: 700;
-}
-
-.mm-calendario__siguiente {
-  font-size: var(--text-sm);
-}
-
-.mm-calendario__siguiente:empty {
-  display: none;
-}
-
-.mm-calendario__tabla td:nth-child(2) {
-  text-transform: capitalize;
-}
-
 /* ---- Follow-up (/mowa-mes/seguimiento) ------------------------------------- */
 
 .mm-mes {
@@ -417,13 +340,6 @@
 .mm-exclusion__campos {
   display: block;
   margin-block-start: var(--space-1);
-}
-
-/* A withdrawn holiday still reads, struck through, so the year's exception is
-   visible where the holiday would have been. */
-.mm-calendario__tabla tr[data-retirado='true'] .mm-calendario__descripcion {
-  color: var(--color-text-muted);
-  text-decoration: line-through;
 }
 
 /* ---- Campaign (/mowa-mes/campana) ------------------------------------------- */

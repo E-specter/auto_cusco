@@ -1,0 +1,130 @@
+/**
+ * The working-day calendar (`/calendario`), end to end against an intercepted API. The screen used to
+ * live inside the MOWA MES configuration; the cases are the same, moved with it (T-MM-C10, L-F7).
+ * A law holiday is withdrawn with an exception, never deleted.
+ */
+import { expect, test, type Page } from '@playwright/test';
+
+import {
+  apiSupervisionCalendario,
+  montarApiSupervisionCalendario,
+  type ApiFalsaSupervisionCalendario,
+} from './api-falsa';
+
+const RUTA = '/calendario';
+const ANIO = new Date().getFullYear();
+
+/** Requests to exactly `ruta` (query ignored); a trailing `/` matches any id under it. */
+const pedidosA = (api: ApiFalsaSupervisionCalendario, metodo: string, ruta: string) =>
+  api.pedidos.filter((p) => {
+    const camino = p.ruta.split('?')[0];
+    return p.metodo === metodo && (ruta.endsWith('/') ? camino.startsWith(ruta) : camino === ruta);
+  });
+
+async function abrir(page: Page, api: ApiFalsaSupervisionCalendario): Promise<void> {
+  await montarApiSupervisionCalendario(page, api);
+  await page.goto(RUTA);
+  await expect(page.getByRole('heading', { name: 'Calendario laboral', level: 1 })).toBeVisible();
+  await expect(page.getByRole('rowheader', { name: new RegExp(`01 ene\\.? ${ANIO}`) })).toBeVisible();
+}
+
+test.describe('carga inicial', () => {
+  test('muestra el título, la introducción, el año, los días y el siguiente día gestionable', async ({ page }) => {
+    const api = apiSupervisionCalendario();
+    await abrir(page, api);
+
+    await expect(page.getByText(/Los feriados de ley se calculan solos/)).toBeVisible();
+    // The panel's title says what is inside, not the h1 again.
+    await expect(page.getByRole('heading', { name: 'Feriados y días no laborables', level: 2 })).toBeVisible();
+    await expect(page.locator('[data-anio]')).toHaveText(String(ANIO));
+    await expect(page.getByText('Retirado este año')).toBeVisible();
+    await expect(page.getByText(/Siguiente día gestionable desde hoy/)).toBeVisible();
+  });
+
+  test('sin conexión con la API muestra el aviso en vez de un panel vacío', async ({ page }) => {
+    const api = apiSupervisionCalendario();
+    api.sinRed = true;
+    await montarApiSupervisionCalendario(page, api);
+    await page.goto(RUTA);
+
+    await expect(page.getByRole('heading', { name: 'Sin conexión con la API' })).toBeVisible();
+    await expect(page.locator('[data-contenido]')).toBeHidden();
+  });
+
+  test('en inglés traduce el título y los días', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
+    });
+    await montarApiSupervisionCalendario(page, apiSupervisionCalendario());
+    await page.goto(RUTA);
+
+    await expect(page.getByRole('heading', { name: 'Working calendar', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Holidays and non-working days', level: 2 })).toBeVisible();
+    await expect(page.getByText('Withdrawn this year')).toBeVisible();
+  });
+});
+
+test.describe('días no laborables', () => {
+  test('un feriado de ley se retira con una excepción, nunca se borra', async ({ page }) => {
+    const api = apiSupervisionCalendario();
+    await abrir(page, api);
+
+    const fila = page.getByRole('row', { name: /Día del Trabajo/ });
+    await fila.getByRole('button', { name: /Retirar el feriado/ }).click();
+
+    const dialogo = page.getByRole('dialog', { name: 'Retirar «Día del Trabajo» este año' });
+    // The date is the holiday clicked: read-only, and it looks it (sunken, unlike the editable motive).
+    const fecha = dialogo.locator('input[type="date"]');
+    await expect(fecha).not.toBeEditable();
+    const fondo = (campo: typeof fecha) => campo.evaluate((e) => getComputedStyle(e).backgroundColor);
+    expect(await fondo(fecha)).not.toBe(await fondo(dialogo.getByLabel('Motivo')));
+    await dialogo.getByLabel('Motivo').fill('Decreto sintético');
+    await dialogo.getByRole('button', { name: 'Retirar feriado' }).click();
+
+    await expect(dialogo).toBeHidden();
+    await expect(fila.getByText('Retirado este año')).toBeVisible();
+    expect(pedidosA(api, 'POST', '/calendario/excepciones')[0].cuerpo).toEqual({
+      fecha: `${ANIO}-05-01`,
+      tipo: 'retirado',
+      descripcion: 'Decreto sintético',
+    });
+    expect(pedidosA(api, 'DELETE', '/calendario/excepciones')).toEqual([]);
+  });
+
+  test('un día agregado se quita borrando su excepción', async ({ page }) => {
+    const api = apiSupervisionCalendario();
+    await abrir(page, api);
+
+    await page.getByRole('button', { name: /Quitar el día no laborable/ }).click();
+
+    await expect(page.getByRole('row', { name: /Día no laborable sintético/ })).toHaveCount(0);
+    expect(pedidosA(api, 'DELETE', '/calendario/excepciones/').map((p) => p.ruta)).toEqual([
+      `/calendario/excepciones/${ANIO}-12-24`,
+    ]);
+  });
+
+  test('una fecha que ya tiene excepción responde 409 y se explica en el diálogo', async ({ page }) => {
+    const api = apiSupervisionCalendario();
+    api.respuestas.crearExcepcion = [{ estado: 409, cuerpo: { detail: 'repetida' } }];
+    await abrir(page, api);
+
+    await page.getByRole('button', { name: 'Agregar día no laborable' }).click();
+    const dialogo = page.getByRole('dialog', { name: 'Agregar un día no laborable' });
+    await dialogo.getByLabel('Fecha').fill(`${ANIO}-11-02`);
+    await dialogo.getByLabel('Descripción').fill('Día sintético');
+    await dialogo.getByRole('button', { name: 'Agregar día' }).click();
+
+    await expect(dialogo.getByText('Esa fecha ya tiene una excepción registrada.')).toBeVisible();
+  });
+
+  test('cambia de año', async ({ page }) => {
+    const api = apiSupervisionCalendario();
+    await abrir(page, api);
+
+    await page.getByRole('button', { name: 'Año siguiente' }).click();
+
+    await expect(page.locator('[data-anio]')).toHaveText(String(ANIO + 1));
+    await expect(page.getByRole('rowheader', { name: new RegExp(`01 ene\\.? ${ANIO + 1}`) })).toBeVisible();
+  });
+});
+

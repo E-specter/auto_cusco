@@ -9,7 +9,15 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-import { ARCHIVO_SINTETICO, apiVacia, montarApi, seleccionGuardada, version } from './api-falsa';
+import {
+  ARCHIVO_SINTETICO,
+  apiSupervisionCalendario,
+  apiVacia,
+  montarApi,
+  montarApiSupervisionCalendario,
+  seleccionGuardada,
+  version,
+} from './api-falsa';
 import { codigoDeRechazo, conCargaMapeada, type ApiFalsaCargaMapeada } from './api-falsa-carga-mapeada';
 import { analisisSintetico, columna } from './api-falsa-mapeador';
 import {
@@ -264,10 +272,9 @@ test('cartera: diálogo de guardar con error de nombre', async ({ page }) => {
   await sinViolaciones(page);
 });
 
-test('mowa-mes configuración: diálogo de excepción de calendario con error', async ({ page }) => {
-  const api = apiMowaMes();
-  await montarApiMowaMes(page, api);
-  await page.goto('/mowa-mes/configuracion');
+test('calendario: diálogo de excepción con error', async ({ page }) => {
+  await montarApiSupervisionCalendario(page, apiSupervisionCalendario());
+  await page.goto('/calendario');
   await page.getByRole('row', { name: /Año Nuevo/ }).getByRole('button', { name: /Retirar el feriado/ }).click();
   const dialogo = page.getByRole('dialog');
   await dialogo.getByRole('button', { name: 'Retirar feriado' }).click();
@@ -828,4 +835,80 @@ test('subir sábana a 360 px: el paso 2 cabe y la acción se alcanza con teclado
   await expect(confirmar).toBeFocused();
   await expect(confirmar).toBeInViewport();
   await sinViolaciones(page);
+});
+
+// ---- Default supervisors and working-day calendar: their own screens (T-MM-C10, L-F7) ------------------
+
+for (const tema of ['light', 'dark'] as const) {
+  test.describe(`supervisores y calendario, tema ${tema === 'light' ? 'claro' : 'oscuro'}`, () => {
+    test.beforeEach(async ({ page }) => {
+      await page.addInitScript((elegido) => {
+        localStorage.setItem('app:appearance', JSON.stringify({ theme: elegido, language: 'es' }));
+      }, tema);
+    });
+
+    test('supervisores, con la lista guardada', async ({ page }) => {
+      await montarApiSupervisionCalendario(page, apiSupervisionCalendario());
+      await page.goto('/supervisores');
+      await expect(page.getByLabel('Número del supervisor 1')).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('supervisores, con un cambio sin guardar y un campo señalado', async ({ page }) => {
+      await montarApiSupervisionCalendario(page, apiSupervisionCalendario());
+      await page.goto('/supervisores');
+      await page.getByRole('button', { name: 'Agregar supervisor' }).click();
+      await page.getByRole('button', { name: 'Guardar supervisores' }).click();
+      await expect(page.getByText('El supervisor 3 no tiene número.')).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('supervisores, sin ninguno guardado: el aviso de que no se podrá crear una campaña', async ({ page }) => {
+      const api = apiSupervisionCalendario();
+      api.supervision = { procedencias: ['Procedencia A'], supervisores: [] };
+      await montarApiSupervisionCalendario(page, api);
+      await page.goto('/supervisores');
+      await expect(page.getByText('Sin supervisores no se puede crear ninguna campaña.', { exact: false })).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('calendario, con feriados, un día agregado y uno retirado', async ({ page }) => {
+      await montarApiSupervisionCalendario(page, apiSupervisionCalendario());
+      await page.goto('/calendario');
+      await expect(page.getByText('Retirado este año')).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('calendario, con el diálogo de una excepción abierto', async ({ page }) => {
+      await montarApiSupervisionCalendario(page, apiSupervisionCalendario());
+      await page.goto('/calendario');
+      await page.getByRole('button', { name: 'Agregar día no laborable' }).click();
+      await expect(page.getByRole('dialog', { name: 'Agregar un día no laborable' })).toBeVisible();
+      await sinViolaciones(page);
+    });
+
+    test('configuración de MOWA MES, con el aviso de las pantallas nuevas', async ({ page }) => {
+      await montarApiMowaMes(page, apiMowaMes());
+      await page.goto('/mowa-mes/configuracion');
+      await expect(page.locator('[data-pantallas-nuevas]')).toBeVisible();
+      await expect(page.locator('[data-speech-filas] tr[data-segmento="9_a_30"] [data-largo]')).not.toHaveText('—');
+      await sinViolaciones(page);
+    });
+  });
+}
+
+test('supervisores y calendario a 360 px: caben sin desplazar la página de lado y sin violaciones', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await montarApiSupervisionCalendario(page, apiSupervisionCalendario());
+
+  for (const [ruta, visible] of [
+    ['/supervisores', () => page.getByLabel('Número del supervisor 1')],
+    ['/calendario', () => page.getByText('Retirado este año')],
+  ] as const) {
+    await page.goto(ruta);
+    await expect(visible()).toBeVisible();
+    const desborde = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(desborde, ruta).toBeLessThanOrEqual(0);
+    await sinViolaciones(page);
+  }
 });

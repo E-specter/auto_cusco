@@ -13,15 +13,10 @@ import {
   listarCampanas,
   listarExclusiones,
   obtenerConciliacion,
-  crearExcepcion,
   crearSpeech,
   editarSpeech,
-  eliminarExcepcion,
   guardarConfiguracion,
-  guardarSupervision,
-  listarFeriados,
   previsualizarSpeech,
-  siguienteDiaGestionable,
 } from '../../src/lib/api-mowa-mes';
 
 function responderCon(estado: number, cuerpo: unknown = {}): ReturnType<typeof vi.fn> {
@@ -72,23 +67,6 @@ describe('configuración del conector', () => {
     expect(fallo).toBeInstanceOf(ApiError);
     expect((fallo as ApiError).status).toBe(400);
     expect((fallo as ApiError).detail).toBe('El numero de WhatsApp no es valido');
-  });
-});
-
-describe('supervisores', () => {
-  it('reemplaza la lista completa con PUT', async () => {
-    const falso = responderCon(200, { procedencias: [], supervisores: [] });
-    const entrada = {
-      procedencias: ['Procedencia A'],
-      supervisores: [{ numero: '900000101', procedencia: 'Procedencia A' }],
-    };
-
-    await guardarSupervision(entrada);
-
-    const { url, opciones } = llamada(falso);
-    expect(url).toBe('/api/supervisores');
-    expect(opciones.method).toBe('PUT');
-    expect(cuerpoDe(opciones)).toEqual(entrada);
   });
 });
 
@@ -218,50 +196,5 @@ describe('campañas y seguimiento', () => {
     const falso = responderCon(200, {});
     await obtenerConciliacion(7);
     expect(llamada(falso).url).toBe('/api/mowa-mes/campanas/7/conciliacion');
-  });
-});
-
-describe('calendario', () => {
-  it('pide los feriados del año indicado', async () => {
-    const falso = responderCon(200, { anio: 2099, dias: [] });
-
-    await listarFeriados(2099);
-
-    const url = new URL(llamada(falso).url, 'http://x');
-    expect(url.pathname).toBe('/api/calendario/feriados');
-    expect(url.searchParams.get('anio')).toBe('2099');
-  });
-
-  it('registra una excepción con POST', async () => {
-    const falso = responderCon(201, {});
-    const entrada = { fecha: '2099-12-24', tipo: 'agregado' as const, descripcion: 'Dia sintetico' };
-
-    await crearExcepcion(entrada);
-
-    const { url, opciones } = llamada(falso);
-    expect(url).toBe('/api/calendario/excepciones');
-    expect(opciones.method).toBe('POST');
-    expect(cuerpoDe(opciones)).toEqual(entrada);
-  });
-
-  it('borra una excepción por su fecha, sin leer cuerpo', async () => {
-    const falso = responderCon(204);
-
-    await expect(eliminarExcepcion('2099-07-28')).resolves.toBeUndefined();
-
-    const { url, opciones } = llamada(falso);
-    expect(url).toBe('/api/calendario/excepciones/2099-07-28');
-    expect(opciones.method).toBe('DELETE');
-  });
-
-  it('el siguiente día gestionable manda `desde` solo si se indica', async () => {
-    const sinFecha = responderCon(200, {});
-    await siguienteDiaGestionable();
-    expect(llamada(sinFecha).url).toBe('/api/calendario/siguiente-dia-gestionable');
-
-    const conFecha = responderCon(200, {});
-    await siguienteDiaGestionable('2099-01-02');
-    const url = new URL(llamada(conFecha).url, 'http://x');
-    expect(url.searchParams.get('desde')).toBe('2099-01-02');
   });
 });

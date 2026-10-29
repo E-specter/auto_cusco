@@ -1,6 +1,7 @@
 /**
- * Calls for the MOWA MES connector: its configuration, the default
- * supervisors, the speech versions and the working-day calendar.
+ * Calls for the MOWA MES connector: its configuration, the speech versions,
+ * the campaigns and the follow-up. The default supervisors and the working-day
+ * calendar are shared by every connector: `api-supervision.ts`, `api-calendario.ts`.
  *
  * Shapes come from the generated contract only (`contrato-api.d.ts`); the
  * transport, errors included, is the shared `request` of `api.ts`.
@@ -14,8 +15,6 @@ type Esquemas = components['schemas'];
 
 export type ConfiguracionMowaMes = Esquemas['ConfiguracionRespuesta'];
 export type ConfiguracionMowaMesEntrada = Esquemas['ConfiguracionEntrada'];
-export type ConfiguracionSupervision = Esquemas['ConfiguracionSupervisionRespuesta'];
-export type ConfiguracionSupervisionEntrada = Esquemas['ConfiguracionSupervisionEntrada'];
 export type Supervisor = Esquemas['SupervisorRespuesta'];
 export type VersionSpeech = Esquemas['VersionSpeechRespuesta'];
 export type PartesSpeech = Esquemas['PartesRespuesta'];
@@ -27,12 +26,6 @@ export type PrevisualizacionSpeech = Esquemas['app__api__mowa_mes__Previsualizac
 export type LargoSegmento = Esquemas['LargoSegmentoRespuesta'];
 export type Segmento = Esquemas['Segmento'];
 export type CodigoMowaMes = Esquemas['CodigoMowaMes'];
-export type Feriados = Esquemas['FeriadosRespuesta'];
-export type DiaNoLaborable = Esquemas['DiaNoLaborableRespuesta'];
-export type TipoExcepcion = Esquemas['TipoExcepcion'];
-export type Excepcion = Esquemas['ExcepcionRespuesta'];
-export type ExcepcionEntrada = Esquemas['ExcepcionEntrada'];
-export type SiguienteDia = Esquemas['SiguienteDiaRespuesta'];
 export type Campana = Esquemas['CampanaRespuesta'];
 export type ListaCampanas = Esquemas['ListaCampanasRespuesta'];
 export type ArchivoCampana = Esquemas['ArchivoRespuesta'];
@@ -91,18 +84,6 @@ export function previsualizarPlantillaNombre(plantilla: string, signal?: AbortSi
   );
 }
 
-// ---- Default supervisors (transversal) ----------------------------------------
-
-export function obtenerSupervision(): Promise<ConfiguracionSupervision> {
-  return request<ConfiguracionSupervision>('/supervisores');
-}
-
-export function guardarSupervision(
-  entrada: ConfiguracionSupervisionEntrada,
-): Promise<ConfiguracionSupervision> {
-  return request<ConfiguracionSupervision>('/supervisores', conJson('PUT', entrada));
-}
-
 // ---- Speech versions ---------------------------------------------------------
 
 export function listarSpeech(): Promise<VersionSpeech[]> {
@@ -126,22 +107,6 @@ export function previsualizarSpeech(
     '/mowa-mes/speech/previsualizacion',
     conJson('POST', entrada, signal),
   );
-}
-
-// ---- Working-day calendar (transversal) --------------------------------------
-
-export function listarFeriados(anio: number): Promise<Feriados> {
-  return request<Feriados>(`/calendario/feriados?${new URLSearchParams({ anio: String(anio) })}`);
-}
-
-export function crearExcepcion(entrada: ExcepcionEntrada): Promise<Excepcion> {
-  return request<Excepcion>('/calendario/excepciones', conJson('POST', entrada));
-}
-
-export function eliminarExcepcion(fecha: string): Promise<void> {
-  return request<void>(`/calendario/excepciones/${encodeURIComponent(fecha)}`, {
-    method: 'DELETE',
-  });
 }
 
 // ---- Campaigns, files, sent reports and reconciliation (B6b) --------------------
@@ -200,12 +165,6 @@ export function importarReporte(id: number, archivo: File, reemplazar = false): 
 
 export function obtenerConciliacion(id: number): Promise<Conciliacion> {
   return request<Conciliacion>(`/mowa-mes/campanas/${id}/conciliacion`);
-}
-
-/** Without `desde`, the API starts from today in America/Lima. */
-export function siguienteDiaGestionable(desde?: string): Promise<SiguienteDia> {
-  const query = desde ? `?${new URLSearchParams({ desde })}` : '';
-  return request<SiguienteDia>(`/calendario/siguiente-dia-gestionable${query}`);
 }
 
 /**
