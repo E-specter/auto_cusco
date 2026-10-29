@@ -1,34 +1,5 @@
 /* Column builder (/columnas). Built at runtime by the page script, so global, like mowa-mes.css. */
 
-.cl {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  padding: var(--space-5) var(--space-4) var(--space-7);
-  max-inline-size: 80rem;
-  margin-inline: auto;
-}
-
-.cl__head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.cl__title {
-  font-size: var(--text-lg);
-  font-weight: 800;
-  line-height: var(--leading-heading);
-  letter-spacing: var(--tracking-heading);
-  text-wrap: balance;
-}
-
-.cl__intro {
-  max-inline-size: 70ch;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
 .cl__contenido {
   display: flex;
   flex-direction: column;

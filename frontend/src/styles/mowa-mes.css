@@ -8,36 +8,6 @@
  * their own sheets: `supervisores.css`, `calendario.css`.
  */
 
-.mm {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  max-inline-size: var(--shell-max);
-  margin-inline: auto;
-  padding: var(--space-4) var(--shell-gutter) var(--space-6);
-}
-
-.mm__head {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-}
-
-.mm__title {
-  font-size: var(--text-lg);
-  font-weight: 800;
-  line-height: var(--leading-heading);
-  letter-spacing: var(--tracking-heading);
-  text-wrap: balance;
-}
-
-.mm__intro {
-  max-inline-size: 70ch;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
 .mm__contenido {
   display: flex;
   flex-direction: column;

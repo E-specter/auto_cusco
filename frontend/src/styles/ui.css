@@ -612,6 +612,40 @@
   user-select: none;
 }
 
+/* ---- Page ---------------------------------------------------------------------
+   The frame of every screen: a column in the shell's width, and its head (title and intro). A screen's
+   own grids and panels sit inside it. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-inline-size: var(--shell-max);
+  margin-inline: auto;
+  padding: var(--space-4) var(--shell-gutter) var(--space-6);
+}
+
+.page__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.page__title {
+  font-size: var(--text-lg);
+  font-weight: 800;
+  line-height: var(--leading-heading);
+  letter-spacing: var(--tracking-heading);
+  text-wrap: balance;
+}
+
+.page__intro {
+  max-inline-size: 70ch;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
 /* ---- Pager -----------------------------------------------------------------
    The foot of a paged table: previous, the range in mono, next. */
 

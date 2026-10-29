@@ -6,15 +6,6 @@
  * at runtime, and Astro's scoped styles only reach markup it rendered.
  */
 
-.console {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  max-inline-size: var(--shell-max);
-  margin-inline: auto;
-  padding: var(--space-4) var(--shell-gutter) var(--space-6);
-}
-
 /* ---- Ruler --------------------------------------------------------------
    The brand's node-link motif doing a job: each cut-off date is a node and
    the dashed rule behind them is the connector. */
