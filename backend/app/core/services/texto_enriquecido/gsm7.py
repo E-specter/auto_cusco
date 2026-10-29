@@ -5,8 +5,9 @@ modulo es el unico dueno de esa tabla (3GPP TS 23.038); MOWA MES la usa para for
 GSM-7 antes de medirlo. Tres funciones:
 
 - `a_gsm7(texto)`: deja el texto dentro de GSM-7, en este orden (decision del usuario, 2026-10-19):
-  1. NFD y se quitan las marcas combinantes (tildes, dieresis, la virgulilla de la n), como la
-     conciliacion de MOWA MES, que hace lo mismo con el mensaje de los dos lados (sin el `strip`);
+  1. NFD y se quitan las marcas combinantes (tildes, dieresis, la virgulilla de la n): es
+     `sin_marcas`, la misma que usa la conciliacion de MOWA MES con el mensaje de los dos lados
+     (que ademas hace `strip`);
   2. se transliteran los signos tipograficos con equivalente simple (`TRANSLITERACION`): comillas,
      puntos suspensivos, guiones, `°`, `º` y `ª`, y los caracteres de la tabla extendida de GSM-7
      (decision del usuario, 2026-10-26, RF-MM-27, que cierra S-MM-9): `€` pasa a `EUR`, `[` y `{` a
@@ -98,16 +99,19 @@ def _transliterar(c: str) -> str:
     return c
 
 
+def sin_marcas(texto: str) -> str:
+    """NFD y sin las marcas combinantes (tildes, dieresis, la virgulilla de la n). Es el primer
+    paso de `a_gsm7` y lo que la conciliacion de MOWA MES hace con el mensaje de los dos lados."""
+    return "".join(c for c in unicodedata.normalize("NFD", texto) if not unicodedata.combining(c))
+
+
 @lru_cache(maxsize=TOPE_DE_CACHE)
 def _caracter(caracter: str) -> tuple[str, bool]:
     """(lo que queda de este caracter, si se borro algo de el). Con cache acotada por
     `TOPE_DE_CACHE`: deja la normalizacion de un texto en un lookup por letra."""
-    base = "".join(
-        c for c in unicodedata.normalize("NFD", caracter) if not unicodedata.combining(c)
-    )
     salida: list[str] = []
     borrado = False
-    for c in base:
+    for c in sin_marcas(caracter):
         for t in _transliterar(c):
             if t in CARACTERES_GSM7:
                 salida.append(t)

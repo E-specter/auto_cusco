@@ -12,7 +12,6 @@ Las cifras por `id` cuentan todas las filas emparejadas, con cualquier estado:
 dicen si el `id` es de esta campana, no cuanto se envio.
 """
 
-import unicodedata
 from collections import Counter, defaultdict, deque
 from collections.abc import Iterable, Sequence
 
@@ -25,6 +24,7 @@ from app.core.entities.mowa_mes_reporte import (
     Conciliacion,
     FilaReporte,
 )
+from app.core.services.texto_enriquecido.gsm7 import sin_marcas
 
 ESTADO_ENVIADO = "enviado"
 
@@ -35,8 +35,7 @@ def es_enviado(estado: str) -> bool:
 
 def normalizar_mensaje(texto: str) -> str:
     """Sin marcas diacriticas (NFD: tildes, dieresis, la de la n) ni espacios en los extremos."""
-    descompuesto = unicodedata.normalize("NFD", texto)
-    return "".join(c for c in descompuesto if not unicodedata.combining(c)).strip()
+    return sin_marcas(texto).strip()
 
 
 def _clave(numero: str, dni: str, mensaje: str) -> tuple[str, str, str]:
