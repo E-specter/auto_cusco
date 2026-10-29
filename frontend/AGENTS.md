@@ -20,3 +20,9 @@ Consult these guides before working on related tasks:
 - [Adding or managing content](https://docs.astro.build/en/guides/content-collections/)
 - [Adding styles or using Tailwind](https://docs.astro.build/en/guides/styling/)
 - [Supporting multiple languages](https://docs.astro.build/en/guides/internationalization/)
+
+## Helpers compartidos (`src/lib`, `e2e`)
+
+Antes de escribir un helper en una página, busca aquí si ya existe:
+
+- `lib/paginacion.ts`: `paginar` y `PaginaLocal`, paginación en el cliente de filas que la página ya tiene (no llama a la API). Los paginadores con desplazamientos del servidor (Cartera, Cargas, seguimiento) no son esto.

@@ -13,13 +13,11 @@ import {
   CAMPOS_DE_ERROR,
   campoDeError,
   entradaSupervision,
-  FILAS_POR_PAGINA,
   insertarVariable,
   modoGuardado,
   moverElemento,
   nivelDeFila,
   nivelLargo,
-  paginar,
   presentarCosto,
   problemasConfiguracion,
   problemasSupervision,
@@ -37,6 +35,7 @@ import {
   traducirCodigo,
 } from '../../src/lib/mowa-mes';
 import { formatNumber } from '../../src/lib/format';
+import { FILAS_POR_PAGINA, paginar } from '../../src/lib/paginacion';
 import { t } from '../../src/lib/i18n';
 import { setLanguageForTests } from './idioma';
 
