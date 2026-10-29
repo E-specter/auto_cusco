@@ -63,7 +63,7 @@ import {
   type Problema,
   type ProblemaUbicado,
 } from '../lib/expresion';
-import { t } from '../lib/i18n';
+import { t, traducirPorPrefijo } from '../lib/i18n';
 import { crearSelectorPatronFecha } from './selector-patron-fecha';
 import { crearSelectorVariable, etiquetaTipo } from './selector-variable';
 import type { components } from '../lib/contrato-api';
@@ -169,9 +169,7 @@ const ejemplo = (): MuestraTexto => ({ tipo: 'ejemplo', cantidad: 1 });
 
 /** A problem's message: the code's text, or the backend's detail for a code we lack. */
 export function mensajeProblema(problema: Pick<Problema, 'codigo' | 'detalle'>): string {
-  const clave = `textoEnriquecido.codigo.${problema.codigo}`;
-  const texto = t(clave);
-  return texto === clave ? problema.detalle : texto;
+  return traducirPorPrefijo('textoEnriquecido.codigo', problema.codigo, problema.detalle);
 }
 
 function nombreTraducido(clave: string, respaldo: string): string {

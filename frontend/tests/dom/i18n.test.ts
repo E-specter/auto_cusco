@@ -7,7 +7,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { applyTranslations, getLanguage, isLanguage, setLanguage, t } from '../../src/lib/i18n';
+import { applyTranslations, getLanguage, isLanguage, setLanguage, t, traducirPorPrefijo } from '../../src/lib/i18n';
 
 beforeEach(() => {
   document.body.replaceChildren();
@@ -100,5 +100,32 @@ describe('repintado de la página', () => {
     setLanguage('en');
 
     expect(avisos).toEqual(['en']);
+  });
+});
+
+describe('traducirPorPrefijo (códigos del servidor)', () => {
+  it('un código que el diccionario conoce se traduce con el prefijo que se le dio', () => {
+    expect(traducirPorPrefijo('textoEnriquecido.codigo', 'sintaxis_invalida', 'respaldo')).toBe(
+      t('textoEnriquecido.codigo.sintaxis_invalida'),
+    );
+    expect(traducirPorPrefijo('textoEnriquecido.codigo', 'sintaxis_invalida', 'respaldo')).not.toBe('respaldo');
+  });
+
+  it('un código que este build no conoce devuelve la frase del servidor, nunca la clave', () => {
+    expect(traducirPorPrefijo('textoEnriquecido.codigo', 'codigo_inventado', 'La frase del servidor')).toBe(
+      'La frase del servidor',
+    );
+  });
+
+  it('el prefijo decide el catálogo: el mismo código en otro prefijo no lo encuentra', () => {
+    expect(traducirPorPrefijo('mowaMes.codigo', 'sintaxis_invalida', 'respaldo')).toBe('respaldo');
+  });
+
+  it('sigue el idioma activo', () => {
+    const es = traducirPorPrefijo('textoEnriquecido.codigo', 'sintaxis_invalida', 'respaldo');
+
+    setLanguage('en');
+
+    expect(traducirPorPrefijo('textoEnriquecido.codigo', 'sintaxis_invalida', 'respaldo')).not.toBe(es);
   });
 });

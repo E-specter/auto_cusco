@@ -11,8 +11,9 @@
 
 import type { components } from './contrato-api';
 import type { Expresion } from './expresion';
-import { t } from './i18n';
+import { t, traducirPorPrefijo } from './i18n';
 import type { LargoSegmento, VersionSpeech } from './api-mowa-mes';
+import { textoDeCodigo } from './generar-carga-mensajes';
 import { ORDEN_SEGMENTOS } from './mowa-mes';
 import { estaVacia, type Segmento, type Variante } from './variantes';
 
@@ -95,13 +96,6 @@ export function segmentosSinContenido(borrador: readonly Variante[], segmentos: 
 export type TonoNivel = 'vigente' | 'advertencia' | 'error' | 'neutral';
 export type NivelesV2 = Record<string, { tono: TonoNivel; texto: string }>;
 
-/** The text of a code of the engine, or the backend's own sentence for one this build lacks. */
-function textoDeCodigoDelMotor(codigo: string, respaldo: string): string {
-  const clave = `textoEnriquecido.codigo.${codigo}`;
-  const texto = t(clave);
-  return texto === clave ? respaldo : texto;
-}
-
 /**
  * What `VariantesSegmento.fijarNiveles` shows beside each segment, from the backend's per-segment
  * preview. A level is never claimed without a maximum: a segment with no bound says why
@@ -116,7 +110,7 @@ export function nivelesDeV2(largos: readonly LargoSegmento[]): NivelesV2 {
       if (largo.sin_maximo) {
         niveles[largo.segmento] = {
           tono: 'advertencia',
-          texto: textoDeCodigoDelMotor(largo.sin_maximo.codigo, largo.sin_maximo.detalle),
+          texto: textoDeCodigo(largo.sin_maximo.codigo, largo.sin_maximo.detalle),
         };
       }
     } else {
@@ -143,7 +137,6 @@ export function nivelesDeV2(largos: readonly LargoSegmento[]): NivelesV2 {
  */
 export function mensajeDeProblema(problema: Pick<ProblemaSpeech, 'codigo' | 'catalogo' | 'detalle'>): string {
   if (!problema.codigo || !problema.catalogo) return problema.detalle;
-  const clave = `${problema.catalogo === 'mowa_mes' ? 'mowaMes' : 'textoEnriquecido'}.codigo.${problema.codigo}`;
-  const texto = t(clave);
-  return texto === clave ? problema.detalle : texto;
+  const prefijo = problema.catalogo === 'mowa_mes' ? 'mowaMes.codigo' : 'textoEnriquecido.codigo';
+  return traducirPorPrefijo(prefijo, problema.codigo, problema.detalle);
 }

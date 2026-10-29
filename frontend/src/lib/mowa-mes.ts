@@ -19,7 +19,7 @@ import type {
   VersionSpeech,
 } from './api-mowa-mes';
 import { formatNumber } from './format';
-import { t } from './i18n';
+import { t, traducirPorPrefijo } from './i18n';
 
 /** Segment order of RF-MM-15, the order every speech table reads in. */
 export const ORDEN_SEGMENTOS: readonly Segmento[] = [
@@ -113,9 +113,7 @@ export function rangoSegmento(
  * degrades to Spanish prose instead of to a raw key.
  */
 export function traducirCodigo(codigo: string, respaldo: string): string {
-  const clave = `mowaMes.codigo.${codigo}`;
-  const traducido = t(clave);
-  return traducido === clave ? respaldo : traducido;
+  return traducirPorPrefijo('mowaMes.codigo', codigo, respaldo);
 }
 
 // ---- Connector configuration ---------------------------------------------------

@@ -37,6 +37,16 @@ export function t(key: string, params?: Record<string, string | number>): string
   );
 }
 
+/**
+ * The text of a code from a catalogue of keys `<prefijo>.<codigo>`, or `respaldo` (the server's own
+ * sentence) when this build does not know the code yet: it degrades to prose, never to a raw key.
+ */
+export function traducirPorPrefijo(prefijo: string, codigo: string, respaldo: string): string {
+  const clave = `${prefijo}.${codigo}`;
+  const texto = t(clave);
+  return texto === clave ? respaldo : texto;
+}
+
 /** Rewrite every translated node inside `root` (defaults to the document). */
 export function applyTranslations(root: ParentNode = document): void {
   root.querySelectorAll<HTMLElement>('[data-i18n]').forEach((node) => {

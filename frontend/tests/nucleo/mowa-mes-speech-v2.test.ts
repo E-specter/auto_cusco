@@ -227,6 +227,24 @@ describe('niveles por segmento', () => {
     expect(niveles['9_a_30'].texto).toMatch(/máximo/i);
   });
 
+  it('sin cota con un código que este build no conoce: la frase del servidor, nunca la clave', () => {
+    const niveles = nivelesDeV2([
+      largo({
+        segmento: '9_a_30',
+        largo_maximo: null,
+        sin_maximo: {
+          // A code newer than this build: outside the generated enum on purpose.
+          codigo: 'codigo_inventado' as never,
+          detalle: 'La frase del servidor',
+          ubicacion: { nodo: 0, funcion: null, parametro: null },
+        },
+      }),
+    ]);
+
+    expect(niveles['9_a_30'].texto).toContain('La frase del servidor');
+    expect(niveles['9_a_30'].texto).not.toContain('textoEnriquecido.codigo');
+  });
+
   it('sin máximo ni motivo no se dice nada del segmento', () => {
     const niveles = nivelesDeV2([largo({ segmento: '9_a_30', largo_maximo: null, sin_maximo: null })]);
 

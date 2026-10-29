@@ -22,13 +22,11 @@ import {
   type ProblemaDeCarga,
   type ResumenDeCarga,
 } from './generar-carga';
-import { t } from './i18n';
+import { t, traducirPorPrefijo } from './i18n';
 
 /** The text of a code of the engine, or the backend's own sentence when this build lacks it. */
 export function textoDeCodigo(codigo: string, respaldo: string): string {
-  const clave = `textoEnriquecido.codigo.${codigo}`;
-  const texto = t(clave);
-  return texto === clave ? respaldo : texto;
+  return traducirPorPrefijo('textoEnriquecido.codigo', codigo, respaldo);
 }
 
 /**
