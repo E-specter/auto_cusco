@@ -1018,7 +1018,12 @@ def limite_mensual(
 )
 async def importar_reporte(
     campana_id: int,
-    archivo: UploadFile = File(description="Reporte 'Campanas de enviados' de MES (.xlsx)"),
+    archivo: UploadFile = File(
+        description=(
+            "Reporte 'Campanas de enviados' de MES, en cualquiera de los formatos de la sabana "
+            "(RF-57): .xlsx, .xlsb, .xls, .ods, .csv, .tsv, .txt o .json"
+        )
+    ),
     reemplazar: bool = Form(
         default=False, description="Reemplazar los id de MES que ya estaban importados"
     ),

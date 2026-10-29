@@ -4365,7 +4365,7 @@
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "Archivo",
-            "description": "Reporte 'Campanas de enviados' de MES (.xlsx)"
+            "description": "Reporte 'Campanas de enviados' de MES, en cualquiera de los formatos de la sabana (RF-57): .xlsx, .xlsb, .xls, .ods, .csv, .tsv, .txt o .json"
           },
           "reemplazar": {
             "type": "boolean",

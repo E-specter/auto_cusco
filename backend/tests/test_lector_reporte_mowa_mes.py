@@ -1,6 +1,8 @@
 """Pruebas del lector del reporte de enviados de MES (RF-MM-20), con archivos en memoria."""
 
+import csv
 import io
+import json
 import re
 import zipfile
 
@@ -110,7 +112,7 @@ def test_un_id_que_no_es_numero() -> None:
 
 
 def test_un_archivo_que_no_es_hoja_de_calculo() -> None:
-    with pytest.raises(ReporteInvalido, match="legible"):
+    with pytest.raises(ReporteInvalido, match="no coincide con el contenido"):
         LectorReporteMowaMes().leer(b"esto no es un xlsx")
 
 
@@ -161,21 +163,8 @@ def test_la_primera_hoja_vacia_no_se_salta_a_otra() -> None:
         LectorReporteMowaMes().leer(contenido, "reporte.xlsx")
 
 
-def test_un_csv_sigue_siendo_un_reporte_invalido() -> None:
-    salto = chr(10)
-    csv = ";".join(COLUMNAS_REPORTE) + salto + ";".join(str(v) for v in FILA) + salto
-
-    with pytest.raises(ReporteInvalido, match="hoja de calculo legible"):
-        LectorReporteMowaMes().leer(csv.encode("utf-8"), "reporte.csv")
-
-
-def test_un_json_sigue_siendo_un_reporte_invalido() -> None:
-    with pytest.raises(ReporteInvalido, match="hoja de calculo legible"):
-        LectorReporteMowaMes().leer(b'[{"id": 1}]', "reporte.json")
-
-
-def test_un_archivo_vacio_no_es_legible() -> None:
-    with pytest.raises(ReporteInvalido, match="hoja de calculo legible"):
+def test_un_archivo_vacio_dice_que_no_coincide_con_su_extension() -> None:
+    with pytest.raises(ReporteInvalido, match="no coincide con el contenido"):
         LectorReporteMowaMes().leer(b"", "reporte.xlsx")
 
 
@@ -207,7 +196,96 @@ def test_el_nombre_es_opcional_y_da_lo_mismo_que_reporte_xlsx() -> None:
     )
 
 
-def test_un_xlsx_con_otra_extension_se_rechaza_con_el_texto_de_siempre() -> None:
-    # Es lo unico que cambia a proposito (declarado): antes el nombre no se miraba.
-    with pytest.raises(ReporteInvalido, match="hoja de calculo legible"):
+def test_un_xlsx_con_otra_extension_se_rechaza() -> None:
+    # El nombre se mira desde L-B7: antes de el, la extension no se comprobaba.
+    with pytest.raises(ReporteInvalido, match="no coincide con el contenido"):
         LectorReporteMowaMes().leer(_xlsx(COLUMNAS_REPORTE, FILA), "reporte.csv")
+
+
+# --- Los formatos de la sabana (T-MM-C10, L-B8, E2-A) ----------------------------------------
+
+FILAS = [
+    FILA,
+    [
+        70002,
+        "900000102",
+        "Canción, señor; ok",  # lleva la tilde, la ñ, una coma y un punto y coma
+        "15/09/26",
+        "20123456789",
+        "Enviado",
+        "Nro. LARGO",
+        "usuario_sintetico",
+    ],
+]
+
+
+def _csv(separador: str, codificacion: str) -> bytes:
+    salida = io.StringIO(newline="")
+    escritor = csv.writer(salida, delimiter=separador, lineterminator=chr(10))
+    escritor.writerow(COLUMNAS_REPORTE)
+    escritor.writerows(FILAS)
+    return salida.getvalue().encode(codificacion)
+
+
+def test_el_reporte_de_ejemplo_trae_los_ceros_del_dni_y_una_tilde() -> None:
+    esperadas = LectorReporteMowaMes().leer(_xlsx(COLUMNAS_REPORTE, *FILAS), "reporte.xlsx")
+
+    assert [f.dni for f in esperadas] == ["01234567", "20123456789"]
+    assert esperadas[1].mensaje == "Canción, señor; ok"
+
+
+@pytest.mark.parametrize(
+    ("separador", "codificacion", "nombre"),
+    [
+        (";", "utf-8", "reporte.csv"),
+        (",", "utf-8", "reporte.csv"),
+        (";", "utf-8-sig", "reporte.csv"),
+        (",", "utf-8-sig", "reporte.csv"),
+        (";", "latin-1", "reporte.csv"),
+        (",", "latin-1", "reporte.csv"),
+        (chr(9), "utf-8", "reporte.tsv"),
+        (";", "utf-8", "reporte.txt"),
+    ],
+)
+def test_el_mismo_reporte_en_csv_da_las_mismas_filas_que_en_xlsx(
+    separador, codificacion, nombre
+) -> None:
+    esperadas = LectorReporteMowaMes().leer(_xlsx(COLUMNAS_REPORTE, *FILAS), "reporte.xlsx")
+
+    leidas = LectorReporteMowaMes().leer(_csv(separador, codificacion), nombre)
+
+    assert leidas == esperadas
+
+
+def test_el_mismo_reporte_en_json_da_las_mismas_filas_que_en_xlsx() -> None:
+    esperadas = LectorReporteMowaMes().leer(_xlsx(COLUMNAS_REPORTE, *FILAS), "reporte.xlsx")
+    objetos = [dict(zip(COLUMNAS_REPORTE, fila, strict=True)) for fila in FILAS]
+
+    leidas = LectorReporteMowaMes().leer(json.dumps(objetos).encode("utf-8"), "reporte.json")
+
+    assert leidas == esperadas
+
+
+def test_un_dni_de_csv_conserva_sus_ceros() -> None:
+    (fila, _) = LectorReporteMowaMes().leer(_csv(";", "utf-8"), "reporte.csv")
+
+    assert fila.dni == "01234567"
+
+
+def test_un_csv_sin_una_columna_dice_cual_falta() -> None:
+    texto = chr(10).join([";".join(COLUMNAS_REPORTE[:-1]), ";".join(map(str, FILA[:-1]))])
+
+    with pytest.raises(ReporteInvalido, match="Faltan columnas del reporte de enviados: usuario"):
+        LectorReporteMowaMes().leer(texto.encode("utf-8"), "reporte.csv")
+
+
+def test_un_csv_con_un_id_que_no_es_numero_dice_la_fila() -> None:
+    texto = chr(10).join([";".join(COLUMNAS_REPORTE), ";".join(["abc", *map(str, FILA[1:])])])
+
+    with pytest.raises(ReporteInvalido, match="fila 2"):
+        LectorReporteMowaMes().leer(texto.encode("utf-8"), "reporte.csv")
+
+
+def test_un_csv_vacio_no_tiene_cabecera_ni_filas() -> None:
+    with pytest.raises(ReporteInvalido, match="no tiene cabecera ni filas"):
+        LectorReporteMowaMes().leer(b"", "reporte.csv")

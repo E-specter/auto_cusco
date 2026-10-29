@@ -1,13 +1,15 @@
 """Lector del reporte "Campanas de enviados" de MES (RF-MM-20), sobre el lector general (RF-57).
 
-El archivo lo lee `LectorTablaPort`; aqui se toma la primera hoja, se exigen las 8 columnas de
-RF-MM-20 (sin distinguir mayusculas, tildes ni espacios de los extremos) y se le da su tipo a cada
-valor. Si falta alguna columna o no hay filas, rechaza el archivo con el motivo. Solo acepta una
-hoja de calculo: un CSV o un JSON es un reporte invalido.
+El archivo lo lee `LectorTablaPort` en cualquiera de los formatos de la sabana (hoja de calculo,
+CSV, JSON), con sus opciones por defecto: el formato se reconoce solo, por la extension y el
+contenido. Aqui se toma la primera hoja, se exigen las 8 columnas de RF-MM-20 (sin distinguir
+mayusculas, tildes ni espacios de los extremos) y se le da su tipo a cada valor. Si falta alguna
+columna o no hay filas, rechaza el archivo con el motivo.
 
 Tipos: MES entrega `celular` y `dni` como texto, pero si alguien abre y guarda el
 archivo en Excel pueden quedar como numero; se vuelven texto sin decimales, y un
-`dni` numerico de hasta 8 digitos recupera los ceros a la izquierda.
+`dni` numerico de hasta 8 digitos recupera los ceros a la izquierda. En un CSV todo viene como
+texto: el `dni` se queda tal cual, con sus ceros.
 """
 
 from datetime import date, datetime
@@ -59,13 +61,16 @@ def _mes_id(valor: Any, fila: int) -> int:
 
 
 def _motivo(error: ArchivoIlegible) -> str:
-    """El texto de siempre para lo que el lector general rechaza (se reconoce por su mensaje)."""
+    """El motivo del rechazo: el de siempre para una hoja de calculo (se reconoce por su mensaje) y,
+    para lo demas (extension que no coincide, CSV o JSON ilegible), el del lector general."""
     mensaje = str(error)
     if mensaje.startswith("No se pudo leer la hoja"):
         return _HOJA_NO_LEIBLE
     if mensaje.endswith("no tiene hojas"):
         return _SIN_HOJAS
-    return _NO_LEGIBLE
+    if mensaje == "El archivo no es una hoja de cálculo legible":
+        return _NO_LEGIBLE
+    return mensaje
 
 
 class LectorReporteMowaMes:
@@ -118,6 +123,4 @@ class LectorReporteMowaMes:
             raise ReporteInvalido("La hoja no tiene cabecera ni filas") from exc
         except ArchivoIlegible as exc:
             raise ReporteInvalido(_motivo(exc)) from exc
-        if not tabla.formato.es_hoja_de_calculo:
-            raise ReporteInvalido(_NO_LEGIBLE)
         return tabla

@@ -1255,7 +1255,7 @@ export interface components {
         Body_importar_reporte_mowa_mes_campanas__campana_id__reportes_post: {
             /**
              * Archivo
-             * @description Reporte 'Campanas de enviados' de MES (.xlsx)
+             * @description Reporte 'Campanas de enviados' de MES, en cualquiera de los formatos de la sabana (RF-57): .xlsx, .xlsb, .xls, .ods, .csv, .tsv, .txt o .json
              */
             archivo: string;
             /**
