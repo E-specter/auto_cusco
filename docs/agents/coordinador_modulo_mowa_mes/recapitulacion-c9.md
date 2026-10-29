@@ -239,7 +239,7 @@ No existen en el proyecto la regresión visual, la seguridad automatizada ni la 
 
 | # | Mejora | I | R | E | Puntaje | ❓ |
 |---|---|---|---|---|---|---|
-| D-1 | **Validar el lector con el reporte real de MES.** Hoy exige las columnas de `COLUMNAS_REPORTE` con su nombre exacto y solo acepta `.xlsx`, y nunca se probó con un archivo real. Pedirle al usuario **solo la fila de cabecera** de un reporte real, sin datos, más el formato del archivo. Con eso, una prueba de adaptador con esa cabecera, replicada con datos sintéticos. Si no coincide, aplicar C (mapeador de encabezados) | 4 | 4 | 2 | **32** | ❓ cabecera y formato reales |
+| D-1 | **Probar el lector con el reporte de una campaña nuestra.** Las columnas de `COLUMNAS_REPORTE` salieron de un reporte real de ejemplo (RF-MM-20 y `requerimientos-mowa-mes.md` §5, «Estructura confirmada con el ejemplo de reporte»): el lector sí se diseñó sobre un archivo real. Lo que falta es importar el reporte de una de las campañas creadas en el sistema. _Corregido el 2026-10-29, a pedido de `architec`: decía que nunca se había probado con un archivo real._ Los formatos ya están decididos (E2-A, T-MM-C10) | 4 | 2 | 2 | **24** | ❓ cuando haya un envío real |
 | D-2 | **El tope de 32 MB del reporte.** No se sabe cuánto pesa un reporte mensual real. Si lo supera, la importación falla con un 413 | 2 | 2 | 1 | **20** | ❓ tamaño típico |
 | D-3 | **`\v`, `\f` y U+0085 en la descripción.** Pasan tal cual al campo de MES | 1 | 2 | 1 | **15** | ❓ si MES los rechaza |
 | D-4 | **Los textos de `mensaje_excede_150` y `mensaje_excede_160`** llevan los números escritos, mientras los límites son constantes del código (`LARGO_ADVERTENCIA` y `LARGO_MAXIMO`, `entities/mowa_mes.py:29-30`). Si cambia la constante, el texto miente. Que el número salga del valor | 1 | 1 | 1 | **10** | |
@@ -274,7 +274,7 @@ La trazabilidad de C2 a C8 no deja ningún RF del módulo sin implementación. L
 | N-4 | **Integración por API con MES** (S-MM-1): subir los archivos y traer el reporte sin pasos manuales. Eliminaría (h1) a (h4) | 4 | 3 | 5 | **7** | ❓ si MES ofrece API |
 
 **Las 5 de mayor puntaje:**
-1. D-1, validar el lector con el reporte real (32);
+1. D-1, probar el lector con el reporte de una campaña nuestra (24, corregido; antes 32);
 2. P-1, la lista para MES al crear (20);
 3. P-2, las pendientes de reporte a la vista (20);
 4. P-3, dónde está el id de MES (20);
