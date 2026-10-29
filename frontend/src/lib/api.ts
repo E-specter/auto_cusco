@@ -254,7 +254,8 @@ export function valoresDeCampo(
 
 // ---- Saved selections (docs/selecciones-guardadas.md) ---------------------------
 
-const json = (method: string, cuerpo: unknown, signal?: AbortSignal): RequestInit => ({
+/** The `RequestInit` of a call with a JSON body: every `api-*` module builds its writes with it. */
+export const conJson = (method: string, cuerpo: unknown, signal?: AbortSignal): RequestInit => ({
   method,
   headers: { 'content-type': 'application/json' },
   body: JSON.stringify(cuerpo),
@@ -267,19 +268,19 @@ export function listarSelecciones(): Promise<SeleccionGuardada[]> {
 
 /** 201 with the saved selection; 400 if a part does not apply, 409 on a taken name. */
 export function crearSeleccion(entrada: SeleccionEntrada): Promise<SeleccionGuardada> {
-  return request<SeleccionGuardada>('/selecciones', json('POST', entrada));
+  return request<SeleccionGuardada>('/selecciones', conJson('POST', entrada));
 }
 
 export function actualizarSeleccion(
   id: number,
   entrada: SeleccionEntrada,
 ): Promise<SeleccionGuardada> {
-  return request<SeleccionGuardada>(`/selecciones/${id}`, json('PUT', entrada));
+  return request<SeleccionGuardada>(`/selecciones/${id}`, conJson('PUT', entrada));
 }
 
 /** Which parts would not apply, without saving anything. */
 export function revisarSeleccion(entrada: SeleccionEntrada, signal?: AbortSignal): Promise<Revision> {
-  return request<Revision>('/selecciones/revision', json('POST', entrada, signal));
+  return request<Revision>('/selecciones/revision', conJson('POST', entrada, signal));
 }
 
 export function eliminarSeleccion(id: number): Promise<void> {

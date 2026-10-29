@@ -11,7 +11,7 @@
  *   next call tries again instead of repeating the failure.
  */
 
-import { request } from './api';
+import { conJson, request } from './api';
 import type { components } from './contrato-api';
 
 type Esquemas = components['schemas'];
@@ -42,24 +42,17 @@ export function olvidarCatalogos(): void {
   catalogos.clear();
 }
 
-const json = (cuerpo: unknown, signal?: AbortSignal): RequestInit => ({
-  method: 'POST',
-  headers: { 'content-type': 'application/json' },
-  body: JSON.stringify(cuerpo),
-  signal,
-});
-
 export function validarTexto(
   contexto: string,
   expresion: ExpresionEntrada,
   signal?: AbortSignal,
 ): Promise<ValidacionTexto> {
-  return request<ValidacionTexto>('/texto-enriquecido/validacion', json({ contexto, expresion }, signal));
+  return request<ValidacionTexto>('/texto-enriquecido/validacion', conJson('POST', { contexto, expresion }, signal));
 }
 
 export function previsualizarTexto(
   peticion: PeticionPrevisualizacion,
   signal?: AbortSignal,
 ): Promise<PrevisualizacionTexto> {
-  return request<PrevisualizacionTexto>('/texto-enriquecido/previsualizacion', json(peticion, signal));
+  return request<PrevisualizacionTexto>('/texto-enriquecido/previsualizacion', conJson('POST', peticion, signal));
 }

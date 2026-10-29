@@ -10,7 +10,7 @@
  * produce. The summary of a download travels in `X-Carga-*` headers because the body is the file.
  */
 
-import { request } from './api';
+import { conJson, request } from './api';
 import { descargarArchivo, type ArchivoDescargado } from './descargas';
 import type { FormatoDisponible, PeticionGeneracion, PrevisualizacionCarga } from './generar-carga';
 
@@ -18,15 +18,6 @@ const RUTA = '/archivos-carga';
 
 /** Prefix of the headers that carry the summary of a generated file. */
 export const PREFIJO_RESUMEN_CARGA = 'X-Carga-';
-
-function conJson(cuerpo: PeticionGeneracion, signal?: AbortSignal): RequestInit {
-  return {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(cuerpo),
-    signal,
-  };
-}
 
 /** The formats that can be generated and what each admits: extension and options with their limits. */
 export function listarFormatos(signal?: AbortSignal): Promise<FormatoDisponible[]> {
@@ -38,7 +29,7 @@ export function previsualizarCarga(
   peticion: PeticionGeneracion,
   signal?: AbortSignal,
 ): Promise<PrevisualizacionCarga> {
-  return request<PrevisualizacionCarga>(`${RUTA}/previsualizacion`, conJson(peticion, signal));
+  return request<PrevisualizacionCarga>(`${RUTA}/previsualizacion`, conJson('POST', peticion, signal));
 }
 
 /**
@@ -46,5 +37,5 @@ export function previsualizarCarga(
  * aborting the signal only frees the screen; the saved version may be marked used all the same.
  */
 export function generarCarga(peticion: PeticionGeneracion, signal?: AbortSignal): Promise<ArchivoDescargado> {
-  return descargarArchivo(RUTA, conJson(peticion, signal), PREFIJO_RESUMEN_CARGA);
+  return descargarArchivo(RUTA, conJson('POST', peticion, signal), PREFIJO_RESUMEN_CARGA);
 }

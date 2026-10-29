@@ -6,7 +6,7 @@
  * a new definition is a POST, and every later save is a POST of a new version.
  */
 
-import { ApiError, request } from './api';
+import { ApiError, conJson, request } from './api';
 import { aDefinicion, type Borrador } from './constructor-columnas';
 import type { components } from './contrato-api';
 
@@ -19,15 +19,6 @@ export type DefinicionColumnasEntrada = Esquemas['DefinicionColumnasEntrada'];
 export type ProblemaDefinicion = Esquemas['ProblemaTextoRespuesta'];
 
 const RUTA = '/definiciones-columnas';
-
-function conJson(method: string, cuerpo: unknown, signal?: AbortSignal): RequestInit {
-  return {
-    method,
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(cuerpo),
-    signal,
-  };
-}
 
 /** Every saved definition with its latest version, newest activity first as the API sorts them. */
 export function listarDefiniciones(signal?: AbortSignal): Promise<ResumenDefinicion[]> {

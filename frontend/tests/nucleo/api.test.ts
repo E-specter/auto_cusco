@@ -13,6 +13,7 @@ import {
   ApiError,
   NetworkError,
   asignarVigente,
+  conJson,
   eliminarVersion,
   listarIncidencias,
   listarVersiones,
@@ -235,5 +236,24 @@ describe('mensajeDeError (lo que se le dice al usuario)', () => {
     expect(mensajeDeError(new ApiError(500, '', null))).toBe(t('common.errorBody'));
     expect(mensajeDeError(new Error('boom'))).toBe(t('common.errorBody'));
     expect(mensajeDeError('texto')).toBe(t('common.errorBody'));
+  });
+});
+
+describe('conJson (el cuerpo JSON de las escrituras)', () => {
+  it('lleva el método, la cabecera, el cuerpo serializado y la señal', () => {
+    const controlador = new AbortController();
+
+    const init = conJson('PATCH', { nombre: 'Nuevo' }, controlador.signal);
+
+    expect(init).toEqual({
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: '{"nombre":"Nuevo"}',
+      signal: controlador.signal,
+    });
+  });
+
+  it('sin señal, la deja sin definir', () => {
+    expect(conJson('POST', {}).signal).toBeUndefined();
   });
 });

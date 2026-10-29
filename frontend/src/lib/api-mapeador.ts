@@ -4,7 +4,7 @@
  * normal answer: only an unreachable API, or a draft that expired (404), rejects.
  */
 
-import { request } from './api';
+import { conJson, request } from './api';
 import type { components } from './contrato-api';
 
 type Esquemas = components['schemas'];
@@ -15,12 +15,10 @@ export function validarMapeo(
   signal?: AbortSignal,
 ): Promise<Esquemas['ProblemaMapeoRespuesta'][]> {
   const cuerpo: Esquemas['ValidacionEntrada'] = { asignaciones };
-  return request<Esquemas['ValidacionMapeoRespuesta']>(`/mapeador/borradores/${borradorId}/validacion`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(cuerpo),
-    signal,
-  }).then((respuesta) => respuesta.problemas);
+  return request<Esquemas['ValidacionMapeoRespuesta']>(
+    `/mapeador/borradores/${borradorId}/validacion`,
+    conJson('POST', cuerpo, signal),
+  ).then((respuesta) => respuesta.problemas);
 }
 
 // ---- The upload flow in two steps (T-MAP-F2) -----------------------------------------------
@@ -31,13 +29,6 @@ export const CATALOGO_SABANA = 'sabana_vencida';
 export type CatalogoMapeador = Esquemas['CatalogoMapeadorRespuesta'];
 export type AnalisisBorrador = Esquemas['AnalisisRespuesta'];
 export type OpcionesLectura = Esquemas['OpcionesLecturaEntrada'];
-
-const conJson = (method: string, cuerpo: unknown, signal?: AbortSignal): RequestInit => ({
-  method,
-  headers: { 'content-type': 'application/json' },
-  body: JSON.stringify(cuerpo),
-  signal,
-});
 
 /** The fields of the catalogue (the dropdown), the encodings and the separators a CSV accepts. */
 export function obtenerCatalogoMapeador(signal?: AbortSignal): Promise<CatalogoMapeador> {

@@ -6,7 +6,7 @@
  * transport, errors included, is the shared `request` of `api.ts`.
  */
 
-import { request } from './api';
+import { conJson, request } from './api';
 import type { components } from './contrato-api';
 import { descargarArchivo, type ArchivoDescargado } from './descargas';
 
@@ -66,15 +66,6 @@ export type VariablePlantilla = Esquemas['VariablePlantillaRespuesta'];
 export type CampoError = Esquemas['CampoConfiguracion'];
 export type EstadoCosto = Esquemas['EstadoCosto'];
 export type EstadoCostoEstimado = Esquemas['EstadoCostoEstimado'];
-
-function conJson(method: string, cuerpo: unknown, signal?: AbortSignal): RequestInit {
-  return {
-    method,
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(cuerpo),
-    signal,
-  };
-}
 
 // ---- Connector configuration ------------------------------------------------
 
