@@ -17,6 +17,7 @@ import {
 import { campoDelError, codigoDeError, textoDeError } from '../lib/carga-mapeada';
 import { ordenarAdicionales, puedeGuardarNombre } from '../lib/campos-adicionales';
 import { t } from '../lib/i18n';
+import { celda } from '../lib/tabla-dom';
 
 export interface OpcionesGestion {
   dialogo: HTMLDialogElement;
@@ -68,13 +69,6 @@ export function montarGestion(opciones: OpcionesGestion): ControladorGestion {
     return b;
   }
 
-  function celda(etiqueta: string, clase = ''): HTMLTableCellElement {
-    const c = document.createElement('td');
-    if (clase) c.className = clase;
-    c.dataset.etiqueta = t(etiqueta);
-    return c;
-  }
-
   function filaDe(campo: CampoAdicional): HTMLTableRowElement {
     const fila = document.createElement('tr');
     fila.dataset.campo = campo.nombre;
@@ -83,7 +77,7 @@ export function montarGestion(opciones: OpcionesGestion): ControladorGestion {
     const nombre = document.createElement('th');
     nombre.scope = 'row';
     nombre.dataset.etiqueta = t('camposAdicionales.gestion.col.nombre');
-    const acciones = celda('camposAdicionales.gestion.col.acciones', 'adicionales__acciones');
+    const acciones = celda('td', '', 'adicionales__acciones', t('camposAdicionales.gestion.col.acciones'));
 
     if (editando) {
       const entrada = document.createElement('input');
@@ -151,11 +145,11 @@ export function montarGestion(opciones: OpcionesGestion): ControladorGestion {
       acciones.append(renombrar, cambia);
     }
 
-    const tipo = celda('camposAdicionales.gestion.col.tipo');
+    const tipo = celda('td', '', '', t('camposAdicionales.gestion.col.tipo'));
     tipo.textContent = t(`mapeador.vista.adicional.tipo.${campo.tipo}`);
-    const origen = celda('camposAdicionales.gestion.col.origen', 'mono');
+    const origen = celda('td', '', 'mono', t('camposAdicionales.gestion.col.origen'));
     origen.textContent = campo.encabezado_origen;
-    const estado = celda('camposAdicionales.gestion.col.estado');
+    const estado = celda('td', '', '', t('camposAdicionales.gestion.col.estado'));
     if (campo.archivado) {
       const marca = document.createElement('span');
       marca.className = 'tag tag--advertencia';

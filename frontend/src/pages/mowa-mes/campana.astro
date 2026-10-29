@@ -444,6 +444,7 @@ import '../../styles/supervisores.css';
 <script>
   import { ApiError, NetworkError, mensajeDeError } from '../../lib/api';
   import { $, appendBreakable, ocupado } from '../../lib/dom';
+  import { celda, cifra, tabla, vacio } from '../../lib/tabla-dom';
   import {
     crearCampana,
     descargarArchivoCampana,
@@ -544,63 +545,6 @@ import '../../styles/supervisores.css';
     nodo.title = etiqueta;
     nodo.append($<HTMLTemplateElement>('template[data-icono-quitar]').content.cloneNode(true));
     return nodo;
-  }
-
-  function celda(etiqueta: 'td' | 'th', texto: string, clase = '', columna = ''): HTMLTableCellElement {
-    const nodo = document.createElement(etiqueta);
-    nodo.textContent = texto;
-    if (clase) nodo.className = clase;
-    // Names the cell when the table stacks below 48rem (`.table--apilable`).
-    if (columna) nodo.dataset.etiqueta = columna;
-    if (etiqueta === 'th') nodo.scope = 'row';
-    return nodo;
-  }
-
-  function vacio(texto: string): HTMLElement {
-    const bloque = document.createElement('p');
-    bloque.className = 'empty';
-    bloque.textContent = texto;
-    return bloque;
-  }
-
-  function tabla(clase: string, columnas: Array<[string, boolean]>): { envoltorio: HTMLElement; cuerpo: HTMLTableSectionElement } {
-    const envoltorio = document.createElement('div');
-    envoltorio.className = 'table-scroll';
-    const nodo = document.createElement('table');
-    nodo.className = `table table--apilable ${clase}`;
-    const cabeza = document.createElement('thead');
-    const fila = document.createElement('tr');
-    columnas.forEach(([texto, numerica]) => {
-      const th = document.createElement('th');
-      th.scope = 'col';
-      if (numerica) th.className = 'num';
-      th.textContent = texto;
-      fila.append(th);
-    });
-    cabeza.append(fila);
-    const cuerpo = document.createElement('tbody');
-    nodo.append(cabeza, cuerpo);
-    envoltorio.append(nodo);
-    return { envoltorio, cuerpo };
-  }
-
-  function cifra(etiqueta: string, valor: string, pista?: string): HTMLElement {
-    const bloque = document.createElement('div');
-    bloque.className = 'stat';
-    const nombre = document.createElement('dt');
-    nombre.className = 'stat__label';
-    nombre.textContent = etiqueta;
-    const numero = document.createElement('dd');
-    numero.className = 'stat__value';
-    numero.textContent = valor;
-    bloque.append(nombre, numero);
-    if (pista) {
-      const detalle = document.createElement('dd');
-      detalle.className = 'field__hint';
-      detalle.textContent = pista;
-      bloque.append(detalle);
-    }
-    return bloque;
   }
 
   // ---- Reading the form into a CampanaBorrador -----------------------------------
@@ -717,7 +661,7 @@ import '../../styles/supervisores.css';
       [t('supervisores.col.numero'), false],
       [t('supervisores.col.procedencia'), false],
       [t('supervisores.col.acciones'), false],
-    ]);
+    ], { apilable: true });
 
     estado.supervisoresPropios.forEach((supervisor, indice) => {
       const total = estado.supervisoresPropios.length;
@@ -1000,7 +944,7 @@ import '../../styles/supervisores.css';
     const { envoltorio, cuerpo } = tabla('mm-exclusiones__tabla', [
       [t('mowaMes.seguimiento.exclusiones.col.pagare'), false],
       [t('mowaMes.seguimiento.exclusiones.col.motivo'), false],
-    ]);
+    ], { apilable: true });
     pagina.filas.forEach((exclusion) => {
       const fila = document.createElement('tr');
       const motivo = document.createElement('td');
@@ -1045,7 +989,7 @@ import '../../styles/supervisores.css';
       [t('mowaMes.campana.muestra.col.largo'), true],
       [t('mowaMes.campana.muestra.col.mensaje'), false],
       [t('mowaMes.campana.muestra.col.advertencias'), false],
-    ]);
+    ], { apilable: true });
     pagina.filas.forEach((fila) => {
       const tr = document.createElement('tr');
       const numero = celda('td', fila.numero, 'mono', t('mowaMes.campana.muestra.col.numero'));
@@ -1294,7 +1238,7 @@ import '../../styles/supervisores.css';
       [t('mowaMes.seguimiento.archivos.col.supervision'), true],
       [t('mowaMes.seguimiento.archivos.col.bytes'), true],
       [t('mowaMes.seguimiento.archivos.col.accion'), false],
-    ]);
+    ], { apilable: true });
     campana.archivos.forEach((archivo) => {
       const fila = document.createElement('tr');
       const boton = document.createElement('button');

@@ -1,6 +1,6 @@
 ---
 /**
- * Default supervisors (RF-MM-04): the procedencias in order and the supervisors of each, which every
+ * Default supervisors (RF-38): the procedencias in order and the supervisors of each, which every
  * campaign starts from. Shared by every connector, so it lives outside `/mowa-mes`.
  *
  * Saves on its own. The document numbers (00000001, ...) are assigned by the API on saving, in the
@@ -115,6 +115,7 @@ import '../styles/supervisores.css';
   import { NetworkError, mensajeDeError } from '../lib/api';
   import { guardarSupervision, obtenerSupervision, type ConfiguracionSupervision } from '../lib/api-supervision';
   import { $, ocupado } from '../lib/dom';
+  import { vacio } from '../lib/tabla-dom';
   import { openWhenFree } from '../lib/dialogs';
   import { applyTranslations, t } from '../lib/i18n';
   import {
@@ -176,13 +177,6 @@ import '../styles/supervisores.css';
     const plantilla = $<HTMLTemplateElement>(`template[data-icono-${direccion}]`);
     nodo.append(plantilla.content.cloneNode(true));
     return nodo;
-  }
-
-  function vacio(clave: string): HTMLElement {
-    const bloque = document.createElement('p');
-    bloque.className = 'empty';
-    bloque.textContent = t(clave);
-    return bloque;
   }
 
   // ---- Supervisors -------------------------------------------------------------
@@ -278,7 +272,7 @@ import '../styles/supervisores.css';
     host.replaceChildren();
 
     if (estado.supervision.supervisores.length === 0) {
-      host.append(vacio('supervisores.ninguno'));
+      host.append(vacio(t('supervisores.ninguno')));
       return;
     }
 

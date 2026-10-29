@@ -149,6 +149,7 @@ import '../styles/cartera.css';
     type Resumen,
   } from '../lib/api';
   import { $ } from '../lib/dom';
+  import { celda, vacio } from '../lib/tabla-dom';
   import { applyTranslations, t } from '../lib/i18n';
   import {
     formatDate,
@@ -211,20 +212,6 @@ import '../styles/cartera.css';
       return formatDateCompact(valor);
     }
     return String(valor);
-  }
-
-  function celda(etiqueta: 'td' | 'th', texto: string, clase = ''): HTMLTableCellElement {
-    const nodo = document.createElement(etiqueta);
-    nodo.textContent = texto;
-    if (clase) nodo.className = clase;
-    return nodo;
-  }
-
-  function vacio(texto: string): HTMLElement {
-    const bloque = document.createElement('p');
-    bloque.className = 'empty';
-    bloque.textContent = texto;
-    return bloque;
   }
 
   // ---- Stand-ins -----------------------------------------------------------------

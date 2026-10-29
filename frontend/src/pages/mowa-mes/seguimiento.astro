@@ -239,6 +239,7 @@ import '../../styles/mowa-mes.css';
 <script>
   import { ApiError, NetworkError, mensajeDeError } from '../../lib/api';
   import { $, ocupado } from '../../lib/dom';
+  import { celda, celdaDeFila, cifra, tabla, vacio } from '../../lib/tabla-dom';
   import {
     consumoLimite,
     descargarArchivoCampana,
@@ -311,62 +312,6 @@ import '../../styles/mowa-mes.css';
     window.setTimeout(() => {
       if (nodo.textContent === texto) nodo.textContent = '';
     }, 4000);
-  }
-
-  function vacio(texto: string): HTMLElement {
-    const bloque = document.createElement('p');
-    bloque.className = 'empty';
-    bloque.textContent = texto;
-    return bloque;
-  }
-
-  function celda(etiqueta: 'td' | 'th', texto: string, clase = ''): HTMLTableCellElement {
-    const nodo = document.createElement(etiqueta);
-    nodo.textContent = texto;
-    if (clase) nodo.className = clase;
-    if (etiqueta === 'th') nodo.scope = 'row';
-    return nodo;
-  }
-
-  /** A dense table in its scroll container, headers from translation keys. */
-  function tabla(clase: string, columnas: Array<[string, boolean]>): { envoltorio: HTMLElement; cuerpo: HTMLTableSectionElement } {
-    const envoltorio = document.createElement('div');
-    envoltorio.className = 'table-scroll';
-    const nodo = document.createElement('table');
-    nodo.className = `table ${clase}`;
-    const cabeza = document.createElement('thead');
-    const fila = document.createElement('tr');
-    columnas.forEach(([clave, numerica]) => {
-      const th = document.createElement('th');
-      th.scope = 'col';
-      if (numerica) th.className = 'num';
-      th.textContent = t(clave);
-      fila.append(th);
-    });
-    cabeza.append(fila);
-    const cuerpo = document.createElement('tbody');
-    nodo.append(cabeza, cuerpo);
-    envoltorio.append(nodo);
-    return { envoltorio, cuerpo };
-  }
-
-  function cifra(etiqueta: string, valor: string, pista?: string, apagada = false): HTMLElement {
-    const bloque = document.createElement('div');
-    bloque.className = 'stat';
-    const nombre = document.createElement('dt');
-    nombre.className = 'stat__label';
-    nombre.textContent = etiqueta;
-    const numero = document.createElement('dd');
-    numero.className = apagada ? 'stat__value muted' : 'stat__value';
-    numero.textContent = valor;
-    bloque.append(nombre, numero);
-    if (pista) {
-      const detalle = document.createElement('dd');
-      detalle.className = 'field__hint';
-      detalle.textContent = pista;
-      bloque.append(detalle);
-    }
-    return bloque;
   }
 
   // ---- Costs (RF-MM-24): the API sends the amounts worked out, as text --------------------------
@@ -529,18 +474,18 @@ import '../../styles/mowa-mes.css';
     }
 
     const { envoltorio, cuerpo } = tabla('mm-campanas__tabla', [
-      ['mowaMes.seguimiento.campanas.col.id', true],
-      ['mowaMes.seguimiento.campanas.col.creada', false],
-      ['mowaMes.seguimiento.campanas.col.descripcion', false],
-      ['mowaMes.seguimiento.campanas.col.envio', false],
-      ['mowaMes.seguimiento.campanas.col.productos', true],
-      ['mowaMes.seguimiento.campanas.col.supervision', true],
-      ['mowaMes.seguimiento.campanas.col.total', true],
-      ['mowaMes.seguimiento.campanas.col.costoEstimado', true],
-      ['mowaMes.seguimiento.campanas.col.costoReal', true],
-      ['mowaMes.seguimiento.campanas.col.excluidos', true],
-      ['mowaMes.seguimiento.campanas.col.archivos', true],
-      ['mowaMes.seguimiento.campanas.col.accion', false],
+      [t('mowaMes.seguimiento.campanas.col.id'), true],
+      [t('mowaMes.seguimiento.campanas.col.creada'), false],
+      [t('mowaMes.seguimiento.campanas.col.descripcion'), false],
+      [t('mowaMes.seguimiento.campanas.col.envio'), false],
+      [t('mowaMes.seguimiento.campanas.col.productos'), true],
+      [t('mowaMes.seguimiento.campanas.col.supervision'), true],
+      [t('mowaMes.seguimiento.campanas.col.total'), true],
+      [t('mowaMes.seguimiento.campanas.col.costoEstimado'), true],
+      [t('mowaMes.seguimiento.campanas.col.costoReal'), true],
+      [t('mowaMes.seguimiento.campanas.col.excluidos'), true],
+      [t('mowaMes.seguimiento.campanas.col.archivos'), true],
+      [t('mowaMes.seguimiento.campanas.col.accion'), false],
     ]);
 
     pagina.campanas.forEach((campana) => {
@@ -652,12 +597,12 @@ import '../../styles/mowa-mes.css';
     const host = $<HTMLElement>('[data-archivos]');
     host.replaceChildren();
     const { envoltorio, cuerpo } = tabla('mm-archivos__tabla', [
-      ['mowaMes.seguimiento.archivos.col.numero', true],
-      ['mowaMes.seguimiento.archivos.col.nombre', false],
-      ['mowaMes.seguimiento.archivos.col.filas', true],
-      ['mowaMes.seguimiento.archivos.col.supervision', true],
-      ['mowaMes.seguimiento.archivos.col.bytes', true],
-      ['mowaMes.seguimiento.archivos.col.accion', false],
+      [t('mowaMes.seguimiento.archivos.col.numero'), true],
+      [t('mowaMes.seguimiento.archivos.col.nombre'), false],
+      [t('mowaMes.seguimiento.archivos.col.filas'), true],
+      [t('mowaMes.seguimiento.archivos.col.supervision'), true],
+      [t('mowaMes.seguimiento.archivos.col.bytes'), true],
+      [t('mowaMes.seguimiento.archivos.col.accion'), false],
     ]);
 
     campana.archivos.forEach((archivo) => {
@@ -849,17 +794,17 @@ import '../../styles/mowa-mes.css';
     });
 
     const grupos = tabla('mm-conciliacion__tabla', [
-      ['mowaMes.seguimiento.conciliacion.col.grupo', false],
-      ['mowaMes.seguimiento.conciliacion.col.cargados', true],
-      ['mowaMes.seguimiento.conciliacion.col.enviados', true],
-      ['mowaMes.seguimiento.conciliacion.col.noEnviados', true],
-      ['mowaMes.seguimiento.conciliacion.col.estados', false],
+      [t('mowaMes.seguimiento.conciliacion.col.grupo'), false],
+      [t('mowaMes.seguimiento.conciliacion.col.cargados'), true],
+      [t('mowaMes.seguimiento.conciliacion.col.enviados'), true],
+      [t('mowaMes.seguimiento.conciliacion.col.noEnviados'), true],
+      [t('mowaMes.seguimiento.conciliacion.col.estados'), false],
     ]);
     filasConciliacion(conciliacion).forEach(({ grupo, cifras }) => {
       const fila = document.createElement('tr');
       fila.dataset.grupo = grupo;
       fila.append(
-        celda('th', t(`mowaMes.seguimiento.conciliacion.grupo.${grupo}`)),
+        celdaDeFila(t(`mowaMes.seguimiento.conciliacion.grupo.${grupo}`)),
         celda('td', formatNumber(cifras.cargados), 'num'),
         celda('td', formatNumber(cifras.enviados), 'num'),
         celda('td', formatNumber(cifras.no_enviados), 'num'),
@@ -901,9 +846,9 @@ import '../../styles/mowa-mes.css';
     host.append(costo);
 
     const ids = tabla('mm-ids__tabla', [
-      ['mowaMes.seguimiento.conciliacion.col.mesId', false],
-      ['mowaMes.seguimiento.conciliacion.col.filas', true],
-      ['mowaMes.seguimiento.conciliacion.col.coinciden', true],
+      [t('mowaMes.seguimiento.conciliacion.col.mesId'), false],
+      [t('mowaMes.seguimiento.conciliacion.col.filas'), true],
+      [t('mowaMes.seguimiento.conciliacion.col.coinciden'), true],
     ]);
     conciliacion.por_id.forEach((porId) => {
       const fila = document.createElement('tr');
@@ -986,9 +931,9 @@ import '../../styles/mowa-mes.css';
     }
 
     const { envoltorio, cuerpo } = tabla('mm-exclusiones__tabla', [
-      ['mowaMes.seguimiento.exclusiones.col.pagare', false],
-      ['mowaMes.seguimiento.exclusiones.col.motivo', false],
-      ['mowaMes.seguimiento.exclusiones.col.detalle', false],
+      [t('mowaMes.seguimiento.exclusiones.col.pagare'), false],
+      [t('mowaMes.seguimiento.exclusiones.col.motivo'), false],
+      [t('mowaMes.seguimiento.exclusiones.col.detalle'), false],
     ]);
     pagina.exclusiones.forEach((exclusion) => {
       const fila = document.createElement('tr');
