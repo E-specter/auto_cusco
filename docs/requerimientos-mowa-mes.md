@@ -234,6 +234,7 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
   * La campaña descartada deja de mostrarse entre las activas y queda fuera de todos los cálculos del módulo: consumo del límite mensual (RF-MM-01), costo del mes (RF-MM-24), cifras, conciliaciones y reportes del seguimiento. Las reglas de qué cuenta viven en un solo lugar del sistema, no en cada pantalla.
   * Conserva todos sus datos: archivos, filas cargadas, exclusiones y reportes importados. Se registra que está descartada y cuándo; el sistema no tiene usuarios, así que no se registra quién.
   * Descartar pide confirmación. Si la campaña ya tiene reporte de enviados importado, entonces la confirmación advierte que, si se envió, su consumo deja de contar en el límite del mes (decisión del usuario, 2026-10-30).
+  * Si se importa un reporte de enviados a una campaña descartada, entonces se rechaza con el motivo: hay que restaurarla primero (decisión del usuario, 2026-10-30).
 * **RF-MM-32 — Campañas descartadas:** Mostrar las campañas descartadas en una sección propia del seguimiento, separada de las activas, donde se puedan ver, restaurar y eliminar definitivamente.
   * **Restaurar** devuelve la campaña a las activas y a todos los cálculos, con pedido de confirmación.
   * **Eliminar definitivamente** borra la campaña con sus archivos, filas cargadas, exclusiones y reportes, solo con una acción explícita y una confirmación que diga que no se puede deshacer. La versión de speech que usó no cambia.
@@ -272,6 +273,7 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Dónde se configuran los supervisores y el calendario laboral | Fuera de MOWA MES: en dos pantallas comunes de la sección «Configuración» del menú, porque sirven a todos los canales (RF-37 a RF-41, RF-MM-08). La configuración de MOWA MES queda con lo propio del conector y enlaza a ellas | Usuario (2026-10-29), consultado por architec (E1) |
 | Speech v1 y v2 | Solo v2 en todo el módulo: las v1 se convierten en su lugar con la conversión exacta y mensajes idénticos; su texto v1 se guarda para trazabilidad (RF-MM-17) | Usuario (2026-10-30), consultado por architec |
 | Campaña descartada y límite mensual | Sale de todos los cálculos, también del límite; si tiene reporte importado, la confirmación lo advierte (RF-MM-31) | Usuario (2026-10-30), consultado por architec |
+| Reporte de una campaña descartada | Se rechaza la importación con «restáurala primero»; no se guarda nada (RF-MM-31) | Usuario (2026-10-30), consultado por coordinador_modulo_mowa_mes |
 | Cambiar los filtros desde la campaña | «Editar en Cartera» y volver, sin editor propio en la campaña (RF-MM-09) | Usuario (2026-10-30), consultado por architec |
 
 ## 7. Evidencia de los ejemplos
@@ -336,5 +338,6 @@ Queda abierto S-MM-1: depende de información externa (qué ofrece MES), no de u
 **2026-10-30**
 - **RF nuevos incorporados:** RF-MM-28 (renombrar una versión de speech), RF-MM-29 (deshabilitar y habilitar) y RF-MM-30 (eliminar definitivamente) en la sección 4; RF-MM-31 (descartar una campaña), RF-MM-32 (campañas descartadas), RF-MM-33 (campañas pendientes de reporte) y RF-MM-34 (dónde está el id de MES) en la sección 5; RF-MM-35 (datos para cargar la campaña en MES) en la sección 3; RF-MM-36 (iconografía del módulo) en la sección 1.
 - **RF existentes ampliados o modificados:** RF-MM-17, solo v2: las v1 se convierten en su lugar (cambia su texto; la conversión es la única excepción a «no se modifica nunca» del Speech original). RF-MM-01, las descartadas no suman al consumo. RF-MM-09, «Editar en Cartera» y volver. La sección 5 pasa a llamarse «Seguimiento y reporte de enviados». Decisiones del usuario en la sección 6.
+- **RF-MM-31 ampliado el mismo día:** importar un reporte a una campaña descartada se rechaza (U-1 del plan T-MM-C11).
 - **Supuesto nuevo:** S-MM-10, cómo aparece el id de MES (RF-MM-34).
 - **Nota de numeración:** sin renumerar, como el resto del módulo.
