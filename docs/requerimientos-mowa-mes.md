@@ -20,6 +20,7 @@ Los requerimientos de este documento se numeran `RF-MM-XX` dentro del módulo, p
   * Límite por defecto: 2 500 000 SMS por mes, configurable (RF-32).
   * El consumo de una campaña se imputa al mes calendario de su fecha de envío, la misma que usa RF-MM-15, no al de la fecha de generación (decisión del usuario, sección 6).
   * Si una campaña superaría el límite del mes, entonces el sistema lo advierte antes de generar la carga y pide confirmación explícita (supuesto S-MM-2: advertir, no bloquear).
+  * Las campañas descartadas no suman al consumo del mes (RF-MM-31).
 * **RF-MM-02 — SMS cargados y SMS enviados:** Distinguir en cada campaña los **SMS cargados** (los que el sistema generó y exportó) de los **SMS enviados** (los que MES reporta como despachados), porque pueden diferir por causas propias de la plataforma.
   * Los cargados se conocen al generar la carga; los enviados, al importar el reporte de enviados (sección 5).
   * Un SMS cargado cuenta como **enviado** solo si su fila del reporte trae `estado` = `enviado`. Si la fila del reporte trae otro estado, el SMS cuenta como cargado no enviado y aparece en el conteo por `estado` (RF-MM-22).
@@ -35,6 +36,11 @@ Los requerimientos de este documento se numeran `RF-MM-XX` dentro del módulo, p
   * Si en el mes hay campañas sin tarifa guardada, entonces el costo del mes suma las demás e indica cuántas campañas quedaron fuera del total.
   * Los montos se calculan con su valor exacto y se redondean solo al mostrarlos.
   * Los montos se muestran en soles con 2 decimales; la tarifa, con los decimales que tenga.
+
+* **RF-MM-36 — Iconografía del módulo:** Acompañar con iconos la información de las pantallas del módulo: métricas e indicadores, medidores y límites, cantidades, estados, tarjetas y acciones, con prioridad en la métrica «Límite mensual» del seguimiento.
+  * El criterio lo define `designer` a partir del brief de diseño del proyecto: cada icono corresponde a lo que representa, con los mismos tamaños, alineación y estilo, y con la paleta existente.
+  * Sin iconos decorativos ni redundantes: un icono no reemplaza a su texto y no se agrega si no mejora la lectura.
+  * Se ve bien en escritorio y en celular (360 px).
 
 ## 2. Inputs de la campaña
 
@@ -61,6 +67,7 @@ Los requerimientos de este documento se numeran `RF-MM-XX` dentro del módulo, p
   * La configuración permite agregar días no laborables decretados y retirar un feriado cuando cambie la ley (RF-32, RF-33).
   * La regla trae solo los 16 feriados nacionales de ley vigentes al 2026; cualquier otro día no laborable (decretos, descansos regionales o compensables) lo registra el usuario a mano, y queda guardado y visible para todos los usuarios (decisión del usuario, 2026-10-26, que cierra el supuesto S-MM-4).
 * **RF-MM-09 — Base de datos de la campaña:** Tomar como base de la campaña una selección de cartera de una fecha de corte (filtros, orden y cantidad, o una selección guardada), con el mismo orden y desempate que la lista de `/cartera` y que el resumen del top n (RF-08).
+  * Si se quieren cambiar los filtros de la base, entonces la campaña ofrece «Editar en Cartera»: abre `/cartera` con la selección cargada y, al guardarla, vuelve a la campaña con la selección actualizada. La campaña no tiene un editor de filtros propio (decisión del usuario, 2026-10-30).
 
 ## 3. Archivo de carga
 
@@ -120,6 +127,7 @@ Formato confirmado con el ejemplo de carga (sección 7).
   * 10 filas por página, con el paginador compartido de la interfaz.
   * La tabla de exclusiones muestra siempre el total de productos excluidos. Si son más de 100, entonces indica que solo se ven las 100 primeras y que la lista completa se consulta en el seguimiento de la campaña después de crearla.
   * Si la previsualización se vuelve a calcular, entonces las dos tablas vuelven a la primera página.
+* **RF-MM-35 — Datos para cargar la campaña en MES:** Al crear la campaña, mostrar lo que hay que hacer en MES: los archivos de carga para descargar y cada dato del formulario de MES con su valor listo para copiar (tipo de carga, descripción, salida, herramientas y programación, RF-MM-03 a RF-MM-07).
 
 ## 4. Construcción del campo `mensaje` (speech)
 
@@ -156,8 +164,9 @@ Formato confirmado con el ejemplo de carga (sección 7).
   * Cada campaña registra la versión de speech con la que se generó.
   * Si una versión ya se usó en alguna campaña, entonces no se modifica: el cambio crea una versión nueva.
   * La versión `Speech original` (RF-MM-18) es la referencia del módulo y **no se modifica nunca**, aunque no se haya usado: personalizarla siempre crea una versión nueva.
-  * La estructura de RF-MM-14 es la de la versión por defecto y la de las versiones de dos partes (v1).
+  * La estructura de RF-MM-14 es la del texto de la versión por defecto.
   * **Versiones nuevas solo con el motor (decisión del usuario, 2026-10-19, fase M3):** una versión nueva se arma con el motor de texto enriquecido, por segmento (v2, RF-42 a RF-50); ya no se crean versiones de dos partes. Las v1 existentes, incluido el Speech original, se siguen usando en campañas y se ven en solo lectura; para personalizar una v1 se la convierte a v2, sin modificarla.
+  * **Solo v2 (decisión del usuario, 2026-10-30):** las versiones de dos partes (v1) que quedan, incluido el Speech original, se convierten una sola vez a v2 en su lugar, con la misma conversión exacta que ya las arma con el motor: conservan su identificador, su nombre y las campañas que las usaron, y sus mensajes salen idénticos. El texto v1 de cada una se guarda aparte, solo para trazabilidad. Desde entonces el módulo no tiene formato, vista ni conversión v1. Esta conversión es la única excepción a «no se modifica nunca» del Speech original: cambia cómo se guarda, no lo que genera.
 * **RF-MM-18 — Speech original:** Mantener como versión por defecto el speech vigente, con la fecha incluida en todos los segmentos:
 
   | Segmento | Parte 1 | Parte 2 |
@@ -183,8 +192,16 @@ Formato confirmado con el ejemplo de carga (sección 7).
   * Por último se borran los caracteres que siguen fuera del alfabeto básico de GSM-7 (por ejemplo, un emoji o `^`).
   * La versión de speech se guarda tal como se escribió; la normalización se aplica al generar, y la previsualización muestra el texto que saldrá.
   * Cambia el `mensaje` de las versiones con tildes, incluido el Speech original (`venció` sale `vencio`): es un cambio decidido, registrado en RF-54.
+* **RF-MM-28 — Renombrar una versión de speech:** Permitir cambiarle el nombre a cualquier versión, incluidas las usadas y el Speech original, sin tocar su contenido.
+  * El nombre sigue siendo único sin distinguir mayúsculas. Las campañas registran la versión, no su nombre, así que siguen apuntando a la misma.
+* **RF-MM-29 — Deshabilitar y habilitar una versión de speech:** Permitir retirar una versión de los flujos operativos sin borrarla, y volver a habilitarla.
+  * Una versión deshabilitada no aparece en el selector de la campaña, y crear o previsualizar una campaña con ella se rechaza con el motivo.
+  * Conserva su contenido y su historial. Al habilitarla vuelve a estar disponible tal como estaba.
+  * Las deshabilitadas se administran en una sección propia de la configuración, separada de las activas, donde se pueden ver con el motor (solo lectura), habilitar o eliminar (RF-MM-30).
+* **RF-MM-30 — Eliminar definitivamente una versión de speech:** Permitir borrar una versión deshabilitada con una acción explícita y una confirmación que diga que no se puede deshacer.
+  * Si alguna campaña usó la versión, o si es el Speech original, entonces no se puede eliminar: se explica el motivo y queda deshabilitada. Las campañas anteriores nunca pierden su speech.
 
-## 5. Reporte de enviados (descargado de MES)
+## 5. Seguimiento y reporte de enviados (descargado de MES)
 
 Estructura confirmada con el ejemplo de reporte (sección 7).
 
@@ -213,6 +230,17 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
   * Enviados son las filas cargadas que tienen correspondencia con `estado` = `enviado` (RF-MM-02). Las que tienen correspondencia con otro estado suman a cargados no enviados.
   * **Normalización del mensaje:** se quitan los signos diacríticos (tildes, diéresis y la virgulilla de la `ñ`, que queda `n`) y los espacios en los extremos, **por igual en el mensaje cargado y en el enviado**. MES quita las tildes y recorta espacios al enviar (sección 7); normalizar los dos lados hace que la conciliación funcione aunque MES conserve o no la `ñ`.
   * Los registros de supervisión se concilian y se muestran aparte de los productos (RF-41).
+* **RF-MM-31 — Descartar una campaña:** Permitir descartar una campaña desde el seguimiento, como operación lógica: no se borra nada.
+  * La campaña descartada deja de mostrarse entre las activas y queda fuera de todos los cálculos del módulo: consumo del límite mensual (RF-MM-01), costo del mes (RF-MM-24), cifras, conciliaciones y reportes del seguimiento. Las reglas de qué cuenta viven en un solo lugar del sistema, no en cada pantalla.
+  * Conserva todos sus datos: archivos, filas cargadas, exclusiones y reportes importados. Se registra que está descartada y cuándo; el sistema no tiene usuarios, así que no se registra quién.
+  * Descartar pide confirmación. Si la campaña ya tiene reporte de enviados importado, entonces la confirmación advierte que, si se envió, su consumo deja de contar en el límite del mes (decisión del usuario, 2026-10-30).
+* **RF-MM-32 — Campañas descartadas:** Mostrar las campañas descartadas en una sección propia del seguimiento, separada de las activas, donde se puedan ver, restaurar y eliminar definitivamente.
+  * **Restaurar** devuelve la campaña a las activas y a todos los cálculos, con pedido de confirmación.
+  * **Eliminar definitivamente** borra la campaña con sus archivos, filas cargadas, exclusiones y reportes, solo con una acción explícita y una confirmación que diga que no se puede deshacer. La versión de speech que usó no cambia.
+  * Se filtra por mes de gestión, que es el mes de la fecha de envío (el mismo de RF-MM-01), escrito como «Octubre de 2026».
+* **RF-MM-33 — Campañas pendientes de reporte:** Señalar en el seguimiento las campañas activas que todavía no tienen reporte de enviados importado, con el paso siguiente («importar el reporte de enviados de MES»).
+  * La campaña recién creada enlaza a su seguimiento.
+* **RF-MM-34 — Dónde está el id de MES:** Explicar, junto al campo del `id` de MES al importar el reporte, dónde se encuentra ese identificador en la web de MES (supuesto S-MM-10).
 
 ## 6. Decisiones tomadas sobre los puntos abiertos del pedido
 
@@ -242,6 +270,9 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Largo de la descripción (S-MM-3) y botón «Copiar» | 100 caracteres, el límite del formulario de MES; la sugerida se acorta por filtros enteros; un botón copia la descripción para pegarla en MES; una sola línea, con los saltos cambiados por un espacio (RF-MM-04) | Usuario (2026-10-27), consultado por architec; la línea única, a pregunta de coordinador_modulo_mowa_mes |
 | Formatos del reporte de enviados | Los mismos que la sábana (RF-57), reconocidos solos y con las opciones por defecto; sin opciones de lectura en pantalla. Si el reporte real lo pidiera, se agregan después (RF-MM-20) | Usuario (2026-10-29), consultado por architec (E2) |
 | Dónde se configuran los supervisores y el calendario laboral | Fuera de MOWA MES: en dos pantallas comunes de la sección «Configuración» del menú, porque sirven a todos los canales (RF-37 a RF-41, RF-MM-08). La configuración de MOWA MES queda con lo propio del conector y enlaza a ellas | Usuario (2026-10-29), consultado por architec (E1) |
+| Speech v1 y v2 | Solo v2 en todo el módulo: las v1 se convierten en su lugar con la conversión exacta y mensajes idénticos; su texto v1 se guarda para trazabilidad (RF-MM-17) | Usuario (2026-10-30), consultado por architec |
+| Campaña descartada y límite mensual | Sale de todos los cálculos, también del límite; si tiene reporte importado, la confirmación lo advierte (RF-MM-31) | Usuario (2026-10-30), consultado por architec |
+| Cambiar los filtros desde la campaña | «Editar en Cartera» y volver, sin editor propio en la campaña (RF-MM-09) | Usuario (2026-10-30), consultado por architec |
 
 ## 7. Evidencia de los ejemplos
 
@@ -268,6 +299,7 @@ Los ejemplos están en `archivos_anexo_chat/`, con prefijo `MOWA_MES_Ejemplo_`: 
 | Supuesto | Qué se asumió | Dónde aplica |
 |---|---|---|
 | S-MM-1 | Sin integración por API: se generan archivos y se importa el reporte a mano | Todo el módulo |
+| S-MM-10 | Pendiente: cómo aparece el `id` de una campaña en la web de MES (pantalla, columna y forma), para el texto de ayuda | RF-MM-34 |
 
 Queda abierto S-MM-1: depende de información externa (qué ofrece MES), no de una preferencia del usuario. S-MM-3 se cerró el 2026-10-27: el usuario confirmó en el formulario de MES que la descripción admite 100 caracteres (sección 6). S-MM-2, S-MM-5 y S-MM-6 se confirmaron el 2026-09-21, y S-MM-7 y S-MM-8 el 2026-09-14; los cinco pasaron a la sección 6. S-MM-9 (los extendidos de GSM-7 se conservaban y contaban 2) se cerró el 2026-10-26 sin esperar a MES: el usuario decidió transliterarlos (RF-MM-27). S-MM-4 se confirmó el mismo día y pasó a la sección 6: architec contrastó la regla con los calendarios publicados para 2026 y 2027 (coinciden los 16 feriados y no hay ley nueva; siguen en trámite, sin aprobar, un feriado el 13 de octubre y el traslado de algunos feriados a lunes). Los descansos compensables por la visita del papa (D. S. 020-2026-TR, del 11 al 16 de noviembre de 2026) son regionales y no son feriados: el usuario no los marcó.
 ## 9. Registro de cambios
@@ -299,4 +331,10 @@ Queda abierto S-MM-1: depende de información externa (qué ofrece MES), no de u
 **2026-10-29**
 - **RF existentes ampliados:** RF-MM-20 (importar el reporte de enviados): acepta los formatos de la sábana (RF-57), reconocidos por su contenido y con las opciones por defecto, en lugar de solo `.xlsx`. Decisión del usuario (E2), con la limpieza de duplicados T-MM-C10.
 - **Decisión registrada en la sección 6:** supervisores y calendario laboral se configuran en pantallas comunes de la sección «Configuración» (E1). No cambia el texto de ningún RF.
+- **Nota de numeración:** sin renumerar, como el resto del módulo.
+
+**2026-10-30**
+- **RF nuevos incorporados:** RF-MM-28 (renombrar una versión de speech), RF-MM-29 (deshabilitar y habilitar) y RF-MM-30 (eliminar definitivamente) en la sección 4; RF-MM-31 (descartar una campaña), RF-MM-32 (campañas descartadas), RF-MM-33 (campañas pendientes de reporte) y RF-MM-34 (dónde está el id de MES) en la sección 5; RF-MM-35 (datos para cargar la campaña en MES) en la sección 3; RF-MM-36 (iconografía del módulo) en la sección 1.
+- **RF existentes ampliados o modificados:** RF-MM-17, solo v2: las v1 se convierten en su lugar (cambia su texto; la conversión es la única excepción a «no se modifica nunca» del Speech original). RF-MM-01, las descartadas no suman al consumo. RF-MM-09, «Editar en Cartera» y volver. La sección 5 pasa a llamarse «Seguimiento y reporte de enviados». Decisiones del usuario en la sección 6.
+- **Supuesto nuevo:** S-MM-10, cómo aparece el id de MES (RF-MM-34).
 - **Nota de numeración:** sin renumerar, como el resto del módulo.
