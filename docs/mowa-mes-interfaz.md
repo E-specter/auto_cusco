@@ -178,6 +178,15 @@ Las tres usan `dialog.dialog`, con el foco inicial en «Cancelar» y Escape para
 | Extra | Si tiene reporte importado, un `.notice--warning`: «Esta campaña ya tiene reporte de enviados. Si se envió, su consumo deja de contar en el límite del mes.» | — | Una casilla obligatoria: «Entiendo que no se puede deshacer». El botón queda inactivo hasta marcarla. Es el patrón de eliminar una versión en `/cargas` |
 | Botón | «Descartar» (`.btn--primary`, `archive`) | «Restaurar» (`.btn--primary`, `archive-restore`) | «Eliminar definitivamente» (`.btn--danger`, `trash-2`) |
 
+### 4.7 «Editar en Cartera» (RF-MM-09, M-F6)
+
+- **En la campaña,** junto al `select` «Selección guardada», va un botón `.btn--sm` «Editar en Cartera» (`square-pen`). Abre `/cartera` con esa selección y `?volver=`.
+  - Sin una selección elegida, queda inactivo, con el `title` «Elige una selección guardada para editarla».
+- **En `/cartera`, cuando llega con `?volver=`,** un `.notice--info` bajo el encabezado de la página y antes de todo lo demás, con una línea y un enlace:
+  - el texto: «Estás editando la selección de una campaña de MOWA MES. Al guardarla, vuelves a la campaña»;
+  - el enlace «Volver a la campaña sin guardar», con el icono `chevron-left`. Si hay cambios sin guardar, pasa por la misma confirmación que ya tiene Cartera («Hay cambios sin guardar»), y no se pierde nada sin aviso.
+- **Si al volver la selección ya no existe** (se borró en Cartera), la campaña muestra un `.notice--warning` bajo el `select`: «La selección que editaste en Cartera ya no existe. Elige otra selección guardada». El `select` queda sin elegir. El aviso se va al elegir otra.
+
 ## 5. Textos nuevos
 
 Prefijo `mowaMes.*` (es y en). No usan el prefijo `mowaMes.codigo.*`, que vigila la prueba espejo del backend.
@@ -234,6 +243,10 @@ Prefijo `mowaMes.*` (es y en). No usan el prefijo `mowaMes.codigo.*`, que vigila
 | `mowaMes.campana.subir.paso2` | Completa el formulario de MES | Fill in the MES form |
 | `mowaMes.campana.subir.paso3` | Después del envío, importa el reporte | After sending, import the report |
 | `mowaMes.campana.subir.irSeguimiento` | Ir al seguimiento de la campaña | Go to the campaign's tracking |
+| `mowaMes.campana.editarEnCartera.inactivo` | Elige una selección guardada para editarla. | Choose a saved selection to edit it. |
+| `mowaMes.campana.seleccionBorrada` | La selección que editaste en Cartera ya no existe. Elige otra selección guardada. | The selection you edited in Portfolio no longer exists. Choose another saved selection. |
+| `cartera.volver.aviso` | Estás editando la selección de una campaña de MOWA MES. Al guardarla, vuelves a la campaña. | You are editing the selection of a MOWA MES campaign. When you save it, you go back to the campaign. |
+| `cartera.volver.sinGuardar` | Volver a la campaña sin guardar | Back to the campaign without saving |
 
 Las cifras que ya tienen texto (cargados, enviados, costo…) conservan sus claves: solo ganan el icono.
 
