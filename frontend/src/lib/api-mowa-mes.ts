@@ -21,6 +21,7 @@ export type PartesSpeech = Esquemas['PartesRespuesta'];
 export type PartesEntrada = Esquemas['PartesEntrada'];
 export type SpeechNuevoEntrada = Esquemas['SpeechNuevoEntrada'];
 export type SpeechEdicionEntrada = Esquemas['SpeechEdicionEntrada'];
+export type SpeechParcialEntrada = Esquemas['SpeechParcialEntrada'];
 export type PrevisualizacionSpeechEntrada = Esquemas['PrevisualizacionEntrada'];
 export type PrevisualizacionSpeech = Esquemas['app__api__mowa_mes__PrevisualizacionRespuesta'];
 export type LargoSegmento = Esquemas['LargoSegmentoRespuesta'];
@@ -98,6 +99,24 @@ export function crearSpeech(entrada: SpeechNuevoEntrada): Promise<VersionSpeech>
 /** Only for a version nobody used; the original and used ones answer 409. */
 export function editarSpeech(id: number, entrada: SpeechEdicionEntrada): Promise<VersionSpeech> {
   return request<VersionSpeech>(`/mowa-mes/speech/${id}`, conJson('PUT', entrada));
+}
+
+/**
+ * Rename (RF-MM-28) and/or disable or enable (RF-MM-29) any version, the used one and the Speech original
+ * included; the content and its huella do not change. A name already taken is a 409 (no `codigo`), a blank or
+ * too long one a 400, and with both fields a refused name changes nothing.
+ */
+export function modificarSpeech(id: number, entrada: SpeechParcialEntrada): Promise<VersionSpeech> {
+  return request<VersionSpeech>(`/mowa-mes/speech/${id}`, conJson('PATCH', entrada));
+}
+
+/**
+ * Delete a disabled version for good (204, RF-MM-30). The 409 carries a `codigo`
+ * (`speech_original`, `speech_usado` or `speech_no_deshabilitado`): the list already says which versions
+ * can go, so it is a safety net for a race, not a way to find out.
+ */
+export function eliminarSpeech(id: number): Promise<void> {
+  return request<void>(`/mowa-mes/speech/${id}`, { method: 'DELETE' });
 }
 
 export function previsualizarSpeech(

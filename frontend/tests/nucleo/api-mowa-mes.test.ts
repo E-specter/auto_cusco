@@ -18,7 +18,9 @@ import {
   obtenerConciliacion,
   crearSpeech,
   editarSpeech,
+  eliminarSpeech,
   guardarConfiguracion,
+  modificarSpeech,
   previsualizarSpeech,
   restaurarCampana,
 } from '../../src/lib/api-mowa-mes';
@@ -111,6 +113,53 @@ describe('speech', () => {
     expect(opciones.method).toBe('POST');
     expect(opciones.signal).toBe(control.signal);
     expect(cuerpoDe(opciones)).toEqual({ partes: PARTES });
+  });
+});
+
+describe('administración de versiones de speech', () => {
+  it('renombrar es un PATCH con solo el nombre', async () => {
+    const falso = responderCon(200, { id: 7 });
+
+    await modificarSpeech(7, { nombre: 'Nuevo nombre' });
+
+    const { url, opciones } = llamada(falso);
+    expect(url).toBe('/api/mowa-mes/speech/7');
+    expect(opciones.method).toBe('PATCH');
+    expect(cuerpoDe(opciones)).toEqual({ nombre: 'Nuevo nombre' });
+  });
+
+  it('deshabilitar y habilitar mandan solo `habilitada`', async () => {
+    const deshabilitar = responderCon(200, { id: 7 });
+    await modificarSpeech(7, { habilitada: false });
+    expect(cuerpoDe(llamada(deshabilitar).opciones)).toEqual({ habilitada: false });
+
+    const habilitar = responderCon(200, { id: 7 });
+    await modificarSpeech(7, { habilitada: true });
+    expect(cuerpoDe(llamada(habilitar).opciones)).toEqual({ habilitada: true });
+  });
+
+  it('un nombre repetido llega como 409 con el motivo del servidor', async () => {
+    responderCon(409, { detail: 'Ya existe una version llamada X' });
+    const error = await modificarSpeech(7, { nombre: 'X' }).catch((caido: unknown) => caido);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(409);
+    expect((error as ApiError).detail).toBe('Ya existe una version llamada X');
+  });
+
+  it('eliminar es un DELETE y contesta 204', async () => {
+    const falso = responderCon(204);
+
+    await expect(eliminarSpeech(7)).resolves.toBeUndefined();
+
+    expect(llamada(falso).url).toBe('/api/mowa-mes/speech/7');
+    expect(llamada(falso).opciones.method).toBe('DELETE');
+  });
+
+  it('el 409 de eliminar trae su código', async () => {
+    responderCon(409, { detail: 'usada', codigo: 'speech_usado' });
+    const error = await eliminarSpeech(7).catch((caido: unknown) => caido);
+    expect((error as ApiError).status).toBe(409);
+    expect((error as ApiError).codigo).toBe('speech_usado');
   });
 });
 

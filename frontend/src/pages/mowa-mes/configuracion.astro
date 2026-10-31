@@ -195,6 +195,19 @@ import '../../styles/mowa-mes-speech-v2.css';
         <form class="panel__body mm-form" data-form-speech novalidate>
           <p class="mono muted mm-nota" data-speech-meta></p>
 
+          <!-- What can be done to the version on screen while it is enabled (RF-MM-28, RF-MM-29). -->
+          <div class="mm-acciones" data-speech-acciones hidden>
+            <button type="button" class="btn btn--sm" data-speech-renombrar>
+              <Icon name="pencil" size={16} />
+              <span data-i18n="mowaMes.accion.renombrar">Renombrar</span>
+            </button>
+            <button type="button" class="btn btn--sm" data-speech-deshabilitar>
+              <span class="btn__spinner" aria-hidden="true"></span>
+              <Icon name="power-off" size={16} />
+              <span class="btn__label" data-i18n="mowaMes.accion.deshabilitar">Deshabilitar</span>
+            </button>
+          </div>
+
           <p class="notice notice--info" data-speech-inmutable hidden>
             <Icon name="lock" size={20} />
             <span data-speech-inmutable-texto></span>
@@ -296,11 +309,89 @@ import '../../styles/mowa-mes-speech-v2.css';
           <p class="mono muted" data-speech-estado role="status"></p>
         </form>
       </section>
+
+      <!-- ---- Disabled versions (RF-MM-29, RF-MM-30): folded, closed, and not shown with none --------------- -->
+      <section class="panel mm-deshab" data-deshabilitadas hidden aria-labelledby="mm-deshab-title">
+        <details>
+          <summary class="panel__head">
+            <Icon name="chevron-right" size={16} class="mm-deshab__flecha" />
+            <h2 class="panel__title" id="mm-deshab-title" data-deshab-titulo></h2>
+          </summary>
+          <ul class="panel__body mm-deshab__lista" data-deshab-lista></ul>
+        </details>
+      </section>
     </div>
   </div>
 
+  <!-- Rename a version (RF-MM-28): the dialog of the saved definitions (motor-texto-enriquecido-interfaz.md §10.1). -->
+  <dialog class="dialog" data-dialog="renombrar" aria-labelledby="mm-renombrar-title">
+    <form method="dialog" data-renombrar-form novalidate>
+      <div class="dialog__head">
+        <h2 id="mm-renombrar-title" data-renombrar-titulo></h2>
+      </div>
+      <div class="dialog__body">
+        <div class="field">
+          <label class="field__label" for="mm-renombrar-nombre" data-i18n="mowaMes.speech.renombrar.campo">Nombre nuevo</label>
+          <input
+            class="input"
+            id="mm-renombrar-nombre"
+            data-renombrar-nombre
+            type="text"
+            maxlength="120"
+            autocomplete="off"
+            aria-describedby="mm-renombrar-hint mm-renombrar-error"
+          />
+          <p class="field__hint" id="mm-renombrar-hint" data-i18n="mowaMes.speech.renombrar.hint">
+            Las campañas siguen apuntando a esta versión: registran la versión, no su nombre.
+          </p>
+          <p class="field__error" id="mm-renombrar-error" data-renombrar-error role="alert"></p>
+        </div>
+      </div>
+      <div class="dialog__foot">
+        <button type="button" class="btn" data-close data-i18n="mowaMes.confirmar.cancelar">Cancelar</button>
+        <button type="submit" class="btn btn--primary" data-renombrar-confirmar>
+          <span class="btn__spinner" aria-hidden="true"></span>
+          <span class="btn__label" data-i18n="mowaMes.speech.renombrar.confirmar">Renombrar</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Delete a disabled version for good (RF-MM-30, §4.6): the danger notice and the mandatory checkbox. -->
+  <dialog class="dialog" data-dialog="eliminar" aria-labelledby="mm-eliminar-title">
+    <div class="dialog__head">
+      <h2 id="mm-eliminar-title" data-eliminar-titulo></h2>
+    </div>
+    <div class="dialog__body">
+      <p class="notice notice--danger">
+        <Icon name="triangle-alert" size={20} />
+        <span data-i18n="mowaMes.confirmar.eliminar.cuerpoVersion">Se borra la versión y su texto. No se puede deshacer.</span>
+      </p>
+      <label class="choice choice--check">
+        <input type="checkbox" data-eliminar-casilla />
+        <span class="choice__body">
+          <span class="choice__title" data-i18n="mowaMes.confirmar.eliminar.casilla">Entiendo que no se puede deshacer</span>
+        </span>
+      </label>
+      <p class="field__error" data-eliminar-error role="alert"></p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn" data-close data-eliminar-cancelar data-i18n="mowaMes.confirmar.cancelar">Cancelar</button>
+      <button type="button" class="btn btn--danger" data-eliminar-aceptar>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <Icon name="trash-2" size={16} />
+        <span class="btn__label" data-i18n="mowaMes.accion.eliminar">Eliminar definitivamente</span>
+      </button>
+    </div>
+  </dialog>
+
   <!-- Icons for rows the script builds: rendered once here, cloned per row. -->
   <template data-icono-borrados><Icon name="triangle-alert" size={16} /></template>
+  <template data-icono-ver><Icon name="eye" size={16} /></template>
+  <template data-icono-habilitar><Icon name="power" size={16} /></template>
+  <template data-icono-eliminar><Icon name="trash-2" size={16} /></template>
+  <template data-icono-deshabilitada><Icon name="power-off" size={16} /></template>
+  <template data-icono-original><Icon name="lock" size={16} /></template>
 
   <!-- ---- Generic failure ---------------------------------------------- -->
   <dialog class="dialog" data-dialog="error" aria-labelledby="mm-error-title">
@@ -325,8 +416,10 @@ import '../../styles/mowa-mes-speech-v2.css';
   import {
     crearSpeech,
     editarSpeech,
+    eliminarSpeech,
     guardarConfiguracion,
     listarSpeech,
+    modificarSpeech,
     obtenerConfiguracion,
     previsualizarPlantillaNombre,
     previsualizarSpeech,
@@ -342,7 +435,19 @@ import '../../styles/mowa-mes-speech-v2.css';
   import { obtenerComoV2, problemasDeErrorSpeech } from '../../lib/api-speech-v2';
   import { SEPARADOR_BORRADOS, elementosBorrados, type CaracterQuitado } from '../../lib/mowa-mes-gsm7';
   import { avisoDeCamposArchivados } from '../../lib/mowa-mes-seguimiento';
-  import { applyTranslations, t } from '../../lib/i18n';
+  import { hayNombreNuevo } from '../../lib/renombrar-definicion';
+  import {
+    LARGO_NOMBRE_SPEECH,
+    accionDeEliminar,
+    clasificarErrorDeRenombrarSpeech,
+    conVersion,
+    deshabilitadas,
+    estaHabilitada,
+    habilitadas,
+    sinVersion,
+    versionesDelSelector,
+  } from '../../lib/mowa-mes-speech-administracion';
+  import { applyTranslations, t, traducirPorPrefijo } from '../../lib/i18n';
   import {
     entradaDeExpresiones,
     esV2,
@@ -405,6 +510,8 @@ import '../../styles/mowa-mes-speech-v2.css';
 
   const dialogos = {
     error: $<HTMLDialogElement>('[data-dialog="error"]'),
+    renombrar: $<HTMLDialogElement>('[data-dialog="renombrar"]'),
+    eliminar: $<HTMLDialogElement>('[data-dialog="eliminar"]'),
   };
 
   document.querySelectorAll<HTMLElement>('[data-close]').forEach((boton) => {
@@ -646,18 +753,106 @@ import '../../styles/mowa-mes-speech-v2.css';
     const marcas = [];
     if (version.original) marcas.push(t('mowaMes.speech.marca.original'));
     if (version.usada) marcas.push(t('mowaMes.speech.marca.usada'));
+    if (!estaHabilitada(version)) marcas.push(t('mowaMes.speech.marca.deshabilitada'));
     return marcas.length ? `${version.nombre} (${marcas.join(', ')})` : version.nombre;
   }
 
+  /** The selector lists the enabled versions, and the disabled one on screen so it still says what the editor shows. */
   function pintarVersiones(): void {
     selectVersion.replaceChildren();
-    estado.versiones.forEach((version) => {
+    versionesDelSelector(estado.versiones, estado.versionId).forEach((version) => {
       const opcion = document.createElement('option');
       opcion.value = String(version.id);
       opcion.textContent = etiquetaVersion(version);
       selectVersion.append(opcion);
     });
     if (estado.versionId !== null) selectVersion.value = String(estado.versionId);
+    pintarDeshabilitadas();
+  }
+
+  /** A text of the screen's status line, which then gets out of the way (an announcement with a name in it). */
+  function anunciar(texto: string): void {
+    const nodo = $<HTMLElement>('[data-speech-estado]');
+    nodo.textContent = texto;
+    window.setTimeout(() => {
+      if (nodo.textContent === texto) nodo.textContent = '';
+    }, 4000);
+  }
+
+  /** The row of a disabled version: its name and tags, and Ver, Habilitar and Eliminar (or why it cannot be). */
+  function filaDeshabilitada(version: VersionSpeech): HTMLElement {
+    const fila = document.createElement('li');
+    fila.className = 'mm-deshab__fila';
+    fila.dataset.version = String(version.id);
+
+    const nombre = document.createElement('span');
+    nombre.className = 'mm-deshab__nombre';
+    nombre.id = `mm-deshab-nombre-${version.id}`;
+    nombre.textContent = version.nombre;
+
+    const marcas = document.createElement('span');
+    marcas.className = 'mm-deshab__marcas';
+    const etiqueta = (icono: 'deshabilitada' | 'original', clave: string): HTMLElement => {
+      const tag = document.createElement('span');
+      tag.className = 'tag tag--neutral';
+      tag.append(
+        $<HTMLTemplateElement>(`template[data-icono-${icono}]`).content.cloneNode(true),
+        document.createTextNode(t(clave)),
+      );
+      return tag;
+    };
+    marcas.append(etiqueta('deshabilitada', 'mowaMes.estado.deshabilitada'));
+    if (version.original) marcas.append(etiqueta('original', 'mowaMes.estado.original'));
+
+    // The button's name is its own text and then the row's name («Ver «Borrable»»), so «Ver», «Habilitar» and
+    // «Eliminar» tell the rows apart in a list of buttons too, where a description is not read. It starts with
+    // the visible text (WCAG 2.5.3).
+    const boton = (icono: 'ver' | 'habilitar' | 'eliminar', clave: string, clase: string): HTMLButtonElement => {
+      const nodo = document.createElement('button');
+      nodo.type = 'button';
+      nodo.id = `mm-deshab-${icono}-${version.id}`;
+      nodo.className = `btn btn--sm ${clase}`.trim();
+      nodo.setAttribute('aria-labelledby', `${nodo.id} ${nombre.id}`);
+      nodo.append(
+        $<HTMLTemplateElement>(`template[data-icono-${icono}]`).content.cloneNode(true),
+        document.createTextNode(t(clave)),
+      );
+      return nodo;
+    };
+    const ver = boton('ver', 'mowaMes.accion.ver', '');
+    ver.addEventListener('click', () => verVersion(version.id));
+    const habilitar = boton('habilitar', 'mowaMes.accion.habilitar', '');
+    habilitar.addEventListener('click', () => void habilitarVersion(version));
+    const acciones = document.createElement('div');
+    acciones.className = 'mm-acciones';
+    acciones.append(ver, habilitar);
+
+    // Deleting is offered only when the API says it can be done; otherwise the reason takes its place.
+    const eliminar = accionDeEliminar(version);
+    if (eliminar.tipo === 'boton') {
+      const borrar = boton('eliminar', 'mowaMes.accion.eliminar', 'btn--danger');
+      borrar.addEventListener('click', () => void pedirEliminar(version));
+      acciones.append(borrar);
+    }
+
+    fila.append(nombre, marcas, acciones);
+    if (eliminar.tipo === 'motivo') {
+      const motivo = document.createElement('p');
+      motivo.className = 'field__hint mm-deshab__motivo';
+      motivo.textContent = t(`mowaMes.errorSpeech.${eliminar.clave}`);
+      fila.append(motivo);
+    }
+    return fila;
+  }
+
+  /** «Versiones deshabilitadas (N)»: shown only when there is one, and closed. */
+  function pintarDeshabilitadas(): void {
+    const lista = deshabilitadas(estado.versiones);
+    $<HTMLElement>('[data-deshabilitadas]').hidden = lista.length === 0;
+    $<HTMLElement>('[data-deshab-titulo]').textContent = t('mowaMes.configuracion.deshabilitadas.titulo', {
+      n: formatNumber(lista.length),
+    });
+    $<HTMLElement>('[data-deshab-lista]').replaceChildren(...lista.map(filaDeshabilitada));
   }
 
   function elegirVersion(id: number | null): void {
@@ -744,6 +939,8 @@ import '../../styles/mowa-mes-speech-v2.css';
 
   function pintarSpeech(): void {
     const version = versionActual();
+    // Rename and disable are for an enabled version; a disabled one is read, and enabled from its list.
+    $<HTMLElement>('[data-speech-acciones]').hidden = !version || !estaHabilitada(version);
     mostrarRama();
     $<HTMLElement>('[data-speech-gsm7]').hidden = !version;
     if (estado.v2 && version) {
@@ -767,7 +964,9 @@ import '../../styles/mowa-mes-speech-v2.css';
 
     // A v1 is always immutable now (RF-MM-17, M3): it is used in campaigns as it is, and converted to change it.
     $<HTMLElement>('[data-speech-inmutable]').hidden = false;
-    $<HTMLElement>('[data-speech-inmutable-texto]').textContent = t('mowaMes.speech.inmutable.v1');
+    $<HTMLElement>('[data-speech-inmutable-texto]').textContent = t(
+      estaHabilitada(version) ? 'mowaMes.speech.inmutable.v1' : 'mowaMes.speech.inmutable.deshabilitada',
+    );
 
     estado.borrador.forEach((parte) => {
       const info = version.partes.find((p) => p.segmento === parte.segmento);
@@ -1000,10 +1199,12 @@ import '../../styles/mowa-mes-speech-v2.css';
     });
     v2El.bloque.hidden = !enV2;
     if (!enV2) pintarArchivados([]);
-    // A v1 is only read (RF-MM-17, M3): there is nothing to save until it is converted.
-    $<HTMLElement>('[data-speech-pie]').hidden = !enV2;
     const version = versionActual();
-    v2El.convertir.hidden = enV2 || !version || esV2(version);
+    // A disabled version is only read, whatever its format: nothing to save, nothing to convert (RF-MM-29).
+    const soloLectura = version !== null && !estaHabilitada(version);
+    // A v1 is only read (RF-MM-17, M3): there is nothing to save until it is converted.
+    $<HTMLElement>('[data-speech-pie]').hidden = !enV2 || soloLectura;
+    v2El.convertir.hidden = enV2 || !version || esV2(version) || soloLectura;
   }
 
   async function asegurarEditorV2(): Promise<ControladorVariantes | null> {
@@ -1072,11 +1273,15 @@ import '../../styles/mowa-mes-speech-v2.css';
     if (base) meta.push(t('mowaMes.speech.basadaEn', { nombre: base.nombre }));
     $<HTMLElement>('[data-speech-meta]').textContent = meta.join('  ·  ');
 
-    // The same rule as v1 (RF-MM-17): the original and a used version never change.
-    const inmutable = !v2.borrador && modoGuardado(version) === 'nueva';
+    // The same rule as v1 (RF-MM-17): the original and a used version never change. A disabled one is not
+    // even edited into a new version: it is read until it is enabled (RF-MM-29).
+    const deshabilitada = !estaHabilitada(version);
+    const inmutable = deshabilitada || (!v2.borrador && modoGuardado(version) === 'nueva');
     $<HTMLElement>('[data-speech-inmutable]').hidden = !inmutable;
     // Only a used v2 is immutable: the original is a v1, which has its own notice.
-    $<HTMLElement>('[data-speech-inmutable-texto]').textContent = t('mowaMes.speech.inmutable.usada');
+    $<HTMLElement>('[data-speech-inmutable-texto]').textContent = t(
+      deshabilitada ? 'mowaMes.speech.inmutable.deshabilitada' : 'mowaMes.speech.inmutable.usada',
+    );
     inputNombre.placeholder =
       v2.borrador && v2.nombreSugerido
         ? v2.nombreSugerido
@@ -1100,6 +1305,8 @@ import '../../styles/mowa-mes-speech-v2.css';
         ctl.fijarSegmentos(estado.v2.segmentos);
         ctl.fijarVariantes({ porDefecto: null, variantes: estado.v2.variantes });
       }
+      // The editor's own read-only mode, set every time: it outlives the version that asked for it.
+      ctl.fijarSoloLectura(deshabilitada);
       pintarBorradosV2();
     });
     pintarBorradosV2();
@@ -1179,11 +1386,15 @@ import '../../styles/mowa-mes-speech-v2.css';
     }
   });
 
+  /** Typed content that leaving this version would drop. */
+  function hayCambiosPendientes(): boolean {
+    const version = versionActual();
+    return estado.v2 ? estado.v2.borrador || (version !== null && hayCambiosV2(version, estado.v2.variantes)) : false;
+  }
+
   selectVersion.addEventListener('change', () => {
     const version = versionActual();
-    const pendientes = estado.v2
-      ? estado.v2.borrador || (version !== null && hayCambiosV2(version, estado.v2.variantes))
-      : false;
+    const pendientes = hayCambiosPendientes();
     if (version && pendientes) {
       // Switching versions would silently drop typed parts; ask by staying put
       // and telling what to do instead.
@@ -1208,7 +1419,7 @@ import '../../styles/mowa-mes-speech-v2.css';
     evento.preventDefault();
     const version = versionActual();
     // Only a v2 is saved: a v1 has no footer (RF-MM-17, M3), the backend refuses its parts.
-    if (!version || !estado.v2) return;
+    if (!version || !estado.v2 || !estaHabilitada(version)) return;
 
     const error = $<HTMLElement>('[data-speech-error]');
     error.textContent = '';
@@ -1290,6 +1501,211 @@ import '../../styles/mowa-mes-speech-v2.css';
     }
   });
 
+  // ---- Administering versions (RF-MM-28 to RF-MM-30) ------------------------------------
+
+  const botonRenombrar = $<HTMLButtonElement>('[data-speech-renombrar]');
+  const botonDeshabilitar = $<HTMLButtonElement>('[data-speech-deshabilitar]');
+  const formRenombrar = $<HTMLFormElement>('[data-renombrar-form]');
+  const inputRenombrar = $<HTMLInputElement>('[data-renombrar-nombre]');
+  const errorRenombrar = $<HTMLElement>('[data-renombrar-error]');
+  const confirmarRenombrar = $<HTMLButtonElement>('[data-renombrar-confirmar]');
+  let renombrando = false;
+
+  /** «Renombrar» is off while there is nothing to do (the same name, edge spaces aside) or a rename is on its way. */
+  function pintarConfirmarRenombrar(): void {
+    const actual = versionActual()?.nombre ?? '';
+    confirmarRenombrar.disabled = renombrando || !hayNombreNuevo(actual, inputRenombrar.value);
+    confirmarRenombrar.dataset.loading = renombrando ? 'true' : 'false';
+  }
+
+  function abrirRenombrar(): void {
+    const version = versionActual();
+    if (!version) return;
+    $<HTMLElement>('[data-renombrar-titulo]').textContent = t('mowaMes.speech.renombrar.titulo', { nombre: version.nombre });
+    inputRenombrar.value = version.nombre;
+    inputRenombrar.maxLength = LARGO_NOMBRE_SPEECH;
+    errorRenombrar.textContent = '';
+    inputRenombrar.removeAttribute('aria-invalid');
+    pintarConfirmarRenombrar();
+    void openWhenFree(dialogos.renombrar).then(() => {
+      inputRenombrar.focus();
+      inputRenombrar.select();
+    });
+  }
+
+  /** The reason under the field, in the screen's own words: the backend's `detail` is Spanish prose. */
+  function textoDeErrorDeRenombrar(error: unknown): string {
+    const clasificado = clasificarErrorDeRenombrarSpeech(error);
+    if (clasificado.tipo === 'repetido') return t('mowaMes.speech.renombrar.repetido');
+    if (clasificado.tipo === 'invalido') return t('mowaMes.speech.renombrar.invalido', { max: LARGO_NOMBRE_SPEECH });
+    return mensajeDeError(error);
+  }
+
+  botonRenombrar.addEventListener('click', abrirRenombrar);
+  // Closing by any way (Cancel, Escape, a rename that worked) returns the focus to the button.
+  dialogos.renombrar.addEventListener('close', () => botonRenombrar.focus());
+
+  inputRenombrar.addEventListener('input', () => {
+    errorRenombrar.textContent = '';
+    inputRenombrar.removeAttribute('aria-invalid');
+    pintarConfirmarRenombrar();
+  });
+
+  formRenombrar.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    const version = versionActual();
+    if (!version || renombrando || !hayNombreNuevo(version.nombre, inputRenombrar.value)) return;
+    renombrando = true;
+    errorRenombrar.textContent = '';
+    pintarConfirmarRenombrar();
+    try {
+      const renombrada = await modificarSpeech(version.id, { nombre: inputRenombrar.value.trim() });
+      // The footer's name field follows only if it still held the old name: what was typed there stays.
+      if (inputNombre.value === version.nombre) inputNombre.value = renombrada.nombre;
+      estado.versiones = conVersion(estado.versiones, renombrada);
+      dialogos.renombrar.close();
+      pintarVersiones();
+      pintarSpeech();
+      anunciar(t('mowaMes.speech.renombrar.hecho', { nombre: renombrada.nombre }));
+    } catch (error) {
+      errorRenombrar.textContent = textoDeErrorDeRenombrar(error);
+      inputRenombrar.setAttribute('aria-invalid', 'true');
+      inputRenombrar.focus();
+    } finally {
+      renombrando = false;
+      pintarConfirmarRenombrar();
+    }
+  });
+
+  /** Leaving the version on screen would drop what was typed: say so where the analyst is, and stay. */
+  function avisarCambiosPendientes(): void {
+    $<HTMLElement>('[data-speech-error]').textContent = t('mowaMes.speech.cambiosPendientes');
+    selectVersion.scrollIntoView({ block: 'center' });
+    selectVersion.focus();
+  }
+
+  botonDeshabilitar.addEventListener('click', async () => {
+    const version = versionActual();
+    if (!version) return;
+    if (hayCambiosPendientes()) {
+      avisarCambiosPendientes();
+      return;
+    }
+    ocupado(botonDeshabilitar, true);
+    try {
+      const nueva = await modificarSpeech(version.id, { habilitada: false });
+      estado.versiones = conVersion(estado.versiones, nueva);
+      pintarVersiones();
+      // Still on screen, now read-only: the editor's mode and the padlock notice follow.
+      pintarSpeech();
+      anunciar(t('mowaMes.configuracion.deshabilitada', { nombre: nueva.nombre }));
+      // The button that was pressed is gone with the actions: the focus goes to the selector.
+      selectVersion.focus();
+    } catch (caido) {
+      mostrarError(caido);
+    } finally {
+      ocupado(botonDeshabilitar, false);
+    }
+  });
+
+  /** «Ver»: the disabled version opens in the editor, read-only, above. */
+  function verVersion(id: number): void {
+    if (hayCambiosPendientes()) {
+      avisarCambiosPendientes();
+      return;
+    }
+    elegirVersion(id);
+    selectVersion.scrollIntoView({ block: 'center' });
+    selectVersion.focus();
+  }
+
+  /** The row that follows a disabled version in its list, or the selector when it was the last. */
+  function enfocarSiguienteDeshabilitada(id: number | null): void {
+    const fila = id === null ? null : document.querySelector<HTMLElement>(`[data-deshab-lista] [data-version="${id}"] button`);
+    (fila ?? selectVersion).focus();
+  }
+
+  async function habilitarVersion(version: VersionSpeech): Promise<void> {
+    const lista = deshabilitadas(estado.versiones);
+    const siguiente = lista[lista.findIndex((v) => v.id === version.id) + 1]?.id ?? null;
+    try {
+      const nueva = await modificarSpeech(version.id, { habilitada: true });
+      estado.versiones = conVersion(estado.versiones, nueva);
+      pintarVersiones();
+      // If it was the one on screen it is editable again (unless a campaign used it).
+      if (estado.versionId === nueva.id) pintarSpeech();
+      anunciar(t('mowaMes.configuracion.habilitada', { nombre: nueva.nombre }));
+      enfocarSiguienteDeshabilitada(siguiente);
+    } catch (caido) {
+      mostrarError(caido);
+    }
+  }
+
+  // Deleting for good: the danger notice and the mandatory checkbox (§4.6).
+  const casillaEliminar = $<HTMLInputElement>('[data-eliminar-casilla]');
+  const aceptarEliminar = $<HTMLButtonElement>('[data-eliminar-aceptar]');
+  const errorEliminar = $<HTMLElement>('[data-eliminar-error]');
+  let porEliminar: VersionSpeech | null = null;
+  let eliminando = false;
+
+  function pintarAceptarEliminar(): void {
+    aceptarEliminar.disabled = eliminando || !casillaEliminar.checked;
+    aceptarEliminar.dataset.loading = eliminando ? 'true' : 'false';
+  }
+
+  casillaEliminar.addEventListener('change', pintarAceptarEliminar);
+
+  async function pedirEliminar(version: VersionSpeech): Promise<void> {
+    porEliminar = version;
+    $<HTMLElement>('[data-eliminar-titulo]').textContent = t('mowaMes.confirmar.eliminar.tituloVersion', {
+      nombre: version.nombre,
+    });
+    casillaEliminar.checked = false;
+    errorEliminar.textContent = '';
+    pintarAceptarEliminar();
+    await openWhenFree(dialogos.eliminar);
+    // Neither deleting nor a keystroke by accident: the focus starts on «Cancelar».
+    $<HTMLButtonElement>('[data-eliminar-cancelar]').focus();
+  }
+
+  aceptarEliminar.addEventListener('click', async () => {
+    const version = porEliminar;
+    if (!version || eliminando || !casillaEliminar.checked) return;
+    const lista = deshabilitadas(estado.versiones);
+    const siguiente = lista[lista.findIndex((v) => v.id === version.id) + 1]?.id ?? null;
+    eliminando = true;
+    errorEliminar.textContent = '';
+    pintarAceptarEliminar();
+    try {
+      await eliminarSpeech(version.id);
+      dialogos.eliminar.close();
+      estado.versiones = sinVersion(estado.versiones, version.id);
+      // If it was the one on screen, the screen goes back to the first enabled version.
+      if (estado.versionId === version.id) elegirVersion(habilitadas(estado.versiones)[0]?.id ?? null);
+      else pintarVersiones();
+      anunciar(t('mowaMes.configuracion.eliminada', { nombre: version.nombre }));
+      enfocarSiguienteDeshabilitada(siguiente);
+    } catch (caido) {
+      // A 409 carries its `codigo` (the list says what can go, so this is a race): its own text, inside the dialog.
+      errorEliminar.textContent =
+        caido instanceof ApiError && caido.codigo
+          ? traducirPorPrefijo('mowaMes.errorSpeech', caido.codigo, mensajeDeError(caido))
+          : mensajeDeError(caido);
+      // The list may be out of date: read it again, quietly.
+      if (caido instanceof ApiError) {
+        void listarSpeech()
+          .then((versiones) => {
+            estado.versiones = versiones;
+            pintarVersiones();
+          })
+          .catch(() => undefined);
+      }
+    } finally {
+      eliminando = false;
+      pintarAceptarEliminar();
+    }
+  });
+
   // ---- Boot --------------------------------------------------------------------
 
   function sinConexion(si: boolean): void {
@@ -1307,8 +1723,8 @@ import '../../styles/mowa-mes-speech-v2.css';
 
       sinConexion(false);
       pintarPlataforma();
-      // The original comes first in the list; a fresh screen starts from it.
-      elegirVersion(versiones[0]?.id ?? null);
+      // The original comes first in the list; a fresh screen starts from the first enabled version.
+      elegirVersion(habilitadas(versiones)[0]?.id ?? null);
     } catch (caido) {
       if (caido instanceof NetworkError) {
         sinConexion(true);

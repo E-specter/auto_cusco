@@ -233,10 +233,21 @@ Prefijo `mowaMes.*` (es y en). No usan el prefijo `mowaMes.codigo.*`, que vigila
 | `mowaMes.confirmar.eliminar.casilla` | Entiendo que no se puede deshacer | I understand this cannot be undone |
 | `mowaMes.confirmar.cancelar` | Cancelar | Cancel |
 | `mowaMes.configuracion.deshabilitadas.titulo` | Versiones deshabilitadas ({n}) | Disabled versions ({n}) |
-| `mowaMes.configuracion.deshabilitadas.usada` | No se puede eliminar: la usaron campañas. | It cannot be deleted: campaigns used it. |
-| `mowaMes.configuracion.deshabilitadas.original` | No se puede eliminar: es el Speech original. | It cannot be deleted: it is the original speech. |
 | `mowaMes.configuracion.habilitada` | Se habilitó «{nombre}». | “{nombre}” was enabled. |
 | `mowaMes.configuracion.deshabilitada` | Se deshabilitó «{nombre}». Ya no aparece en la campaña. | “{nombre}” was disabled. It no longer shows in the campaign. |
+| `mowaMes.speech.renombrar.titulo` | Renombrar la versión «{nombre}» | Rename the “{nombre}” version |
+| `mowaMes.speech.renombrar.campo` | Nombre nuevo | New name |
+| `mowaMes.speech.renombrar.hint` | Las campañas siguen apuntando a esta versión: registran la versión, no su nombre. | Campaigns keep pointing to this version: they record the version, not its name. |
+| `mowaMes.speech.renombrar.confirmar` | Renombrar | Rename |
+| `mowaMes.speech.renombrar.repetido` | Ya existe una versión con ese nombre. Elige otro. | A version with that name already exists. Choose another one. |
+| `mowaMes.speech.renombrar.hecho` | Renombrada a «{nombre}». | Renamed to “{nombre}”. |
+| `mowaMes.speech.inmutable.deshabilitada` | Esta versión está deshabilitada: no aparece en la campaña y se ve en solo lectura. Para usarla o editarla, habilítala. | This version is disabled: it does not show in the campaign and is read-only. To use or edit it, enable it. |
+| `mowaMes.campana.speech.ninguna` | No hay versiones habilitadas | No enabled versions |
+| `mowaMes.campana.speech.ningunaAviso` | No hay ninguna versión de speech habilitada. Habilita una en la configuración para crear la campaña. | There is no enabled speech version. Enable one in the settings to create the campaign. |
+| `mowaMes.campana.speech.irConfiguracion` | Ir a la configuración | Go to the settings |
+| `mowaMes.speech.renombrar.invalido` | Escribe un nombre de 1 a {max} caracteres. | Enter a name of 1 to {max} characters. |
+| `mowaMes.speech.marca.deshabilitada` | deshabilitada | disabled |
+| `mowaMes.configuracion.eliminada` | Se eliminó «{nombre}». | “{nombre}” was deleted. |
 | `mowaMes.campana.subir.creada` | Se creó la campaña {id}. Ahora súbela a MES con estos datos. | Campaign {id} was created. Now upload it to MES with this data. |
 | `mowaMes.campana.subir.titulo` | Para subir a MES | To upload to MES |
 | `mowaMes.campana.subir.paso1` | Descarga los archivos de carga | Download the load files |

@@ -484,6 +484,68 @@
   gap: var(--space-2);
 }
 
+/* ---- Disabled speech versions (RF-MM-29, RF-MM-30) ---------------------------------
+   A folded panel, closed: its summary is the panel's head with a chevron that turns when it opens. Each row
+   is the name with its tags, the actions under it and, when it cannot be deleted, the reason in its place. */
+.mm-speech .mm-acciones[data-speech-acciones] {
+  margin-block-end: var(--space-2);
+}
+
+.mm-deshab > details > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  list-style: none;
+}
+
+.mm-deshab > details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mm-deshab__flecha {
+  flex: none;
+  transition: transform var(--duration-fast, 120ms) ease;
+}
+
+.mm-deshab > details[open] .mm-deshab__flecha {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-deshab__flecha {
+    transition: none;
+  }
+}
+
+.mm-deshab__lista {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  list-style: none;
+}
+
+.mm-deshab__fila {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.mm-deshab__nombre {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.mm-deshab__marcas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.mm-deshab__motivo {
+  margin: 0;
+}
+
 /* ---- To upload to MES (RF-MM-35) -----------------------------------------------
    Three numbered steps once the campaign exists: the files, the data of MES's form with a copy button
    each, and the link to its follow-up. The numbers are the list's own. */

@@ -173,6 +173,16 @@ import '../../styles/supervisores.css';
             <div class="field">
               <label class="field__label" for="mm-speech" data-i18n="mowaMes.campana.speech">Versión de speech</label>
               <select class="input" id="mm-speech" data-speech></select>
+              <!-- No speech version is enabled (RF-MM-29): nothing to choose, and a way to where one is enabled. -->
+              <p class="notice notice--warning" data-speech-ninguna hidden>
+                <Icon name="triangle-alert" size={20} />
+                <span data-i18n="mowaMes.campana.speech.ningunaAviso">
+                  No hay ninguna versión de speech habilitada. Habilita una en la configuración para crear la campaña.
+                </span>
+                <a class="btn btn--sm" href="/mowa-mes/configuracion" data-i18n="mowaMes.campana.speech.irConfiguracion">
+                  Ir a la configuración
+                </a>
+              </p>
             </div>
 
             <div class="field">
@@ -507,6 +517,7 @@ import '../../styles/supervisores.css';
   import { openWhenFree } from '../../lib/dialogs';
   import { formatBytes, formatNumber, formatSoles, formatTarifa } from '../../lib/format';
   import { applyTranslations, t, traducirPorPrefijo } from '../../lib/i18n';
+  import { opcionesDeCampana, preseleccionDeCampana } from '../../lib/mowa-mes-speech-administracion';
   import { EVENTO_SELECCION, montarSelector, type EstadoSeleccion } from '../../scripts/selector-seleccion';
 
   /** Same debounce the speech and portfolio screens use. */
@@ -527,6 +538,8 @@ import '../../styles/supervisores.css';
     paginaMuestra: 1,
     error404: null as string | null,
     huellaInvalida: false,
+    /** No speech version is enabled: there is nothing to build a campaign with (RF-MM-29). */
+    sinSpeech: false,
     campanaCreada: null as Campana | null,
   };
 
@@ -651,19 +664,21 @@ import '../../styles/supervisores.css';
     const select = $<HTMLSelectElement>('#mm-speech');
     const valorPrevio = select.value;
     select.replaceChildren();
-    const original = document.createElement('option');
-    original.value = '';
-    original.textContent = t('mowaMes.campana.speech.original');
-    select.append(original);
-    estado.versionesSpeech
-      .filter((v) => !v.original)
-      .forEach((version) => {
-        const opcion = document.createElement('option');
-        opcion.value = String(version.id);
-        opcion.textContent = version.nombre;
-        select.append(opcion);
+    // Only the enabled versions are offered; the Speech original too only while it is enabled.
+    const opciones = opcionesDeCampana(estado.versionesSpeech);
+    estado.sinSpeech = opciones.length === 0;
+    if (estado.sinSpeech) {
+      select.append(new Option(t('mowaMes.campana.speech.ninguna'), ''));
+    } else {
+      opciones.forEach(({ valor, version }) => {
+        select.append(new Option(version.original ? t('mowaMes.campana.speech.original') : version.nombre, valor));
       });
-    select.value = valorPrevio && [...select.options].some((o) => o.value === valorPrevio) ? valorPrevio : '';
+    }
+    select.disabled = estado.sinSpeech;
+    // The one that was chosen while it is still offered; else the first enabled one.
+    select.value = preseleccionDeCampana(opciones, valorPrevio);
+    $<HTMLElement>('[data-speech-ninguna]').hidden = !estado.sinSpeech;
+    pintarEstadoCrear();
   }
 
   function pintarSupervisoresPropios(foco?: number): void {
@@ -1048,7 +1063,11 @@ import '../../styles/supervisores.css';
   function pintarEstadoCrear(): void {
     const boton = $<HTMLButtonElement>('[data-crear]');
     boton.disabled =
-      !estado.previsualizacion || !estado.previsualizacion.puede_crear || estado.huellaInvalida || boton.dataset.loading === 'true';
+      !estado.previsualizacion ||
+      !estado.previsualizacion.puede_crear ||
+      estado.huellaInvalida ||
+      estado.sinSpeech ||
+      boton.dataset.loading === 'true';
   }
 
   /** The notice of the archived fields the speech reads; hidden with none, and with no preview to say it about. */

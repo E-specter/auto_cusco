@@ -34,6 +34,7 @@ import type {
   Segmento,
   SpeechEdicionEntrada,
   SpeechNuevoEntrada,
+  SpeechParcialEntrada,
   VersionSpeech,
 } from '../src/lib/api-mowa-mes';
 import { json, siguiente } from './apoyo';
@@ -137,6 +138,29 @@ export function speechOriginal(): VersionSpeech {
     partes: partesCompletas(partesOriginales()),
     expresiones: [],
   };
+}
+
+/** The moment `PATCH {habilitada: false}` stamps. */
+export const DESHABILITADA_EN = '2026-10-31T09:00:00-05:00';
+
+/**
+ * What the API works out for a version from the rest of it (RF-MM-29, RF-MM-30): a disabled one is not
+ * editable, and it can be deleted only if it is disabled, unused and not the Speech original. The reason it
+ * never can be (`original`, `usada`) comes whether or not it is disabled.
+ */
+export function conEliminable(version: VersionSpeech): VersionSpeech {
+  const deshabilitada = version.deshabilitada_en !== null;
+  return {
+    ...version,
+    editable: !deshabilitada && !version.usada && !version.original,
+    eliminable: deshabilitada && !version.usada && !version.original,
+    motivo_no_eliminable: version.original ? 'original' : version.usada ? 'usada' : null,
+  };
+}
+
+/** A version as the API lists it once it can be disabled: `eliminable`, `motivo_no_eliminable` and `editable` agree. */
+export function versionAdministrable(parcial: Partial<VersionSpeech> = {}): VersionSpeech {
+  return conEliminable({ ...versionSpeech(), ...parcial });
 }
 
 export function versionSpeech(parcial: Partial<VersionSpeech> = {}): VersionSpeech {
@@ -871,6 +895,41 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       );
     }
     const unaVersion = ruta.match(/^\/mowa-mes\/speech\/(\d+)$/);
+    // Rename and/or disable or enable (RF-MM-28, RF-MM-29); with both, a refused name changes nothing.
+    if (unaVersion && metodo === 'PATCH') {
+      const id = Number(unaVersion[1]);
+      const entrada = cuerpo as SpeechParcialEntrada;
+      const actual = estado.versiones.find((v) => v.id === id);
+      if (!actual) return json(route, 404, { detail: 'No existe la version' });
+      let nueva = actual;
+      if (entrada.nombre !== undefined && entrada.nombre !== null) {
+        const nombre = entrada.nombre.trim();
+        if (nombre === '' || nombre.length > 120) {
+          return json(route, 400, { detail: 'El nombre debe tener de 1 a 120 caracteres' });
+        }
+        if (estado.versiones.some((v) => v.id !== id && v.nombre.trim().toLowerCase() === nombre.toLowerCase())) {
+          return json(route, 409, { detail: `Ya existe una version llamada ${nombre}` });
+        }
+        nueva = { ...nueva, nombre };
+      }
+      if (entrada.habilitada === true) nueva = { ...nueva, deshabilitada_en: null };
+      else if (entrada.habilitada === false) nueva = { ...nueva, deshabilitada_en: nueva.deshabilitada_en ?? DESHABILITADA_EN };
+      nueva = conEliminable(nueva);
+      estado.versiones = estado.versiones.map((v) => (v.id === id ? nueva : v));
+      return json(route, 200, nueva);
+    }
+    // Deleting for good (RF-MM-30): only a disabled, unused version that is not the original.
+    if (unaVersion && metodo === 'DELETE') {
+      const id = Number(unaVersion[1]);
+      const actual = estado.versiones.find((v) => v.id === id);
+      if (!actual) return json(route, 404, { detail: 'No existe la version' });
+      if (!conEliminable(actual).eliminable) {
+        const codigo = actual.original ? 'speech_original' : actual.usada ? 'speech_usado' : 'speech_no_deshabilitado';
+        return json(route, 409, { detail: `No se puede eliminar la version ${id}`, codigo });
+      }
+      estado.versiones = estado.versiones.filter((v) => v.id !== id);
+      return route.fulfill({ status: 204 });
+    }
     if (unaVersion && metodo === 'PUT') {
       const guion = siguiente(estado.respuestas.editarSpeech);
       if (guion) return json(route, guion.estado, guion.cuerpo ?? {});
