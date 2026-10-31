@@ -27,6 +27,7 @@ from app.core.entities.mowa_mes import (
     CodigoMowaMes,
     DatosSpeech,
     FaltaWhatsapp,
+    FormatoSpeech,
     MensajeNoGenerable,
     PartesSegmento,
     Segmento,
@@ -40,6 +41,7 @@ from app.core.entities.texto_enriquecido import (
     NodoVariable,
     TipoValor,
 )
+from app.core.entities.valores import vacia
 from app.core.services.plataformas.mowa_mes import speech
 from app.core.services.plataformas.mowa_mes.campana import (
     Exclusion,
@@ -186,6 +188,54 @@ def test_toda_la_matriz_de_mensajes_da_la_huella_gsm7_de_la_congelada_en_head() 
     assert len(filas) == MATRIZ_CASOS
     assert sum(fila[-1] is None for fila in filas) == MATRIZ_CASOS_SIN_WHATSAPP
     assert huella_de_la_matriz(filas) == MATRIZ_HUELLA_GSM7
+
+
+class _ConvertidaALaV2:
+    """El constructor de una v1 convertida a v2; un dato obligatorio vacio no arma mensaje."""
+
+    def __init__(self, version, whatsapp) -> None:
+        convertida = DatosSpeech(
+            "convertida", expresiones=speech.convertir_a_v2(version), formato=FormatoSpeech.V2
+        )
+        self._constructor = speech.ConstructorMensajes(convertida, whatsapp)
+
+    def mensaje_de(self, segmento, titular, vencimiento):
+        try:
+            return self._constructor.mensaje_de(segmento, titular, vencimiento)
+        except MensajeNoGenerable:
+            return SIN_MENSAJE
+
+
+SIN_MENSAJE = "<sin mensaje: dato obligatorio vacio>"
+
+
+def test_el_v2_convertido_da_el_mismo_mensaje_byte_a_byte_que_el_v1_congelado() -> None:
+    # T-MM-C11, M-B3 (RF-MM-17): la migracion pasa cada v1 a v2 con `convertir_a_v2`. La unica
+    # afirmacion que se agrega al oro: en TODA la matriz, el mensaje del v2 convertido es el mismo,
+    # caracter por caracter (y el mismo error donde falta el WhatsApp), que el del v1 congelado.
+    # Una excepcion, que no es de los bytes: el titular y la fecha del v2 convertido son
+    # obligatorios, asi que con uno de los dos vacio no arma mensaje; en la campana ese producto
+    # ya se excluye (`falta_titular` o `falta_vencimiento`) antes de pedirlo, igual que con la v1.
+    de_la_v1 = mensajes_de_la_matriz(speech.ConstructorMensajes)
+    de_la_v2 = mensajes_de_la_matriz(_ConvertidaALaV2)
+
+    assert len(de_la_v2) == len(de_la_v1) == MATRIZ_CASOS
+    sin_mensaje = [fila for fila in de_la_v2 if fila[-1] == SIN_MENSAJE]
+    # El mismo predicado que la campana (`campana.evaluar_producto`): el titular con `vacia` (None o
+    # solo espacios) y la fecha con `is None`. Se comprueba en los dos sentidos: lo que no arma
+    # mensaje es exactamente lo que la campana excluye (salvo donde falta el WhatsApp, que va antes).
+    for fila in de_la_v2:
+        _, _, _, titular, fecha, mensaje = fila
+        excluye_la_campana = vacia(titular) or fecha is None
+        if mensaje is not None:  # None: falta el WhatsApp, un error que va antes que el dato
+            assert (mensaje == SIN_MENSAJE) is excluye_la_campana, fila
+    comparables = [
+        (v1, v2) for v1, v2 in zip(de_la_v1, de_la_v2, strict=True) if v2 not in sin_mensaje
+    ]
+    assert len(comparables) == MATRIZ_CASOS - len(sin_mensaje)
+    assert sin_mensaje and comparables  # el caso existe y la mayoria de la matriz se compara
+    for v1, v2 in comparables:
+        assert v2 == v1, (v1, v2)  # el mensaje, byte a byte (o None donde falta el WhatsApp)
 
 
 def test_el_mensaje_del_speech_original_conserva_su_texto_conocido() -> None:

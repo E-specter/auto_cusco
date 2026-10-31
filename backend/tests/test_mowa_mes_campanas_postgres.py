@@ -44,11 +44,12 @@ from app.adapters.persistence.repositorio_supervision_postgres import (
     RepositorioSupervisionPostgres,
 )
 from app.core.entities.gestiones_digitales import ConfiguracionSupervision, Supervisor
-from app.core.entities.mowa_mes import CodigoMowaMes, DatosSpeech, PartesSegmento
+from app.core.entities.mowa_mes import CodigoMowaMes, DatosSpeech, FormatoSpeech, PartesSegmento
 from app.core.entities.mowa_mes_reporte import COLUMNAS_REPORTE, FilaReporte
 from app.core.entities.nombres import normalizar_nombre
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService
-from app.core.services.plataformas.mowa_mes.campana import huella_speech
+from app.core.services.plataformas.mowa_mes.campana import huella_de
+from app.core.services.plataformas.mowa_mes.speech import convertir_a_v2
 from app.core.services.texto_enriquecido.gsm7 import largo_gsm7
 from app.main import app
 from tests.test_sabana_cabeceras import CABECERAS_10_09
@@ -386,18 +387,24 @@ def test_si_el_speech_cambia_despues_de_previsualizar_no_se_crea_nada(cliente) -
     assert client.get(f"/mowa-mes/speech/{version['id']}").json()["usada"] is False
 
 
-def test_una_campana_con_una_v1_heredada_la_usa_y_registra_su_huella(cliente) -> None:
-    # La version 92 del usuario: una v1 que no es la original. Ya no se crea por HTTP (RF-MM-17),
-    # asi que se siembra por el repositorio; la campana debe poder usarla de punta a punta.
+def test_una_campana_con_una_version_heredada_la_usa_y_registra_su_huella(cliente) -> None:
+    # La version 92 del usuario: antes una v1 que no era la original; desde M-B3 las v1 son v2
+    # convertidas. Ya no se crea por HTTP (RF-MM-17), asi que se siembra por el repositorio, ya
+    # convertida; la campana debe poder usarla de punta a punta, con la huella de su v2.
     client, engine = cliente
     partes = tuple(
         PartesSegmento(p.segmento, p.parte_1, p.parte_2 + " Heredada.")
         for p in speech_del_documento()
     )
     heredada = RepositorioMowaMesPostgres(engine).crear_speech(
-        DatosSpeech(f"{PREFIJO}heredada", partes), None
+        DatosSpeech(
+            f"{PREFIJO}heredada",
+            expresiones=convertir_a_v2(partes),
+            formato=FormatoSpeech.V2,
+        ),
+        None,
     )
-    huella = huella_speech(partes)
+    huella = huella_de(heredada.datos)
 
     previa = _previsualizar(client, speech_id=heredada.id)
     creada = _crear(client, previa["speech"]["huella"], speech_id=heredada.id)
@@ -413,7 +420,7 @@ def test_una_campana_con_una_v1_heredada_la_usa_y_registra_su_huella(cliente) ->
             select(_SPEECH.c.usada_en).where(_SPEECH.c.id == heredada.id)
         ).scalar_one()
 
-    assert previa["speech"]["huella"] == huella and previa["speech"]["formato"] == "v1"
+    assert previa["speech"]["huella"] == huella and previa["speech"]["formato"] == "v2"
     assert creada.status_code == 201, creada.text
     assert (guardada.speech_huella, guardada.speech_version_id) == (huella, heredada.id)
     assert campana["speech"] == {"id": heredada.id, "nombre": f"{PREFIJO}heredada"}

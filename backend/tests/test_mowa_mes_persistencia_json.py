@@ -68,6 +68,7 @@ def test_el_check_pregunta_por_nulo_de_sql_y_no_compara_con_el_json_null() -> No
         if str(getattr(c, "name", "")).endswith("contenido_segun_formato")
     )
 
-    assert "expresiones IS NULL" in sqltext and "expresiones IS NOT NULL" in sqltext
+    # Antes tambien preguntaba `expresiones IS NULL` (la rama de las v1); desde M-B3 solo vale v2.
+    assert "expresiones IS NOT NULL" in sqltext
     sin_is_null = sqltext.replace("IS NOT NULL", "").replace("IS NULL", "")
     assert "null" not in sin_is_null.lower()  # ni `= 'null'::jsonb` ni `jsonb_typeof`

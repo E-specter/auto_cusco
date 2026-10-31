@@ -126,11 +126,16 @@ def _guardar_v2(client, nombre: str, expresiones: list[dict], **extra) -> int:
 
 
 def _v2_desde_el_original(client) -> int:
-    """Una v2 por `como-v2` desde el Speech original, guardada como version nueva (C-5)."""
+    """Una v2 copiada del Speech original, guardada como version nueva (C-5).
+
+    Antes la daba `como-v2`; desde M-B3 el original ya es v2 (la migracion lo convirtio con la misma
+    conversion) y `como-v2` responde 400, asi que se copian sus expresiones tal como las expone la
+    API.
+    """
     original = next(v for v in client.get("/mowa-mes/speech").json() if v["original"])
-    borrador = client.get(f"/mowa-mes/speech/{original['id']}/como-v2").json()
+    assert original["formato"] == "v2"
     expresiones = [
-        {"segmento": e["segmento"], "expresion": e["expresion"]} for e in borrador["expresiones"]
+        {"segmento": e["segmento"], "expresion": e["expresion"]} for e in original["expresiones"]
     ]
     return _guardar_v2(client, "como v2", expresiones, basada_en_id=original["id"])
 

@@ -499,3 +499,27 @@ La ida y vuelta de la migración contra la base la corre `architec` (`alembic do
 - **Errores de crear campaña.** En `/mowa-mes/campana`, el 409 de la huella usa `mowaMes.errorCampana.huella_cambiada` y el del límite, `limite_excedido` (con la frase del servidor como respaldo para un código que esta versión no conoce). Se borró el texto duplicado `mowaMes.campana.crear.bloqueadaHuella`.
 - **API falsa** (`e2e/api-falsa-mowa-mes.ts`): contesta `GET /campanas/descartadas` (con `meses` sin recortar por el filtro y `total_descartadas`), `POST …/descartar` y `…/restaurar` (idempotentes) y `DELETE` (409 `campana_no_descartada` si está activa). Una descartada no cuenta en la lista activa, en su `total` ni en `total_pendientes`; importar a una descartada es 409 `campana_descartada`.
 - **Pruebas.** Vitest: `mowa-mes-seguimiento.test.ts` (la vista de la URL, el orden y el texto de los meses, el mes que abre la vista, el aviso de descartar y `pendienteVisible`) y `api-mowa-mes.test.ts` (las cuatro llamadas nuevas). Playwright: `e2e/mowa-mes-descartadas.spec.ts` (las dos vistas y su URL, atrás y adelante, el filtro por mes, la fila, descartar con y sin aviso, Escape y Cancelar, restaurar, eliminar con la casilla, los 409, el foco y el anuncio, el inglés, 1280 y 360 px, axe claro y oscuro).
+
+## 24. Todas las versiones de speech son v2 (T-MM-C11, M-B3; RF-MM-17 modificado)
+
+Desde esta migración no queda ninguna versión de dos partes en la base: cada v1 pasó a v2 en su lugar, con el mismo mensaje. El código que lee v1 sigue ahí (lo retira M-B4); lo que cambió es que ya no hay filas v1.
+
+- **Migración `d7a3e5b9c241`** (cuelga de `c5d9f2a8e714`; no importa nada de `app`). Lleva dos copias congeladas de la conversión:
+  - `_convertir(partes)`: lo que hoy hacen `speech.expresion_de` y `expresion_a_dict`. El titular lleva `primeros(8)` y es obligatorio; la parte 1, con cada `[whatsapp]` como `whatsapp_contacto | enlace_whatsapp`; la fecha con `formato_fecha("dd/mm/aaaa")`, obligatoria; y la parte 2;
+  - `EXPRESIONES_ORIGINAL`: el literal del Speech original convertido. Una base reconstruida desde cero siembra el original como v1 (`a4c8e2f6b913`) y esta migración lo convierte siempre igual.
+- **Upgrade.** Cada fila `formato = 'v1'` queda con `formato = 'v2'` y `expresiones = _convertir(partes)` (el original, con el literal). **No se toca nada más**: `partes` queda como estaba (el texto v1, para trazabilidad y para el downgrade), y se conservan `id`, `nombre`, `nombre_normalizado`, `usada_en`, `basada_en_id`, `original`, `creado_en` y `deshabilitada_en`. Las campañas que usaron una versión siguen apuntando a ella. Después, el CHECK `contenido_segun_formato` exige `formato = 'v2' AND expresiones IS NOT NULL`, y el `formato` por defecto de una fila nueva pasa a `v2` (el modelo lo declara igual).
+- **Downgrade exacto.** Se quita el CHECK nuevo, las filas con `partes` no vacío vuelven a `formato = 'v1'` con `expresiones = NULL`, se pone el CHECK de antes y, por último, el `formato` por defecto vuelve a `v1`. Las v2 nativas (`partes = []`) no se tocan. Una convertida que se editó después tiene `partes = []`, así que se queda como v2: ya no es la v1 de antes.
+- **Las huellas.** La del Speech original deja de ser `297c227c…` (la de su texto v1) y pasa a `5b1c556c…` (la de sus expresiones): el mensaje es el mismo byte a byte, la huella no. Las campañas ya creadas guardan la que tenían. La huella del texto v1 se puede seguir calculando desde `partes` (`huella_speech`), y la prueba de PostgreSQL lo comprueba.
+- **Lo que ve la API.** Cada versión sale `formato: "v2"` con `partes: []` (`datos_de_fila` decide por el `formato` y no lee `partes` de una v2). `GET /speech/{id}/como-v2` de una versión ya v2 responde 400. **El contrato no cambia.**
+- **Oro.** `test_mowa_mes_speech_oro.py` gana una sola afirmación: en toda la matriz (4992 casos), el mensaje del v2 convertido es el mismo que el del v1 congelado, byte a byte (2286 mensajes con texto; 928 sin WhatsApp coinciden en la excepción). En 1778 casos el v2 convertido no arma mensaje porque el titular o la fecha, obligatorios, vienen vacíos: la campaña ya excluye esos productos (`falta_titular` o `falta_vencimiento`) antes de pedirlo, igual que con la v1. Ninguna expectativa existente cambió.
+- **Con `--sql` (modo offline)** solo emite el DDL: convertir las filas necesita la base.
+
+### 24.1 Pruebas
+
+| Archivo | Qué fija |
+|---|---|
+| `tests/test_mowa_mes_speech_solo_v2_migracion.py` | El convertidor de la migración contra `convertir_a_v2` de la app (el original y 200 juegos sintéticos con semilla fija), el literal del original, su huella, el SQL del upgrade y del downgrade sin base y su orden, el modelo contra la migración, y lo que hace con las filas sobre un doble de la conexión |
+| `tests/test_mowa_mes_speech_oro.py` | (una afirmación nueva) el v2 convertido da el mismo mensaje que el v1 congelado |
+| `tests/test_mowa_mes_speech_solo_v2_postgres.py` | `@postgres` (`architec`, `-ConBase`): la ida y vuelta con una v1 usada por una campaña real, más una v1 sin usar y una v2 nativa; y una convertida editada que se queda v2 |
+
+**Las `@postgres` que hubo que pasar al mundo solo v2** (ya no se puede insertar una v1): `test_mowa_mes_speech_v2_postgres.py`, `test_mowa_mes_campanas_postgres.py`, `test_mowa_mes_configuracion_postgres.py` y `test_mowa_mes_conciliacion_v2_postgres.py`.

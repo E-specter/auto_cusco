@@ -497,7 +497,7 @@ class MowaMesSpeechVersion(Base):
     partes: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     # M2 (B6): `v1` es la estructura fija de partes; `v2`, una expresion del motor por segmento
     # (`expresiones`: lista de {segmento, expresion}, nula en las v1; `partes` queda en `[]`).
-    formato: Mapped[str] = mapped_column(String(2), server_default=FormatoSpeech.V1.value)
+    formato: Mapped[str] = mapped_column(String(2), server_default=FormatoSpeech.V2.value)
     # `none_as_null`: un None de Python es NULL de SQL, no el JSON `null` (que para el CHECK de
     # arriba no es NULL y rechazaria toda v1).
     expresiones: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB(none_as_null=True))
@@ -515,8 +515,7 @@ class MowaMesSpeechVersion(Base):
         UniqueConstraint("nombre_normalizado"),
         CheckConstraint(f"formato IN ({_en(FormatoSpeech)})", name="formato_valido"),
         CheckConstraint(
-            "(formato = 'v1' AND expresiones IS NULL) "
-            "OR (formato = 'v2' AND expresiones IS NOT NULL)",
+            "formato = 'v2' AND expresiones IS NOT NULL",
             name="contenido_segun_formato",
         ),
         Index(

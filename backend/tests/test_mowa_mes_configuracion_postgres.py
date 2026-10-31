@@ -29,8 +29,9 @@ from app.adapters.persistence.repositorio_supervision_postgres import (
     RepositorioSupervisionPostgres,
 )
 from app.core.entities.calendario import ExcepcionCalendario, ExcepcionRepetida, TipoExcepcion
-from app.core.entities.mowa_mes import DatosSpeech
+from app.core.entities.mowa_mes import DatosSpeech, FormatoSpeech
 from app.core.entities.nombres import normalizar_nombre
+from app.core.services.plataformas.mowa_mes.speech import convertir_a_v2
 from app.main import app
 from tests.test_speech_original import speech_del_documento
 
@@ -57,6 +58,15 @@ def _partes_json(partes) -> list[dict]:
 
 
 PARTES = _partes_json(speech_del_documento())
+
+
+def _v2_del_documento(nombre: str) -> DatosSpeech:
+    """El texto de RF-MM-18 ya convertido a v2: lo unico que una version puede ser desde M-B3."""
+    return DatosSpeech(
+        nombre,
+        expresiones=convertir_a_v2(speech_del_documento()),
+        formato=FormatoSpeech.V2,
+    )
 
 
 def _limpiar(engine) -> None:
@@ -110,10 +120,16 @@ def cliente(engine):
 
 
 def test_la_migracion_siembra_el_speech_original_con_el_texto_de_rf_mm_18(engine) -> None:
+    # Antes: el original se leia como v1 (`datos.partes == speech_del_documento()`). Desde M-B3 es
+    # v2: se lee por sus expresiones, y el texto de RF-MM-18 sigue intacto en la columna `partes`.
     (original,) = [v for v in RepositorioMowaMesPostgres(engine).listar_speech() if v.original]
+    with engine.connect() as cx:
+        partes = cx.execute(select(_SPEECH.c.partes).where(_SPEECH.c.original)).scalar_one()
 
     assert original.datos.nombre == "Speech original"
-    assert original.datos.partes == speech_del_documento()
+    assert original.datos.formato is FormatoSpeech.V2
+    assert original.datos.expresiones == convertir_a_v2(speech_del_documento())
+    assert partes == PARTES  # el texto de RF-MM-18, tal como lo sembro a4c8e2f6b913
 
 
 def test_la_migracion_no_siembra_feriados_ni_numeros(engine) -> None:
@@ -283,9 +299,7 @@ def test_speech_por_http_de_punta_a_punta(cliente, engine) -> None:
 
 def test_ya_no_se_crean_ni_se_editan_versiones_de_dos_partes_por_http(cliente, engine) -> None:
     repositorio = RepositorioMowaMesPostgres(engine)
-    heredada = repositorio.crear_speech(
-        DatosSpeech(f"{PREFIJO}heredada", speech_del_documento()), None
-    )
+    heredada = repositorio.crear_speech(_v2_del_documento(f"{PREFIJO}heredada"), None)
     antes = len(cliente.get("/mowa-mes/speech").json())
 
     creada = cliente.post(
@@ -305,22 +319,20 @@ def test_ya_no_se_crean_ni_se_editan_versiones_de_dos_partes_por_http(cliente, e
         assert (problema["codigo"], problema["catalogo"]) == ("version_v1_retirada", "mowa_mes")
     assert len(cliente.get("/mowa-mes/speech").json()) == antes  # no se creo nada
     assert repositorio.obtener_speech(heredada.id).datos.nombre == f"{PREFIJO}heredada"
-    # y la heredada se sigue leyendo y convirtiendo
-    assert cliente.get(f"/mowa-mes/speech/{heredada.id}").json()["formato"] == "v1"
-    assert cliente.get(f"/mowa-mes/speech/{heredada.id}/como-v2").status_code == 200
+    # y la heredada (antes v1: formato v1 y `como-v2` 200) ahora es v2 y no hay nada que convertir
+    assert cliente.get(f"/mowa-mes/speech/{heredada.id}").json()["formato"] == "v2"
+    assert cliente.get(f"/mowa-mes/speech/{heredada.id}/como-v2").status_code == 400
 
 
 def test_la_escritura_misma_no_modifica_una_version_usada_ni_la_original(engine) -> None:
     # Sin pasar por el servicio: la condicion de la sentencia UPDATE es la que protege
     # cuando una campana marca la version entre la lectura y la escritura.
     repositorio = RepositorioMowaMesPostgres(engine)
-    creada = repositorio.crear_speech(
-        DatosSpeech(f"{PREFIJO}usada", speech_del_documento()), basada_en_id=None
-    )
+    creada = repositorio.crear_speech(_v2_del_documento(f"{PREFIJO}usada"), basada_en_id=None)
     original = next(v for v in repositorio.listar_speech() if v.original)
     repositorio.marcar_speech_usado(creada.id)
 
-    otra = DatosSpeech(f"{PREFIJO}cambiada", speech_del_documento())
+    otra = _v2_del_documento(f"{PREFIJO}cambiada")
 
     assert repositorio.actualizar_speech(creada.id, otra) is None
     assert repositorio.actualizar_speech(original.id, otra) is None

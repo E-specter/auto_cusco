@@ -6,7 +6,8 @@ Corre solo con AUTO_CUSCO_DB_TESTS=1 y la base migrada (`alembic upgrade head`, 
 configuracion y los supervisores que se restituyen al terminar, y las versiones de speech
 con el prefijo de prueba que se borran. Numeros 900000xxx.
 
-Lo que solo aqui se verifica: las versiones v1 que ya existian siguen siendo v1 con su huella, los
+Lo que solo aqui se verifica: las versiones que ya existian quedan v2 (M-B3) y el original conserva
+su texto v1 en `partes`, los
 CHECK de la base (formato valido y contenido segun el formato), el round trip de las expresiones por
 JSONB, que editar no cambia el formato, y la huella de una v2 comprobada dentro de la transaccion
 de crear la campana.
@@ -21,13 +22,12 @@ from sqlalchemy.exc import IntegrityError
 from app.adapters.persistence.modelos import MowaMesCampana, MowaMesSpeechVersion
 from app.adapters.persistence.repositorio_mowa_mes_postgres import RepositorioMowaMesPostgres
 from app.core.entities.mowa_mes import (
-    DatosSpeech,
     ExpresionSegmento,
     FormatoSpeech,
     PartesSegmento,
     Segmento,
 )
-from app.core.services.plataformas.mowa_mes.campana import huella_de
+from app.core.services.plataformas.mowa_mes.campana import huella_de, huella_speech
 from app.core.services.texto_enriquecido.serializacion import expresion_desde_dict
 from tests import test_mowa_mes_campanas_postgres as base
 from tests.test_mowa_mes_campanas_postgres import (
@@ -48,7 +48,12 @@ pytestmark = [
 cliente = base.cliente  # la fixture del entorno sintetico, la misma de las campanas
 _SPEECH = MowaMesSpeechVersion.__table__
 _CAMPANA = MowaMesCampana.__table__
-HUELLA_DEL_SPEECH_ORIGINAL = "297c227cfdd0bb5e1636e08d4ed6cebab971d724c84223acfdb0cfebc2fcf88a"
+# La huella del texto v1 del original (la que registraron las campanas de antes de M-B3) y la de su
+# conversion a v2 (la que registran desde entonces): el mensaje es el mismo, la huella no.
+HUELLA_DEL_TEXTO_V1_DEL_ORIGINAL = (
+    "297c227cfdd0bb5e1636e08d4ed6cebab971d724c84223acfdb0cfebc2fcf88a"
+)
+HUELLA_DEL_SPEECH_ORIGINAL = "5b1c556c283ceccd59007114c0da16df3f323ef98b4122d5dc1628b0ef1992b1"
 SEGMENTOS = [s.value for s in Segmento]
 
 
@@ -82,16 +87,6 @@ def _crear_v2(client, nombre: str, expresiones=None, **extra):
     )
 
 
-def _v1_heredada(engine, nombre: str) -> int:
-    """Una version de dos partes como las que ya existian: ya no se crean por HTTP (RF-MM-17)."""
-    partes = tuple(PartesSegmento(Segmento(s), "a", "b") for s in SEGMENTOS)
-    return (
-        RepositorioMowaMesPostgres(engine)
-        .crear_speech(DatosSpeech(f"{PREFIJO}{nombre}", partes), None)
-        .id
-    )
-
-
 def _fila(engine, speech_id: int):
     with engine.connect() as cx:
         return cx.execute(select(_SPEECH).where(_SPEECH.c.id == speech_id)).one()
@@ -100,7 +95,9 @@ def _fila(engine, speech_id: int):
 # --- Las versiones que ya existian ---------------------------------------------------------------
 
 
-def test_todas_las_versiones_existentes_son_v1_con_partes_y_sin_expresiones(cliente) -> None:
+def test_todas_las_versiones_existentes_son_v2_con_expresiones(cliente) -> None:
+    # T-MM-C11, M-B3 (RF-MM-17): la migracion pasa cada v1 a v2; antes eran todas v1 sin
+    # expresiones.
     _, engine = cliente
 
     with engine.connect() as cx:
@@ -111,17 +108,26 @@ def test_todas_las_versiones_existentes_son_v1_con_partes_y_sin_expresiones(clie
         ).all()
 
     assert filas, "falta el Speech original: aplica las migraciones"
-    assert {(f.formato, f.expresiones) for f in filas} == {("v1", None)}
+    assert {f.formato for f in filas} == {"v2"}
+    assert all(f.expresiones for f in filas)
 
 
-def test_el_speech_original_conserva_su_huella(cliente) -> None:
+def test_el_speech_original_es_v2_y_conserva_su_texto_v1_en_partes(cliente) -> None:
+    # Antes: formato v1 y huella 297c... Ahora: v2 convertido (otra huella, el mismo mensaje) y el
+    # texto v1 intacto en `partes`, cuya huella v1 sigue siendo la de siempre (trazabilidad).
     _, engine = cliente
     repositorio = RepositorioMowaMesPostgres(engine)
 
     original = next(v for v in repositorio.listar_speech() if v.original)
+    with engine.connect() as cx:
+        partes = cx.execute(select(_SPEECH.c.partes).where(_SPEECH.c.original)).scalar_one()
 
-    assert original.datos.formato is FormatoSpeech.V1
+    assert original.datos.formato is FormatoSpeech.V2
     assert huella_de(original.datos) == HUELLA_DEL_SPEECH_ORIGINAL
+    texto_v1 = tuple(
+        PartesSegmento(Segmento(p["segmento"]), p["parte_1"], p["parte_2"]) for p in partes
+    )
+    assert huella_speech(texto_v1) == HUELLA_DEL_TEXTO_V1_DEL_ORIGINAL
 
 
 # --- Guardar y leer una v2 -----------------------------------------------------------------------
@@ -158,11 +164,11 @@ def test_la_huella_de_una_v2_sale_igual_antes_y_despues_de_guardarla(cliente) ->
     assert previa["speech"]["huella"] == huella_de(guardada.datos)
 
 
-def test_un_nombre_repetido_entre_formatos_lo_rechaza_la_base(cliente) -> None:
-    client, engine = cliente
-    _v1_heredada(engine, "unico")
+def test_un_nombre_repetido_lo_rechaza_la_base_sin_distinguir_mayusculas(cliente) -> None:
+    client, _ = cliente
+    assert _crear_v2(client, "unico").status_code == 201
 
-    repetido = _crear_v2(client, "UNICO")  # el mismo nombre, otra caja, otro formato
+    repetido = _crear_v2(client, "UNICO")  # el mismo nombre, otra caja
 
     assert repetido.status_code == 409
 
@@ -183,16 +189,6 @@ def _crudo(engine, speech_id: int):
         return cx.execute(_CRUDO, {"id": speech_id}).one()
 
 
-def test_una_v1_guarda_expresiones_como_null_de_sql_y_las_partes_como_lista(cliente) -> None:
-    _, engine = cliente
-    id_ = _v1_heredada(engine, "crudo v1")
-
-    fila = _crudo(engine, id_)
-
-    assert (fila.formato, fila.expresiones_nulas, fila.tipo_expresiones) == ("v1", True, None)
-    assert (fila.partes_nulas, fila.tipo_partes, fila.partes_vacias) == (False, "array", False)
-
-
 def test_una_v2_guarda_expresiones_como_lista_y_las_partes_como_lista_vacia(cliente) -> None:
     client, engine = cliente
     id_ = _crear_v2(client, "crudo v2").json()["id"]
@@ -204,23 +200,16 @@ def test_una_v2_guarda_expresiones_como_lista_y_las_partes_como_lista_vacia(clie
     assert (fila.partes_nulas, fila.tipo_partes, fila.partes_vacias) == (False, "array", True)
 
 
-def test_editar_no_cambia_lo_que_hay_en_la_columna(cliente) -> None:
+def test_editar_deja_expresiones_como_lista_y_las_partes_vacias(cliente) -> None:
     client, engine = cliente
-    partes = [{"segmento": s, "parte_1": "a", "parte_2": "b"} for s in SEGMENTOS]
-    v1 = _v1_heredada(engine, "crudo ed v1")
     v2 = _crear_v2(client, "crudo ed v2").json()["id"]
 
-    intento = client.put(
-        f"/mowa-mes/speech/{v1}", json={"nombre": f"{PREFIJO}crudo ed v1", "partes": partes}
-    )
-    assert intento.status_code == 400  # una v1 ya no se edita, y el rechazo no la toca
     client.put(
         f"/mowa-mes/speech/{v2}",
         json={"nombre": f"{PREFIJO}crudo ed v2", "expresiones": _expresiones(_nodo_titular())},
     )
 
-    uno, dos = _crudo(engine, v1), _crudo(engine, v2)
-    assert (uno.expresiones_nulas, uno.tipo_expresiones) == (True, None)
+    dos = _crudo(engine, v2)
     assert (dos.expresiones_nulas, dos.tipo_expresiones, dos.partes_vacias) == (
         False,
         "array",
@@ -228,14 +217,15 @@ def test_editar_no_cambia_lo_que_hay_en_la_columna(cliente) -> None:
     )
 
 
-def test_el_speech_original_tiene_expresiones_null_de_sql(cliente) -> None:
+def test_el_speech_original_tiene_expresiones_y_conserva_las_partes(cliente) -> None:
+    # Antes: formato v1, expresiones NULL. Ahora: v2 con expresiones; `partes` queda como estaba.
     _, engine = cliente
     with engine.connect() as cx:
         id_ = cx.execute(select(_SPEECH.c.id).where(_SPEECH.c.original)).scalar_one()
 
     fila = _crudo(engine, id_)
 
-    assert (fila.formato, fila.expresiones_nulas, fila.tipo_expresiones) == ("v1", True, None)
+    assert (fila.formato, fila.expresiones_nulas, fila.tipo_expresiones) == ("v2", False, "array")
     assert fila.tipo_partes == "array" and fila.partes_vacias is False
 
 
@@ -274,28 +264,42 @@ def test_la_base_rechaza_un_formato_que_no_es_v1_ni_v2(cliente) -> None:
         _insertar(engine, formato="v3", expresiones=None)
 
 
-def test_la_base_rechaza_una_v2_sin_expresiones_y_una_v1_con_expresiones(cliente) -> None:
+def test_la_base_rechaza_una_v2_sin_expresiones_y_cualquier_v1(cliente) -> None:
+    # Antes aceptaba una v1 con `expresiones` NULL; desde M-B3 solo vale formato v2 con expresiones.
     _, engine = cliente
 
     with pytest.raises(IntegrityError):
         _insertar(engine, formato="v2", expresiones=None)
     with pytest.raises(IntegrityError):
         _insertar(
-            engine, nombre=f"{PREFIJO}otro", nombre_normalizado="otro", formato="v1", expresiones=[]
+            engine,
+            nombre=f"{PREFIJO}otro",
+            nombre_normalizado="otro",
+            formato="v1",
+            expresiones=None,
+        )
+    with pytest.raises(IntegrityError):
+        _insertar(
+            engine, nombre=f"{PREFIJO}otra", nombre_normalizado="otra", formato="v1", expresiones=[]
         )
 
 
-def test_una_fila_sin_formato_es_v1(cliente) -> None:
-    """El valor por defecto del servidor: lo que las filas existentes recibieron al migrar."""
+def test_una_fila_sin_formato_es_v2(cliente) -> None:
+    """El valor por defecto del servidor: antes v1, desde M-B3 v2 (el CHECK solo admite v2)."""
     _, engine = cliente
-    _insertar(engine, nombre=f"{PREFIJO}defecto", nombre_normalizado=f"{PREFIJO}defecto".casefold())
+    _insertar(
+        engine,
+        nombre=f"{PREFIJO}defecto",
+        nombre_normalizado=f"{PREFIJO}defecto".casefold(),
+        expresiones=[],
+    )
 
     with engine.connect() as cx:
         formato = cx.execute(
             select(_SPEECH.c.formato).where(_SPEECH.c.nombre == f"{PREFIJO}defecto")
         ).scalar_one()
 
-    assert formato == "v1"
+    assert formato == "v2"
 
 
 def test_las_restricciones_existen_con_el_nombre_de_la_migracion(cliente) -> None:
@@ -413,7 +417,7 @@ def test_si_la_v2_cambia_entre_previsualizar_y_crear_es_409_huella_cambiada(clie
     assert campanas == [] and usada is None  # no se creo nada ni se marco la version
 
 
-def test_la_huella_de_una_v1_no_sirve_para_crear_con_una_v2(cliente) -> None:
+def test_la_huella_del_original_no_sirve_para_crear_con_otra_version(cliente) -> None:
     client, _ = cliente
     id_ = _crear_v2(client, "otra huella").json()["id"]
     huella_original = _previsualizar(client)["speech"]["huella"]
@@ -423,12 +427,13 @@ def test_la_huella_de_una_v1_no_sirve_para_crear_con_una_v2(cliente) -> None:
     assert cruzada.status_code == 409 and cruzada.json()["codigo"] == "huella_cambiada"
 
 
-def test_la_campana_con_la_v1_de_siempre_sigue_igual(cliente) -> None:
+def test_la_campana_con_el_original_convertido_sigue_dando_los_mismos_mensajes(cliente) -> None:
+    # Antes: previsualizaba como v1 con la huella 297c... Ahora: v2 convertido, otra huella.
     client, _ = cliente
 
     previa = _previsualizar(client)
     creada = _crear(client, previa["speech"]["huella"])
 
-    assert previa["speech"]["formato"] == "v1"
+    assert previa["speech"]["formato"] == "v2"
     assert previa["speech"]["huella"] == HUELLA_DEL_SPEECH_ORIGINAL
     assert creada.status_code == 201, creada.text
