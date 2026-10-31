@@ -21,6 +21,7 @@ from app.core.entities.mowa_mes import ExpresionSegmento, PartesSegmento, Segmen
 from app.core.services.plataformas.mowa_mes.campana import huella_expresiones
 from app.core.services.plataformas.mowa_mes.speech import convertir_a_v2
 from app.core.services.texto_enriquecido.serializacion import expresion_a_dict, expresion_desde_dict
+from tests.test_mowa_mes_speech_v2_postgres import CUERPO_V2 as CUERPO_V2_DE_LAS_PRUEBAS_DE_BASE
 
 BACKEND = Path(__file__).resolve().parents[1]
 VERSIONES = BACKEND / "migrations" / "versions"
@@ -38,6 +39,19 @@ def _cargar(archivo: str) -> ModuleType:
 
 MIGRACION = _cargar("d7a3e5b9c241_speech_solo_v2.py")
 SIEMBRA = _cargar("a4c8e2f6b913_configuracion_mowa_mes.py")  # donde nace el original, como v1
+
+
+def normalizado(cuerpo: list[dict]) -> list[dict]:
+    """El cuerpo de un PUT tal como lo deja guardado la app: cada expresion pasa por
+    `expresion_desde_dict` y `expresion_a_dict`, que agregan `obligatoria` (falso si no viene) y
+    fijan el orden de las claves. Es lo que hay que comparar contra una fila leida de la base."""
+    return [
+        {
+            "segmento": e["segmento"],
+            "expresion": expresion_a_dict(expresion_desde_dict(e["expresion"])),
+        }
+        for e in cuerpo
+    ]
 
 
 def _de_la_app(partes: list[dict]) -> list[dict]:
@@ -120,6 +134,22 @@ def test_lo_que_convierte_la_migracion_lo_lee_la_aplicacion_y_es_una_expresion_v
         for segmento in MIGRACION._convertir(_juego_sintetico(azar)):
             expresion = expresion_desde_dict(segmento["expresion"])  # no lanza
             assert expresion_a_dict(expresion) == segmento["expresion"]
+
+
+def test_el_cuerpo_crudo_de_un_put_no_es_lo_que_guarda_la_app_pero_normalizado_se_lee_igual() -> (
+    None
+):
+    crudo = CUERPO_V2_DE_LAS_PRUEBAS_DE_BASE
+    guardado = normalizado(crudo)
+
+    assert guardado != crudo  # la app agrega `obligatoria` a cada variable
+    variables = [n for s in guardado for n in s["expresion"]["nodos"] if n["tipo"] == "variable"]
+    assert variables and all(n["obligatoria"] is False for n in variables)
+    assert not any("obligatoria" in n for s in crudo for n in s["expresion"]["nodos"])
+    assert normalizado(guardado) == guardado  # idempotente: guardar de nuevo no lo cambia
+    assert [expresion_desde_dict(e["expresion"]) for e in guardado] == [
+        expresion_desde_dict(e["expresion"]) for e in crudo
+    ]  # el mismo contenido para el motor
 
 
 def test_el_titular_y_la_fecha_son_obligatorios_y_el_enlace_no() -> None:

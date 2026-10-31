@@ -25,7 +25,7 @@ from sqlalchemy.exc import IntegrityError
 from app.adapters.persistence.modelos import MowaMesCampana, MowaMesSpeechVersion
 from tests import test_mowa_mes_campanas_postgres as base
 from tests.test_mowa_mes_campanas_postgres import PREFIJO, _crear, _previsualizar
-from tests.test_mowa_mes_speech_solo_v2_migracion import MIGRACION, SIEMBRA
+from tests.test_mowa_mes_speech_solo_v2_migracion import MIGRACION, SIEMBRA, normalizado
 from tests.test_mowa_mes_speech_v2_postgres import CUERPO_V2
 
 pytestmark = [
@@ -170,6 +170,7 @@ def test_una_convertida_y_editada_se_queda_v2_en_el_downgrade(cliente) -> None:
 
         fila = _fila(engine, libre)
         assert (fila["formato"], fila["partes"]) == ("v2", [])
-        assert fila["expresiones"] == CUERPO_V2
+        # La fila trae la forma que serializa la app (con `obligatoria`), no el cuerpo del PUT.
+        assert fila["expresiones"] == normalizado(CUERPO_V2)
     finally:
         command.upgrade(configuracion, "head")
