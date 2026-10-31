@@ -265,7 +265,7 @@ test.describe('P3: límite mensual excedido', () => {
     api.respuestas.crearCampana = [{ estado: 201, cuerpo: campanaDesdeEntrada({ ...bodyFrom(previaExcedida), speech_huella: previaExcedida.speech.huella, confirmar_limite: true }, 5) }];
     await dialogo.getByRole('button', { name: 'Crear de todas formas' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Campaña 5 creada' })).toBeVisible();
+    await expect(page.getByText('Se creó la campaña 5. Ahora súbela a MES con estos datos.')).toBeVisible();
     const envios = api.pedidos.filter((p) => p.ruta === '/mowa-mes/campanas' && p.metodo === 'POST');
     expect(envios).toHaveLength(2);
     expect((envios[0].cuerpo as Record<string, unknown>).confirmar_limite).toBe(false);
@@ -445,7 +445,7 @@ test.describe('P7: creación y descarga', () => {
     await elegirSeleccionGuardada(page);
 
     await page.getByRole('button', { name: 'Crear campaña' }).click();
-    await expect(page.getByRole('heading', { name: 'Campaña 9 creada' })).toBeVisible();
+    await expect(page.getByText('Se creó la campaña 9. Ahora súbela a MES con estos datos.')).toBeVisible();
 
     const descarga = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Descargar el archivo 1' }).click();

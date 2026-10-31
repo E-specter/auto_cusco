@@ -431,3 +431,14 @@ Descartar es lógico: la campaña no se borra, deja de contar y se mueve a una s
 | `tests/test_mowa_mes_descartadas_postgres.py` | `@postgres` (`architec`, `-ConBase`): un agregado por prueba, `listar_descartadas`, la cascada completa con `usada_en` intacto, eliminar una activa, importar a una descartada, la columna |
 
 La ida y vuelta de la migración contra la base la corre `architec` (`alembic downgrade -1` y `alembic upgrade head`, con `alembic check`).
+
+## 21. Para subir a MES (M-F5, RF-MM-35)
+
+- **Qué es.** Al crear la campaña, `/mowa-mes/campana` deja de decir solo «creada»: muestra el aviso de éxito y el panel «Para subir a MES», en tres pasos numerados (reglas de interfaz de `designer`: `docs/mowa-mes-interfaz.md` §4.4).
+  1. **Descarga los archivos de carga:** un botón «Descargar» por archivo, con su nombre real en mono y en el orden de `{archivo}`.
+  2. **Completa el formulario de MES:** una lista de definición con los cinco datos en el orden del formulario (tipo de carga, descripción, salida, herramientas y programación, RF-MM-03 a RF-MM-07), cada uno con un botón de solo icono «Copiar {dato}». Al copiar, la región de estado dice «Copiado: {dato}» y el icono pasa a `check` por 2 s.
+  3. **Después del envío, importa el reporte:** un enlace a `/mowa-mes/seguimiento?campana=<id>`.
+- **Sin backend nuevo.** Todo sale de la respuesta de `POST /mowa-mes/campanas` (`CampanaRespuesta`).
+- **Lo que se copia es lo que se lee.** `datosParaMes(campana)` (`lib/mowa-mes-campana.ts`) arma etiqueta y valor con las palabras de la pantalla; la programación lleva sus fechas como `dd/mm/aaaa hh:mm` en hora de Lima (`fechaHoraParaMes`), igual en cualquier idioma. Sin herramientas, el valor es «Ninguna».
+- **Portapapeles.** `copiarConRespaldo` y `ResultadoCopia` pasaron de `mowa-mes-campana.ts` a `lib/portapapeles.ts`, que suma `copiarTexto` (el portapapeles si el navegador lo tiene, un `textarea` fuera de la pantalla si no). Si ninguno copia, el dato queda seleccionado y se dice que se copie con Ctrl+C.
+- **Pruebas.** Vitest: `datos-para-mes.test.ts` y `portapapeles.test.ts`. Playwright: `e2e/mowa-mes-subir.spec.ts` (los tres pasos, descarga, cada copia con su anuncio y su portapapeles, el fallo, el inglés, 1280 y 360 px, axe claro y oscuro).

@@ -376,22 +376,38 @@ import '../../styles/supervisores.css';
         </div>
       </section>
 
-      <!-- ---- Created campaign -------------------------------------------------- -->
+      <!-- ---- Created campaign: what to upload to MES, in three steps (RF-MM-35) -------------- -->
       <section class="panel" data-panel-creada hidden aria-labelledby="mm-creada-title">
         <div class="panel__head">
-          <h2 class="panel__title" id="mm-creada-title" data-creada-titulo></h2>
+          <h2 class="panel__title" id="mm-creada-title" data-i18n="mowaMes.campana.subir.titulo">Para subir a MES</h2>
         </div>
         <div class="panel__body mm-form">
-          <p data-creada-meta></p>
-          <div data-creada-archivos></div>
-          <p class="mono muted" data-creada-descarga-estado role="status"></p>
+          <p class="notice notice--success" role="status" data-creada-aviso>
+            <Icon name="circle-check" size={20} />
+            <span data-creada-aviso-texto></span>
+          </p>
+          <ol class="mm-subir">
+            <li class="mm-subir__paso">
+              <h3 class="mm-subtitulo" data-i18n="mowaMes.campana.subir.paso1">Descarga los archivos de carga</h3>
+              <ul class="mm-subir__archivos" data-creada-archivos></ul>
+              <p class="mono muted" data-creada-descarga-estado role="status"></p>
+            </li>
+            <li class="mm-subir__paso">
+              <h3 class="mm-subtitulo" data-i18n="mowaMes.campana.subir.paso2">Completa el formulario de MES</h3>
+              <dl class="mm-subir__datos" data-creada-datos></dl>
+              <p class="mono muted" data-creada-copia-estado role="status"></p>
+            </li>
+            <li class="mm-subir__paso">
+              <h3 class="mm-subtitulo" data-i18n="mowaMes.campana.subir.paso3">Después del envío, importa el reporte</h3>
+              <a class="btn" href="/mowa-mes/seguimiento" data-creada-seguimiento data-i18n="mowaMes.campana.subir.irSeguimiento">
+                Ir al seguimiento de la campaña
+              </a>
+            </li>
+          </ol>
           <div class="mm-form__foot">
             <button type="button" class="btn" data-creada-otra data-i18n="mowaMes.campana.creada.otra">
               Armar otra campaña
             </button>
-            <a class="btn btn--primary" href="/mowa-mes/seguimiento" data-i18n="mowaMes.campana.creada.irASeguimiento">
-              Ver en Seguimiento
-            </a>
           </div>
         </div>
       </section>
@@ -402,6 +418,9 @@ import '../../styles/supervisores.css';
   <template data-icono-arriba><Icon name="arrow-up" size={16} /></template>
   <template data-icono-abajo><Icon name="arrow-down" size={16} /></template>
   <template data-icono-quitar><Icon name="x" size={16} /></template>
+  <template data-icono-copiar><Icon name="copy" size={16} /></template>
+  <template data-icono-copiado><Icon name="check" size={16} /></template>
+  <template data-icono-descargar><Icon name="download" size={16} /></template>
 
   <!-- ---- Monthly limit confirmation ---------------------------------------- -->
   <dialog class="dialog" data-dialog="limite" aria-labelledby="mm-limite-title">
@@ -461,7 +480,7 @@ import '../../styles/supervisores.css';
   import {
     DESCRIPCION_MAXIMA,
     contadorDescripcion,
-    copiarConRespaldo,
+    datosParaMes,
     descripcionARegistrar,
     entradaCampana,
     entradaCreacion,
@@ -484,8 +503,9 @@ import '../../styles/supervisores.css';
   import { notaVariablesDesconocidas, pintarBotonesDeVariables } from '../../lib/mowa-mes-plantilla';
   import { avisoDeCamposArchivados, leerResumenDescarga, listaDeCampos, nombreArchivo } from '../../lib/mowa-mes-seguimiento';
   import { guardarArchivo } from '../../lib/descargas';
+  import { copiarConRespaldo, copiarDesdeTextareaTemporal, copiarTexto } from '../../lib/portapapeles';
   import { openWhenFree } from '../../lib/dialogs';
-  import { formatBytes, formatDate, formatNumber, formatSoles, formatTarifa } from '../../lib/format';
+  import { formatBytes, formatNumber, formatSoles, formatTarifa } from '../../lib/format';
   import { applyTranslations, t } from '../../lib/i18n';
   import { EVENTO_SELECCION, montarSelector, type EstadoSeleccion } from '../../scripts/selector-seleccion';
 
@@ -1202,6 +1222,11 @@ import '../../styles/supervisores.css';
 
   // ---- Created campaign -----------------------------------------------------------
 
+  /** An icon taken from the page's templates (rendered once by Astro, cloned per use). */
+  function icono(nombre: 'copiar' | 'copiado' | 'descargar'): Node {
+    return $<HTMLTemplateElement>(`template[data-icono-${nombre}]`).content.cloneNode(true);
+  }
+
   function pintarCreada(): void {
     const campana = estado.campanaCreada;
     $<HTMLElement>('[data-formulario]').hidden = true;
@@ -1212,48 +1237,103 @@ import '../../styles/supervisores.css';
     panel.hidden = !campana;
     if (!campana) return;
 
-    $<HTMLElement>('[data-creada-titulo]').textContent = t('mowaMes.campana.creada.title', { id: campana.id });
-    $<HTMLElement>('[data-creada-meta]').textContent = t('mowaMes.campana.creada.meta', {
-      corte: formatDate(campana.fecha_corte),
-      envio: formatDate(campana.fecha_envio),
-      speech: campana.speech.nombre,
-    });
+    $<HTMLElement>('[data-creada-aviso-texto]').textContent = t('mowaMes.campana.subir.creada', { id: campana.id });
+    $<HTMLAnchorElement>('[data-creada-seguimiento]').href = `/mowa-mes/seguimiento?campana=${campana.id}`;
+    pintarArchivosCreados(campana);
+    pintarDatosParaMes(campana);
+  }
 
-    const host = $<HTMLElement>('[data-creada-archivos]');
-    host.replaceChildren();
-    const { envoltorio, cuerpo } = tabla('mm-archivos__tabla', [
-      [t('mowaMes.seguimiento.archivos.col.numero'), true],
-      [t('mowaMes.seguimiento.archivos.col.filas'), true],
-      [t('mowaMes.seguimiento.archivos.col.supervision'), true],
-      [t('mowaMes.seguimiento.archivos.col.bytes'), true],
-      [t('mowaMes.seguimiento.archivos.col.accion'), false],
-    ], { apilable: true });
-    campana.archivos.forEach((archivo) => {
-      const fila = document.createElement('tr');
+  /** Step 1: one download per file, in the order of `{archivo}`, with its real name. */
+  function pintarArchivosCreados(campana: Campana): void {
+    const lista = $<HTMLElement>('[data-creada-archivos]');
+    lista.replaceChildren();
+    [...campana.archivos]
+      .sort((a, b) => a.numero - b.numero)
+      .forEach((archivo) => {
+        const item = document.createElement('li');
+        item.className = 'mm-subir__archivo';
+        const nombre = document.createElement('span');
+        nombre.className = 'mono mm-subir__nombre';
+        nombre.textContent = nombreArchivo(archivo.nombre, campana.id, archivo.numero);
+        const detalle = document.createElement('span');
+        detalle.className = 'muted mm-subir__detalle';
+        detalle.textContent = t('mowaMes.campana.subir.archivoDetalle', {
+          filas: formatNumber(archivo.filas),
+          supervision: formatNumber(archivo.supervision),
+          tamano: formatBytes(archivo.bytes),
+        });
+        const boton = document.createElement('button');
+        boton.type = 'button';
+        boton.className = 'btn btn--sm';
+        const spinner = document.createElement('span');
+        spinner.className = 'btn__spinner';
+        spinner.setAttribute('aria-hidden', 'true');
+        const etiqueta = document.createElement('span');
+        etiqueta.className = 'btn__label';
+        etiqueta.textContent = t('mowaMes.seguimiento.archivos.descargar');
+        boton.append(spinner, icono('descargar'), etiqueta);
+        boton.setAttribute('aria-label', t('mowaMes.seguimiento.archivos.descargarAria', { n: archivo.numero }));
+        boton.addEventListener('click', () => void descargar(campana, archivo, boton));
+        item.append(nombre, detalle, boton);
+        lista.append(item);
+      });
+  }
+
+  /** Select a text so Ctrl+C is one key away when the copy was refused. */
+  function seleccionar(nodo: HTMLElement): void {
+    const seleccion = window.getSelection();
+    if (!seleccion) return;
+    seleccion.selectAllChildren(nodo);
+  }
+
+  let temporizadorCopia: number | undefined;
+  /** Says it in the status region; emptied first so a second copy of the same words is read again. */
+  function anunciarCopia(texto: string): void {
+    const nodo = $<HTMLElement>('[data-creada-copia-estado]');
+    window.clearTimeout(temporizadorCopia);
+    nodo.textContent = '';
+    temporizadorCopia = window.setTimeout(() => {
+      nodo.textContent = texto;
+    }, 100);
+  }
+
+  /** Step 2: each field of MES's form with its value and a button that copies exactly what is read. */
+  function pintarDatosParaMes(campana: Campana): void {
+    const lista = $<HTMLElement>('[data-creada-datos]');
+    lista.replaceChildren();
+    datosParaMes(campana).forEach((dato) => {
+      const fila = document.createElement('div');
+      fila.className = 'mm-subir__dato';
+      const nombre = document.createElement('dt');
+      nombre.textContent = dato.etiqueta;
+      const valor = document.createElement('dd');
+      const texto = document.createElement('span');
+      texto.className = 'mono mm-subir__valor';
+      texto.textContent = dato.valor;
       const boton = document.createElement('button');
       boton.type = 'button';
-      boton.className = 'btn btn--sm';
-      const spinner = document.createElement('span');
-      spinner.className = 'btn__spinner';
-      spinner.setAttribute('aria-hidden', 'true');
-      const etiqueta = document.createElement('span');
-      etiqueta.className = 'btn__label';
-      etiqueta.textContent = t('mowaMes.seguimiento.archivos.descargar');
-      boton.append(spinner, etiqueta);
-      boton.setAttribute('aria-label', t('mowaMes.seguimiento.archivos.descargarAria', { n: archivo.numero }));
-      boton.addEventListener('click', () => void descargar(campana, archivo, boton));
-      const accion = document.createElement('td');
-      accion.append(boton);
-      fila.append(
-        celda('td', String(archivo.numero), 'num'),
-        celda('td', formatNumber(archivo.filas), 'num'),
-        celda('td', formatNumber(archivo.supervision), 'num'),
-        celda('td', formatBytes(archivo.bytes), 'num'),
-        accion,
-      );
-      cuerpo.append(fila);
+      boton.className = 'btn btn--sm btn--icon';
+      boton.setAttribute('aria-label', t('mowaMes.accion.copiar', { dato: dato.etiqueta }));
+      boton.title = t('mowaMes.accion.copiar', { dato: dato.etiqueta });
+      boton.append(icono('copiar'));
+      let devolver: number | undefined;
+      boton.addEventListener('click', async () => {
+        const resultado = await copiarTexto(dato.valor);
+        if (resultado === 'fallo') {
+          seleccionar(texto);
+          anunciarCopia(t('mowaMes.campana.subir.copiarFallo', { dato: dato.etiqueta }));
+          return;
+        }
+        anunciarCopia(t('mowaMes.estado.copiado', { dato: dato.etiqueta }));
+        // The icon says «copied» for 2 s, then goes back.
+        boton.replaceChildren(icono('copiado'));
+        window.clearTimeout(devolver);
+        devolver = window.setTimeout(() => boton.replaceChildren(icono('copiar')), 2000);
+      });
+      valor.append(texto, boton);
+      fila.append(nombre, valor);
+      lista.append(fila);
     });
-    host.append(envoltorio);
   }
 
   async function descargar(campana: Campana, archivo: ArchivoCampana, boton: HTMLButtonElement): Promise<void> {
@@ -1340,19 +1420,8 @@ import '../../styles/supervisores.css';
       campoDescripcion.setSelectionRange(inicio, inicio + texto.length);
       return document.execCommand('copy');
     }
-    // Nothing written: the suggestion is what is copied, from an off-screen textarea taken out in `finally`.
-    const temporal = document.createElement('textarea');
-    temporal.value = texto;
-    temporal.setAttribute('readonly', '');
-    temporal.setAttribute('aria-hidden', 'true');
-    temporal.style.cssText = 'position:fixed;inset-block-start:0;inset-inline-start:-9999px;opacity:0';
-    document.body.append(temporal);
-    try {
-      temporal.select();
-      return document.execCommand('copy');
-    } finally {
-      temporal.remove();
-    }
+    // Nothing written: the suggestion is what is copied, from an off-screen textarea.
+    return copiarDesdeTextareaTemporal(texto);
   }
 
   botonCopiar.addEventListener('click', async () => {

@@ -11,6 +11,7 @@
 
 import type {
   ArchivoPrevisto,
+  Campana,
   ConsumoLimite,
   CreacionCampanaEntrada,
   HerramientasEntrada,
@@ -275,40 +276,6 @@ export function textoDePegado(valor: string, inicio: number, fin: number, pegado
   return { texto, cortado: texto.length < normalizado.length };
 }
 
-/** How a copy ended: with the async clipboard, with the classic fallback, or not at all. */
-export type ResultadoCopia = 'portapapeles' | 'respaldo' | 'fallo';
-
-export interface OperacionesCopia {
-  /** `navigator.clipboard.writeText`; absent where the browser has no async clipboard (plain http outside localhost). */
-  escribir?: (texto: string) => Promise<void>;
-  /** The classic way: select the text and `document.execCommand('copy')`; `false` when the browser refuses. */
-  seleccionarYCopiar: () => boolean;
-}
-
-/**
- * The order of attempts: the async clipboard first; only if it is missing or rejects, the classic
- * fallback; only if that returns `false` or throws, the failure. The fallback is never tried when the
- * clipboard worked.
- */
-export async function copiarConRespaldo(
-  texto: string,
-  { escribir, seleccionarYCopiar }: OperacionesCopia,
-): Promise<ResultadoCopia> {
-  if (escribir) {
-    try {
-      await escribir(texto);
-      return 'portapapeles';
-    } catch {
-      // Falls through to the classic way.
-    }
-  }
-  try {
-    return seleccionarYCopiar() ? 'respaldo' : 'fallo';
-  } catch {
-    return 'fallo';
-  }
-}
-
 /**
  * One sentence per problem, errors before warnings, in the order the API
  * evaluated them. For a screen-reader status line, updated once per preview.
@@ -340,4 +307,83 @@ export function mensajeLimiteExcedido(consumo: ConsumoLimite): string {
     cargados: formatNumber(consumo.total),
     limite: formatNumber(consumo.limite),
   });
+}
+
+// ---- The data to upload to MES (RF-MM-35) --------------------------------------------
+
+/** One field of MES's form, as the analyst types it there: what it is called and what it holds. */
+export interface DatoParaMes {
+  clave: 'tipoCarga' | 'descripcion' | 'salida' | 'herramientas' | 'programacion';
+  etiqueta: string;
+  valor: string;
+}
+
+const CLAVE_TIPO_CARGA: Record<Campana['tipo_carga'], string> = {
+  masiva: 'mowaMes.campana.tipoCarga.masiva',
+  personalizada: 'mowaMes.campana.tipoCarga.personalizada',
+};
+const CLAVE_SALIDA: Record<Campana['salida'], string> = {
+  numero_largo: 'mowaMes.campana.salida.numeroLargo',
+  numero_corto: 'mowaMes.campana.salida.numeroCorto',
+  numero_corto_flash: 'mowaMes.campana.salida.numeroCortoFlash',
+};
+const CLAVE_PROGRAMACION: Record<Campana['programacion'], string> = {
+  enviar_ahora: 'mowaMes.campana.programacion.enviarAhora',
+  hora_determinada: 'mowaMes.campana.programacion.horaDeterminada',
+  diferentes_horas: 'mowaMes.campana.programacion.diferentesHoras',
+};
+const CLAVE_HERRAMIENTA: Record<keyof Campana['herramientas'], string> = {
+  keyword: 'mowaMes.campana.herramientas.keyword',
+  respuesta_automatica: 'mowaMes.campana.herramientas.respuestaAutomatica',
+  blacklist_indecopi: 'mowaMes.campana.herramientas.blacklist',
+  speech_optimizado: 'mowaMes.campana.herramientas.speechOptimizado',
+};
+
+/** `dd/mm/aaaa hh:mm` in Lima, the hour MES asks for: the same text whatever the screen's language or zone. */
+export function fechaHoraParaMes(iso: string): string {
+  const partes = new Map(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'America/Lima',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(new Date(iso))
+      .map((parte) => [parte.type, parte.value]),
+  );
+  return `${partes.get('day')}/${partes.get('month')}/${partes.get('year')} ${partes.get('hour')}:${partes.get('minute')}`;
+}
+
+/**
+ * What the form of MES asks for, in its order (RF-MM-03 to RF-MM-07), read from the campaign as it was
+ * created. The values are the screen's own words, so what is copied is what was read.
+ */
+export function datosParaMes(
+  campana: Pick<Campana, 'tipo_carga' | 'descripcion' | 'salida' | 'herramientas' | 'programacion' | 'envios'>,
+): DatoParaMes[] {
+  const herramientas = (Object.keys(CLAVE_HERRAMIENTA) as Array<keyof Campana['herramientas']>)
+    .filter((nombre) => campana.herramientas[nombre])
+    .map((nombre) => t(CLAVE_HERRAMIENTA[nombre]));
+  const programacion = t(CLAVE_PROGRAMACION[campana.programacion]);
+  return [
+    { clave: 'tipoCarga', etiqueta: t('mowaMes.campana.tipoCarga'), valor: t(CLAVE_TIPO_CARGA[campana.tipo_carga]) },
+    { clave: 'descripcion', etiqueta: t('mowaMes.campana.descripcion'), valor: campana.descripcion },
+    { clave: 'salida', etiqueta: t('mowaMes.campana.salida'), valor: t(CLAVE_SALIDA[campana.salida]) },
+    {
+      clave: 'herramientas',
+      etiqueta: t('mowaMes.campana.herramientas'),
+      valor: herramientas.length > 0 ? herramientas.join(', ') : t('mowaMes.campana.subir.sinHerramientas'),
+    },
+    {
+      clave: 'programacion',
+      etiqueta: t('mowaMes.campana.programacion'),
+      valor:
+        campana.envios.length > 0
+          ? `${programacion}: ${campana.envios.map(fechaHoraParaMes).join('; ')}`
+          : programacion,
+    },
+  ];
 }

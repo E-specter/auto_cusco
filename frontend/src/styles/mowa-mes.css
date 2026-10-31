@@ -446,6 +446,85 @@
   flex: 1 1 16rem;
 }
 
+/* ---- To upload to MES (RF-MM-35) -----------------------------------------------
+   Three numbered steps once the campaign exists: the files, the data of MES's form with a copy button
+   each, and the link to its follow-up. The numbers are the list's own. */
+.mm-subir {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding-inline-start: var(--space-5);
+}
+
+.mm-subir__paso {
+  padding-inline-start: var(--space-2);
+}
+
+.mm-subir__paso > * + * {
+  margin-block-start: var(--space-2);
+}
+
+.mm-subir__archivos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mm-subir__archivo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+
+.mm-subir__nombre,
+.mm-subir__valor {
+  overflow-wrap: anywhere;
+}
+
+.mm-subir__detalle {
+  font-size: var(--text-sm);
+}
+
+.mm-subir__datos {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.mm-subir__dato {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) 1fr;
+  align-items: start;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  border-block-end: var(--color-border-hairline) solid var(--color-border);
+}
+
+.mm-subir__dato dt {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.mm-subir__dato dd {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+/* On a phone the name goes above its value, so neither is squeezed beside the other. */
+@media (max-width: 47.99rem) {
+  .mm-subir__dato {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+}
+
 /* File-name template (RF-MM-25): the variables as a row of quiet buttons under
    the field, and the name the API gives, in mono, wrapping instead of scrolling. */
 .mm-variables {
