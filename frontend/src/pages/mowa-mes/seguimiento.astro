@@ -89,6 +89,13 @@ import '../../styles/mowa-mes.css';
           <h2 class="panel__title" id="mm-campanas-title" data-i18n="mowaMes.seguimiento.campanas.title">Campañas</h2>
           <p class="mono muted mm-nota" data-campanas-cuenta aria-live="polite"></p>
         </div>
+        <!-- Above the list: how many of its campaigns still wait for the sent report (RF-MM-33). -->
+        <div class="panel__body" data-pendientes hidden>
+          <p class="notice notice--warning" role="status">
+            <Icon name="triangle-alert" size={20} />
+            <span data-pendientes-texto></span>
+          </p>
+        </div>
         <div data-campanas>
           <p class="empty" data-i18n="common.loading">Cargando</p>
         </div>
@@ -120,6 +127,18 @@ import '../../styles/mowa-mes.css';
           </p>
 
           <div class="mm-detalle" data-detalle-cuerpo hidden>
+            <!-- A campaign with no report imported yet: the next step, and the way to it (RF-MM-33). -->
+            <p class="notice notice--warning mm-pendiente" data-pendiente-aviso hidden>
+              <Icon name="triangle-alert" size={20} />
+              <span data-i18n="mowaMes.seguimiento.pendiente.aviso">
+                Falta importar el reporte de enviados de MES. Cuando la campaña se haya enviado, descárgalo de MES e impórtalo aquí.
+              </span>
+              <button type="button" class="btn btn--sm" data-pendiente-importar>
+                <Icon name="upload" size={16} />
+                <span data-i18n="mowaMes.seguimiento.pendiente.importar">Importar el reporte</span>
+              </button>
+            </p>
+
             <dl class="mm-cifras" data-detalle-cifras></dl>
 
             <h3 class="mm-subtitulo" data-i18n="mowaMes.seguimiento.archivos.title">Archivos de carga</h3>
@@ -219,6 +238,9 @@ import '../../styles/mowa-mes.css';
     </div>
   </dialog>
 
+  <!-- The icon of a row's tag: rendered once here, cloned per row. -->
+  <template data-icono-pendiente><Icon name="hourglass" size={16} /></template>
+
   <!-- ---- Generic failure ---------------------------------------------- -->
   <dialog class="dialog" data-dialog="error" aria-labelledby="mm-error-title">
     <div class="dialog__head">
@@ -247,6 +269,7 @@ import '../../styles/mowa-mes.css';
     importarReporte,
     listarCampanas,
     listarExclusiones,
+    obtenerCampana,
     obtenerConciliacion,
     type ArchivoCampana,
     type Campana,
@@ -266,6 +289,7 @@ import '../../styles/mowa-mes.css';
   import { presentarCosto, traducirCodigo, type PresentacionCosto } from '../../lib/mowa-mes';
   import {
     CODIGOS_EXCLUSION,
+    campanaDeLaUrl,
     detalleDeExclusion,
     filasConciliacion,
     leerResumenDescarga,
@@ -286,6 +310,8 @@ import '../../styles/mowa-mes.css';
     campanas: null as ListaCampanas | null,
     desplazamientoCampanas: 0,
     campanaId: null as number | null,
+    /** The campaign a link asked for when it is not on the page of the list (an older one). */
+    campanaAparte: null as Campana | null,
     conciliacion: null as Conciliacion | null,
     exclusiones: null as PaginaExclusiones | null,
     codigo: '' as CodigoMowaMes | '',
@@ -446,7 +472,31 @@ import '../../styles/mowa-mes.css';
   // ---- Campaigns ---------------------------------------------------------------
 
   const campanaActual = (): Campana | null =>
-    estado.campanas?.campanas.find((c) => c.id === estado.campanaId) ?? null;
+    estado.campanas?.campanas.find((c) => c.id === estado.campanaId) ??
+    (estado.campanaAparte?.id === estado.campanaId ? estado.campanaAparte : null);
+
+  /** The tag of a campaign whose sent report has not been imported yet (RF-MM-33). */
+  function etiquetaPendiente(): HTMLElement {
+    const etiqueta = document.createElement('span');
+    etiqueta.className = 'tag tag--advertencia mm-pendiente__tag';
+    etiqueta.append(
+      $<HTMLTemplateElement>('template[data-icono-pendiente]').content.cloneNode(true),
+      document.createTextNode(t('mowaMes.estado.pendienteReporte')),
+    );
+    return etiqueta;
+  }
+
+  /** Above the list: how many campaigns, of the whole list and not only this page, still wait for their report. */
+  function pintarPendientes(pagina: ListaCampanas): void {
+    const cuantas = pagina.total_pendientes;
+    $<HTMLElement>('[data-pendientes]').hidden = cuantas === 0;
+    $<HTMLElement>('[data-pendientes-texto]').textContent =
+      cuantas === 0
+        ? ''
+        : t(cuantas === 1 ? 'mowaMes.seguimiento.pendientesUna' : 'mowaMes.seguimiento.pendientes', {
+            n: formatNumber(cuantas),
+          });
+  }
 
   function pintarCampanas(): void {
     const host = $<HTMLElement>('[data-campanas]');
@@ -455,6 +505,7 @@ import '../../styles/mowa-mes.css';
     host.replaceChildren();
     const pagina = estado.campanas;
     if (!pagina) return;
+    pintarPendientes(pagina);
 
     cuenta.textContent =
       pagina.total === 1
@@ -496,10 +547,13 @@ import '../../styles/mowa-mes.css';
       const accion = document.createElement('td');
       accion.append(ver);
 
+      const descripcion = celda('td', campana.descripcion);
+      if (campana.pendiente_reporte) descripcion.append(etiquetaPendiente());
+
       fila.append(
         celda('td', String(campana.id), 'num'),
         celda('td', formatDateTime(campana.creado_en), 'mono'),
-        celda('td', campana.descripcion),
+        descripcion,
         celda('td', formatDate(campana.fecha_envio), 'mono'),
         celda('td', formatNumber(campana.productos_cargados), 'num'),
         celda('td', formatNumber(campana.supervision_cargados), 'num'),
@@ -545,6 +599,7 @@ import '../../styles/mowa-mes.css';
     const titulo = $<HTMLElement>('[data-detalle-titulo]');
     $<HTMLElement>('[data-detalle-vacio]').hidden = Boolean(campana);
     $<HTMLElement>('[data-detalle-cuerpo]').hidden = !campana;
+    $<HTMLElement>('[data-pendiente-aviso]').hidden = !campana?.pendiente_reporte;
 
     if (!campana) {
       titulo.dataset.i18n = 'mowaMes.seguimiento.detalle.titleNinguna';
@@ -652,6 +707,11 @@ import '../../styles/mowa-mes.css';
     }
   }
 
+  $<HTMLButtonElement>('[data-pendiente-importar]').addEventListener('click', () => {
+    inputReporte.scrollIntoView({ block: 'center' });
+    inputReporte.focus();
+  });
+
   async function elegirCampana(id: number): Promise<void> {
     estado.campanaId = id;
     estado.conciliacion = null;
@@ -731,7 +791,7 @@ import '../../styles/mowa-mes.css';
       pintarConciliacion();
       pintarDetalle();
       // The list row carries the real cost too, and it just changed.
-      void cargarCampanas().catch(mostrarError);
+      void cargarCampanas().then(pintarDetalle).catch(mostrarError);
       avisar($<HTMLElement>('[data-reporte-estado]'), t('mowaMes.seguimiento.reporte.importado'));
     } catch (caido) {
       if (caido instanceof ApiError && caido.status === 409 && !reemplazar) {
@@ -992,6 +1052,20 @@ import '../../styles/mowa-mes.css';
     document.dispatchEvent(new CustomEvent('healthchanged'));
   }
 
+  /** Opens the campaign the URL names, even if it is not on this page of the list. `false` if there is none. */
+  async function abrirPedida(id: number | null): Promise<boolean> {
+    if (id === null) return false;
+    if (!estado.campanas?.campanas.some((campana) => campana.id === id)) {
+      try {
+        estado.campanaAparte = await obtenerCampana(id);
+      } catch {
+        return false;
+      }
+    }
+    await elegirCampana(id);
+    return true;
+  }
+
   async function arrancar(): Promise<void> {
     try {
       const [consumo, campanas] = await Promise.all([
@@ -1005,9 +1079,12 @@ import '../../styles/mowa-mes.css';
       pintarLimite();
       pintarCampanas();
       pintarDetalle();
-      // The most recent campaign is the one a follow-up usually starts from.
+      // `?campana=<id>` opens that one (the link of «Para subir a MES»); otherwise the most recent, which is
+      // where a follow-up usually starts.
       const primera = campanas.campanas[0];
-      if (primera && estado.campanaId === null) await elegirCampana(primera.id);
+      if (estado.campanaId === null && !(await abrirPedida(campanaDeLaUrl(window.location.search)))) {
+        if (primera) await elegirCampana(primera.id);
+      }
     } catch (caido) {
       if (caido instanceof NetworkError) {
         sinConexion(true);

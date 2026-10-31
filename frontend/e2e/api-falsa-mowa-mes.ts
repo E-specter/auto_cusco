@@ -887,7 +887,9 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
 
     if (ruta === '/mowa-mes/campanas' && metodo === 'GET') {
       const { elementos, ...resto } = pagina(estado.campanas, 50);
-      return json(route, 200, { ...resto, campanas: elementos });
+      // The count of the whole list, not of the page: the API counts them in the repository.
+      const totalPendientes = estado.campanas.filter((c) => c.pendiente_reporte && c.descartada_en === null).length;
+      return json(route, 200, { ...resto, total_pendientes: totalPendientes, campanas: elementos });
     }
 
     if (ruta === '/mowa-mes/campanas/previsualizacion' && metodo === 'POST') {
@@ -1004,7 +1006,9 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
         estado.conciliaciones.set(id, conciliacion);
         // The real cost is not stored: the list recomputes it from the reconciliation in force.
         estado.campanas = estado.campanas.map((c) =>
-          c.id === id ? { ...c, costo_real: conciliacion.costo_real, costo_real_estado: conciliacion.costo_real_estado } : c,
+          c.id === id
+            ? { ...c, costo_real: conciliacion.costo_real, costo_real_estado: conciliacion.costo_real_estado, pendiente_reporte: false }
+            : c,
         );
         return json(route, 201, conciliacion);
       }

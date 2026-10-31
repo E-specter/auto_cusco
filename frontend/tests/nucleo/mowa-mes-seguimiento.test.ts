@@ -16,6 +16,7 @@ import {
   moverMes,
   nombreArchivo,
   ordenarEstados,
+  campanaDeLaUrl,
   rangoPagina,
   usoDelLimite,
 } from '../../src/lib/mowa-mes-seguimiento';
@@ -154,5 +155,28 @@ describe('paginación', () => {
   it('una página vacía no tiene rango', () => {
     expect(rangoPagina(0, 0, 0)).toBeNull();
     expect(rangoPagina(40, 0, 25)).toBeNull();
+  });
+});
+
+describe('campanaDeLaUrl (el enlace de «Para subir a MES»)', () => {
+  it('lee el id de ?campana=', () => {
+    expect(campanaDeLaUrl('?campana=9')).toBe(9);
+    expect(campanaDeLaUrl('campana=123')).toBe(123);
+  });
+
+  it('con otros parámetros, sigue encontrándolo', () => {
+    expect(campanaDeLaUrl('?mes=2026-09&campana=7')).toBe(7);
+  });
+
+  it('sin el parámetro, o vacío, no hay campaña', () => {
+    expect(campanaDeLaUrl('')).toBeNull();
+    expect(campanaDeLaUrl('?mes=2026-09')).toBeNull();
+    expect(campanaDeLaUrl('?campana=')).toBeNull();
+  });
+
+  it('un valor que no es un entero positivo no es una campaña', () => {
+    for (const malo of ['abc', '0', '-3', '2.5', '1e3', ' 4', '4 ', '99999999999999999999', '0x10', '+5']) {
+      expect(campanaDeLaUrl(`?campana=${encodeURIComponent(malo)}`), malo).toBeNull();
+    }
   });
 });

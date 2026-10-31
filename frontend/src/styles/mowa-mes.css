@@ -427,6 +427,25 @@
   margin-inline-end: var(--space-1);
 }
 
+/* ---- Pending report (RF-MM-33) ---------------------------------------------------
+   The tag sits after the description, on its own line when the cell is narrow; the notice in the detail
+   carries its way to the import field at the end, and drops it under the text when there is no room. */
+.mm-pendiente__tag {
+  margin-inline-start: var(--space-2);
+}
+
+.mm-pendiente {
+  flex-wrap: wrap;
+}
+
+.mm-pendiente .btn {
+  margin-inline-start: auto;
+}
+
+.mm-pendiente > span {
+  flex: 1 1 16rem;
+}
+
 /* File-name template (RF-MM-25): the variables as a row of quiet buttons under
    the field, and the name the API gives, in mono, wrapping instead of scrolling. */
 .mm-variables {

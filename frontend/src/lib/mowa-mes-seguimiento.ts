@@ -151,3 +151,15 @@ export function rangoPagina(
   if (enPagina <= 0 || total <= 0) return null;
   return { desde: desplazamiento + 1, hasta: Math.min(desplazamiento + enPagina, total) };
 }
+
+/**
+ * The campaign a link asks the follow-up to open: `?campana=<id>` (the one «Para subir a MES» points at).
+ * `null` when the parameter is missing or is not a whole, positive number: the screen then starts from the
+ * latest campaign, as always.
+ */
+export function campanaDeLaUrl(busqueda: string): number | null {
+  const valor = new URLSearchParams(busqueda).get('campana');
+  if (valor === null || !/^[0-9]+$/.test(valor)) return null;
+  const id = Number(valor);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
