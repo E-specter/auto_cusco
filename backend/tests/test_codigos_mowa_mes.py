@@ -7,7 +7,7 @@ en su bloque `mowaMes.*`. La prueba espejo del frontend comprueba la otra
 direccion: que no queden claves de codigos que ya no existen.
 """
 
-from app.core.entities.mowa_mes import TIPO_CODIGO, CodigoMowaMes, TipoCodigo
+from app.core.entities.mowa_mes import TIPO_CODIGO, CodigoErrorSpeech, CodigoMowaMes, TipoCodigo
 from app.core.entities.mowa_mes_campana import CodigoErrorCampana
 from tests.ayudas.espejo_i18n import assert_cubre
 
@@ -25,6 +25,10 @@ def test_cada_codigo_tiene_su_traduccion() -> None:
 
 def test_cada_codigo_de_error_de_campana_tiene_su_traduccion() -> None:
     assert_cubre(CodigoErrorCampana, "mowaMes.errorCampana")
+
+
+def test_cada_codigo_de_error_de_speech_tiene_su_traduccion() -> None:
+    assert_cubre(CodigoErrorSpeech, "mowaMes.errorSpeech")
 
 
 def test_cada_codigo_tiene_tipo() -> None:

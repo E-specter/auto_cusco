@@ -91,6 +91,33 @@ class RepositorioMowaMesFalso:
         self.versiones[speech_id] = replace(version, datos=datos)
         return self.versiones[speech_id]
 
+    def renombrar_speech(self, speech_id, nombre):
+        version = self.versiones.get(speech_id)
+        if version is None:
+            return None
+        if self._repetido(nombre, excepto=speech_id):
+            raise NombreDeSpeechRepetido(nombre)
+        self.escrituras += 1
+        self.versiones[speech_id] = replace(version, datos=replace(version.datos, nombre=nombre))
+        return self.versiones[speech_id]
+
+    def cambiar_habilitacion(self, speech_id, habilitada):
+        version = self.versiones.get(speech_id)
+        if version is None:
+            return None
+        if habilitada:
+            self.versiones[speech_id] = replace(version, deshabilitada_en=None)
+        elif version.deshabilitada_en is None:  # repetirlo no pisa la fecha
+            self.versiones[speech_id] = replace(version, deshabilitada_en=MOMENTO)
+        return self.versiones[speech_id]
+
+    def eliminar_speech(self, speech_id):
+        version = self.versiones.get(speech_id)
+        if version is None or version.original or version.usada or version.habilitada:
+            return False
+        del self.versiones[speech_id]
+        return True
+
     def marcar_speech_usado(self, speech_id):
         self.versiones[speech_id] = replace(self.versiones[speech_id], usada_en=MOMENTO)
 

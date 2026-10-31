@@ -17,6 +17,7 @@ from app.core.entities.mowa_mes import (
     BYTES_POR_ARCHIVO_MINIMO,
     REGISTROS_POR_ARCHIVO,
     CampoConfiguracion,
+    CodigoErrorSpeech,
     CodigoMowaMes,
     ConfiguracionInvalida,
     ConfiguracionMowaMes,
@@ -29,6 +30,7 @@ from app.core.entities.mowa_mes import (
     Segmento,
     SpeechInmutable,
     SpeechInvalido,
+    SpeechNoEliminable,
     SpeechNoEncontrado,
     VersionSpeech,
 )
@@ -215,6 +217,45 @@ class ConfiguracionMowaMesService:
             adicionales=speech.adicionales_de(self._catalogo),
         )
         return BorradorV2(version.id, nombre, expresiones, problemas)
+
+    def renombrar_speech(self, speech_id: int, nombre: str) -> VersionSpeech:
+        """RF-MM-28: cualquier version, la usada y el original incluidos. No cambia el contenido
+        ni la huella; el nombre repetido (sin distinguir mayusculas) es `NombreDeSpeechRepetido`."""
+        self.obtener_speech(speech_id)
+        limpio = nombre.strip()
+        problemas = speech.problemas_del_nombre(limpio)
+        if problemas:
+            raise SpeechInvalido(problemas)
+        version = self._repositorio.renombrar_speech(speech_id, limpio)
+        if version is None:
+            raise SpeechNoEncontrado(speech_id)
+        return version
+
+    def deshabilitar_speech(self, speech_id: int) -> VersionSpeech:
+        """RF-MM-29: ya no se elige en campanas nuevas; conserva todo. Repetirlo no cambia nada."""
+        return self._cambiar_habilitacion(speech_id, habilitada=False)
+
+    def habilitar_speech(self, speech_id: int) -> VersionSpeech:
+        return self._cambiar_habilitacion(speech_id, habilitada=True)
+
+    def _cambiar_habilitacion(self, speech_id: int, habilitada: bool) -> VersionSpeech:
+        self.obtener_speech(speech_id)
+        version = self._repositorio.cambiar_habilitacion(speech_id, habilitada)
+        if version is None:
+            raise SpeechNoEncontrado(speech_id)
+        return version
+
+    def eliminar_speech(self, speech_id: int) -> None:
+        """RF-MM-30: solo una version deshabilitada, sin uso y que no sea el original."""
+        version = self.obtener_speech(speech_id)
+        if version.bloqueo_para_eliminar is not None:
+            raise SpeechNoEliminable(version, version.bloqueo_para_eliminar)
+        if not self._repositorio.eliminar_speech(speech_id):
+            # Entre la lectura y el borrado, alguien la habilito o una campana la uso.
+            actual = self.obtener_speech(speech_id)
+            raise SpeechNoEliminable(
+                actual, actual.bloqueo_para_eliminar or CodigoErrorSpeech.SPEECH_NO_DESHABILITADO
+            )
 
     def actualizar_speech(self, speech_id: int, datos: DatosSpeech) -> VersionSpeech:
         if datos.formato is FormatoSpeech.V1:

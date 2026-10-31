@@ -108,6 +108,7 @@ class CodigoMowaMes(StrEnum):
     SIN_SUPERVISORES = "sin_supervisores"
     SIN_PRODUCTOS_CARGABLES = "sin_productos_cargables"
     VERSION_V1_RETIRADA = "version_v1_retirada"  # RF-MM-17 (M3): no se crean versiones de 2 partes
+    SPEECH_DESHABILITADO = "speech_deshabilitado"  # RF-MM-29: la campana no usa una deshabilitada
 
 
 TIPO_CODIGO: dict[CodigoMowaMes, TipoCodigo] = {
@@ -126,6 +127,7 @@ TIPO_CODIGO: dict[CodigoMowaMes, TipoCodigo] = {
     CodigoMowaMes.SIN_SUPERVISORES: TipoCodigo.ERROR,
     CodigoMowaMes.SIN_PRODUCTOS_CARGABLES: TipoCodigo.ERROR,
     CodigoMowaMes.VERSION_V1_RETIRADA: TipoCodigo.ERROR,
+    CodigoMowaMes.SPEECH_DESHABILITADO: TipoCodigo.ERROR,
 }
 
 # RF-MM-11. Son el maximo de la plataforma: la configuracion solo puede bajarlos.
@@ -188,6 +190,26 @@ class DatosSpeech:
     formato: FormatoSpeech = FormatoSpeech.V1
 
 
+class CodigoErrorSpeech(StrEnum):
+    """Motivo del 409 de `DELETE /mowa-mes/speech/{id}` (RF-MM-30): por que no se puede eliminar.
+
+    Catalogo propio, aparte de `CodigoMowaMes` (los de una campana) y de `CodigoErrorCampana` (los
+    409 de las campanas). El frontend los traduce como `mowaMes.errorSpeech.<codigo>`. Un codigo por
+    linea, con la forma `NOMBRE = "codigo"`: la prueba espejo del frontend lee esta clase.
+    """
+
+    SPEECH_ORIGINAL = "speech_original"
+    SPEECH_USADO = "speech_usado"
+    SPEECH_NO_DESHABILITADO = "speech_no_deshabilitado"
+
+
+class MotivoNoEliminable(StrEnum):
+    """Por que una version no se podra eliminar por mas que se deshabilite (RF-MM-30)."""
+
+    ORIGINAL = "original"
+    USADA = "usada"
+
+
 @dataclass(frozen=True)
 class VersionSpeech:
     id: int
@@ -196,15 +218,49 @@ class VersionSpeech:
     basada_en_id: int | None
     usada_en: datetime | None
     creado_en: datetime
+    # RF-MM-29: cuando se deshabilito; None = habilitada.
+    deshabilitada_en: datetime | None = None
 
     @property
     def usada(self) -> bool:
         return self.usada_en is not None
 
     @property
+    def habilitada(self) -> bool:
+        return self.deshabilitada_en is None
+
+    @property
     def editable(self) -> bool:
-        """RF-MM-17: una version usada no se modifica; el Speech original tampoco."""
-        return not self.original and not self.usada
+        """RF-MM-17: una version usada no se modifica; el Speech original tampoco. Una
+        deshabilitada tampoco: se ve en solo lectura hasta que se habilite (RF-MM-29)."""
+        return not self.original and not self.usada and self.habilitada
+
+    @property
+    def bloqueo_para_eliminar(self) -> CodigoErrorSpeech | None:
+        """Lo que impide eliminarla ahora (RF-MM-30), o None si se puede. El unico lugar donde se
+        decide: lo usan el `DELETE`, `eliminable` y `motivo_no_eliminable`. Primero lo que no se
+        arregla deshabilitando (el original, luego el uso) y al final lo que si."""
+        if self.original:
+            return CodigoErrorSpeech.SPEECH_ORIGINAL
+        if self.usada:
+            return CodigoErrorSpeech.SPEECH_USADO
+        if self.habilitada:
+            return CodigoErrorSpeech.SPEECH_NO_DESHABILITADO
+        return None
+
+    @property
+    def eliminable(self) -> bool:
+        return self.bloqueo_para_eliminar is None
+
+    @property
+    def motivo_no_eliminable(self) -> MotivoNoEliminable | None:
+        """Lo que la pantalla muestra en vez del boton: solo lo permanente. Una version habilitada
+        sin uso tiene motivo None y `eliminable` falso: antes hay que deshabilitarla."""
+        if self.original:
+            return MotivoNoEliminable.ORIGINAL
+        if self.usada:
+            return MotivoNoEliminable.USADA
+        return None
 
 
 # Los campos que un problema de speech puede senalar: la API los publica tal cual.
@@ -285,9 +341,28 @@ class SpeechNoEncontrado(Exception):
         self.speech_id = speech_id
 
 
+class SpeechNoEliminable(Exception):
+    """RF-MM-30: la version no se puede eliminar; `codigo` dice por que."""
+
+    def __init__(self, version: VersionSpeech, codigo: CodigoErrorSpeech) -> None:
+        motivo = {
+            CodigoErrorSpeech.SPEECH_ORIGINAL: "es el Speech original",
+            CodigoErrorSpeech.SPEECH_USADO: "ya la uso una campana",
+            CodigoErrorSpeech.SPEECH_NO_DESHABILITADO: "esta habilitada; deshabilitala primero",
+        }[codigo]
+        super().__init__(f"La version {version.datos.nombre!r} no se elimina porque {motivo}")
+        self.speech_id = version.id
+        self.codigo = codigo
+
+
 class SpeechInmutable(Exception):
     def __init__(self, version: VersionSpeech) -> None:
-        motivo = "es el Speech original" if version.original else "ya se uso en una campana"
+        if version.original:
+            motivo = "es el Speech original"
+        elif version.usada:
+            motivo = "ya se uso en una campana"
+        else:
+            motivo = "esta deshabilitada; habilitala para editarla"
         super().__init__(
             f"La version {version.datos.nombre!r} no se modifica porque {motivo}; "
             "guarda el cambio como una version nueva"

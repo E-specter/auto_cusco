@@ -52,6 +52,9 @@ function version(parcial: Partial<VersionSpeech> = {}): VersionSpeech {
     usada: false,
     editable: true,
     creado_en: '2099-01-01T08:00:00-05:00',
+    deshabilitada_en: null,
+    eliminable: false,
+    motivo_no_eliminable: null,
     // Desordenadas a propósito: el borrador sigue el orden de RF-MM-15.
     partes: [parte('9_a_30'), parte('preventiva'), parte('1_a_8')],
     expresiones: [],

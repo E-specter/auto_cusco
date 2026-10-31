@@ -48,6 +48,9 @@ function versionV2(parcial: Partial<VersionSpeech> = {}): VersionSpeech {
     usada: false,
     editable: true,
     creado_en: '2026-10-10T09:00:00-05:00',
+    deshabilitada_en: null,
+    eliminable: false,
+    motivo_no_eliminable: null,
     partes: [],
     expresiones: [...RANGOS].reverse().map((r) => ({
       ...r,

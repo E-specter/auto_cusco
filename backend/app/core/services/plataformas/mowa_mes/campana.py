@@ -344,6 +344,8 @@ class CampanasMowaMesService:
                 sin_whatsapp[resultado] += 1
 
         errores = _errores(productos, supervisores, sin_whatsapp)
+        if not version.habilitada:
+            errores = (_error_speech_deshabilitado(version), *errores)
         filas_supervision = _filas_supervision(productos, supervisores, procedencias)
         filas = (*filas_supervision, *productos)
         mes = fecha_envio.replace(day=1)
@@ -545,6 +547,14 @@ def _validar_opciones(peticion: PeticionCampana) -> None:
         raise PeticionCampanaInvalida("La respuesta automatica todavia no esta habilitada")
     if not 1 <= peticion.cantidad <= CANTIDAD_MAXIMA:
         raise PeticionCampanaInvalida(f"La cantidad debe estar entre 1 y {CANTIDAD_MAXIMA}")
+
+
+def _error_speech_deshabilitado(version: VersionSpeech) -> ErrorCampana:
+    return ErrorCampana(
+        CodigoMowaMes.SPEECH_DESHABILITADO,
+        f"La version de speech {version.datos.nombre!r} esta deshabilitada; elige otra o "
+        "habilitala",
+    )
 
 
 def _errores(

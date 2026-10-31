@@ -785,10 +785,22 @@ export interface paths {
          */
         put: operations["actualizar_speech_mowa_mes_speech__speech_id__put"];
         post?: never;
-        delete?: never;
+        /**
+         * Eliminar Speech
+         * @description Borra del todo una version DESHABILITADA que ninguna campana uso (RF-MM-30). El Speech
+         *     original nunca se elimina.
+         */
+        delete: operations["eliminar_speech_mowa_mes_speech__speech_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Modificar Speech
+         * @description Renombra (RF-MM-28) y/o deshabilita o habilita (RF-MM-29) una version, sea cual sea: la
+         *     usada y el Speech original incluidos. No cambia el contenido ni la huella. Con los dos campos,
+         *     primero renombra: si el nombre ya existe (409), no cambia nada. Sin ninguno, devuelve la
+         *     version tal cual.
+         */
+        patch: operations["modificar_speech_mowa_mes_speech__speech_id__patch"];
         trace?: never;
     };
     "/mowa-mes/speech/{speech_id}/como-v2": {
@@ -1692,6 +1704,16 @@ export interface components {
          */
         CodigoErrorMapeador: "archivo_vacio" | "archivo_ilegible" | "extension_no_coincide" | "archivo_sin_datos" | "archivo_demasiado_grande" | "hoja_inexistente" | "separador_invalido" | "codificacion_invalida" | "codificacion_no_coincide" | "catalogo_desconocido" | "borrador_no_encontrado" | "mapeo_con_problemas" | "nombre_repetido" | "campo_adicional_no_encontrado" | "columna_inexistente";
         /**
+         * CodigoErrorSpeech
+         * @description Motivo del 409 de `DELETE /mowa-mes/speech/{id}` (RF-MM-30): por que no se puede eliminar.
+         *
+         *     Catalogo propio, aparte de `CodigoMowaMes` (los de una campana) y de `CodigoErrorCampana` (los
+         *     409 de las campanas). El frontend los traduce como `mowaMes.errorSpeech.<codigo>`. Un codigo por
+         *     linea, con la forma `NOMBRE = "codigo"`: la prueba espejo del frontend lee esta clase.
+         * @enum {string}
+         */
+        CodigoErrorSpeech: "speech_original" | "speech_usado" | "speech_no_deshabilitado";
+        /**
          * CodigoMapeo
          * @description Los problemas de una asignacion (RF-60).
          * @enum {string}
@@ -1706,7 +1728,7 @@ export interface components {
          *     `NOMBRE = "codigo"`: la prueba espejo del frontend lee esta clase.
          * @enum {string}
          */
-        CodigoMowaMes: "telefono_invalido" | "falta_documento" | "sin_speech" | "falta_titular" | "falta_vencimiento" | "falta_campo_adicional" | "mensaje_excede_160" | "mensaje_excede_150" | "documento_no_estandar" | "limite_mensual_excedido" | "id_sin_correspondencia" | "falta_whatsapp" | "sin_supervisores" | "sin_productos_cargables" | "version_v1_retirada";
+        CodigoMowaMes: "telefono_invalido" | "falta_documento" | "sin_speech" | "falta_titular" | "falta_vencimiento" | "falta_campo_adicional" | "mensaje_excede_160" | "mensaje_excede_150" | "documento_no_estandar" | "limite_mensual_excedido" | "id_sin_correspondencia" | "falta_whatsapp" | "sin_supervisores" | "sin_productos_cargables" | "version_v1_retirada" | "speech_deshabilitado";
         /**
          * CodigoTexto
          * @description Catalogo de codigos que el frontend traducira como `textoEnriquecido.codigo.<codigo>`.
@@ -2256,6 +2278,15 @@ export interface components {
             problemas: components["schemas"]["ProblemaSpeechRespuesta"][];
         };
         /**
+         * DetalleErrorSpeechNoEliminable
+         * @description 409 del `DELETE`: `codigo` dice por que no se puede eliminar (RF-MM-30).
+         */
+        DetalleErrorSpeechNoEliminable: {
+            /** Detail */
+            detail: string;
+            codigo: components["schemas"]["CodigoErrorSpeech"];
+        };
+        /**
          * DetalleErrorTexto
          * @description El motivo y el `codigo` del catalogo (`CodigoTexto`) que la interfaz traduce.
          */
@@ -2800,6 +2831,12 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * MotivoNoEliminable
+         * @description Por que una version no se podra eliminar por mas que se deshabilite (RF-MM-30).
+         * @enum {string}
+         */
+        MotivoNoEliminable: "original" | "usada";
         /**
          * MuestraEntrada
          * @description La muestra con la que se evalua.
@@ -3676,6 +3713,19 @@ export interface components {
              */
             expresiones?: components["schemas"]["ExpresionSegmentoEntrada"][] | null;
         };
+        /** SpeechParcialEntrada */
+        SpeechParcialEntrada: {
+            /**
+             * Nombre
+             * @description El nombre nuevo; no cambia si no viene (RF-MM-28)
+             */
+            nombre?: string | null;
+            /**
+             * Habilitada
+             * @description false deshabilita y true habilita; no cambia si no viene (RF-MM-29)
+             */
+            habilitada?: boolean | null;
+        };
         /** SpeechRegistradoRespuesta */
         SpeechRegistradoRespuesta: {
             /** Id */
@@ -3972,6 +4022,18 @@ export interface components {
              * Format: date-time
              */
             creado_en: string;
+            /**
+             * Deshabilitada En
+             * @description Cuando se deshabilito (RF-MM-29). null: esta habilitada. Una deshabilitada no se elige en campanas nuevas, se ve en solo lectura (`editable` false) y se puede habilitar de nuevo
+             */
+            deshabilitada_en: string | null;
+            /**
+             * Eliminable
+             * @description true si `DELETE /speech/{id}` la borraria ahora: deshabilitada, sin uso en campanas y no es el Speech original (RF-MM-30)
+             */
+            eliminable: boolean;
+            /** @description Por que no se podra eliminar por mas que se deshabilite: `original` o `usada` (RF-MM-30). null en las demas: una habilitada sin uso no es eliminable todavia (`eliminable` false), pero basta deshabilitarla */
+            motivo_no_eliminable: components["schemas"]["MotivoNoEliminable"] | null;
             /** Partes */
             partes: components["schemas"]["PartesRespuesta"][];
             /** Expresiones */
@@ -5934,6 +5996,115 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SpeechEdicionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionSpeechRespuesta"];
+                };
+            };
+            /** @description La peticion no vale: `detail` es el motivo y `problemas` dice donde */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorSpeech"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description La operacion choca con el estado actual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    eliminar_speech_mowa_mes_speech__speech_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speech_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description No se puede eliminar: es el Speech original, ya la uso una campana o esta habilitada (`codigo`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorSpeechNoEliminable"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    modificar_speech_mowa_mes_speech__speech_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speech_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeechParcialEntrada"];
             };
         };
         responses: {

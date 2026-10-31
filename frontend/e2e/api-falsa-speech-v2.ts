@@ -82,6 +82,9 @@ export function versionV2Sintetica(base: VersionSpeech, parcial: Partial<Version
     usada: false,
     editable: true,
     creado_en: '2026-10-10T09:00:00-05:00',
+    deshabilitada_en: null,
+    eliminable: false,
+    motivo_no_eliminable: null,
     partes: [],
     expresiones: base.partes.map(expresionDeSegmento),
     ...parcial,
@@ -257,6 +260,9 @@ export async function montarApiSpeechV2(
         usada: false,
         editable: true,
         creado_en: new Date().toISOString(),
+        deshabilitada_en: null,
+        eliminable: false,
+        motivo_no_eliminable: null,
         partes: [],
         expresiones: segmentosBase.map((p) => {
           const entrada = expresiones.find((e) => e.segmento === p.segmento)!;

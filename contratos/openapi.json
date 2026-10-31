@@ -2719,6 +2719,141 @@
           }
         }
       },
+      "patch": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Modificar Speech",
+        "description": "Renombra (RF-MM-28) y/o deshabilita o habilita (RF-MM-29) una version, sea cual sea: la\nusada y el Speech original incluidos. No cambia el contenido ni la huella. Con los dos campos,\nprimero renombra: si el nombre ya existe (409), no cambia nada. Sin ninguno, devuelve la\nversion tal cual.",
+        "operationId": "modificar_speech_mowa_mes_speech__speech_id__patch",
+        "parameters": [
+          {
+            "name": "speech_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Speech Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpeechParcialEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionSpeechRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no vale: `detail` es el motivo y `problemas` dice donde",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorSpeech"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La operacion choca con el estado actual",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "mowa-mes"
+        ],
+        "summary": "Eliminar Speech",
+        "description": "Borra del todo una version DESHABILITADA que ninguna campana uso (RF-MM-30). El Speech\noriginal nunca se elimina.",
+        "operationId": "eliminar_speech_mowa_mes_speech__speech_id__delete",
+        "parameters": [
+          {
+            "name": "speech_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Speech Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No se puede eliminar: es el Speech original, ya la uso una campana o esta habilitada (`codigo`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorSpeechNoEliminable"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "put": {
         "tags": [
           "mowa-mes"
@@ -5439,6 +5574,16 @@
         "title": "CodigoErrorMapeador",
         "description": "Por que el mapeador rechaza una peticion (`400`, `404` o `413`): el `codigo` del cuerpo de\nerror, que la pantalla traduce como `mapeador.error.<codigo>`.\n\nUn valor por linea: la prueba espejo del contrato y del frontend lee esta clase."
       },
+      "CodigoErrorSpeech": {
+        "type": "string",
+        "enum": [
+          "speech_original",
+          "speech_usado",
+          "speech_no_deshabilitado"
+        ],
+        "title": "CodigoErrorSpeech",
+        "description": "Motivo del 409 de `DELETE /mowa-mes/speech/{id}` (RF-MM-30): por que no se puede eliminar.\n\nCatalogo propio, aparte de `CodigoMowaMes` (los de una campana) y de `CodigoErrorCampana` (los\n409 de las campanas). El frontend los traduce como `mowaMes.errorSpeech.<codigo>`. Un codigo por\nlinea, con la forma `NOMBRE = \"codigo\"`: la prueba espejo del frontend lee esta clase."
+      },
       "CodigoMapeo": {
         "type": "string",
         "enum": [
@@ -5470,7 +5615,8 @@
           "falta_whatsapp",
           "sin_supervisores",
           "sin_productos_cargables",
-          "version_v1_retirada"
+          "version_v1_retirada",
+          "speech_deshabilitado"
         ],
         "title": "CodigoMowaMes",
         "description": "Catalogo de codigos que el frontend traduce como `mowaMes.codigo.<codigo>`.\n\nLas exclusiones van en el orden en que se evaluan: un producto excluido lleva\nun solo motivo, el primero que falla. Un codigo por linea, con la forma\n`NOMBRE = \"codigo\"`: la prueba espejo del frontend lee esta clase."
@@ -6912,6 +7058,24 @@
         "title": "DetalleErrorSpeech",
         "description": "Un 400 de speech: el motivo y los problemas, cada uno con su ubicacion."
       },
+      "DetalleErrorSpeechNoEliminable": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoErrorSpeech"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "codigo"
+        ],
+        "title": "DetalleErrorSpeechNoEliminable",
+        "description": "409 del `DELETE`: `codigo` dice por que no se puede eliminar (RF-MM-30)."
+      },
       "DetalleErrorTexto": {
         "properties": {
           "detail": {
@@ -8291,6 +8455,15 @@
           "adicionales"
         ],
         "title": "MetricasRespuesta"
+      },
+      "MotivoNoEliminable": {
+        "type": "string",
+        "enum": [
+          "original",
+          "usada"
+        ],
+        "title": "MotivoNoEliminable",
+        "description": "Por que una version no se podra eliminar por mas que se deshabilite (RF-MM-30)."
       },
       "MuestraEntrada": {
         "properties": {
@@ -10625,6 +10798,38 @@
         "type": "object",
         "title": "SpeechNuevoEntrada"
       },
+      "SpeechParcialEntrada": {
+        "properties": {
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre",
+            "description": "El nombre nuevo; no cambia si no viene (RF-MM-28)"
+          },
+          "habilitada": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Habilitada",
+            "description": "false deshabilita y true habilita; no cambia si no viene (RF-MM-29)"
+          }
+        },
+        "type": "object",
+        "title": "SpeechParcialEntrada"
+      },
       "SpeechRegistradoRespuesta": {
         "properties": {
           "id": {
@@ -11371,6 +11576,35 @@
             "format": "date-time",
             "title": "Creado En"
           },
+          "deshabilitada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deshabilitada En",
+            "description": "Cuando se deshabilito (RF-MM-29). null: esta habilitada. Una deshabilitada no se elige en campanas nuevas, se ve en solo lectura (`editable` false) y se puede habilitar de nuevo"
+          },
+          "eliminable": {
+            "type": "boolean",
+            "title": "Eliminable",
+            "description": "true si `DELETE /speech/{id}` la borraria ahora: deshabilitada, sin uso en campanas y no es el Speech original (RF-MM-30)"
+          },
+          "motivo_no_eliminable": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MotivoNoEliminable"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Por que no se podra eliminar por mas que se deshabilite: `original` o `usada` (RF-MM-30). null en las demas: una habilitada sin uso no es eliminable todavia (`eliminable` false), pero basta deshabilitarla"
+          },
           "partes": {
             "items": {
               "$ref": "#/components/schemas/PartesRespuesta"
@@ -11396,6 +11630,9 @@
           "usada",
           "editable",
           "creado_en",
+          "deshabilitada_en",
+          "eliminable",
+          "motivo_no_eliminable",
           "partes",
           "expresiones"
         ],

@@ -153,6 +153,11 @@ def limpiar(datos: DatosSpeech) -> DatosSpeech:
     return replace(datos, nombre=datos.nombre.strip())
 
 
+def problemas_del_nombre(nombre: str) -> tuple[ProblemaSpeech, ...]:
+    """Los problemas de un nombre solo (renombrar no toca el contenido, RF-MM-28)."""
+    return tuple(_problemas_de_nombre(DatosSpeech(nombre=nombre)))
+
+
 def _problemas_de_nombre(datos: DatosSpeech) -> list[ProblemaSpeech]:
     if 1 <= len(datos.nombre.strip()) <= LARGO_MAXIMO_NOMBRE_SPEECH:
         return []

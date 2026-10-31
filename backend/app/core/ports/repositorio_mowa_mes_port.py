@@ -30,6 +30,21 @@ class RepositorioMowaMesPort(Protocol):
         """
         ...
 
+    def renombrar_speech(self, speech_id: int, nombre: str) -> VersionSpeech | None:
+        """Cualquier version, la usada y el original incluidos (RF-MM-28): solo cambia el nombre,
+        no el contenido ni la huella. None si no existe; NombreDeSpeechRepetido si ya existe."""
+        ...
+
+    def cambiar_habilitacion(self, speech_id: int, habilitada: bool) -> VersionSpeech | None:
+        """Deshabilita (ahora) o habilita (RF-MM-29). Repetirlo no cambia la fecha. None si no
+        existe."""
+        ...
+
+    def eliminar_speech(self, speech_id: int) -> bool:
+        """Borra una version DESHABILITADA, sin uso y que no sea el original (RF-MM-30). La
+        condicion va en el mismo DELETE; False, sin borrar nada, si no se cumple o no existe."""
+        ...
+
     def marcar_speech_usado(self, speech_id: int) -> None:
         """La campana que usa la version la marca en su misma transaccion (B4)."""
         ...

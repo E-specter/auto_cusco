@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import Engine, func, insert, select, update
+from sqlalchemy import Engine, delete, func, insert, select, update
 from sqlalchemy.engine import Row
 from sqlalchemy.exc import IntegrityError
 
@@ -90,6 +90,7 @@ def _version(fila: Row) -> VersionSpeech:
         basada_en_id=fila.basada_en_id,
         usada_en=fila.usada_en,
         creado_en=fila.creado_en,
+        deshabilitada_en=fila.deshabilitada_en,
     )
 
 
@@ -183,6 +184,7 @@ class RepositorioMowaMesPostgres(RepositorioMowaMesPort):
                 _SPEECH.c.id == speech_id,
                 _SPEECH.c.usada_en.is_(None),
                 _SPEECH.c.original.is_(False),
+                _SPEECH.c.deshabilitada_en.is_(None),
                 # El formato no cambia al editar: una v1 sigue siendo v1 y una v2, v2.
                 _SPEECH.c.formato == datos.formato.value,
             )
@@ -201,6 +203,46 @@ class RepositorioMowaMesPostgres(RepositorioMowaMesPort):
                 raise NombreDeSpeechRepetido(datos.nombre) from exc
             raise
         return _version(fila) if fila else None
+
+    def renombrar_speech(self, speech_id: int, nombre: str) -> VersionSpeech | None:
+        consulta = (
+            update(_SPEECH)
+            .where(_SPEECH.c.id == speech_id)
+            .values(nombre=nombre, nombre_normalizado=normalizar_nombre(nombre))
+            .returning(*_SPEECH.c)
+        )
+        try:
+            with self._engine.begin() as cx:
+                fila = cx.execute(consulta).one_or_none()
+        except IntegrityError as exc:
+            if _es_nombre_repetido(exc):
+                raise NombreDeSpeechRepetido(nombre) from exc
+            raise
+        return _version(fila) if fila else None
+
+    def cambiar_habilitacion(self, speech_id: int, habilitada: bool) -> VersionSpeech | None:
+        # Repetirlo no pisa la fecha: deshabilitar una deshabilitada conserva la primera.
+        marca = _SPEECH.c.deshabilitada_en.is_(None) if not habilitada else None
+        consulta = update(_SPEECH).where(_SPEECH.c.id == speech_id)
+        if marca is not None:
+            consulta = consulta.where(marca)
+        valor = None if habilitada else func.clock_timestamp()
+        with self._engine.begin() as cx:
+            cx.execute(consulta.values(deshabilitada_en=valor))
+            fila = cx.execute(select(_SPEECH).where(_SPEECH.c.id == speech_id)).one_or_none()
+        return _version(fila) if fila else None
+
+    def eliminar_speech(self, speech_id: int) -> bool:
+        with self._engine.begin() as cx:
+            resultado = cx.execute(
+                delete(_SPEECH).where(
+                    _SPEECH.c.id == speech_id,
+                    _SPEECH.c.deshabilitada_en.is_not(None),
+                    _SPEECH.c.usada_en.is_(None),
+                    _SPEECH.c.original.is_(False),
+                )
+            )
+        return resultado.rowcount > 0
 
     def marcar_speech_usado(self, speech_id: int) -> None:
         with self._engine.begin() as cx:

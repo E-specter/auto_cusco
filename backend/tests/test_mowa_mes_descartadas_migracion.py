@@ -37,7 +37,9 @@ def test_la_migracion_se_encadena_a_la_anterior() -> None:
     directorio = ScriptDirectory.from_config(_configuracion())
 
     assert directorio.get_revision(REVISION).down_revision == REVISION_ANTERIOR
-    assert REVISION in directorio.get_heads()
+    # Ya no es la cabeza (la sigue la de las versiones de speech), pero sigue en la unica cadena.
+    assert len(directorio.get_heads()) == 1
+    assert REVISION in {revision.revision for revision in directorio.walk_revisions()}
 
 
 def test_la_migracion_suma_la_columna_que_declara_el_modelo() -> None:

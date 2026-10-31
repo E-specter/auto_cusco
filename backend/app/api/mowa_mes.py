@@ -24,7 +24,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -45,18 +45,21 @@ from app.core.entities.mowa_mes import (
     REGISTROS_POR_ARCHIVO,
     CampoConfiguracion,
     CampoProblemaSpeech,
+    CodigoErrorSpeech,
     CodigoMowaMes,
     ConfiguracionInvalida,
     ConfiguracionMowaMes,
     DatosSpeech,
     ExpresionSegmento,
     FormatoSpeech,
+    MotivoNoEliminable,
     NombreDeSpeechRepetido,
     PartesSegmento,
     ProblemaSpeech,
     Segmento,
     SpeechInmutable,
     SpeechInvalido,
+    SpeechNoEliminable,
     SpeechNoEncontrado,
     VersionSpeech,
 )
@@ -327,6 +330,19 @@ class SpeechEdicionEntrada(BaseModel):
     )
 
 
+class SpeechParcialEntrada(BaseModel):
+    nombre: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=LARGO_MAXIMO_NOMBRE_SPEECH,
+        description="El nombre nuevo; no cambia si no viene (RF-MM-28)",
+    )
+    habilitada: bool | None = Field(
+        default=None,
+        description="false deshabilita y true habilita; no cambia si no viene (RF-MM-29)",
+    )
+
+
 class PrevisualizacionEntrada(BaseModel):
     partes: list[PartesEntrada] | None = Field(default=None, description=_DESCRIPCION_CONTENIDO)
     expresiones: list[ExpresionSegmentoEntrada] | None = Field(
@@ -374,6 +390,26 @@ class VersionSpeechRespuesta(ModeloRespuesta):
     usada: bool
     editable: bool
     creado_en: datetime
+    deshabilitada_en: datetime | None = Field(
+        description=(
+            "Cuando se deshabilito (RF-MM-29). null: esta habilitada. Una deshabilitada no se "
+            "elige en campanas nuevas, se ve en solo lectura (`editable` false) y se puede "
+            "habilitar de nuevo"
+        )
+    )
+    eliminable: bool = Field(
+        description=(
+            "true si `DELETE /speech/{id}` la borraria ahora: deshabilitada, sin uso en campanas "
+            "y no es el Speech original (RF-MM-30)"
+        )
+    )
+    motivo_no_eliminable: MotivoNoEliminable | None = Field(
+        description=(
+            "Por que no se podra eliminar por mas que se deshabilite: `original` o `usada` "
+            "(RF-MM-30). null en las demas: una habilitada sin uso no es eliminable todavia "
+            "(`eliminable` false), pero basta deshabilitarla"
+        )
+    )
     partes: list[PartesRespuesta]
     expresiones: list[ExpresionSegmentoRespuesta]
 
@@ -595,6 +631,9 @@ def _version(version: VersionSpeech) -> VersionSpeechRespuesta:
         usada=version.usada,
         editable=version.editable,
         creado_en=version.creado_en,
+        deshabilitada_en=version.deshabilitada_en,
+        eliminable=version.eliminable,
+        motivo_no_eliminable=version.motivo_no_eliminable,
         partes=[
             PartesRespuesta(
                 segmento=p.segmento,
@@ -611,6 +650,13 @@ def _version(version: VersionSpeech) -> VersionSpeechRespuesta:
     )
 
 
+class DetalleErrorSpeechNoEliminable(ModeloRespuesta):
+    """409 del `DELETE`: `codigo` dice por que no se puede eliminar (RF-MM-30)."""
+
+    detail: str
+    codigo: CodigoErrorSpeech
+
+
 def _traducir(exc: Exception) -> HTTPException:
     if isinstance(exc, SpeechNoEncontrado):
         return HTTPException(status_code=404, detail=str(exc))
@@ -623,6 +669,9 @@ def _respuesta_de_error(exc: Exception) -> JSONResponse:
     """El 400 con sus problemas; el 404 y el 409 siguen siendo `{"detail"}`."""
     if isinstance(exc, SpeechInvalido):
         return _error_400(str(exc), exc.problemas)
+    if isinstance(exc, SpeechNoEliminable):
+        cuerpo = DetalleErrorSpeechNoEliminable(detail=str(exc), codigo=exc.codigo)
+        return JSONResponse(status_code=409, content=cuerpo.model_dump(mode="json"))
     if isinstance(exc, ConfiguracionInvalida):
         return _error_400(str(exc))
     http = _traducir(exc)
@@ -700,6 +749,61 @@ def obtener_speech(
         return _version(servicio.obtener_speech(speech_id))
     except SpeechNoEncontrado as exc:
         raise _traducir(exc) from exc
+
+
+@router.patch(
+    "/speech/{speech_id}",
+    response_model=VersionSpeechRespuesta,
+    responses={**_RESPUESTAS_400, **respuestas_de_error(404, 409)},
+)
+def modificar_speech(
+    speech_id: int,
+    entrada: SpeechParcialEntrada,
+    servicio: ConfiguracionMowaMesService = Depends(obtener_servicio_mowa_mes),
+) -> Any:
+    """Renombra (RF-MM-28) y/o deshabilita o habilita (RF-MM-29) una version, sea cual sea: la
+    usada y el Speech original incluidos. No cambia el contenido ni la huella. Con los dos campos,
+    primero renombra: si el nombre ya existe (409), no cambia nada. Sin ninguno, devuelve la
+    version tal cual."""
+    try:
+        version = servicio.obtener_speech(speech_id)
+        if entrada.nombre is not None:
+            version = servicio.renombrar_speech(speech_id, entrada.nombre)
+        if entrada.habilitada is True:
+            version = servicio.habilitar_speech(speech_id)
+        elif entrada.habilitada is False:
+            version = servicio.deshabilitar_speech(speech_id)
+        return _version(version)
+    except (SpeechInvalido, SpeechNoEncontrado, NombreDeSpeechRepetido) as exc:
+        return _respuesta_de_error(exc)
+
+
+@router.delete(
+    "/speech/{speech_id}",
+    status_code=204,
+    responses={
+        **respuestas_de_error(404),
+        409: {
+            "model": DetalleErrorSpeechNoEliminable,
+            "description": (
+                "No se puede eliminar: es el Speech original, ya la uso una campana o esta "
+                "habilitada (`codigo`)"
+            ),
+        },
+    },
+)
+def eliminar_speech(
+    speech_id: int,
+    servicio: ConfiguracionMowaMesService = Depends(obtener_servicio_mowa_mes),
+) -> Response:
+    """Borra del todo una version DESHABILITADA que ninguna campana uso (RF-MM-30). El Speech
+    original nunca se elimina."""
+    try:
+        servicio.eliminar_speech(speech_id)
+    except (SpeechNoEncontrado, SpeechNoEliminable) as exc:
+        respuesta = _respuesta_de_error(exc)
+        return respuesta
+    return Response(status_code=204)
 
 
 @router.get(

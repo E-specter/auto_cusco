@@ -507,6 +507,8 @@ class MowaMesSpeechVersion(Base):
     )
     # La marca la campana que la usa, en su misma transaccion: desde ahi es inmutable.
     usada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # RF-MM-29: NULL = habilitada. Una deshabilitada no se elige en campanas nuevas.
+    deshabilitada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (

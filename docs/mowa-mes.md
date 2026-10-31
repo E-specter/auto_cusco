@@ -442,3 +442,42 @@ La ida y vuelta de la migración contra la base la corre `architec` (`alembic do
 - **Lo que se copia es lo que se lee.** `datosParaMes(campana)` (`lib/mowa-mes-campana.ts`) arma etiqueta y valor con las palabras de la pantalla; la programación lleva sus fechas como `dd/mm/aaaa hh:mm` en hora de Lima (`fechaHoraParaMes`), igual en cualquier idioma. Sin herramientas, el valor es «Ninguna».
 - **Portapapeles.** `copiarConRespaldo` y `ResultadoCopia` pasaron de `mowa-mes-campana.ts` a `lib/portapapeles.ts`, que suma `copiarTexto` (el portapapeles si el navegador lo tiene, un `textarea` fuera de la pantalla si no). Si ninguno copia, el dato queda seleccionado y se dice que se copie con Ctrl+C.
 - **Pruebas.** Vitest: `datos-para-mes.test.ts` y `portapapeles.test.ts`. Playwright: `e2e/mowa-mes-subir.spec.ts` (los tres pasos, descarga, cada copia con su anuncio y su portapapeles, el fallo, el inglés, 1280 y 360 px, axe claro y oscuro).
+
+## 22. Administración de versiones de speech (T-MM-C11, M-B2; RF-MM-28, RF-MM-29 y RF-MM-30)
+
+Cualquier versión se puede renombrar; una versión se puede deshabilitar para que no se elija en campañas nuevas y habilitar de nuevo; y una deshabilitada que nadie usó se puede eliminar del todo. Nada de esto toca el contenido de la versión ni su huella.
+
+- **Columna.** `mowa_mes_speech_version.deshabilitada_en timestamptz NULL` (migración `c5d9f2a8e714`, que va después de la de las campañas descartadas, `b4e7a1c9d352`; el downgrade la quita). NULL es una versión habilitada; toda versión existente queda habilitada.
+- **Renombrar (RF-MM-28).** Cualquier versión, la usada y el Speech original incluidos: el nombre no es parte de la huella (`huella_de` no lo lee), así que la huella y las campañas que la usaron no cambian. Reusa la unicidad de `nombre_normalizado` y su 409 `NombreDeSpeechRepetido` (sin distinguir mayúsculas ni espacios en los extremos). Un nombre en blanco o de más de 120 caracteres es 400 con su problema (`campo: nombre`).
+- **Deshabilitar y habilitar (RF-MM-29).** Sirve para cualquier versión, la usada y el original incluidos. Deshabilitar una ya deshabilitada no pisa la fecha. Una deshabilitada conserva todo: contenido, huella, `usada_en` y las campañas que la usaron, que no cambian.
+  - `listar_speech` y las respuestas traen `deshabilitada_en`.
+  - **`armar`** (la previsualización y la creación) rechaza una deshabilitada con un error de campaña, `speech_deshabilitado` (`CodigoMowaMes`, tipo error): la previsualización lo lista en `errores` con `puede_crear` falso, y la creación da 400 sin guardar nada ni marcar la versión como usada. Va en `CodigoMowaMes` porque es un error de armado, como `sin_supervisores`, y no un 409 de una operación.
+  - **Una deshabilitada no es `editable`** (desvío del plan, decidido en M-B2): se ve en solo lectura, como pide `mowa-mes-interfaz.md` §4.5. `PUT /speech/{id}` a una deshabilitada es el mismo 409 `{"detail"}` sin código que el de una usada o el original (`SpeechInmutable`, con el motivo «esta deshabilitada; habilitala para editarla»), y el `UPDATE` del repositorio lo lleva en la misma sentencia (`deshabilitada_en IS NULL`). Al habilitarla de nuevo vuelve a ser editable, si no está usada ni es el original.
+- **Eliminar (RF-MM-30).** `DELETE /mowa-mes/speech/{id}`: solo una versión deshabilitada, sin uso (`usada_en IS NULL`) y que no sea el original. Las tres condiciones van en el mismo `DELETE`, así que si una campaña la usa o la habilitan entre la lectura y el borrado, no se borra. El motivo por el que no se puede sale de un solo lugar, `VersionSpeech.bloqueo_para_eliminar`, en este orden (primero lo que no se arregla deshabilitando):
+  1. `speech_original`: es el Speech original, aunque esté deshabilitado;
+  2. `speech_usado`: ya la usó una campaña, aunque esté deshabilitada. Una campaña descartada o eliminada después deja `usada_en`, así que sigue sin poder borrarse (RF-MM-32);
+  3. `speech_no_deshabilitado`: está habilitada; hay que deshabilitarla primero.
+  Los tres son el `codigo` del 409 (catálogo propio `CodigoErrorSpeech`, aparte de `CodigoMowaMes` y de `CodigoErrorCampana`). La versión en la que se basaba otra queda con `basada_en_id` nulo (`ON DELETE SET NULL`).
+- **`eliminable` y `motivo_no_eliminable`** (pedido de `designer`, §4.5): cada versión de la lista los trae, calculados en el backend con la misma regla del `DELETE`. `eliminable` es verdadero si el `DELETE` la borraría ahora. `motivo_no_eliminable` es `original` o `usada` (lo permanente, para mostrarlo en vez del botón) o `null`: una habilitada sin uso trae `null` y `eliminable` falso, porque antes hay que deshabilitarla.
+
+| Método y ruta | Respuesta | Errores |
+|---|---|---|
+| `PATCH /mowa-mes/speech/{id}` con `{nombre?, habilitada?}` | `200` `VersionSpeechRespuesta` | 400 (nombre en blanco), 404, 409 (nombre repetido), 422 |
+| `DELETE /mowa-mes/speech/{id}` | `204` | 404; 409 con `codigo` (`speech_original`, `speech_usado` o `speech_no_deshabilitado`) |
+| `GET /mowa-mes/speech` y `GET /speech/{id}` | (ya existían) | ahora con `deshabilitada_en`, `eliminable` y `motivo_no_eliminable` |
+
+`PATCH` con los dos campos primero renombra: si el nombre ya existe (409), tampoco se deshabilita. Sin ninguno devuelve la versión tal cual.
+
+- **Textos.** Las claves están en `es.json` y `en.json`; el espejo de cada catálogo es `tests/test_codigos_mowa_mes.py` (el backend: cada código tiene su clave) y, para el frontend, `tests/nucleo/i18n-codigos-mowa-mes.test.ts` y `i18n-codigos-error-speech.test.ts` (la dirección contraria y la paridad es/en). Los textos de los tres códigos del `DELETE` y de `speech_deshabilitado` son provisionales hasta que los apruebe `designer`.
+
+### 22.1 Pruebas
+
+| Archivo | Qué fija |
+|---|---|
+| `tests/test_mowa_mes_speech_administracion.py` | Núcleo, con el repositorio en memoria: renombrar (la usada, el original, la huella, el nombre repetido y en blanco), deshabilitar y habilitar, los tres motivos para no eliminar y su orden, la carrera con el borrado, y `armar` con una deshabilitada |
+| `tests/test_api_mowa_mes_speech_administracion.py` | API: los tres campos nuevos de la lista, el `PATCH` (incluido el 409 que no deshabilita), el `DELETE` con sus códigos, el `PUT` a una deshabilitada, la campaña con una deshabilitada y el contrato |
+| `tests/test_mowa_mes_speech_administracion_sql.py` | El SQL sin base: las tres condiciones en el `DELETE`, deshabilitar sin pisar la fecha, renombrar sin tocar el contenido y editar sin deshabilitadas |
+| `tests/test_mowa_mes_speech_administracion_migracion.py` | El SQL de la migración y del downgrade contra el modelo, sin base |
+| `tests/test_mowa_mes_speech_administracion_postgres.py` | `@postgres` (`architec`, `-ConBase`): la unicidad al renombrar, los tres motivos, eliminar la que se puede, una deshabilitada en `armar` y la columna |
+
+La ida y vuelta de la migración contra la base la corre `architec` (`alembic downgrade -1` y `alembic upgrade head`, con `alembic check`).
