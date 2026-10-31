@@ -305,3 +305,17 @@
     inset-inline-start: 0;
   }
 }
+
+/* ---- Coming from a MOWA MES campaign (RF-MM-09) -----------------------------------------
+   The notice and its way back: the link goes under the text when there is no room, never off the screen. */
+.cartera__volver {
+  flex-wrap: wrap;
+}
+
+.cartera__volver > span {
+  flex: 1 1 16rem;
+}
+
+.cartera__volver .btn {
+  margin-inline-start: auto;
+}

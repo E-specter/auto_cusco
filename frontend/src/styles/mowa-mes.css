@@ -546,6 +546,13 @@
   margin: 0;
 }
 
+/* ---- «Editar en Cartera» (RF-MM-09) ---------------------------------------------------
+   Under the saved-selection list, which the selector draws: a small button, left-aligned, apart from the field. */
+.mm-editar-cartera {
+  align-self: flex-start;
+  margin-block-start: var(--space-2);
+}
+
 /* ---- To upload to MES (RF-MM-35) -----------------------------------------------
    Three numbered steps once the campaign exists: the files, the data of MES's form with a copy button
    each, and the link to its follow-up. The numbers are the list's own. */

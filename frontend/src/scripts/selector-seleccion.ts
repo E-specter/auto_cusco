@@ -59,6 +59,12 @@ import { botonConFoco, destinoDeArrastre, moverFiltro, posicion, puedeMover, typ
 
 export const EVENTO_SELECCION = 'seleccioncambiada';
 
+/**
+ * Emitted by the root after a selection is saved, as a new one or over the loaded one, with the id it was
+ * saved under. A page that sent the analyst here to edit one (`/cartera?volver=`) listens to bring them back.
+ */
+export const EVENTO_SELECCION_GUARDADA = 'seleccionguardada';
+
 /** Long enough that a review does not fire on every keystroke. */
 const ESPERA_REVISION = 600;
 
@@ -82,6 +88,18 @@ export interface EstadoSeleccion {
 
 export interface ControladorSelector {
   estado(): EstadoSeleccion;
+  /**
+   * Load a saved selection by id, as choosing it in the list would. `false` (and nothing changes) if there is none.
+   * It does NOT ask about unsaved changes: it is for loading when the page opens, and a caller that uses it with an
+   * edit in progress loses that edit (ask `confirmarDescartar()` first).
+   */
+  cargarGuardada(id: number): boolean;
+  /**
+   * Whether it is fine to leave what is on screen: with nothing unsaved it answers `true` without asking;
+   * with edits it opens the «Hay cambios sin guardar» dialog and answers what the analyst chose. Asked again
+   * while it waits (a double click), it answers with the same promise.
+   */
+  confirmarDescartar(): Promise<boolean>;
 }
 
 /** Cut-off dates, newest first, each saying whether it has a current version. */
@@ -822,6 +840,9 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
     s.cantidadInvalida = false;
     renderTodo();
     emitir();
+    root.dispatchEvent(
+      new CustomEvent<{ id: number }>(EVENTO_SELECCION_GUARDADA, { bubbles: true, detail: { id: guardada.id } }),
+    );
   }
 
   if (el.editor) {
@@ -1005,16 +1026,50 @@ export async function montarSelector(root: HTMLElement): Promise<ControladorSele
     cargarGuardada(id);
   });
 
+  // Someone outside asked «may I leave?» (`confirmarDescartar`): the dialog answers them, not the list.
+  // The promise travels with its resolver: asked again while waiting (a double click), the same one answers.
+  let esperaDescarte: { promesa: Promise<boolean>; resolver: (confirmado: boolean) => void } | null = null;
+
   dialogos.descartar?.querySelector('form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     dialogos.descartar!.close();
-    cargarGuardada(pendiente);
+    const espera = esperaDescarte;
+    esperaDescarte = null;
+    if (espera) espera.resolver(true);
+    else cargarGuardada(pendiente);
   });
+
+  // Any other way out (Seguir editando, Escape) is a no.
+  dialogos.descartar?.addEventListener('close', () => {
+    const espera = esperaDescarte;
+    esperaDescarte = null;
+    espera?.resolver(false);
+  });
+
+  function confirmarDescartar(): Promise<boolean> {
+    if (esperaDescarte) return esperaDescarte.promesa;
+    if (!el.editor || !sucio() || !dialogos.descartar) return Promise.resolve(true);
+    let resolver!: (confirmado: boolean) => void;
+    const promesa = new Promise<boolean>((resolve) => {
+      resolver = resolve;
+    });
+    esperaDescarte = { promesa, resolver };
+    void openWhenFree(dialogos.descartar);
+    return promesa;
+  }
 
   document.addEventListener('languagechange', () => renderTodo());
 
   renderTodo();
   emitir();
 
-  return { estado };
+  return {
+    estado,
+    cargarGuardada(id: number): boolean {
+      if (!s.selecciones.some((seleccion) => seleccion.id === id)) return false;
+      cargarGuardada(id);
+      return true;
+    },
+    confirmarDescartar,
+  };
 }

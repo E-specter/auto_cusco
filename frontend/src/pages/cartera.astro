@@ -26,6 +26,27 @@ import '../styles/cartera.css';
       </p>
     </header>
 
+    <!-- Sent here by «Editar en Cartera» of a MOWA MES campaign (RF-MM-09): saving the selection takes the analyst
+         back, and this link goes back without saving. Only with a valid `volver` (src/lib/volver.ts). -->
+    <p class="notice notice--info cartera__volver" data-volver hidden>
+      <Icon name="info" size={20} />
+      <span data-i18n="cartera.volver.aviso">
+        Estás editando la selección de una campaña de MOWA MES. Al guardarla, vuelves a la campaña.
+      </span>
+      <a class="btn btn--sm" href="/mowa-mes/campana" data-volver-enlace>
+        <Icon name="chevron-left" size={16} />
+        <span data-i18n="cartera.volver.sinGuardar">Volver a la campaña sin guardar</span>
+      </a>
+    </p>
+
+    <!-- `?seleccion=` names one that is gone: Cartera opens empty, with this notice and no error. -->
+    <p class="notice notice--warning" data-seleccion-no-existe role="status" hidden>
+      <Icon name="triangle-alert" size={20} />
+      <span data-i18n="cartera.volver.noExiste">
+        La selección que abriste ya no existe. Arma una nueva o elige otra de la lista.
+      </span>
+    </p>
+
     <section class="standIn" data-offline hidden aria-labelledby="offline-title">
       <h2 class="standIn__title" id="offline-title" data-i18n="console.offline.title">Sin conexión con la API</h2>
       <p class="standIn__body" data-i18n="console.offline.body">
@@ -164,9 +185,12 @@ import '../styles/cartera.css';
   import { llenarSelect } from '../scripts/lista-de-campos';
   import {
     EVENTO_SELECCION,
+    EVENTO_SELECCION_GUARDADA,
     montarSelector,
+    type ControladorSelector,
     type EstadoSeleccion,
   } from '../scripts/selector-seleccion';
+  import { destinoConSeleccion, destinoSinSeleccion, seleccionDeLaUrl, volverValido } from '../lib/volver';
 
   /** Long enough to let a value be typed, short enough to feel live (RF-28). */
   const ESPERA_RECALCULO = 400;
@@ -703,13 +727,48 @@ import '../styles/cartera.css';
     document.dispatchEvent(new CustomEvent('healthchanged'));
   }
 
+  // ---- Coming from a campaign (RF-MM-09, M-F6): `?seleccion=<id>&volver=/mowa-mes/campana` ------------------
+  // With neither parameter nothing below does anything: Cartera is what it was.
+
+  const parametros = new URLSearchParams(window.location.search);
+  /** Where «Editar en Cartera» came from; `null` unless `volver` is a MOWA MES page of this very site, which is ignored otherwise. */
+  const volver = volverValido(parametros.get('volver'), window.location.origin);
+  let controlador: ControladorSelector | null = null;
+
+  if (volver) {
+    $<HTMLElement>('[data-volver]').hidden = false;
+    const enlace = $<HTMLAnchorElement>('[data-volver-enlace]');
+    enlace.href = destinoSinSeleccion(volver);
+    enlace.addEventListener('click', async (evento) => {
+      // A click with a modifier is the browser's own (new tab): it keeps its link.
+      if (evento.button !== 0 || evento.metaKey || evento.ctrlKey || evento.shiftKey || evento.altKey) return;
+      evento.preventDefault();
+      // Unsaved edits ask first, with the selector's own dialog; «Seguir editando» stays here.
+      if (controlador && !(await controlador.confirmarDescartar())) return;
+      window.location.assign(destinoSinSeleccion(volver));
+    });
+    // Saved, as it was or as a new one: back to the campaign, which loads it.
+    raiz.addEventListener(EVENTO_SELECCION_GUARDADA, (evento) => {
+      window.location.assign(destinoConSeleccion(volver, (evento as CustomEvent<{ id: number }>).detail.id));
+    });
+  }
+
+  /** Opens the selection `?seleccion=` names. One that does not exist leaves Cartera empty, with a notice. */
+  function abrirLaPedida(): void {
+    if (!parametros.has('seleccion') || !controlador) return;
+    const id = seleccionDeLaUrl(window.location.search);
+    const cargada = id !== null && controlador.cargarGuardada(id);
+    $<HTMLElement>('[data-seleccion-no-existe]').hidden = cargada;
+  }
+
   let montado = false;
 
   async function arrancar(): Promise<void> {
     try {
       if (!montado) {
-        await montarSelector(raiz);
+        controlador = await montarSelector(raiz);
         montado = true;
+        abrirLaPedida();
       } else {
         await recalcular(true);
       }

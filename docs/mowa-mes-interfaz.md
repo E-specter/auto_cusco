@@ -186,6 +186,8 @@ Las tres usan `dialog.dialog`, con el foco inicial en «Cancelar» y Escape para
   - el texto: «Estás editando la selección de una campaña de MOWA MES. Al guardarla, vuelves a la campaña»;
   - el enlace «Volver a la campaña sin guardar», con el icono `chevron-left`. Si hay cambios sin guardar, pasa por la misma confirmación que ya tiene Cartera («Hay cambios sin guardar»), y no se pierde nada sin aviso.
 - **Si al volver la selección ya no existe** (se borró en Cartera), la campaña muestra un `.notice--warning` bajo el `select`: «La selección que editaste en Cartera ya no existe. Elige otra selección guardada». El `select` queda sin elegir. El aviso se va al elegir otra.
+- **Si `/cartera` llega con un `seleccion` que no existe,** queda vacía y usable, con un `.notice--warning` (`role="status"`): «La selección que abriste ya no existe. Arma una nueva o elige otra de la lista». Nunca un error.
+- **La confirmación de volver con cambios** es «la de siempre del selector» (`dialog.dialog` con el título «Hay cambios sin guardar» y «Seguir editando»), no una propia. Para que sirva a los dos usos, el texto de siempre cambia en todas las pantallas que lo tienen: el cuerpo pasa a «Los cambios que no guardaste se pierden» y el botón, a «Descartar cambios» (antes «Si cargas otra selección, los cambios de ahora se pierden» y «Descartar y cargar»).
 
 ## 5. Textos nuevos
 
@@ -258,6 +260,9 @@ Prefijo `mowaMes.*` (es y en). No usan el prefijo `mowaMes.codigo.*`, que vigila
 | `mowaMes.campana.seleccionBorrada` | La selección que editaste en Cartera ya no existe. Elige otra selección guardada. | The selection you edited in Portfolio no longer exists. Choose another saved selection. |
 | `cartera.volver.aviso` | Estás editando la selección de una campaña de MOWA MES. Al guardarla, vuelves a la campaña. | You are editing the selection of a MOWA MES campaign. When you save it, you go back to the campaign. |
 | `cartera.volver.sinGuardar` | Volver a la campaña sin guardar | Back to the campaign without saving |
+| `cartera.volver.noExiste` | La selección que abriste ya no existe. Arma una nueva o elige otra de la lista. | The selection you opened no longer exists. Build a new one or choose another from the list. |
+| `selector.descartar.cuerpo` (cambia el texto) | Los cambios que no guardaste se pierden. | The changes you did not save will be lost. |
+| `selector.descartar.confirmar` (cambia el texto) | Descartar cambios | Discard changes |
 
 Las cifras que ya tienen texto (cargados, enviados, costo…) conservan sus claves: solo ganan el icono.
 

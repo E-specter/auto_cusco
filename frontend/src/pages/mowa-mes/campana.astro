@@ -42,6 +42,14 @@ import '../../styles/supervisores.css';
     <div class="mm__contenido" data-contenido hidden>
       <SelectorSeleccion modo="compacto" id="seleccion" />
 
+      <!-- Back from Cartera, the selection that was being edited is gone (deleted there): none is chosen, and this says why. -->
+      <p class="notice notice--warning" data-seleccion-borrada hidden role="status">
+        <Icon name="triangle-alert" size={20} />
+        <span data-i18n="mowaMes.campana.seleccionBorrada">
+          La selección que editaste en Cartera ya no existe. Elige otra selección guardada.
+        </span>
+      </p>
+
       <p class="notice notice--warning" data-guardia hidden></p>
 
       <div class="mm-form" data-formulario hidden>
@@ -429,6 +437,7 @@ import '../../styles/supervisores.css';
   <template data-icono-abajo><Icon name="arrow-down" size={16} /></template>
   <template data-icono-quitar><Icon name="x" size={16} /></template>
   <template data-icono-copiar><Icon name="copy" size={16} /></template>
+  <template data-icono-editar-cartera><Icon name="square-pen" size={16} /></template>
   <template data-icono-copiado><Icon name="check" size={16} /></template>
   <template data-icono-descargar><Icon name="download" size={16} /></template>
 
@@ -518,7 +527,15 @@ import '../../styles/supervisores.css';
   import { formatBytes, formatNumber, formatSoles, formatTarifa } from '../../lib/format';
   import { applyTranslations, t, traducirPorPrefijo } from '../../lib/i18n';
   import { opcionesDeCampana, preseleccionDeCampana } from '../../lib/mowa-mes-speech-administracion';
-  import { EVENTO_SELECCION, montarSelector, type EstadoSeleccion } from '../../scripts/selector-seleccion';
+  import { EVENTO_SELECCION, montarSelector, type ControladorSelector, type EstadoSeleccion } from '../../scripts/selector-seleccion';
+  import {
+    almacenDeSesion,
+    guardarBorrador,
+    tomarBorrador,
+    type BorradorEnPantalla,
+    type ModoDeProgramacion,
+  } from '../../lib/mowa-mes-borrador-campana';
+  import { enlaceEditarEnCartera, seleccionDeLaUrl } from '../../lib/volver';
 
   /** Same debounce the speech and portfolio screens use. */
   const ESPERA_PREVISUALIZACION = 400;
@@ -1556,9 +1573,132 @@ import '../../styles/supervisores.css';
   // Subscribed before mounting, so no `seleccioncambiada` is ever missed.
   raiz.addEventListener(EVENTO_SELECCION, (event) => {
     estado.seleccion = (event as CustomEvent<EstadoSeleccion>).detail;
+    pintarEditarEnCartera();
+    // Choosing another saved selection takes away the notice of the one that was gone.
+    if (estado.seleccion.guardada) $<HTMLElement>('[data-seleccion-borrada]').hidden = true;
     pintarGuardia();
     programarPrevisualizacion(0);
   });
+
+  // ---- «Editar en Cartera» (RF-MM-09, M-F6, docs/mowa-mes-interfaz.md §4.7) ------------------------------------
+
+  /** Where Cartera sends the analyst back to: this page. */
+  const VUELTA = '/mowa-mes/campana';
+  let controlador: ControladorSelector | null = null;
+  let botonEditar: HTMLButtonElement | null = null;
+
+  /** Everything the form holds now, for the draft that waits while the selection is edited in Cartera. */
+  function leerBorradorEnPantalla(): BorradorEnPantalla {
+    return {
+      seleccionId: estado.seleccion?.guardada?.id ?? null,
+      fechaCorte: estado.seleccion?.fechaCorte ?? null,
+      descripcion: campoDescripcion.value,
+      descripcionEditada: estado.descripcionEditada,
+      plantilla: $<HTMLInputElement>('#mm-plantilla').value,
+      plantillaEditada: estado.plantillaEditada,
+      keyword: $<HTMLInputElement>('[data-herramienta-keyword]').checked,
+      blacklist: $<HTMLInputElement>('[data-herramienta-blacklist]').checked,
+      programacion: ($<HTMLInputElement>('input[name="programacion"]:checked')?.value ?? 'hora_determinada') as ModoDeProgramacion,
+      fechaUnica: $<HTMLInputElement>('#mm-fecha-unica').value,
+      fechasMultiples: [...estado.fechasMultiples],
+      speech: $<HTMLSelectElement>('#mm-speech').value,
+      whatsapp: $<HTMLInputElement>('#mm-whatsapp').value,
+      supervisoresModo: $<HTMLInputElement>('input[name="supervisores_modo"]:checked')?.value === 'propios' ? 'propios' : 'defecto',
+      supervisoresPropios: estado.supervisoresPropios.map((s) => ({ ...s })),
+    };
+  }
+
+  /** A field set from the draft, then told so, so every handler the page already has runs as if it had been typed. */
+  function poner(campo: HTMLInputElement | HTMLSelectElement, valor: string, evento: 'input' | 'change'): void {
+    campo.value = valor;
+    campo.dispatchEvent(new Event(evento, { bubbles: true }));
+  }
+
+  /** The draft taken back, put in the fields. What it names that is no longer there (a speech, a date) is left as it was. */
+  function aplicarBorradorEnPantalla(b: BorradorEnPantalla): void {
+    // The date of the cut is the selector's own control, set as if it had been chosen.
+    const fecha = raiz.querySelector<HTMLSelectElement>('[data-selector-fecha]');
+    if (fecha && b.fechaCorte && [...fecha.options].some((o) => o.value === b.fechaCorte)) poner(fecha, b.fechaCorte, 'change');
+    // Untouched, the description keeps following the API's suggestion.
+    if (b.descripcionEditada) poner(campoDescripcion, b.descripcion, 'input');
+    if (b.plantillaEditada) poner($<HTMLInputElement>('#mm-plantilla'), b.plantilla, 'input');
+    const keyword = $<HTMLInputElement>('[data-herramienta-keyword]');
+    keyword.checked = b.keyword;
+    keyword.dispatchEvent(new Event('change', { bubbles: true }));
+    const blacklist = $<HTMLInputElement>('[data-herramienta-blacklist]');
+    blacklist.checked = b.blacklist;
+    blacklist.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const modo = document.querySelector<HTMLInputElement>(`input[name="programacion"][value="${b.programacion}"]`);
+    if (modo) {
+      modo.checked = true;
+      modo.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (b.fechaUnica) poner($<HTMLInputElement>('#mm-fecha-unica'), b.fechaUnica, 'input');
+    estado.fechasMultiples = b.fechasMultiples.length > 0 ? [...b.fechasMultiples] : [''];
+    pintarFechasMultiples();
+
+    const speech = $<HTMLSelectElement>('#mm-speech');
+    if ([...speech.options].some((o) => o.value === b.speech)) poner(speech, b.speech, 'change');
+    poner($<HTMLInputElement>('#mm-whatsapp'), b.whatsapp, 'input');
+
+    estado.supervisoresPropios = b.supervisoresPropios.map((s) => ({ ...s }));
+    const supervisores = document.querySelector<HTMLInputElement>(`input[name="supervisores_modo"][value="${b.supervisoresModo}"]`);
+    if (supervisores) {
+      supervisores.checked = true;
+      supervisores.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    pintarSupervisoresPropios();
+  }
+
+  /** The button is on only with a saved selection to edit; without one it says what to do, in its `title`. */
+  function pintarEditarEnCartera(): void {
+    if (!botonEditar) return;
+    const hay = Boolean(estado.seleccion?.guardada);
+    botonEditar.disabled = !hay;
+    if (hay) botonEditar.removeAttribute('title');
+    else botonEditar.title = t('mowaMes.campana.editarEnCartera.inactivo');
+  }
+
+  /** «Editar en Cartera» goes next to the saved-selection list, which the selector draws and knows nothing of this. */
+  function montarEditarEnCartera(): void {
+    const campo = raiz.querySelector('[data-selector-guardada]')?.closest('.field');
+    if (!campo) return;
+    const boton = document.createElement('button');
+    boton.type = 'button';
+    boton.className = 'btn btn--sm mm-editar-cartera';
+    const etiqueta = document.createElement('span');
+    etiqueta.dataset.i18n = 'mowaMes.accion.editarEnCartera';
+    etiqueta.textContent = t('mowaMes.accion.editarEnCartera');
+    boton.append($<HTMLTemplateElement>('template[data-icono-editar-cartera]').content.cloneNode(true), etiqueta);
+    boton.addEventListener('click', () => {
+      const id = estado.seleccion?.guardada?.id;
+      if (id === undefined) return;
+      // The draft is a courtesy: if it cannot be kept the analyst still goes, and comes back to an empty form.
+      guardarBorrador(almacenDeSesion(), leerBorradorEnPantalla());
+      window.location.assign(enlaceEditarEnCartera(id, VUELTA));
+    });
+    campo.append(boton);
+    botonEditar = boton;
+    pintarEditarEnCartera();
+  }
+
+  /**
+   * On opening: the draft is taken back (and deleted) and put in the form, and the selection is loaded: the
+   * one `?seleccion=` names (saved in Cartera, perhaps as a new one) or, coming back without saving, the one the
+   * draft had. If it is gone, none is chosen and the notice says why. Without a draft or a parameter, nothing.
+   */
+  function restaurarAlVolver(): void {
+    if (!controlador) return;
+    const borrador = tomarBorrador(almacenDeSesion());
+    if (borrador) aplicarBorradorEnPantalla(borrador);
+    const id = seleccionDeLaUrl(window.location.search) ?? borrador?.seleccionId ?? null;
+    if (id !== null && !controlador.cargarGuardada(id)) $<HTMLElement>('[data-seleccion-borrada]').hidden = false;
+    // The parameter did its work: a reload must not load it over what is there now.
+    if (new URLSearchParams(window.location.search).has('seleccion')) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }
 
   async function arrancar(): Promise<void> {
     try {
@@ -1582,8 +1722,10 @@ import '../../styles/supervisores.css';
       $<HTMLInputElement>('#mm-fecha-unica').value = `${siguiente.fecha}T09:00`;
 
       if (!montado) {
-        await montarSelector(raiz);
+        controlador = await montarSelector(raiz);
         montado = true;
+        montarEditarEnCartera();
+        restaurarAlVolver();
       }
       sinConexion(false);
     } catch (caido) {
@@ -1612,6 +1754,7 @@ import '../../styles/supervisores.css';
     pintarSpeech();
     pintarSupervisoresPropios();
     pintarFechasMultiples();
+    pintarEditarEnCartera();
     pintarGuardia();
     pintarResultado();
     if (estado.campanaCreada) pintarCreada();
