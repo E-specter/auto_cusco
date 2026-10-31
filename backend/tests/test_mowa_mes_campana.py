@@ -25,10 +25,12 @@ from app.core.entities.mowa_mes_campana import (
     ArchivoResumen,
     CampanaInvalida,
     CampanaRegistrada,
+    CampanasDescartadas,
     Exclusion,
     FilaCarga,
     Herramientas,
     LimiteMensualExcedido,
+    PaginaCampanas,
     PeticionCampana,
     PeticionCampanaInvalida,
     Salida,
@@ -99,14 +101,19 @@ class RepositorioCampanasMemoria:
         self.campanas: dict[int, CampanaRegistrada] = {}
         self.guardadas: dict[int, tuple] = {}
         self.informes: dict[int, tuple[int, str, list[FilaReporte]]] = {}
+        self._ultimo_id = 0
+
+    def _activas(self):
+        """Una campana cuenta si no esta descartada (RF-MM-31): la misma regla que `_ACTIVA`."""
+        return [c for c in self.campanas.values() if c.descartada_en is None]
 
     def cargados_en_mes(self, mes):
         self.meses_consultados.append(mes)
-        propias = sum(c.total_cargados for c in self.campanas.values() if c.mes_imputacion == mes)
+        propias = sum(c.total_cargados for c in self._activas() if c.mes_imputacion == mes)
         return self.cargados_mes + propias
 
     def costo_del_mes(self, mes):
-        del_mes = [c for c in self.campanas.values() if c.mes_imputacion == mes]
+        del_mes = [c for c in self._activas() if c.mes_imputacion == mes]
         con_tarifa = [c.costo_estimado for c in del_mes if c.tarifa_sms is not None]
         return CostoMes(
             self.costo_previo_mes + sum(con_tarifa, Decimal(0)),
@@ -114,9 +121,10 @@ class RepositorioCampanasMemoria:
         )
 
     def crear(self, armada, archivos, nombrar):
-        nombres = list(nombrar(len(self.campanas) + 1))
+        self._ultimo_id += 1
+        campana_id = self._ultimo_id
+        nombres = list(nombrar(campana_id))
         p = armada.peticion
-        campana_id = len(self.campanas) + 1
         campana = CampanaRegistrada(
             id=campana_id,
             creado_en=MOMENTO,
@@ -155,8 +163,39 @@ class RepositorioCampanasMemoria:
         return campana
 
     def listar(self, limite, desplazamiento):
-        todas = sorted(self.campanas.values(), key=lambda c: -c.id)
-        return len(todas), todas[desplazamiento : desplazamiento + limite]
+        todas = sorted(self._activas(), key=lambda c: -c.id)
+        return PaginaCampanas(
+            total=len(todas),
+            total_pendientes=sum(1 for c in todas if c.pendiente_reporte),
+            campanas=todas[desplazamiento : desplazamiento + limite],
+        )
+
+    def descartar(self, campana_id):
+        campana = self.campanas[campana_id]
+        if campana.descartada_en is None:
+            self.campanas[campana_id] = replace(campana, descartada_en=MOMENTO)
+
+    def restaurar(self, campana_id):
+        self.campanas[campana_id] = replace(self.campanas[campana_id], descartada_en=None)
+
+    def eliminar(self, campana_id):
+        campana = self.campanas.get(campana_id)
+        if campana is None or campana.descartada_en is None:
+            return False
+        del self.campanas[campana_id]
+        del self.guardadas[campana_id]
+        for mes_id in [m for m, (cid, _, _) in self.informes.items() if cid == campana_id]:
+            del self.informes[mes_id]
+        return True
+
+    def listar_descartadas(self, mes):
+        descartadas = [c for c in self.campanas.values() if c.descartada_en is not None]
+        del_mes = [c for c in descartadas if mes is None or c.mes_imputacion == mes]
+        return CampanasDescartadas(
+            campanas=sorted(del_mes, key=lambda c: -c.id),
+            meses=tuple(sorted({c.mes_imputacion for c in descartadas}, reverse=True)),
+            total_descartadas=len(descartadas),
+        )
 
     def obtener(self, campana_id):
         return self.campanas.get(campana_id)
@@ -190,7 +229,9 @@ class RepositorioCampanasMemoria:
                 else None
             )
             self.campanas[id_afectada] = replace(
-                self.campanas[id_afectada], enviados_conciliados=enviados
+                self.campanas[id_afectada],
+                enviados_conciliados=enviados,
+                pendiente_reporte=enviados is None,
             )
 
     def reportes(self, campana_id):

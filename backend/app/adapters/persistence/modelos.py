@@ -575,6 +575,9 @@ class MowaMesCampana(Base):
     # NULL: sin reporte importado (costo real pendiente). 0: se importo y no se envio nada.
     # El costo real se calcula al leer como enviados_conciliados x tarifa_sms (D-3).
     enviados_conciliados: Mapped[int | None] = mapped_column(Integer)
+    # RF-MM-31: NULL = activa. Una descartada queda fuera de todos los calculos (`_ACTIVA` en el
+    # repositorio) y conserva sus datos; eliminarla (RF-MM-32) las borra en cascada.
+    descartada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
         CheckConstraint(f"tipo_carga IN ({_en(TipoCarga)})", name="tipo_carga_valido"),

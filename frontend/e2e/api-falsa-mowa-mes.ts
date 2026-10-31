@@ -373,6 +373,8 @@ export function campanaSintetica(parcial: Partial<Campana> = {}): Campana {
     costo_estimado_estado: 'calculado',
     costo_real: null,
     costo_real_estado: 'pendiente',
+    pendiente_reporte: true,
+    descartada_en: null,
     ...parcial,
   };
 }
@@ -644,6 +646,8 @@ export function campanaDesdeEntrada(
     costo_estimado_estado: 'calculado',
     costo_real: null,
     costo_real_estado: 'pendiente',
+    pendiente_reporte: true,
+    descartada_en: null,
     ...parcial,
   };
 }

@@ -9,8 +9,10 @@ from app.core.entities.mowa_mes_campana import (
     ArchivoCarga,
     CampanaArmada,
     CampanaRegistrada,
+    CampanasDescartadas,
     Exclusion,
     FilaCarga,
+    PaginaCampanas,
 )
 from app.core.entities.mowa_mes_costo import CostoMes
 from app.core.entities.mowa_mes_reporte import FilaReporte, ReporteImportado
@@ -25,12 +27,15 @@ ContadorDeEnviados = Callable[[Sequence[FilaCarga], Sequence[FilaReporte]], int]
 
 
 class RepositorioCampanasMowaMesPort(Protocol):
+    # Solo las campanas ACTIVAS cuentan: `cargados_en_mes`, `costo_del_mes` y `listar` dejan
+    # fuera las descartadas (RF-MM-31), con una sola regla en cada implementacion.
+
     def cargados_en_mes(self, mes: date) -> int:
-        """Filas cargadas (productos y supervision) de las campanas imputadas a ese mes."""
+        """Filas cargadas (productos y supervision) de las campanas activas imputadas a ese mes."""
         ...
 
     def costo_del_mes(self, mes: date) -> CostoMes:
-        """Suma del costo estimado guardado de las campanas imputadas a ese mes, sin las
+        """Suma del costo estimado guardado de las campanas activas imputadas a ese mes, sin las
         que no tienen tarifa, y cuantas fueron."""
         ...
 
@@ -49,8 +54,29 @@ class RepositorioCampanasMowaMesPort(Protocol):
         """
         ...
 
-    def listar(self, limite: int, desplazamiento: int) -> tuple[int, list[CampanaRegistrada]]:
-        """Las mas recientes primero."""
+    def listar(self, limite: int, desplazamiento: int) -> PaginaCampanas:
+        """Las activas, las mas recientes primero, con el total y cuantas estan pendientes de
+        reporte (RF-MM-33): ambos de TODAS las activas, no solo de la pagina."""
+        ...
+
+    # --- Descartar, restaurar y eliminar (RF-MM-31, RF-MM-32) ---------------
+
+    def descartar(self, campana_id: int) -> None:
+        """Marca la campana como descartada ahora; si ya lo estaba, no cambia la fecha."""
+        ...
+
+    def restaurar(self, campana_id: int) -> None:
+        """La devuelve a las activas; si ya lo estaba, no hace nada."""
+        ...
+
+    def eliminar(self, campana_id: int) -> bool:
+        """Borra una campana DESCARTADA con todo lo suyo (archivos, filas, exclusiones y
+        reportes). Devuelve False, sin borrar nada, si no existe o no esta descartada."""
+        ...
+
+    def listar_descartadas(self, mes: date | None) -> CampanasDescartadas:
+        """Las descartadas imputadas a ese mes (todas si es None), las mas recientes primero,
+        con los meses que tienen descartadas y cuantas hay en total."""
         ...
 
     def obtener(self, campana_id: int) -> CampanaRegistrada | None: ...

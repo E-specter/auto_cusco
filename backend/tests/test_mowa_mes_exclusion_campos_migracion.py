@@ -36,11 +36,13 @@ def _sql(subir: bool) -> str:
     return configuracion.output_buffer.getvalue()
 
 
-def test_la_migracion_se_encadena_a_la_de_los_adicionales_y_es_la_cabeza() -> None:
+def test_la_migracion_se_encadena_a_la_de_los_adicionales_y_sigue_en_la_cadena() -> None:
     directorio = ScriptDirectory.from_config(_configuracion())
 
     assert directorio.get_revision(REVISION).down_revision == REVISION_ANTERIOR
-    assert directorio.get_heads() == [REVISION]
+    # Ya no es la cabeza (la sigue la de las campanas descartadas), pero sigue en la unica cadena.
+    assert len(directorio.get_heads()) == 1
+    assert REVISION in {revision.revision for revision in directorio.walk_revisions()}
 
 
 def test_la_migracion_suma_la_columna_que_declara_el_modelo() -> None:

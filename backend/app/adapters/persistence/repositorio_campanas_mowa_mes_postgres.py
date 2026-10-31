@@ -36,9 +36,11 @@ from app.core.entities.mowa_mes_campana import (
     ArchivoResumen,
     CampanaArmada,
     CampanaRegistrada,
+    CampanasDescartadas,
     Exclusion,
     FilaCarga,
     Herramientas,
+    PaginaCampanas,
     Salida,
     SpeechCambiado,
     SupervisorAsignado,
@@ -60,6 +62,12 @@ _EXCLUSION = MowaMesExclusion.__table__
 _REPORTE = MowaMesReporte.__table__
 _REPORTE_FILA = MowaMesReporteFila.__table__
 _SPEECH = MowaMesSpeechVersion.__table__
+# Una campana cuenta si no esta descartada (RF-MM-31). Es el unico lugar donde se decide: lo usan
+# todos los agregados y el listado de activas.
+_ACTIVA = _CAMPANA.c.descartada_en.is_(None)
+# Pendiente de reporte (RF-MM-33): sin reporte importado. Es la misma expresion para el
+# `pendiente_reporte` de cada fila y para el total de pendientes del listado.
+_PENDIENTE = _CAMPANA.c.enviados_conciliados.is_(None)
 _LOTE = 5_000
 # Clave de pg_advisory_xact_lock que serializa las importaciones de reportes. Es GLOBAL y
 # no por campana a proposito: un id de MES es unico entre campanas, asi que dos importaciones
@@ -185,6 +193,8 @@ def _campana(fila: Row, archivos: Sequence[ArchivoResumen]) -> CampanaRegistrada
         tarifa_sms=fila.tarifa_sms,
         costo_estimado=fila.costo_estimado,
         enviados_conciliados=fila.enviados_conciliados,
+        descartada_en=fila.descartada_en,
+        pendiente_reporte=fila.pendiente_reporte,
     )
 
 
@@ -194,7 +204,7 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
 
     def cargados_en_mes(self, mes: date) -> int:
         consulta = select(func.coalesce(func.sum(_CAMPANA.c.total_cargados), 0)).where(
-            _CAMPANA.c.mes_imputacion == mes
+            _CAMPANA.c.mes_imputacion == mes, _ACTIVA
         )
         with self._engine.connect() as cx:
             return int(cx.execute(consulta).scalar_one())
@@ -203,7 +213,7 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
         consulta = select(
             func.coalesce(func.sum(_CAMPANA.c.costo_estimado), Decimal(0)),
             func.count().filter(_CAMPANA.c.tarifa_sms.is_(None)),
-        ).where(_CAMPANA.c.mes_imputacion == mes)
+        ).where(_CAMPANA.c.mes_imputacion == mes, _ACTIVA)
         with self._engine.connect() as cx:
             costo, sin_tarifa = cx.execute(consulta).one()
         return CostoMes(Decimal(costo), int(sin_tarifa))
@@ -257,9 +267,11 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
         return registrada
 
     def _consulta_campanas(self):
-        return select(*_CAMPANA.c, _SPEECH.c.nombre.label("speech_nombre")).join(
-            _SPEECH, _SPEECH.c.id == _CAMPANA.c.speech_version_id
-        )
+        return select(
+            *_CAMPANA.c,
+            _SPEECH.c.nombre.label("speech_nombre"),
+            _PENDIENTE.label("pendiente_reporte"),
+        ).join(_SPEECH, _SPEECH.c.id == _CAMPANA.c.speech_version_id)
 
     def _archivos(self, cx: Connection, ids: Sequence[int]) -> dict[int, list[ArchivoResumen]]:
         por_campana: dict[int, list[ArchivoResumen]] = {i: [] for i in ids}
@@ -283,17 +295,74 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
             )
         return por_campana
 
-    def listar(self, limite: int, desplazamiento: int) -> tuple[int, list[CampanaRegistrada]]:
+    def listar(self, limite: int, desplazamiento: int) -> PaginaCampanas:
         with self._engine.connect() as cx:
-            total = cx.execute(select(func.count()).select_from(_CAMPANA)).scalar_one()
+            pendientes = cx.execute(
+                select(func.count()).select_from(_CAMPANA).where(_ACTIVA, _PENDIENTE)
+            ).scalar_one()
+            total = cx.execute(
+                select(func.count()).select_from(_CAMPANA).where(_ACTIVA)
+            ).scalar_one()
             filas = cx.execute(
                 self._consulta_campanas()
+                .where(_ACTIVA)
                 .order_by(_CAMPANA.c.creado_en.desc(), _CAMPANA.c.id.desc())
                 .limit(limite)
                 .offset(desplazamiento)
             ).all()
             archivos = self._archivos(cx, [fila.id for fila in filas])
-        return total, [_campana(fila, archivos[fila.id]) for fila in filas]
+        return PaginaCampanas(
+            total=total,
+            total_pendientes=pendientes,
+            campanas=[_campana(fila, archivos[fila.id]) for fila in filas],
+        )
+
+    def descartar(self, campana_id: int) -> None:
+        with self._engine.begin() as cx:
+            cx.execute(
+                update(_CAMPANA)
+                .where(_CAMPANA.c.id == campana_id, _ACTIVA)
+                .values(descartada_en=func.clock_timestamp())
+            )
+
+    def restaurar(self, campana_id: int) -> None:
+        with self._engine.begin() as cx:
+            cx.execute(
+                update(_CAMPANA).where(_CAMPANA.c.id == campana_id).values(descartada_en=None)
+            )
+
+    def eliminar(self, campana_id: int) -> bool:
+        # El predicado va en el DELETE y no solo en una lectura previa: si la restauran entre las
+        # dos, no se borra. Las tablas hijas caen en cascada; la version de speech no se toca.
+        with self._engine.begin() as cx:
+            resultado = cx.execute(delete(_CAMPANA).where(_CAMPANA.c.id == campana_id, ~_ACTIVA))
+        return resultado.rowcount > 0
+
+    def listar_descartadas(self, mes: date | None) -> CampanasDescartadas:
+        descartadas = ~_ACTIVA
+        consulta = self._consulta_campanas().where(descartadas)
+        if mes is not None:
+            consulta = consulta.where(_CAMPANA.c.mes_imputacion == mes)
+        with self._engine.connect() as cx:
+            filas = cx.execute(
+                consulta.order_by(_CAMPANA.c.creado_en.desc(), _CAMPANA.c.id.desc())
+            ).all()
+            archivos = self._archivos(cx, [fila.id for fila in filas])
+            meses = cx.execute(
+                select(_CAMPANA.c.mes_imputacion)
+                .where(descartadas)
+                .distinct()
+                .order_by(_CAMPANA.c.mes_imputacion.desc())
+            ).scalars()
+            meses = tuple(meses)
+            total = cx.execute(
+                select(func.count()).select_from(_CAMPANA).where(descartadas)
+            ).scalar_one()
+        return CampanasDescartadas(
+            campanas=[_campana(fila, archivos[fila.id]) for fila in filas],
+            meses=meses,
+            total_descartadas=total,
+        )
 
     def obtener(self, campana_id: int) -> CampanaRegistrada | None:
         with self._engine.connect() as cx:

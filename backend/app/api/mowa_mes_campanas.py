@@ -56,7 +56,9 @@ from app.core.entities.mowa_mes_campana import (
     ArchivoDemasiadoGrande,
     ArchivoNoEncontrado,
     CampanaArmada,
+    CampanaDescartada,
     CampanaInvalida,
+    CampanaNoDescartada,
     CampanaNoEncontrada,
     CampanaRegistrada,
     CodigoErrorCampana,
@@ -221,12 +223,20 @@ class PeticionCampanaEntrada(BaseModel):
 
 
 class ErrorCreacionCampanaRespuesta(ModeloRespuesta):
-    """409 propio de este endpoint: distingue por `codigo` sin que el cliente
-    tenga que adivinar la causa por el orden en que el servicio los revisa
-    (huella primero, limite despues; ver `docs/mowa-mes.md`)."""
+    """409 de las campanas con `codigo` propio: distingue la causa sin que el cliente tenga que
+    adivinarla (al crear: huella primero, limite despues; ver `docs/mowa-mes.md`; al eliminar
+    una activa: `campana_no_descartada`)."""
 
     detail: str
     codigo: CodigoErrorCampana
+
+
+class ErrorImportacionReporteRespuesta(ModeloRespuesta):
+    """409 de la importacion de un reporte. `codigo` solo viaja con `campana_descartada`: el 409
+    de un id de MES ya importado no lo trae."""
+
+    detail: str
+    codigo: CodigoErrorCampana | None = None
 
 
 class CreacionCampanaEntrada(PeticionCampanaEntrada):
@@ -466,13 +476,42 @@ class CampanaRespuesta(ModeloRespuesta):
             "campana no tiene tarifa (con o sin reporte). Ni pendiente ni no disponible son cero"
         )
     )
+    pendiente_reporte: bool = Field(
+        description=(
+            "true si todavia no hay reporte de enviados importado (RF-MM-33). Es lo unico que se "
+            "publica del derivado `enviados_conciliados`: los enviados que se muestran salen de "
+            "la conciliacion en vivo"
+        )
+    )
+    descartada_en: datetime | None = Field(
+        description=(
+            "Cuando se descarto (RF-MM-31). null: la campana esta activa. Una descartada no suma "
+            "al limite mensual ni al costo del mes y se ve en la seccion de descartadas"
+        )
+    )
 
 
 class ListaCampanasRespuesta(ModeloRespuesta):
     total: int
     limite: int
     desplazamiento: int
+    total_pendientes: int = Field(
+        description=(
+            "De TODAS las campanas activas, no solo de esta pagina: las que todavia no tienen "
+            "reporte de enviados importado (RF-MM-33)"
+        )
+    )
     campanas: list[CampanaRespuesta]
+
+
+class ListaDescartadasRespuesta(ModeloRespuesta):
+    campanas: list[CampanaRespuesta] = Field(
+        description="Las descartadas del mes pedido (todas sin `mes`), las mas recientes primero"
+    )
+    meses: list[str] = Field(
+        description="YYYY-MM de los meses que tienen descartadas, el mas reciente primero"
+    )
+    total_descartadas: int = Field(description="Descartadas de todos los meses")
 
 
 class EstadoConteoRespuesta(ModeloRespuesta):
@@ -728,6 +767,8 @@ def _campana(campana: CampanaRegistrada) -> CampanaRespuesta:
         ),
         costo_real=_monto(real.valor),
         costo_real_estado=real.estado,
+        pendiente_reporte=campana.pendiente_reporte,
+        descartada_en=campana.descartada_en,
     )
 
 
@@ -888,18 +929,42 @@ def crear_campana(
         raise _traducir(exc) from exc
 
 
+@router.get(
+    "/campanas/descartadas",
+    response_model=ListaDescartadasRespuesta,
+    summary="Campanas descartadas (RF-MM-32)",
+)
+def listar_descartadas(
+    mes: str | None = Query(
+        default=None,
+        pattern=r"^\d{4}-(0[1-9]|1[0-2])$",
+        description="YYYY-MM, el mes de gestion (el de la fecha de envio); sin mes, todas",
+    ),
+    servicio: CampanasMowaMesService = Depends(obtener_servicio_campanas),
+) -> ListaDescartadasRespuesta:
+    """Las descartadas del mes de gestion, los meses que tienen descartadas y el total."""
+    primero = None if mes is None else date(int(mes[:4]), int(mes[5:]), 1)
+    descartadas = servicio.listar_descartadas(primero)
+    return ListaDescartadasRespuesta(
+        campanas=[_campana(c) for c in descartadas.campanas],
+        meses=[_mes(m) for m in descartadas.meses],
+        total_descartadas=descartadas.total_descartadas,
+    )
+
+
 @router.get("/campanas", response_model=ListaCampanasRespuesta)
 def listar_campanas(
     limite: int = Query(default=50, ge=1, le=500),
     desplazamiento: int = Query(default=0, ge=0),
     servicio: CampanasMowaMesService = Depends(obtener_servicio_campanas),
 ) -> ListaCampanasRespuesta:
-    total, campanas = servicio.listar(limite, desplazamiento)
+    pagina = servicio.listar(limite, desplazamiento)
     return ListaCampanasRespuesta(
-        total=total,
+        total=pagina.total,
+        total_pendientes=pagina.total_pendientes,
         limite=limite,
         desplazamiento=desplazamiento,
-        campanas=[_campana(c) for c in campanas],
+        campanas=[_campana(c) for c in pagina.campanas],
     )
 
 
@@ -913,6 +978,65 @@ def obtener_campana(
         return _campana(servicio.obtener(campana_id))
     except CampanaNoEncontrada as exc:
         raise _traducir(exc) from exc
+
+
+@router.post(
+    "/campanas/{campana_id}/descartar",
+    response_model=CampanaRespuesta,
+    responses=respuestas_de_error(404),
+)
+def descartar_campana(
+    campana_id: int, servicio: CampanasMowaMesService = Depends(obtener_servicio_campanas)
+) -> CampanaRespuesta:
+    """La saca de las activas y de todos los calculos sin borrar nada (RF-MM-31). Descartar una
+    ya descartada no cambia nada."""
+    try:
+        return _campana(servicio.descartar(campana_id))
+    except CampanaNoEncontrada as exc:
+        raise _traducir(exc) from exc
+
+
+@router.post(
+    "/campanas/{campana_id}/restaurar",
+    response_model=CampanaRespuesta,
+    responses=respuestas_de_error(404),
+)
+def restaurar_campana(
+    campana_id: int, servicio: CampanasMowaMesService = Depends(obtener_servicio_campanas)
+) -> CampanaRespuesta:
+    """La devuelve a las activas y a todos los calculos (RF-MM-32)."""
+    try:
+        return _campana(servicio.restaurar(campana_id))
+    except CampanaNoEncontrada as exc:
+        raise _traducir(exc) from exc
+
+
+@router.delete(
+    "/campanas/{campana_id}",
+    status_code=204,
+    responses={
+        **respuestas_de_error(404),
+        409: {
+            "model": ErrorCreacionCampanaRespuesta,
+            "description": "La campana esta activa: solo se elimina una descartada",
+        },
+    },
+)
+def eliminar_campana(
+    campana_id: int, servicio: CampanasMowaMesService = Depends(obtener_servicio_campanas)
+) -> Response:
+    """Borra del todo una campana DESCARTADA, con sus archivos, filas cargadas, exclusiones y
+    reportes (RF-MM-32). La version de speech que uso no cambia."""
+    try:
+        servicio.eliminar(campana_id)
+    except CampanaNoEncontrada as exc:
+        raise _traducir(exc) from exc
+    except CampanaNoDescartada as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"detail": str(exc), "codigo": CodigoErrorCampana.CAMPANA_NO_DESCARTADA.value},
+        )
+    return Response(status_code=204)
 
 
 @router.get(
@@ -1014,7 +1138,16 @@ def limite_mensual(
     "/campanas/{campana_id}/reportes",
     status_code=201,
     response_model=ConciliacionRespuesta,
-    responses=respuestas_de_error(400, 404, 409, 413),
+    responses={
+        **respuestas_de_error(400, 404, 413),
+        409: {
+            "model": ErrorImportacionReporteRespuesta,
+            "description": (
+                "Algun id de MES ya estaba importado (sin `codigo`), o la campana esta "
+                "descartada y hay que restaurarla primero (`campana_descartada`)"
+            ),
+        },
+    },
 )
 async def importar_reporte(
     campana_id: int,
@@ -1039,6 +1172,11 @@ async def importar_reporte(
     try:
         estado = servicio.importar(
             campana_id, archivo.filename or "reporte.xlsx", contenido, reemplazar
+        )
+    except CampanaDescartada as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"detail": str(exc), "codigo": CodigoErrorCampana.CAMPANA_DESCARTADA.value},
         )
     except (CampanaNoEncontrada, ReporteInvalido, ReporteYaImportado) as exc:
         raise _traducir(exc) from exc

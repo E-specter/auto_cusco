@@ -861,6 +861,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/mowa-mes/campanas/descartadas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Campanas descartadas (RF-MM-32)
+         * @description Las descartadas del mes de gestion, los meses que tienen descartadas y el total.
+         */
+        get: operations["listar_descartadas_mowa_mes_campanas_descartadas_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mowa-mes/campanas/{campana_id}": {
         parameters: {
             query?: never;
@@ -872,6 +892,52 @@ export interface paths {
         get: operations["obtener_campana_mowa_mes_campanas__campana_id__get"];
         put?: never;
         post?: never;
+        /**
+         * Eliminar Campana
+         * @description Borra del todo una campana DESCARTADA, con sus archivos, filas cargadas, exclusiones y
+         *     reportes (RF-MM-32). La version de speech que uso no cambia.
+         */
+        delete: operations["eliminar_campana_mowa_mes_campanas__campana_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/campanas/{campana_id}/descartar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Descartar Campana
+         * @description La saca de las activas y de todos los calculos sin borrar nada (RF-MM-31). Descartar una
+         *     ya descartada no cambia nada.
+         */
+        post: operations["descartar_campana_mowa_mes_campanas__campana_id__descartar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mowa-mes/campanas/{campana_id}/restaurar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restaurar Campana
+         * @description La devuelve a las activas y a todos los calculos (RF-MM-32).
+         */
+        post: operations["restaurar_campana_mowa_mes_campanas__campana_id__restaurar_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1390,6 +1456,16 @@ export interface components {
             costo_real: string | null;
             /** @description `calculado`; `pendiente` si no hay reporte importado; `no_disponible` si la campana no tiene tarifa (con o sin reporte). Ni pendiente ni no disponible son cero */
             costo_real_estado: components["schemas"]["EstadoCosto"];
+            /**
+             * Pendiente Reporte
+             * @description true si todavia no hay reporte de enviados importado (RF-MM-33). Es lo unico que se publica del derivado `enviados_conciliados`: los enviados que se muestran salen de la conciliacion en vivo
+             */
+            pendiente_reporte: boolean;
+            /**
+             * Descartada En
+             * @description Cuando se descarto (RF-MM-31). null: la campana esta activa. Una descartada no suma al limite mensual ni al costo del mes y se ve en la seccion de descartadas
+             */
+            descartada_en: string | null;
         };
         /**
          * CampoAdicionalCreadoRespuesta
@@ -1595,7 +1671,8 @@ export interface components {
         };
         /**
          * CodigoErrorCampana
-         * @description Motivo del 409 de `POST /mowa-mes/campanas` (los unicos dos posibles).
+         * @description Motivo del 409 de las campanas: la creacion (`huella_cambiada`, `limite_excedido`), importar
+         *     un reporte a una descartada y eliminar una activa (RF-MM-31 y RF-MM-32).
          *
          *     Catalogo propio, aparte de `CodigoMowaMes`: `LIMITE_EXCEDIDO` aqui es la
          *     creacion rechazada por no traer `confirmar_limite`, distinto del codigo
@@ -1604,7 +1681,7 @@ export interface components {
          *     nombre significara "advertencia" en un endpoint y "error" en otro.
          * @enum {string}
          */
-        CodigoErrorCampana: "huella_cambiada" | "limite_excedido";
+        CodigoErrorCampana: "huella_cambiada" | "limite_excedido" | "campana_descartada" | "campana_no_descartada";
         /**
          * CodigoErrorMapeador
          * @description Por que el mapeador rechaza una peticion (`400`, `404` o `413`): el `codigo` del cuerpo de
@@ -2214,9 +2291,9 @@ export interface components {
         };
         /**
          * ErrorCreacionCampanaRespuesta
-         * @description 409 propio de este endpoint: distingue por `codigo` sin que el cliente
-         *     tenga que adivinar la causa por el orden en que el servicio los revisa
-         *     (huella primero, limite despues; ver `docs/mowa-mes.md`).
+         * @description 409 de las campanas con `codigo` propio: distingue la causa sin que el cliente tenga que
+         *     adivinarla (al crear: huella primero, limite despues; ver `docs/mowa-mes.md`; al eliminar
+         *     una activa: `campana_no_descartada`).
          */
         ErrorCreacionCampanaRespuesta: {
             /** Detail */
@@ -2231,6 +2308,16 @@ export interface components {
             campo: string;
             /** Detalle */
             detalle: string;
+        };
+        /**
+         * ErrorImportacionReporteRespuesta
+         * @description 409 de la importacion de un reporte. `codigo` solo viaja con `campana_descartada`: el 409
+         *     de un id de MES ya importado no lo trae.
+         */
+        ErrorImportacionReporteRespuesta: {
+            /** Detail */
+            detail: string;
+            codigo: components["schemas"]["CodigoErrorCampana"] | null;
         };
         /**
          * ErrorPeticionCampanaRespuesta
@@ -2652,8 +2739,31 @@ export interface components {
             limite: number;
             /** Desplazamiento */
             desplazamiento: number;
+            /**
+             * Total Pendientes
+             * @description De TODAS las campanas activas, no solo de esta pagina: las que todavia no tienen reporte de enviados importado (RF-MM-33)
+             */
+            total_pendientes: number;
             /** Campanas */
             campanas: components["schemas"]["CampanaRespuesta"][];
+        };
+        /** ListaDescartadasRespuesta */
+        ListaDescartadasRespuesta: {
+            /**
+             * Campanas
+             * @description Las descartadas del mes pedido (todas sin `mes`), las mas recientes primero
+             */
+            campanas: components["schemas"]["CampanaRespuesta"][];
+            /**
+             * Meses
+             * @description YYYY-MM de los meses que tienen descartadas, el mas reciente primero
+             */
+            meses: string[];
+            /**
+             * Total Descartadas
+             * @description Descartadas de todos los meses
+             */
+            total_descartadas: number;
         };
         /** LlamadaGuardadaRespuesta */
         LlamadaGuardadaRespuesta: {
@@ -6066,7 +6176,166 @@ export interface operations {
             };
         };
     };
+    listar_descartadas_mowa_mes_campanas_descartadas_get: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM, el mes de gestion (el de la fecha de envio); sin mes, todas */
+                mes?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaDescartadasRespuesta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     obtener_campana_mowa_mes_campanas__campana_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campana_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampanaRespuesta"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    eliminar_campana_mowa_mes_campanas__campana_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campana_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description La campana esta activa: solo se elimina una descartada */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorCreacionCampanaRespuesta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    descartar_campana_mowa_mes_campanas__campana_id__descartar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campana_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampanaRespuesta"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restaurar_campana_mowa_mes_campanas__campana_id__restaurar_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -6279,13 +6548,13 @@ export interface operations {
                     "application/json": components["schemas"]["DetalleError"];
                 };
             };
-            /** @description La operacion choca con el estado actual */
+            /** @description Algun id de MES ya estaba importado (sin `codigo`), o la campana esta descartada y hay que restaurarla primero (`campana_descartada`) */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetalleError"];
+                    "application/json": components["schemas"]["ErrorImportacionReporteRespuesta"];
                 };
             };
             /** @description El archivo supera el tamano maximo */

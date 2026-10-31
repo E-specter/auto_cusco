@@ -58,7 +58,8 @@ class Salida(StrEnum):
 
 
 class CodigoErrorCampana(StrEnum):
-    """Motivo del 409 de `POST /mowa-mes/campanas` (los unicos dos posibles).
+    """Motivo del 409 de las campanas: la creacion (`huella_cambiada`, `limite_excedido`), importar
+    un reporte a una descartada y eliminar una activa (RF-MM-31 y RF-MM-32).
 
     Catalogo propio, aparte de `CodigoMowaMes`: `LIMITE_EXCEDIDO` aqui es la
     creacion rechazada por no traer `confirmar_limite`, distinto del codigo
@@ -69,6 +70,8 @@ class CodigoErrorCampana(StrEnum):
 
     HUELLA_CAMBIADA = "huella_cambiada"
     LIMITE_EXCEDIDO = "limite_excedido"
+    CAMPANA_DESCARTADA = "campana_descartada"
+    CAMPANA_NO_DESCARTADA = "campana_no_descartada"
 
 
 @dataclass(frozen=True)
@@ -294,6 +297,11 @@ class CampanaRegistrada:
     # reporte. None = sin reporte importado; 0 = se importo y no se envio nada. Solo sirve
     # para el costo real del listado; las cifras de la conciliacion salen de conciliar().
     enviados_conciliados: int | None = None
+    # RF-MM-31: cuando se descarto; None = activa.
+    descartada_en: datetime | None = None
+    # RF-MM-33: sin reporte importado. Lo calcula la consulta (`_PENDIENTE` del repositorio), la
+    # misma expresion del total de pendientes; no se deriva de `enviados_conciliados` aqui.
+    pendiente_reporte: bool = True
 
     @property
     def total_cargados(self) -> int:
@@ -344,6 +352,41 @@ class CampanaNoEncontrada(Exception):
     def __init__(self, campana_id: int) -> None:
         super().__init__(f"No existe la campana {campana_id}")
         self.campana_id = campana_id
+
+
+class CampanaDescartada(Exception):
+    """La campana esta descartada: hay que restaurarla antes de importarle un reporte."""
+
+    def __init__(self, campana_id: int) -> None:
+        super().__init__(f"La campana {campana_id} esta descartada; restaurala primero")
+        self.campana_id = campana_id
+
+
+class CampanaNoDescartada(Exception):
+    """Solo se elimina una campana descartada (RF-MM-32)."""
+
+    def __init__(self, campana_id: int) -> None:
+        super().__init__(f"La campana {campana_id} no esta descartada; descartala primero")
+        self.campana_id = campana_id
+
+
+@dataclass(frozen=True)
+class PaginaCampanas:
+    """Una pagina de las campanas activas, con el total y cuantas estan pendientes de reporte."""
+
+    total: int
+    total_pendientes: int
+    campanas: list["CampanaRegistrada"]
+
+
+@dataclass(frozen=True)
+class CampanasDescartadas:
+    """Las descartadas de un mes de gestion (o todas) y lo que la pantalla necesita para el
+    filtro: los meses que tienen descartadas y cuantas hay en total."""
+
+    campanas: list["CampanaRegistrada"]
+    meses: tuple[date, ...]
+    total_descartadas: int
 
 
 class ArchivoNoEncontrado(Exception):

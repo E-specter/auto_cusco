@@ -37,13 +37,16 @@ from app.core.entities.mowa_mes_campana import (
     ArchivoNoEncontrado,
     CampanaArmada,
     CampanaInvalida,
+    CampanaNoDescartada,
     CampanaNoEncontrada,
     CampanaRegistrada,
+    CampanasDescartadas,
     ConsumoLimite,
     ErrorCampana,
     Exclusion,
     FilaCarga,
     LimiteMensualExcedido,
+    PaginaCampanas,
     PeticionCampana,
     PeticionCampanaInvalida,
     Salida,
@@ -425,7 +428,7 @@ class CampanasMowaMesService:
 
         return self._campanas.crear(armada, archivos, nombrar)
 
-    def listar(self, limite: int, desplazamiento: int) -> tuple[int, list[CampanaRegistrada]]:
+    def listar(self, limite: int, desplazamiento: int) -> PaginaCampanas:
         return self._campanas.listar(limite, desplazamiento)
 
     def obtener(self, campana_id: int) -> CampanaRegistrada:
@@ -433,6 +436,28 @@ class CampanasMowaMesService:
         if campana is None:
             raise CampanaNoEncontrada(campana_id)
         return campana
+
+    # --- Descartar, restaurar y eliminar (RF-MM-31, RF-MM-32) ---------------
+
+    def descartar(self, campana_id: int) -> CampanaRegistrada:
+        """La saca de los calculos y de las activas sin borrar nada; repetirlo no cambia nada."""
+        self.obtener(campana_id)
+        self._campanas.descartar(campana_id)
+        return self.obtener(campana_id)
+
+    def restaurar(self, campana_id: int) -> CampanaRegistrada:
+        self.obtener(campana_id)
+        self._campanas.restaurar(campana_id)
+        return self.obtener(campana_id)
+
+    def eliminar(self, campana_id: int) -> None:
+        """Borra del todo una campana descartada; una activa es `CampanaNoDescartada`."""
+        campana = self.obtener(campana_id)
+        if campana.descartada_en is None or not self._campanas.eliminar(campana_id):
+            raise CampanaNoDescartada(campana_id)
+
+    def listar_descartadas(self, mes: date | None) -> CampanasDescartadas:
+        return self._campanas.listar_descartadas(None if mes is None else mes.replace(day=1))
 
     def exclusiones(
         self, campana_id: int, codigo: CodigoMowaMes | None, limite: int, desplazamiento: int

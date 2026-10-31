@@ -10,7 +10,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 
-from app.core.entities.mowa_mes_campana import CampanaNoEncontrada, CampanaRegistrada, FilaCarga
+from app.core.entities.mowa_mes_campana import (
+    CampanaDescartada,
+    CampanaNoEncontrada,
+    CampanaRegistrada,
+    FilaCarga,
+)
 from app.core.entities.mowa_mes_costo import CostoReal
 from app.core.entities.mowa_mes_reporte import (
     Conciliacion,
@@ -50,7 +55,8 @@ class ReportesMowaMesService:
     def importar(
         self, campana_id: int, nombre_archivo: str, contenido: bytes, reemplazar: bool = False
     ) -> EstadoConciliacion:
-        self._campana(campana_id)
+        if self._campana(campana_id).descartada_en is not None:
+            raise CampanaDescartada(campana_id)
         filas = self._lector.leer(contenido, nombre_archivo)
         por_id: dict[int, list[FilaReporte]] = defaultdict(list)
         for fila in filas:
