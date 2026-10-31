@@ -344,7 +344,8 @@ import '../../styles/supervisores.css';
             <p class="field__hint" data-limite-esta-campana></p>
             <p class="notice notice--danger" data-limite-excedido hidden></p>
 
-            <h3 class="mm-subtitulo" tabindex="-1" data-exclusiones-titulo>
+            <h3 class="mm-subtitulo mm-subtitulo--icono" tabindex="-1" data-exclusiones-titulo>
+              <Icon name="ban" size={16} />
               <span data-i18n="mowaMes.campana.exclusiones.title">Exclusiones</span>{' '}
               <span class="mono muted" data-exclusiones-total></span>
             </h3>
@@ -376,7 +377,10 @@ import '../../styles/supervisores.css';
               </button>
             </div>
 
-            <h3 class="mm-subtitulo" data-i18n="mowaMes.campana.archivosPrevistos.title">Archivos previstos</h3>
+            <h3 class="mm-subtitulo mm-subtitulo--icono">
+              <Icon name="files" size={16} />
+              <span data-i18n="mowaMes.campana.archivosPrevistos.title">Archivos previstos</span>
+            </h3>
             <p class="field__hint" data-i18n="mowaMes.campana.archivoPrevisto.nota">
               Estimación solo por filas: el tamaño real en bytes puede dividir un archivo en más.
             </p>
@@ -437,6 +441,11 @@ import '../../styles/supervisores.css';
   <template data-icono-abajo><Icon name="arrow-down" size={16} /></template>
   <template data-icono-quitar><Icon name="x" size={16} /></template>
   <template data-icono-copiar><Icon name="copy" size={16} /></template>
+  <!-- The labels of the preview's figures (RF-MM-36, §3.1): the same icon for the same concept as in the follow-up. -->
+  <template data-icono-cargados><Icon name="file-up" size={16} /></template>
+  <template data-icono-supervision><Icon name="user-check" size={16} /></template>
+  <template data-icono-excluidos><Icon name="ban" size={16} /></template>
+  <template data-icono-costo><Icon name="coins" size={16} /></template>
   <template data-icono-editar-cartera><Icon name="square-pen" size={16} /></template>
   <template data-icono-copiado><Icon name="check" size={16} /></template>
   <template data-icono-descargar><Icon name="download" size={16} /></template>
@@ -895,14 +904,16 @@ import '../../styles/supervisores.css';
       cifra(t('mowaMes.campana.cifras.solicitados'), formatNumber(previa.solicitados)),
       cifra(t('mowaMes.campana.cifras.evaluados'), formatNumber(previa.evaluados)),
       cifra(t('mowaMes.seguimiento.detalle.productos'), formatNumber(previa.productos_cargados)),
-      cifra(t('mowaMes.seguimiento.detalle.supervision'), formatNumber(previa.supervision_cargados)),
-      cifra(t('mowaMes.seguimiento.detalle.total'), formatNumber(previa.total_cargados)),
-      cifra(t('mowaMes.seguimiento.detalle.excluidos'), formatNumber(previa.excluidos)),
+      cifra(t('mowaMes.seguimiento.detalle.supervision'), formatNumber(previa.supervision_cargados), undefined, false, icono('supervision')),
+      cifra(t('mowaMes.seguimiento.detalle.total'), formatNumber(previa.total_cargados), undefined, false, icono('cargados')),
+      cifra(t('mowaMes.seguimiento.detalle.excluidos'), formatNumber(previa.excluidos), undefined, false, icono('excluidos')),
       // The API sends the amount already worked out, as text: only formatted here.
       cifra(
         t('mowaMes.campana.costo.estimado'),
         formatSoles(previa.costo_estimado),
         t('mowaMes.campana.costo.hint', { n: formatNumber(previa.total_cargados), tarifa: formatTarifa(previa.tarifa_sms) }),
+        false,
+        icono('costo'),
       ),
     );
 
@@ -1263,7 +1274,7 @@ import '../../styles/supervisores.css';
   // ---- Created campaign -----------------------------------------------------------
 
   /** An icon taken from the page's templates (rendered once by Astro, cloned per use). */
-  function icono(nombre: 'copiar' | 'copiado' | 'descargar'): Node {
+  function icono(nombre: 'copiar' | 'copiado' | 'descargar' | 'cargados' | 'supervision' | 'excluidos' | 'costo'): Node {
     return $<HTMLTemplateElement>(`template[data-icono-${nombre}]`).content.cloneNode(true);
   }
 
