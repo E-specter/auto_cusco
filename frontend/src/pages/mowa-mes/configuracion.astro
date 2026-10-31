@@ -792,17 +792,18 @@ import '../../styles/mowa-mes-speech-v2.css';
 
     const marcas = document.createElement('span');
     marcas.className = 'mm-deshab__marcas';
-    const etiqueta = (icono: 'deshabilitada' | 'original', clave: string): HTMLElement => {
+    // «Deshabilitada» is neutral and «Original» is info, as the catalogue says (§3.2): two states, two tones.
+    const etiqueta = (icono: 'deshabilitada' | 'original', clave: string, tono: 'neutral' | 'info'): HTMLElement => {
       const tag = document.createElement('span');
-      tag.className = 'tag tag--neutral';
+      tag.className = `tag tag--${tono}`;
       tag.append(
         $<HTMLTemplateElement>(`template[data-icono-${icono}]`).content.cloneNode(true),
         document.createTextNode(t(clave)),
       );
       return tag;
     };
-    marcas.append(etiqueta('deshabilitada', 'mowaMes.estado.deshabilitada'));
-    if (version.original) marcas.append(etiqueta('original', 'mowaMes.estado.original'));
+    marcas.append(etiqueta('deshabilitada', 'mowaMes.estado.deshabilitada', 'neutral'));
+    if (version.original) marcas.append(etiqueta('original', 'mowaMes.estado.original', 'info'));
 
     // The button's name is its own text and then the row's name («Ver «Borrable»»), so «Ver», «Habilitar» and
     // «Eliminar» tell the rows apart in a list of buttons too, where a description is not read. It starts with
