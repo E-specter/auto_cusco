@@ -62,6 +62,23 @@ describe('vacio', () => {
 });
 
 describe('cifra', () => {
+  it('con icono, la etiqueta lo lleva antes de su texto y el texto sigue siendo el mismo', () => {
+    const icono = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icono.setAttribute('aria-hidden', 'true');
+    const etiqueta = cifra('Excluidos', '20', undefined, false, icono).querySelector('dt')!;
+
+    expect(etiqueta.firstElementChild).toBe(icono);
+    expect(etiqueta.textContent).toBe('Excluidos');
+    expect(etiqueta.querySelectorAll('svg')).toHaveLength(1);
+  });
+
+  it('sin icono, la etiqueta es solo su texto, como antes', () => {
+    const etiqueta = cifra('Excluidos', '20').querySelector('dt')!;
+
+    expect(etiqueta.children).toHaveLength(0);
+    expect(etiqueta.textContent).toBe('Excluidos');
+  });
+
   it('etiqueta y valor, el valor con el estilo de las cifras', () => {
     const nodo = cifra('Cargados', '982');
 

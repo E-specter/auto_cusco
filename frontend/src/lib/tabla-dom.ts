@@ -58,13 +58,17 @@ export function tabla(
   return { envoltorio, cuerpo };
 }
 
-/** A figure: label, value and an optional hint; `apagada` reads it muted (a value that is not an amount). */
-export function cifra(etiqueta: string, valor: string, pista?: string, apagada = false): HTMLElement {
+/**
+ * A figure: label, value and an optional hint; `apagada` reads it muted (a value that is not an amount).
+ * `icono` is a node the label carries before its text (an `aria-hidden` icon cloned from the page's template).
+ */
+export function cifra(etiqueta: string, valor: string, pista?: string, apagada = false, icono?: Node): HTMLElement {
   const bloque = document.createElement('div');
   bloque.className = 'stat';
   const nombre = document.createElement('dt');
   nombre.className = 'stat__label';
-  nombre.textContent = etiqueta;
+  if (icono) nombre.append(icono, document.createTextNode(etiqueta));
+  else nombre.textContent = etiqueta;
   const numero = document.createElement('dd');
   numero.className = apagada ? 'stat__value muted' : 'stat__value';
   numero.textContent = valor;

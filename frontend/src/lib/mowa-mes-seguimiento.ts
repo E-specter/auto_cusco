@@ -88,6 +88,29 @@ export function usoDelLimite(consumo: Pick<ConsumoLimite, 'cargados_mes' | 'limi
   return consumo.limite > 0 ? consumo.cargados_mes / consumo.limite : 0;
 }
 
+/** How close the month is to its limit: the colour of the usage bar (docs/mowa-mes-interfaz.md §4.1). */
+export type TonoDeUso = 'normal' | 'cerca' | 'excedido';
+
+/**
+ * The tone of the bar: `normal` (accent) up to 90%, `cerca` (signal) from 90% to 100%, both included, and
+ * `excedido` (danger) above 100%. Whole numbers, never a share: 90% is `cargados * 10 >= limite * 9`, so the
+ * edge is not at the mercy of a division. A limit that is not positive has no share to speak of: with
+ * something loaded it is exceeded (nothing fits), with nothing it is not.
+ */
+export function tonoDelUso(consumo: Pick<ConsumoLimite, 'cargados_mes' | 'limite'>): TonoDeUso {
+  const { cargados_mes: cargados, limite } = consumo;
+  if (cargados > limite) return 'excedido';
+  if (limite > 0 && cargados * 10 >= limite * 9) return 'cerca';
+  return 'normal';
+}
+
+/** The fill of the bar, as a percentage of its width: from 0 to 100, never more, whatever the usage. */
+export function anchoDeLaBarra(consumo: Pick<ConsumoLimite, 'cargados_mes' | 'limite'>): number {
+  const { cargados_mes: cargados, limite } = consumo;
+  if (limite <= 0) return cargados > 0 ? 100 : 0;
+  return Math.min(100, Math.max(0, (cargados / limite) * 100));
+}
+
 // ---- Downloads -------------------------------------------------------------------
 
 export interface ResumenDescarga {

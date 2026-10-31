@@ -41,7 +41,11 @@ import '../../styles/mowa-mes.css';
       <!-- ---- Monthly SMS limit (RF-MM-01) ---------------------------------- -->
       <section class="panel" aria-labelledby="mm-limite-title">
         <div class="panel__head">
-          <h2 class="panel__title" id="mm-limite-title" data-i18n="mowaMes.seguimiento.limite.title">Límite mensual</h2>
+          <!-- The only panel title with an icon: it names a gauge (RF-MM-36, §4.1). -->
+          <h2 class="panel__title mm-titulo-icono" id="mm-limite-title">
+            <Icon name="gauge" size={20} />
+            <span data-i18n="mowaMes.seguimiento.limite.title">Límite mensual</span>
+          </h2>
           <div class="row mm-mes">
             <button
               type="button"
@@ -68,7 +72,12 @@ import '../../styles/mowa-mes.css';
         </div>
         <div class="panel__body mm-form">
           <dl class="mm-cifras" data-limite-cifras></dl>
+          <!-- The usage, as a bar: the share is already written in «Uso del límite», so this is only to see it. -->
+          <div class="mm-uso" aria-hidden="true">
+            <div class="mm-uso__relleno" data-limite-barra data-tono="normal"></div>
+          </div>
           <p class="mm-costo-mes" data-costo-mes>
+            <Icon name="coins" size={16} class="mm-costo-mes__icono" />
             <span data-i18n="mowaMes.seguimiento.costoMes">Costo del mes:</span>{' '}
             <strong class="mm-costo-mes__valor" data-costo-mes-valor></strong>{' '}
             <span class="muted" data-costo-mes-nota hidden></span>
@@ -168,7 +177,10 @@ import '../../styles/mowa-mes.css';
 
             <dl class="mm-cifras" data-detalle-cifras></dl>
 
-            <h3 class="mm-subtitulo" data-i18n="mowaMes.seguimiento.archivos.title">Archivos de carga</h3>
+            <h3 class="mm-subtitulo mm-subtitulo--icono">
+              <Icon name="files" size={16} />
+              <span data-i18n="mowaMes.seguimiento.archivos.title">Archivos de carga</span>
+            </h3>
             <div data-archivos></div>
             <p class="mono muted mm-nota" data-descarga-estado role="status"></p>
 
@@ -209,6 +221,7 @@ import '../../styles/mowa-mes.css';
               <div class="mm-form__foot">
                 <button type="submit" class="btn btn--primary" data-reporte-importar>
                   <span class="btn__spinner" aria-hidden="true"></span>
+                  <Icon name="upload" size={16} />
                   <span class="btn__label" data-i18n="mowaMes.seguimiento.reporte.importar">Importar reporte</span>
                 </button>
                 <p class="mono muted" data-reporte-estado role="status"></p>
@@ -218,7 +231,10 @@ import '../../styles/mowa-mes.css';
             <h3 class="mm-subtitulo" data-i18n="mowaMes.seguimiento.conciliacion.title">Conciliación</h3>
             <div class="mm-detalle" data-conciliacion></div>
 
-            <h3 class="mm-subtitulo" data-i18n="mowaMes.seguimiento.exclusiones.title">Exclusiones</h3>
+            <h3 class="mm-subtitulo mm-subtitulo--icono">
+              <Icon name="ban" size={16} />
+              <span data-i18n="mowaMes.seguimiento.exclusiones.title">Exclusiones</span>
+            </h3>
             <div class="mm-exclusiones__controles">
               <label class="field__label" for="mm-exclusiones-filtro" data-i18n="mowaMes.seguimiento.exclusiones.filtro">Motivo</label>
               <select class="input" id="mm-exclusiones-filtro" data-exclusiones-filtro></select>
@@ -311,6 +327,14 @@ import '../../styles/mowa-mes.css';
   <template data-icono-pendiente><Icon name="hourglass" size={16} /></template>
   <template data-icono-archivar><Icon name="archive" size={16} /></template>
   <template data-icono-restaurar><Icon name="archive-restore" size={16} /></template>
+  <template data-icono-ver><Icon name="eye" size={16} /></template>
+  <template data-icono-descargar><Icon name="download" size={16} /></template>
+  <!-- The labels of the detail's figures (RF-MM-36, §3.1): the same icon for the same concept across the module. -->
+  <template data-icono-cargados><Icon name="file-up" size={16} /></template>
+  <template data-icono-supervision><Icon name="user-check" size={16} /></template>
+  <template data-icono-excluidos><Icon name="ban" size={16} /></template>
+  <template data-icono-advertencias><Icon name="triangle-alert" size={16} /></template>
+  <template data-icono-costo><Icon name="coins" size={16} /></template>
   <template data-icono-eliminar><Icon name="trash-2" size={16} /></template>
 
   <!-- ---- Generic failure ---------------------------------------------- -->
@@ -376,6 +400,7 @@ import '../../styles/mowa-mes.css';
   import {
     CODIGOS_EXCLUSION,
     advertirAlDescartar,
+    anchoDeLaBarra,
     busquedaConVista,
     campanaDeLaUrl,
     detalleDeExclusion,
@@ -390,6 +415,7 @@ import '../../styles/mowa-mes.css';
     ordenarEstados,
     pendienteVisible,
     rangoPagina,
+    tonoDelUso,
     usoDelLimite,
     vistaDeLaUrl,
     type VistaCampanas,
@@ -471,12 +497,14 @@ import '../../styles/mowa-mes.css';
   ): HTMLElement {
     const presentacion = presentarCosto(estadoCosto, monto);
     const pista = tarifa === null ? undefined : t('mowaMes.costo.tarifa', { tarifa: formatTarifa(tarifa) });
-    if (presentacion.tipo === 'monto') return cifra(etiqueta, formatSoles(presentacion.valor), pista);
+    // The label carries the cost's icon whether the value is an amount or not (§3.2: the value stays muted text).
+    if (presentacion.tipo === 'monto') return cifra(etiqueta, formatSoles(presentacion.valor), pista, false, icono('costo'));
     return cifra(
       etiqueta,
       textoDeCosto(presentacion),
       presentacion.tipo === 'no_disponible' ? t(AYUDA_SIN_TARIFA) : pista,
       true,
+      icono('costo'),
     );
   }
 
@@ -508,11 +536,19 @@ import '../../styles/mowa-mes.css';
 
   // ---- Monthly limit -----------------------------------------------------------
 
+  /** The usage bar: how much of the limit is loaded, in the tone of how close it is (accent, signal, danger). */
+  function pintarBarraDeUso(consumo: ConsumoLimite | null): void {
+    const barra = $<HTMLElement>('[data-limite-barra]');
+    barra.dataset.tono = consumo ? tonoDelUso(consumo) : 'normal';
+    barra.style.inlineSize = `${consumo ? anchoDeLaBarra(consumo) : 0}%`;
+  }
+
   function pintarLimite(): void {
     $<HTMLElement>('[data-mes]').textContent = formatMesGestion(estado.mes);
     const host = $<HTMLElement>('[data-limite-cifras]');
     host.replaceChildren();
     const consumo = estado.consumo;
+    pintarBarraDeUso(consumo);
     if (!consumo) return;
 
     const uso = new Intl.NumberFormat(locale(), { style: 'percent', maximumFractionDigits: 1 }).format(
@@ -596,7 +632,20 @@ import '../../styles/mowa-mes.css';
   }
 
   /** A template's icon, cloned for one more use. */
-  function icono(nombre: 'pendiente' | 'archivar' | 'restaurar' | 'eliminar'): Node {
+  function icono(
+    nombre:
+      | 'pendiente'
+      | 'archivar'
+      | 'restaurar'
+      | 'eliminar'
+      | 'ver'
+      | 'descargar'
+      | 'cargados'
+      | 'supervision'
+      | 'excluidos'
+      | 'advertencias'
+      | 'costo',
+  ): Node {
     return $<HTMLTemplateElement>(`template[data-icono-${nombre}]`).content.cloneNode(true);
   }
 
@@ -688,7 +737,7 @@ import '../../styles/mowa-mes.css';
       const ver = document.createElement('button');
       ver.type = 'button';
       ver.className = 'btn btn--sm';
-      ver.textContent = t('mowaMes.seguimiento.campanas.ver');
+      ver.append(icono('ver'), document.createTextNode(t('mowaMes.seguimiento.campanas.ver')));
       ver.setAttribute('aria-label', t('mowaMes.seguimiento.campanas.verAria', { id: campana.id }));
       ver.setAttribute('aria-pressed', String(campana.id === estado.campanaId));
       ver.addEventListener('click', () => void elegirCampana(campana.id));
@@ -967,10 +1016,10 @@ import '../../styles/mowa-mes.css';
     const cifras = $<HTMLElement>('[data-detalle-cifras]');
     cifras.replaceChildren(
       cifra(t('mowaMes.seguimiento.detalle.productos'), formatNumber(campana.productos_cargados)),
-      cifra(t('mowaMes.seguimiento.detalle.supervision'), formatNumber(campana.supervision_cargados)),
-      cifra(t('mowaMes.seguimiento.detalle.total'), formatNumber(campana.total_cargados)),
-      cifra(t('mowaMes.seguimiento.detalle.excluidos'), formatNumber(campana.excluidos)),
-      cifra(t('mowaMes.seguimiento.detalle.advertencias'), formatNumber(campana.advertencias)),
+      cifra(t('mowaMes.seguimiento.detalle.supervision'), formatNumber(campana.supervision_cargados), undefined, false, icono('supervision')),
+      cifra(t('mowaMes.seguimiento.detalle.total'), formatNumber(campana.total_cargados), undefined, false, icono('cargados')),
+      cifra(t('mowaMes.seguimiento.detalle.excluidos'), formatNumber(campana.excluidos), undefined, false, icono('excluidos')),
+      cifra(t('mowaMes.seguimiento.detalle.advertencias'), formatNumber(campana.advertencias), undefined, false, icono('advertencias')),
       cifraDeCosto(
         t('mowaMes.seguimiento.detalle.costoEstimado'),
         campana.costo_estimado_estado,
@@ -1011,7 +1060,7 @@ import '../../styles/mowa-mes.css';
       const etiqueta = document.createElement('span');
       etiqueta.className = 'btn__label';
       etiqueta.textContent = t('mowaMes.seguimiento.archivos.descargar');
-      boton.append(spinner, etiqueta);
+      boton.append(spinner, icono('descargar'), etiqueta);
       boton.setAttribute('aria-label', t('mowaMes.seguimiento.archivos.descargarAria', { n: archivo.numero }));
       boton.addEventListener('click', () => void descargar(campana, archivo, boton));
       const accion = document.createElement('td');

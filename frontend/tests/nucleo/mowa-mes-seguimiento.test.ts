@@ -12,6 +12,7 @@ import { formatDate, formatMesGestion } from '../../src/lib/format';
 import {
   CODIGOS_EXCLUSION,
   advertirAlDescartar,
+  anchoDeLaBarra,
   busquedaConVista,
   campanaDeLaUrl,
   elegirMesDescartadas,
@@ -26,6 +27,7 @@ import {
   ordenarMeses,
   pendienteVisible,
   rangoPagina,
+  tonoDelUso,
   usoDelLimite,
   vistaDeLaUrl,
 } from '../../src/lib/mowa-mes-seguimiento';
@@ -268,5 +270,71 @@ describe('qué avisa descartar y qué muestra una descartada', () => {
     expect(pendienteVisible({ pendiente_reporte: false, descartada_en: null })).toBe(false);
     expect(pendienteVisible({ pendiente_reporte: true, descartada_en: '2026-10-30T10:00:00-05:00' })).toBe(false);
     expect(pendienteVisible({ pendiente_reporte: false, descartada_en: '2026-10-30T10:00:00-05:00' })).toBe(false);
+  });
+});
+
+describe('la barra de uso del límite (RF-MM-36, §4.1)', () => {
+  const LIMITE = 2_500_000;
+  const con = (cargados_mes: number, limite = LIMITE) => ({ cargados_mes, limite });
+
+  it('hasta el 90% es el color de siempre: 0 y 89,9%', () => {
+    expect(tonoDelUso(con(0))).toBe('normal');
+    expect(tonoDelUso(con(1))).toBe('normal');
+    expect(tonoDelUso(con(2_247_500))).toBe('normal'); // 89.9%
+    expect(tonoDelUso(con(2_249_999))).toBe('normal'); // 89.99996%
+  });
+
+  it('desde el 90%, ya se acerca: el 90% mismo cuenta', () => {
+    expect(tonoDelUso(con(2_250_000))).toBe('cerca'); // 90%
+    expect(tonoDelUso(con(2_250_001))).toBe('cerca');
+    expect(tonoDelUso(con(2_400_000))).toBe('cerca'); // 96%
+  });
+
+  it('el 100% todavía no es un exceso: es «se acerca»', () => {
+    expect(tonoDelUso(con(2_500_000))).toBe('cerca'); // 100%
+  });
+
+  it('por encima del 100% es un exceso: 100,1%', () => {
+    expect(tonoDelUso(con(2_502_500))).toBe('excedido'); // 100.1%
+    expect(tonoDelUso(con(2_500_001))).toBe('excedido');
+    expect(tonoDelUso(con(10_000_000))).toBe('excedido');
+  });
+
+  it('el borde del 90% no depende de una división: vale con otros límites', () => {
+    expect(tonoDelUso(con(9, 10))).toBe('cerca'); // 90% de 10
+    expect(tonoDelUso(con(8, 10))).toBe('normal');
+    expect(tonoDelUso(con(90, 100))).toBe('cerca');
+    expect(tonoDelUso(con(89, 100))).toBe('normal');
+    expect(tonoDelUso(con(10, 10))).toBe('cerca');
+    expect(tonoDelUso(con(11, 10))).toBe('excedido');
+    // A limit with a repeating share (90% of 3 is 2.7): 3 loaded is the whole limit; 2 is two thirds.
+    expect(tonoDelUso(con(2, 3))).toBe('normal');
+    expect(tonoDelUso(con(3, 3))).toBe('cerca');
+  });
+
+  it('un límite 0: nada cargado no es un exceso; algo cargado, sí (no cabe nada)', () => {
+    expect(tonoDelUso(con(0, 0))).toBe('normal');
+    expect(tonoDelUso(con(1, 0))).toBe('excedido');
+  });
+
+  it('el relleno es la parte usada, con tope en la barra', () => {
+    expect(anchoDeLaBarra(con(0))).toBe(0);
+    expect(anchoDeLaBarra(con(625_000))).toBe(25);
+    expect(anchoDeLaBarra(con(2_250_000))).toBeCloseTo(90);
+    expect(anchoDeLaBarra(con(2_500_000))).toBe(100);
+  });
+
+  it('por encima del límite el relleno no se sale: 100', () => {
+    expect(anchoDeLaBarra(con(2_502_500))).toBe(100);
+    expect(anchoDeLaBarra(con(99_000_000))).toBe(100);
+  });
+
+  it('con un límite 0, la barra está vacía o llena, nunca NaN ni infinito', () => {
+    expect(anchoDeLaBarra(con(0, 0))).toBe(0);
+    expect(anchoDeLaBarra(con(5, 0))).toBe(100);
+  });
+
+  it('un valor negativo no da un ancho negativo', () => {
+    expect(anchoDeLaBarra(con(-5))).toBe(0);
   });
 });

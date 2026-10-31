@@ -553,6 +553,79 @@
   margin-block-start: var(--space-2);
 }
 
+/* ---- Icons (RF-MM-36, docs/mowa-mes-interfaz.md §2.2 and §2.3) ------------------------------
+   The icon takes the colour of its text (currentColor) and sits before it, aligned with the first line when
+   the text breaks in two. A tag's icon is 1.2em of the tag's own text: 16 px would be taller than the tag. */
+.tag svg {
+  flex: none;
+  inline-size: 1.2em;
+  block-size: 1.2em;
+}
+
+.mm-titulo-icono {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mm-titulo-icono svg {
+  flex: none;
+}
+
+.mm-cifras .stat__label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.mm-cifras .stat__label svg {
+  flex: none;
+  margin-block-start: 0.1em;
+}
+
+.mm-subtitulo--icono {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.mm-subtitulo--icono svg {
+  flex: none;
+  margin-block-start: 0.2em;
+}
+
+.mm-costo-mes__icono {
+  vertical-align: -0.2em;
+  margin-inline-end: var(--space-1);
+  color: var(--color-text-muted);
+}
+
+/* ---- The month's usage bar (§4.1) --------------------------------------------------------
+   Decorative (aria-hidden): the share is already written. The fill is the share, capped at the bar; its colour
+   says how close it is: accent up to 90%, signal from 90% to 100%, danger above. The tone is set by the script
+   from `tonoDelUso`; the width, from `anchoDeLaBarra`. */
+.mm-uso {
+  block-size: var(--space-2);
+  border-radius: var(--radius-pill);
+  background-color: var(--color-surface-sunken);
+  overflow: hidden;
+}
+
+.mm-uso__relleno {
+  block-size: 100%;
+  inline-size: 0;
+  border-radius: inherit;
+  background-color: var(--color-accent);
+}
+
+.mm-uso__relleno[data-tono='cerca'] {
+  background-color: var(--color-signal);
+}
+
+.mm-uso__relleno[data-tono='excedido'] {
+  background-color: var(--color-danger);
+}
+
 /* ---- To upload to MES (RF-MM-35) -----------------------------------------------
    Three numbered steps once the campaign exists: the files, the data of MES's form with a copy button
    each, and the link to its follow-up. The numbers are the list's own. */
