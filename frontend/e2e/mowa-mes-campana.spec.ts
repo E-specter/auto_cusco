@@ -259,7 +259,7 @@ test.describe('P3: límite mensual excedido', () => {
 
     const dialogo = page.getByRole('dialog', { name: 'La campaña superaría el límite mensual' });
     await expect(dialogo).toBeVisible();
-    await expect(dialogo.getByText('La campana supera el limite mensual; confirma para continuar')).toBeVisible();
+    await expect(dialogo.getByText('La campaña supera el límite mensual. Confirma para crearla igual.')).toBeVisible();
     await expect(dialogo.getByRole('button', { name: 'No crear' })).toBeFocused();
 
     api.respuestas.crearCampana = [{ estado: 201, cuerpo: campanaDesdeEntrada({ ...bodyFrom(previaExcedida), speech_huella: previaExcedida.speech.huella, confirmar_limite: true }, 5) }];

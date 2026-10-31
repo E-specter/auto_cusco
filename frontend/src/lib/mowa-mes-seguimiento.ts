@@ -5,6 +5,7 @@
  */
 
 import type {
+  Campana,
   CifrasGrupo,
   CodigoMowaMes,
   Conciliacion,
@@ -12,7 +13,8 @@ import type {
   EstadoConteo,
   Exclusion,
 } from './api-mowa-mes';
-import { t } from './i18n';
+import { formatDate, toApiDate } from './format';
+import { locale, t } from './i18n';
 import { traducirCodigo } from './mowa-mes';
 
 /** Exclusion reasons in evaluation order (docs/mowa-mes.md §12): the filter's options. */
@@ -162,4 +164,73 @@ export function campanaDeLaUrl(busqueda: string): number | null {
   if (valor === null || !/^[0-9]+$/.test(valor)) return null;
   const id = Number(valor);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+// ---- Active and discarded campaigns (RF-MM-31, RF-MM-32) ----------------------------------
+
+/** Which list the screen shows: the live campaigns, or the ones set aside. */
+export type VistaCampanas = 'activas' | 'descartadas';
+
+/** The view the URL asks for (`?vista=descartadas`); anything else is the active list. */
+export function vistaDeLaUrl(busqueda: string): VistaCampanas {
+  return new URLSearchParams(busqueda).get('vista') === 'descartadas' ? 'descartadas' : 'activas';
+}
+
+/**
+ * The query string for a view, keeping the other parameters. The active list is the default, so it carries no
+ * `vista`: going back to it leaves the URL as it was before any switch.
+ */
+export function busquedaConVista(busqueda: string, vista: VistaCampanas): string {
+  const parametros = new URLSearchParams(busqueda);
+  if (vista === 'descartadas') parametros.set('vista', 'descartadas');
+  else parametros.delete('vista');
+  const texto = parametros.toString();
+  return texto === '' ? '' : `?${texto}`;
+}
+
+/** The months with discarded campaigns, newest first, each once and only if it is a `YYYY-MM`. */
+export function ordenarMeses(meses: readonly string[]): string[] {
+  return [...new Set(meses.filter((mes) => /^\d{4}-(0[1-9]|1[0-2])$/.test(mes)))].sort().reverse();
+}
+
+/**
+ * The month the discarded view shows: the one chosen while it still has campaigns, otherwise the most recent
+ * (so the view opens on it), and `''` when no month has any.
+ */
+export function elegirMesDescartadas(meses: readonly string[], elegido: string): string {
+  const ordenados = ordenarMeses(meses);
+  return ordenados.includes(elegido) ? elegido : (ordenados[0] ?? '');
+}
+
+/** «Octubre de 2026» (es) or «October 2026» (en), with its first letter in capitals. */
+export function etiquetaDelMes(mes: string): string {
+  const [anio, numero] = mes.split('-').map(Number);
+  const texto = new Intl.DateTimeFormat(locale(), { month: 'long', year: 'numeric' }).format(new Date(anio, numero - 1, 1));
+  return texto.charAt(0).toLocaleUpperCase(locale()) + texto.slice(1);
+}
+
+/** The day a campaign was discarded, in the analyst's zone, as the site writes dates (`format.ts`). */
+export function fechaDeDescarte(descartadaEn: string): string {
+  return formatDate(toApiDate(new Date(descartadaEn)));
+}
+
+/**
+ * Whether discarding warns that a report was imported. `pendiente_reporte` is the only sign the API gives of
+ * «has a report»: false means one is in. The warning says its consumption stops counting toward the limit.
+ */
+export function advertirAlDescartar(campana: Pick<Campana, 'pendiente_reporte'>): boolean {
+  return campana.pendiente_reporte === false;
+}
+
+/**
+ * Whether a campaign shows as «pending the report». `pendiente_reporte` does not look at whether it was
+ * discarded, so a discarded one never shows it, nor the notice or the way to import.
+ */
+export function pendienteVisible(campana: Pick<Campana, 'pendiente_reporte' | 'descartada_en'>): boolean {
+  return campana.pendiente_reporte && campana.descartada_en === null;
+}
+
+/** The text of a month in a select, for each month the API lists. */
+export function opcionesDeMeses(meses: readonly string[]): Array<{ valor: string; texto: string }> {
+  return ordenarMeses(meses).map((mes) => ({ valor: mes, texto: etiquetaDelMes(mes) }));
 }

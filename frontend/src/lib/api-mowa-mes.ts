@@ -28,6 +28,7 @@ export type Segmento = Esquemas['Segmento'];
 export type CodigoMowaMes = Esquemas['CodigoMowaMes'];
 export type Campana = Esquemas['CampanaRespuesta'];
 export type ListaCampanas = Esquemas['ListaCampanasRespuesta'];
+export type ListaDescartadas = Esquemas['ListaDescartadasRespuesta'];
 export type ArchivoCampana = Esquemas['ArchivoRespuesta'];
 export type PaginaExclusiones = Esquemas['PaginaExclusionesRespuesta'];
 export type Exclusion = Esquemas['ExclusionRespuesta'];
@@ -124,6 +125,34 @@ export function listarCampanas(
 
 export function obtenerCampana(id: number): Promise<Campana> {
   return request<Campana>(`/mowa-mes/campanas/${id}`);
+}
+
+/**
+ * The campaigns set aside (RF-MM-31, RF-MM-32), most recent first: those of a management month (`YYYY-MM`),
+ * or all of them without one. It also says which months have any and how many there are in all, so the
+ * counter and the month filter come from here and never from the active list.
+ */
+export function listarDescartadas(mes?: string): Promise<ListaDescartadas> {
+  const query = mes ? `?${new URLSearchParams({ mes })}` : '';
+  return request<ListaDescartadas>(`/mowa-mes/campanas/descartadas${query}`);
+}
+
+/** Set an active campaign aside. A 404 if it does not exist; the answer is the campaign, now discarded. */
+export function descartarCampana(id: number): Promise<Campana> {
+  return request<Campana>(`/mowa-mes/campanas/${id}/descartar`, { method: 'POST' });
+}
+
+/** Bring a discarded campaign back to the active ones. */
+export function restaurarCampana(id: number): Promise<Campana> {
+  return request<Campana>(`/mowa-mes/campanas/${id}/restaurar`, { method: 'POST' });
+}
+
+/**
+ * Delete a discarded campaign for good (204). An active one answers 409 `campana_no_descartada`: it has to be
+ * discarded first.
+ */
+export function eliminarCampana(id: number): Promise<void> {
+  return request<void>(`/mowa-mes/campanas/${id}`, { method: 'DELETE' });
 }
 
 /** In the selection's order; without `codigo`, every reason. */

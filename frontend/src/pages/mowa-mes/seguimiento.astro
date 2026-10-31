@@ -89,6 +89,33 @@ import '../../styles/mowa-mes.css';
           <h2 class="panel__title" id="mm-campanas-title" data-i18n="mowaMes.seguimiento.campanas.title">Campañas</h2>
           <p class="mono muted mm-nota" data-campanas-cuenta aria-live="polite"></p>
         </div>
+        <!-- Active or discarded (RF-MM-31): one list that changes view, kept in the URL (`?vista=`). -->
+        <div class="panel__body mm-vistas">
+          <div
+            class="segmented"
+            role="group"
+            data-vistas
+            data-i18n-attr="aria-label:mowaMes.seguimiento.vista.etiqueta"
+            aria-label="Mostrar"
+          >
+            <button type="button" class="segmented__item" data-vista="activas" aria-pressed="true"></button>
+            <button type="button" class="segmented__item" data-vista="descartadas" aria-pressed="false"></button>
+          </div>
+          <p class="mono muted mm-nota" data-campanas-aviso role="status"></p>
+        </div>
+        <!-- Only in the discarded view: the month they are listed by, and what that view leaves out (RF-MM-32). -->
+        <div class="panel__body mm-descartadas" data-descartadas-controles hidden>
+          <div class="field">
+            <label class="field__label" for="mm-descartadas-mes">
+              <Icon name="calendar" size={16} />
+              <span data-i18n="mowaMes.seguimiento.descartadas.mes">Mes de gestión</span>
+            </label>
+            <select class="input" id="mm-descartadas-mes" data-descartadas-mes></select>
+            <p class="field__hint" data-i18n="mowaMes.seguimiento.descartadas.hint">
+              Las campañas descartadas no cuentan en el límite, el costo ni las cifras del mes.
+            </p>
+          </div>
+        </div>
         <!-- Above the list: how many of its campaigns still wait for the sent report (RF-MM-33). -->
         <div class="panel__body" data-pendientes hidden>
           <p class="notice notice--warning" role="status">
@@ -145,7 +172,7 @@ import '../../styles/mowa-mes.css';
             <div data-archivos></div>
             <p class="mono muted mm-nota" data-descarga-estado role="status"></p>
 
-            <h3 class="mm-subtitulo" data-i18n="mowaMes.seguimiento.reporte.title">Reporte de enviados</h3>
+            <h3 class="mm-subtitulo" data-reporte-titulo data-i18n="mowaMes.seguimiento.reporte.title">Reporte de enviados</h3>
             <form class="mm-form" data-form-reporte novalidate>
               <p class="field__hint" data-i18n="mowaMes.seguimiento.reporte.intro">
                 Sube el reporte que descargas de MES para esta campaña. Cada id de MES del archivo queda asociado a ella.
@@ -238,8 +265,50 @@ import '../../styles/mowa-mes.css';
     </div>
   </dialog>
 
-  <!-- The icon of a row's tag: rendered once here, cloned per row. -->
+  <!-- Discard, restore or delete a campaign (RF-MM-31, RF-MM-32): one dialog for the three. -->
+  <dialog class="dialog" data-dialog="confirmar" aria-labelledby="mm-confirmar-title">
+    <div class="dialog__head">
+      <h2 id="mm-confirmar-title" data-confirmar-titulo></h2>
+    </div>
+    <div class="dialog__body">
+      <p data-confirmar-cuerpo></p>
+      <p class="notice notice--warning" data-confirmar-reporte hidden>
+        <Icon name="triangle-alert" size={20} />
+        <span data-i18n="mowaMes.confirmar.descartar.conReporte">
+          Esta campaña ya tiene reporte de enviados. Si se envió, su consumo deja de contar en el límite del mes.
+        </span>
+      </p>
+      <div data-confirmar-eliminar hidden>
+        <p class="notice notice--danger">
+          <Icon name="triangle-alert" size={20} />
+          <span data-confirmar-peligro></span>
+        </p>
+        <label class="choice choice--check">
+          <input type="checkbox" data-confirmar-casilla />
+          <span class="choice__body">
+            <span class="choice__title" data-i18n="mowaMes.confirmar.eliminar.casilla">Entiendo que no se puede deshacer</span>
+          </span>
+        </label>
+      </div>
+      <p class="field__error" data-confirmar-error role="alert"></p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn" data-close data-confirmar-cancelar data-i18n="mowaMes.confirmar.cancelar">
+        Cancelar
+      </button>
+      <button type="button" class="btn btn--primary" data-confirmar-aceptar>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span data-confirmar-icono></span>
+        <span class="btn__label" data-confirmar-etiqueta></span>
+      </button>
+    </div>
+  </dialog>
+
+  <!-- The icons of a row's tags and actions: rendered once here, cloned per row. -->
   <template data-icono-pendiente><Icon name="hourglass" size={16} /></template>
+  <template data-icono-archivar><Icon name="archive" size={16} /></template>
+  <template data-icono-restaurar><Icon name="archive-restore" size={16} /></template>
+  <template data-icono-eliminar><Icon name="trash-2" size={16} /></template>
 
   <!-- ---- Generic failure ---------------------------------------------- -->
   <dialog class="dialog" data-dialog="error" aria-labelledby="mm-error-title">
@@ -266,11 +335,15 @@ import '../../styles/mowa-mes.css';
   import {
     consumoLimite,
     descargarArchivoCampana,
+    descartarCampana,
+    eliminarCampana,
     importarReporte,
     listarCampanas,
+    listarDescartadas,
     listarExclusiones,
     obtenerCampana,
     obtenerConciliacion,
+    restaurarCampana,
     type ArchivoCampana,
     type Campana,
     type CodigoMowaMes,
@@ -280,25 +353,34 @@ import '../../styles/mowa-mes.css';
     type EstadoCosto,
     type EstadoCostoEstimado,
     type ListaCampanas,
+    type ListaDescartadas,
     type PaginaExclusiones,
   } from '../../lib/api-mowa-mes';
   import { guardarArchivo } from '../../lib/descargas';
   import { openWhenFree } from '../../lib/dialogs';
   import { formatBytes, formatDate, formatDateTime, formatNumber, formatSoles, formatTarifa } from '../../lib/format';
-  import { applyTranslations, locale, t } from '../../lib/i18n';
+  import { applyTranslations, locale, t, traducirPorPrefijo } from '../../lib/i18n';
   import { presentarCosto, traducirCodigo, type PresentacionCosto } from '../../lib/mowa-mes';
   import {
     CODIGOS_EXCLUSION,
+    advertirAlDescartar,
+    busquedaConVista,
     campanaDeLaUrl,
     detalleDeExclusion,
+    elegirMesDescartadas,
+    fechaDeDescarte,
     filasConciliacion,
     leerResumenDescarga,
     mesDe,
     moverMes,
     nombreArchivo,
+    opcionesDeMeses,
     ordenarEstados,
+    pendienteVisible,
     rangoPagina,
     usoDelLimite,
+    vistaDeLaUrl,
+    type VistaCampanas,
   } from '../../lib/mowa-mes-seguimiento';
 
   const POR_PAGINA_CAMPANAS = 20;
@@ -309,6 +391,11 @@ import '../../styles/mowa-mes.css';
     consumo: null as ConsumoLimite | null,
     campanas: null as ListaCampanas | null,
     desplazamientoCampanas: 0,
+    /** Active or discarded: what `?vista=` says, and what the buttons change. */
+    vista: vistaDeLaUrl(window.location.search) as VistaCampanas,
+    /** The discarded campaigns of `mesDescartadas`, with every month that has any and how many there are in all. */
+    descartadas: null as ListaDescartadas | null,
+    mesDescartadas: '',
     campanaId: null as number | null,
     /** The campaign a link asked for when it is not on the page of the list (an older one). */
     campanaAparte: null as Campana | null,
@@ -320,6 +407,7 @@ import '../../styles/mowa-mes.css';
 
   const dialogos = {
     reemplazar: $<HTMLDialogElement>('[data-dialog="reemplazar"]'),
+    confirmar: $<HTMLDialogElement>('[data-dialog="confirmar"]'),
     error: $<HTMLDialogElement>('[data-dialog="error"]'),
   };
 
@@ -473,29 +561,76 @@ import '../../styles/mowa-mes.css';
 
   const campanaActual = (): Campana | null =>
     estado.campanas?.campanas.find((c) => c.id === estado.campanaId) ??
+    estado.descartadas?.campanas.find((c) => c.id === estado.campanaId) ??
     (estado.campanaAparte?.id === estado.campanaId ? estado.campanaAparte : null);
+
+  /** The campaigns the list shows now, in its order. */
+  const campanasDeLaVista = (): Campana[] =>
+    (estado.vista === 'activas' ? estado.campanas?.campanas : estado.descartadas?.campanas) ?? [];
 
   /** The tag of a campaign whose sent report has not been imported yet (RF-MM-33). */
   function etiquetaPendiente(): HTMLElement {
     const etiqueta = document.createElement('span');
     etiqueta.className = 'tag tag--advertencia mm-pendiente__tag';
-    etiqueta.append(
-      $<HTMLTemplateElement>('template[data-icono-pendiente]').content.cloneNode(true),
-      document.createTextNode(t('mowaMes.estado.pendienteReporte')),
-    );
+    etiqueta.append(icono('pendiente'), document.createTextNode(t('mowaMes.estado.pendienteReporte')));
     return etiqueta;
   }
 
   /** Above the list: how many campaigns, of the whole list and not only this page, still wait for their report. */
   function pintarPendientes(pagina: ListaCampanas): void {
     const cuantas = pagina.total_pendientes;
-    $<HTMLElement>('[data-pendientes]').hidden = cuantas === 0;
+    $<HTMLElement>('[data-pendientes]').hidden = cuantas === 0 || estado.vista !== 'activas';
     $<HTMLElement>('[data-pendientes-texto]').textContent =
       cuantas === 0
         ? ''
         : t(cuantas === 1 ? 'mowaMes.seguimiento.pendientesUna' : 'mowaMes.seguimiento.pendientes', {
             n: formatNumber(cuantas),
           });
+  }
+
+  /** A template's icon, cloned for one more use. */
+  function icono(nombre: 'pendiente' | 'archivar' | 'restaurar' | 'eliminar'): Node {
+    return $<HTMLTemplateElement>(`template[data-icono-${nombre}]`).content.cloneNode(true);
+  }
+
+  /** The tag of a discarded campaign and, under it, the day it was set aside (RF-MM-32). */
+  function marcaDeDescartada(descartadaEn: string): Node[] {
+    const etiqueta = document.createElement('span');
+    etiqueta.className = 'tag tag--neutral mm-descartada__tag';
+    etiqueta.append(icono('archivar'), document.createTextNode(t('mowaMes.estado.descartada')));
+    const cuando = document.createElement('span');
+    cuando.className = 'mono muted mm-descartada__el';
+    cuando.textContent = t('mowaMes.seguimiento.descartadas.el', { fecha: fechaDeDescarte(descartadaEn) });
+    return [etiqueta, cuando];
+  }
+
+  /** «Activas (N) · Descartadas (M)»: N from the active list, M from the discarded one (its only source). */
+  function pintarVistas(): void {
+    const totales = { activas: estado.campanas?.total ?? 0, descartadas: estado.descartadas?.total_descartadas ?? 0 };
+    document.querySelectorAll<HTMLButtonElement>('[data-vista]').forEach((boton) => {
+      const vista = boton.dataset.vista as VistaCampanas;
+      boton.textContent = t(`mowaMes.seguimiento.vista.${vista}`, { n: formatNumber(totales[vista]) });
+      boton.setAttribute('aria-pressed', String(vista === estado.vista));
+    });
+  }
+
+  /** The months that have discarded campaigns, newest first, as the filter's options. */
+  function pintarMesesDescartadas(): void {
+    const selector = $<HTMLSelectElement>('[data-descartadas-mes]');
+    const opciones = opcionesDeMeses(estado.descartadas?.meses ?? []);
+    selector.replaceChildren(...opciones.map(({ valor, texto }) => new Option(texto, valor)));
+    selector.value = estado.mesDescartadas;
+    $<HTMLElement>('[data-descartadas-controles]').hidden = estado.vista !== 'descartadas' || opciones.length === 0;
+  }
+
+  function accionDeCampana(accion: Accion, campana: Campana): HTMLButtonElement {
+    const boton = document.createElement('button');
+    boton.type = 'button';
+    boton.className = accion === 'eliminar' ? 'btn btn--sm btn--danger' : 'btn btn--sm';
+    boton.append(icono(ACCIONES[accion].icono), document.createTextNode(t(`mowaMes.accion.${accion}`)));
+    boton.setAttribute('aria-label', t(ACCIONES[accion].titulo, { id: campana.id }));
+    boton.addEventListener('click', () => void pedirConfirmacion(accion, campana));
+    return boton;
   }
 
   function pintarCampanas(): void {
@@ -506,14 +641,19 @@ import '../../styles/mowa-mes.css';
     const pagina = estado.campanas;
     if (!pagina) return;
     pintarPendientes(pagina);
+    pintarVistas();
+    pintarMesesDescartadas();
 
+    const enDescartadas = estado.vista === 'descartadas';
+    const lista = campanasDeLaVista();
+    const total = enDescartadas ? lista.length : pagina.total;
     cuenta.textContent =
-      pagina.total === 1
+      total === 1
         ? t('mowaMes.seguimiento.campanas.cuentaUno')
-        : t('mowaMes.seguimiento.campanas.cuenta', { total: formatNumber(pagina.total) });
+        : t('mowaMes.seguimiento.campanas.cuenta', { total: formatNumber(total) });
 
-    if (pagina.campanas.length === 0) {
-      host.append(vacio(t('mowaMes.seguimiento.campanas.vacio')));
+    if (lista.length === 0) {
+      host.append(vacio(t(enDescartadas ? 'mowaMes.seguimiento.descartadas.vacio' : 'mowaMes.seguimiento.campanas.vacio')));
       paginador.hidden = true;
       return;
     }
@@ -533,9 +673,10 @@ import '../../styles/mowa-mes.css';
       [t('mowaMes.seguimiento.campanas.col.accion'), false],
     ]);
 
-    pagina.campanas.forEach((campana) => {
+    lista.forEach((campana) => {
       const fila = document.createElement('tr');
       fila.dataset.seleccionada = String(campana.id === estado.campanaId);
+      fila.dataset.campanaFila = String(campana.id);
 
       const ver = document.createElement('button');
       ver.type = 'button';
@@ -544,11 +685,18 @@ import '../../styles/mowa-mes.css';
       ver.setAttribute('aria-label', t('mowaMes.seguimiento.campanas.verAria', { id: campana.id }));
       ver.setAttribute('aria-pressed', String(campana.id === estado.campanaId));
       ver.addEventListener('click', () => void elegirCampana(campana.id));
+      const acciones = document.createElement('div');
+      acciones.className = 'mm-acciones';
+      acciones.append(ver);
+      if (campana.descartada_en === null) acciones.append(accionDeCampana('descartar', campana));
+      else acciones.append(accionDeCampana('restaurar', campana), accionDeCampana('eliminar', campana));
       const accion = document.createElement('td');
-      accion.append(ver);
+      accion.append(acciones);
 
+      // A discarded campaign never shows as pending: it is out of the count and the way to import is closed.
       const descripcion = celda('td', campana.descripcion);
-      if (campana.pendiente_reporte) descripcion.append(etiquetaPendiente());
+      if (pendienteVisible(campana)) descripcion.append(etiquetaPendiente());
+      if (campana.descartada_en !== null) descripcion.append(...marcaDeDescartada(campana.descartada_en));
 
       fila.append(
         celda('td', String(campana.id), 'num'),
@@ -568,7 +716,9 @@ import '../../styles/mowa-mes.css';
     });
 
     host.append(envoltorio);
-    pintarPaginas(paginador, pagina, pagina.campanas.length);
+    // The API does not page the discarded ones: a month's worth fits in one list.
+    if (enDescartadas) paginador.hidden = true;
+    else pintarPaginas(paginador, pagina, pagina.campanas.length);
   }
 
   async function cargarCampanas(): Promise<void> {
@@ -578,6 +728,190 @@ import '../../styles/mowa-mes.css';
     });
     pintarCampanas();
   }
+
+  /**
+   * The discarded campaigns of the month in view. Without a month chosen (or when the chosen one has no more)
+   * it opens on the most recent; the first answer already says which months there are.
+   */
+  async function cargarDescartadas(): Promise<void> {
+    let lista = await listarDescartadas(estado.mesDescartadas || undefined);
+    const mes = elegirMesDescartadas(lista.meses, estado.mesDescartadas);
+    if (mes !== estado.mesDescartadas) {
+      estado.mesDescartadas = mes;
+      if (mes) lista = await listarDescartadas(mes);
+    }
+    estado.descartadas = lista;
+    pintarCampanas();
+  }
+
+  async function cambiarVista(vista: VistaCampanas, enHistorial: boolean): Promise<void> {
+    if (vista === estado.vista) return;
+    estado.vista = vista;
+    if (enHistorial) {
+      window.history.pushState(null, '', `${window.location.pathname}${busquedaConVista(window.location.search, vista)}`);
+    }
+    pintarCampanas();
+    if (vista === 'descartadas') {
+      try {
+        await cargarDescartadas();
+      } catch (caido) {
+        mostrarError(caido);
+      }
+    }
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('[data-vista]').forEach((boton) => {
+    boton.addEventListener('click', () => void cambiarVista(boton.dataset.vista as VistaCampanas, true));
+  });
+  // Back and forward restore the view the URL names.
+  window.addEventListener('popstate', () => void cambiarVista(vistaDeLaUrl(window.location.search), false));
+
+  $<HTMLSelectElement>('[data-descartadas-mes]').addEventListener('change', (evento) => {
+    estado.mesDescartadas = (evento.currentTarget as HTMLSelectElement).value;
+    void cargarDescartadas().catch(mostrarError);
+  });
+
+  // ---- Discard, restore, delete (RF-MM-31, RF-MM-32) ------------------------------------------------
+
+  type Accion = 'descartar' | 'restaurar' | 'eliminar';
+
+  const ACCIONES: Record<
+    Accion,
+    {
+      titulo: string;
+      cuerpo: string;
+      hecho: string;
+      icono: 'archivar' | 'restaurar' | 'eliminar';
+      clase: string;
+      llamar: (id: number) => Promise<unknown>;
+    }
+  > = {
+    descartar: {
+      titulo: 'mowaMes.confirmar.descartar.titulo',
+      cuerpo: 'mowaMes.confirmar.descartar.cuerpo',
+      hecho: 'mowaMes.seguimiento.descartada',
+      icono: 'archivar',
+      clase: 'btn btn--primary',
+      llamar: descartarCampana,
+    },
+    restaurar: {
+      titulo: 'mowaMes.confirmar.restaurar.titulo',
+      cuerpo: 'mowaMes.confirmar.restaurar.cuerpo',
+      hecho: 'mowaMes.seguimiento.restaurada',
+      icono: 'restaurar',
+      clase: 'btn btn--primary',
+      llamar: restaurarCampana,
+    },
+    eliminar: {
+      titulo: 'mowaMes.confirmar.eliminar.tituloCampana',
+      cuerpo: 'mowaMes.confirmar.eliminar.cuerpoCampana',
+      hecho: 'mowaMes.seguimiento.eliminada',
+      icono: 'eliminar',
+      clase: 'btn btn--danger',
+      llamar: eliminarCampana,
+    },
+  };
+
+  const confirmacion = { accion: null as Accion | null, campana: null as Campana | null };
+  const aceptar = $<HTMLButtonElement>('[data-confirmar-aceptar]');
+  const casilla = $<HTMLInputElement>('[data-confirmar-casilla]');
+  const errorConfirmar = $<HTMLElement>('[data-confirmar-error]');
+
+  /** Deleting for good waits for the checkbox; the other two are ready as soon as they open. */
+  function actualizarAceptar(): void {
+    aceptar.disabled = confirmacion.accion === 'eliminar' && !casilla.checked;
+  }
+
+  casilla.addEventListener('change', actualizarAceptar);
+
+  /** The words of a campaign error: its code's text, or the server's own sentence for a code this build lacks. */
+  function textoDeErrorDeCampana(error: unknown): string {
+    return error instanceof ApiError && error.codigo
+      ? traducirPorPrefijo('mowaMes.errorCampana', error.codigo, mensajeDeError(error))
+      : mensajeDeError(error);
+  }
+
+  async function pedirConfirmacion(accion: Accion, campana: Campana): Promise<void> {
+    const config = ACCIONES[accion];
+    confirmacion.accion = accion;
+    confirmacion.campana = campana;
+    $<HTMLElement>('[data-confirmar-titulo]').textContent = t(config.titulo, { id: campana.id });
+    const cuerpo = $<HTMLElement>('[data-confirmar-cuerpo]');
+    cuerpo.hidden = accion === 'eliminar';
+    cuerpo.textContent = accion === 'eliminar' ? '' : t(config.cuerpo);
+    $<HTMLElement>('[data-confirmar-reporte]').hidden = !(accion === 'descartar' && advertirAlDescartar(campana));
+    $<HTMLElement>('[data-confirmar-eliminar]').hidden = accion !== 'eliminar';
+    $<HTMLElement>('[data-confirmar-peligro]').textContent = accion === 'eliminar' ? t(config.cuerpo) : '';
+    casilla.checked = false;
+    errorConfirmar.textContent = '';
+    aceptar.className = config.clase;
+    $<HTMLElement>('[data-confirmar-icono]').replaceChildren(icono(config.icono));
+    $<HTMLElement>('[data-confirmar-etiqueta]').textContent = t(`mowaMes.accion.${accion}`);
+    actualizarAceptar();
+    await openWhenFree(dialogos.confirmar);
+    // Neither discarding nor deleting is what Enter should do by accident.
+    $<HTMLButtonElement>('[data-confirmar-cancelar]').focus();
+  }
+
+  /** The detail of a campaign that just left its view has nothing left to show. */
+  function cerrarDetalle(): void {
+    estado.campanaId = null;
+    estado.campanaAparte = null;
+    estado.conciliacion = null;
+    estado.exclusiones = null;
+    reiniciarReporte();
+    pintarDetalle();
+    pintarConciliacion();
+    pintarExclusiones();
+  }
+
+  /** Both lists and the month's consumption: any of the three actions changes all of them. */
+  async function recargarTodo(): Promise<void> {
+    await Promise.all([
+      cargarCampanas(),
+      cargarDescartadas(),
+      consumoLimite(estado.mes).then((consumo) => {
+        estado.consumo = consumo;
+        pintarLimite();
+      }),
+    ]);
+    // The last row of a page may have been the one that left.
+    if (estado.campanas?.campanas.length === 0 && estado.desplazamientoCampanas > 0) {
+      estado.desplazamientoCampanas = Math.max(0, estado.desplazamientoCampanas - POR_PAGINA_CAMPANAS);
+      await cargarCampanas();
+    }
+  }
+
+  /** Focus goes to the row that took the place of the one that left or, with none, to the views control. */
+  function enfocarSiguiente(id: number | null): void {
+    const fila = id === null ? null : document.querySelector<HTMLElement>(`[data-campana-fila="${id}"] button`);
+    (fila ?? document.querySelector<HTMLElement>('[data-vista][aria-pressed="true"]'))?.focus();
+  }
+
+  aceptar.addEventListener('click', async () => {
+    const { accion, campana } = confirmacion;
+    if (!accion || !campana) return;
+    errorConfirmar.textContent = '';
+    const lista = campanasDeLaVista();
+    const siguiente = lista[lista.findIndex((c) => c.id === campana.id) + 1]?.id ?? null;
+    ocupado(aceptar, true);
+    try {
+      await ACCIONES[accion].llamar(campana.id);
+      dialogos.confirmar.close();
+      if (estado.campanaId === campana.id) cerrarDetalle();
+      await recargarTodo();
+      pintarDetalle();
+      avisar($<HTMLElement>('[data-campanas-aviso]'), t(ACCIONES[accion].hecho, { id: campana.id }));
+      enfocarSiguiente(siguiente);
+    } catch (caido) {
+      errorConfirmar.textContent = textoDeErrorDeCampana(caido);
+      // The lists may be out of date (another tab got there first): read them again, quietly.
+      if (caido instanceof ApiError) void recargarTodo().catch(() => undefined);
+    } finally {
+      ocupado(aceptar, false);
+      actualizarAceptar();
+    }
+  });
 
   async function moverCampanas(delta: -1 | 1): Promise<void> {
     estado.desplazamientoCampanas = Math.max(0, estado.desplazamientoCampanas + delta * POR_PAGINA_CAMPANAS);
@@ -599,7 +933,11 @@ import '../../styles/mowa-mes.css';
     const titulo = $<HTMLElement>('[data-detalle-titulo]');
     $<HTMLElement>('[data-detalle-vacio]').hidden = Boolean(campana);
     $<HTMLElement>('[data-detalle-cuerpo]').hidden = !campana;
-    $<HTMLElement>('[data-pendiente-aviso]').hidden = !campana?.pendiente_reporte;
+    $<HTMLElement>('[data-pendiente-aviso]').hidden = !campana || !pendienteVisible(campana);
+    // A discarded campaign takes no report until it is restored.
+    const descartada = campana?.descartada_en != null;
+    $<HTMLElement>('[data-reporte-titulo]').hidden = descartada;
+    formReporte.hidden = descartada;
 
     if (!campana) {
       titulo.dataset.i18n = 'mowaMes.seguimiento.detalle.titleNinguna';
@@ -794,7 +1132,9 @@ import '../../styles/mowa-mes.css';
       void cargarCampanas().then(pintarDetalle).catch(mostrarError);
       avisar($<HTMLElement>('[data-reporte-estado]'), t('mowaMes.seguimiento.reporte.importado'));
     } catch (caido) {
-      if (caido instanceof ApiError && caido.status === 409 && !reemplazar) {
+      if (caido instanceof ApiError && caido.status === 409 && caido.codigo === 'campana_descartada') {
+        fallarReporte(textoDeErrorDeCampana(caido));
+      } else if (caido instanceof ApiError && caido.status === 409 && !reemplazar) {
         $<HTMLElement>('[data-reemplazar-detalle]').textContent = caido.detail;
         // Replacing overwrites imported rows, so keeping them is what Enter does.
         void openWhenFree(dialogos.reemplazar).then(() =>
@@ -1068,12 +1408,20 @@ import '../../styles/mowa-mes.css';
 
   async function arrancar(): Promise<void> {
     try {
-      const [consumo, campanas] = await Promise.all([
+      const [consumo, campanas, descartadas] = await Promise.all([
         consumoLimite(estado.mes),
         listarCampanas({ limite: POR_PAGINA_CAMPANAS, desplazamiento: estado.desplazamientoCampanas }),
+        // Its totals feed the counter of the views even while the active list is the one in view.
+        listarDescartadas(),
       ]);
       estado.consumo = consumo;
       estado.campanas = campanas;
+      estado.descartadas = descartadas;
+      estado.mesDescartadas = elegirMesDescartadas(descartadas.meses, estado.mesDescartadas);
+      // Opened on the discarded view (`?vista=descartadas`): the month it opens on is the newest.
+      if (estado.vista === 'descartadas' && estado.mesDescartadas) {
+        estado.descartadas = await listarDescartadas(estado.mesDescartadas);
+      }
       sinConexion(false);
       pintarFiltro();
       pintarLimite();

@@ -338,7 +338,7 @@ test('mowa-mes campaña: diálogo del límite mensual con error', async ({ page 
   await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 1000' });
   await page.getByRole('button', { name: 'Crear campaña' }).click();
   const dialogo = page.getByRole('dialog', { name: 'La campaña superaría el límite mensual' });
-  await expect(dialogo.getByText('La campana supera el limite mensual; confirma para continuar')).toBeVisible();
+  await expect(dialogo.getByText('La campaña supera el límite mensual. Confirma para crearla igual.')).toBeVisible();
   await sinViolaciones(page);
 });
 

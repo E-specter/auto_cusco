@@ -8,17 +8,27 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import type { Conciliacion } from '../../src/lib/api-mowa-mes';
+import { formatDate } from '../../src/lib/format';
 import {
   CODIGOS_EXCLUSION,
+  advertirAlDescartar,
+  busquedaConVista,
+  campanaDeLaUrl,
+  elegirMesDescartadas,
+  etiquetaDelMes,
+  fechaDeDescarte,
   filasConciliacion,
   leerResumenDescarga,
   mesDe,
   moverMes,
   nombreArchivo,
+  opcionesDeMeses,
   ordenarEstados,
-  campanaDeLaUrl,
+  ordenarMeses,
+  pendienteVisible,
   rangoPagina,
   usoDelLimite,
+  vistaDeLaUrl,
 } from '../../src/lib/mowa-mes-seguimiento';
 
 const CATALOGO = fileURLToPath(
@@ -178,5 +188,85 @@ describe('campanaDeLaUrl (el enlace de «Para subir a MES»)', () => {
     for (const malo of ['abc', '0', '-3', '2.5', '1e3', ' 4', '4 ', '99999999999999999999', '0x10', '+5']) {
       expect(campanaDeLaUrl(`?campana=${encodeURIComponent(malo)}`), malo).toBeNull();
     }
+  });
+});
+
+describe('la vista de las campañas en la URL (RF-MM-31)', () => {
+  it('?vista=descartadas abre las descartadas; cualquier otra cosa, las activas', () => {
+    expect(vistaDeLaUrl('?vista=descartadas')).toBe('descartadas');
+    expect(vistaDeLaUrl('?mes=2026-09&vista=descartadas')).toBe('descartadas');
+    for (const otra of ['', '?vista=activas', '?vista=', '?vista=Descartadas', '?vista=otra', '?campana=3']) {
+      expect(vistaDeLaUrl(otra), otra).toBe('activas');
+    }
+  });
+
+  it('elegir una vista conserva los demás parámetros', () => {
+    expect(busquedaConVista('?campana=3', 'descartadas')).toBe('?campana=3&vista=descartadas');
+    expect(busquedaConVista('?vista=descartadas&campana=3', 'activas')).toBe('?campana=3');
+  });
+
+  it('las activas son la vista por defecto: no escriben `vista`', () => {
+    expect(busquedaConVista('', 'activas')).toBe('');
+    expect(busquedaConVista('?vista=descartadas', 'activas')).toBe('');
+    expect(busquedaConVista('', 'descartadas')).toBe('?vista=descartadas');
+  });
+});
+
+describe('los meses de las descartadas (RF-MM-32)', () => {
+  it('van del más reciente al más antiguo, sin repetirse', () => {
+    expect(ordenarMeses(['2026-08', '2026-10', '2025-12', '2026-09', '2026-10'])).toEqual([
+      '2026-10',
+      '2026-09',
+      '2026-08',
+      '2025-12',
+    ]);
+  });
+
+  it('el orden es el del calendario, no el del texto de otro formato', () => {
+    expect(ordenarMeses(['2026-02', '2026-11', '2026-01'])).toEqual(['2026-11', '2026-02', '2026-01']);
+  });
+
+  it('lo que no es AAAA-MM no es un mes', () => {
+    expect(ordenarMeses(['2026-13', '2026-00', '26-10', '2026-1', 'octubre', '', '2026-10'])).toEqual(['2026-10']);
+  });
+
+  it('se escriben con la inicial en mayúscula', () => {
+    expect(etiquetaDelMes('2026-10')).toBe('Octubre de 2026');
+    expect(etiquetaDelMes('2025-01')).toBe('Enero de 2025');
+  });
+
+  it('las opciones del select salen ordenadas y con su texto', () => {
+    expect(opcionesDeMeses(['2026-08', '2026-10'])).toEqual([
+      { valor: '2026-10', texto: 'Octubre de 2026' },
+      { valor: '2026-08', texto: 'Agosto de 2026' },
+    ]);
+    expect(opcionesDeMeses([])).toEqual([]);
+  });
+
+  it('la vista abre en el más reciente, y conserva el elegido mientras tenga campañas', () => {
+    expect(elegirMesDescartadas(['2026-08', '2026-10'], '')).toBe('2026-10');
+    expect(elegirMesDescartadas(['2026-08', '2026-10'], '2026-08')).toBe('2026-08');
+    // The chosen month lost its last campaign: it falls to the newest left.
+    expect(elegirMesDescartadas(['2026-10'], '2026-08')).toBe('2026-10');
+    expect(elegirMesDescartadas([], '2026-08')).toBe('');
+  });
+
+  it('el día del descarte se escribe como el resto del sitio', () => {
+    expect(fechaDeDescarte('2026-10-30T12:00:00Z')).toBe(formatDate('2026-10-30'));
+    expect(fechaDeDescarte('2026-10-30T12:00:00Z')).toContain('2026');
+  });
+});
+
+describe('qué avisa descartar y qué muestra una descartada', () => {
+  it('avisa del reporte solo cuando ya hay uno importado (pendiente_reporte === false)', () => {
+    expect(advertirAlDescartar({ pendiente_reporte: false })).toBe(true);
+    expect(advertirAlDescartar({ pendiente_reporte: true })).toBe(false);
+  });
+
+  it('el aviso de «pendiente del reporte» es de las activas: una descartada nunca lo muestra', () => {
+    expect(pendienteVisible({ pendiente_reporte: true, descartada_en: null })).toBe(true);
+    expect(pendienteVisible({ pendiente_reporte: false, descartada_en: null })).toBe(false);
+    expect(pendienteVisible({ pendiente_reporte: true, descartada_en: '2026-10-30T10:00:00-05:00' })).toBe(false);
+    expect(pendienteVisible({ pendiente_reporte: false, descartada_en: '2026-10-30T10:00:00-05:00' })).toBe(false);
   });
 });

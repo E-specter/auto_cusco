@@ -658,6 +658,9 @@ export function campanaDesdeEntrada(
   };
 }
 
+/** The moment `POST /mowa-mes/campanas/{id}/descartar` stamps, so a test can read the day it shows. */
+export const DESCARTADA_EN = '2026-10-30T10:00:00-05:00';
+
 export interface ApiFalsaMowaMes extends EstadoSupervisionCalendario {
   configuracion: ConfiguracionMowaMes;
   versiones: VersionSpeech[];
@@ -892,10 +895,28 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
     };
 
     if (ruta === '/mowa-mes/campanas' && metodo === 'GET') {
-      const { elementos, ...resto } = pagina(estado.campanas, 50);
+      // A discarded campaign is in no active total (RF-MM-31): neither the list, nor its count, nor the pending one.
+      const activas = estado.campanas.filter((c) => c.descartada_en === null);
+      const { elementos, ...resto } = pagina(activas, 50);
       // The count of the whole list, not of the page: the API counts them in the repository.
-      const totalPendientes = estado.campanas.filter((c) => c.pendiente_reporte && c.descartada_en === null).length;
+      const totalPendientes = activas.filter((c) => c.pendiente_reporte).length;
       return json(route, 200, { ...resto, total_pendientes: totalPendientes, campanas: elementos });
+    }
+
+    // The discarded ones (RF-MM-32): those of a management month, the months that have any (not trimmed by the
+    // filter, newest first) and how many there are in all.
+    if (ruta === '/mowa-mes/campanas/descartadas' && metodo === 'GET') {
+      const mes = url.searchParams.get('mes');
+      if (mes !== null && !/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) {
+        return json(route, 422, { detail: [{ loc: ['query', 'mes'], msg: 'Input should be YYYY-MM', type: 'value_error' }] });
+      }
+      const descartadas = estado.campanas.filter((c) => c.descartada_en !== null);
+      const meses = [...new Set(descartadas.map((c) => c.mes_imputacion))].sort().reverse();
+      return json(route, 200, {
+        campanas: mes === null ? descartadas : descartadas.filter((c) => c.mes_imputacion === mes),
+        meses,
+        total_descartadas: descartadas.length,
+      });
     }
 
     if (ruta === '/mowa-mes/campanas/previsualizacion' && metodo === 'POST') {
@@ -963,6 +984,28 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
 
       if (resto === '' && metodo === 'GET') return json(route, 200, campana);
 
+      // Discarding and restoring are idempotent, as in the API: discarding a discarded one keeps its date.
+      if (resto === '/descartar' && metodo === 'POST') {
+        const descartada = campana.descartada_en === null ? { ...campana, descartada_en: DESCARTADA_EN } : campana;
+        estado.campanas = estado.campanas.map((c) => (c.id === id ? descartada : c));
+        return json(route, 200, descartada);
+      }
+      if (resto === '/restaurar' && metodo === 'POST') {
+        const activa = { ...campana, descartada_en: null };
+        estado.campanas = estado.campanas.map((c) => (c.id === id ? activa : c));
+        return json(route, 200, activa);
+      }
+      // Only a discarded one is deleted, and its files, exclusions and reports go with it.
+      if (resto === '' && metodo === 'DELETE') {
+        if (campana.descartada_en === null) {
+          return json(route, 409, { detail: `La campana ${id} esta activa; descartala primero`, codigo: 'campana_no_descartada' });
+        }
+        estado.campanas = estado.campanas.filter((c) => c.id !== id);
+        estado.exclusiones.delete(id);
+        estado.conciliaciones.delete(id);
+        return route.fulfill({ status: 204 });
+      }
+
       if (resto === '/exclusiones' && metodo === 'GET') {
         const codigo = url.searchParams.get('codigo');
         // Any catalogue code filters (a non-exclusion one simply finds nothing);
@@ -999,6 +1042,9 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       if (resto === '/reportes' && metodo === 'POST') {
         const guion = siguiente(estado.respuestas.importarReporte);
         if (guion) return json(route, guion.estado, guion.cuerpo ?? {});
+        if (campana.descartada_en !== null) {
+          return json(route, 409, { detail: `La campana ${id} esta descartada; restaurala primero`, codigo: 'campana_descartada' });
+        }
         const nombre = nombreSubido(cuerpo);
         if (nombre !== null && !FORMATOS_REPORTE.some((extension) => nombre.toLowerCase().endsWith(extension))) {
           return json(route, 400, { detail: `El formato de ${nombre} no es reconocido: usa ${FORMATOS_REPORTE.join(', ')}` });

@@ -9,14 +9,18 @@ import { ApiError } from '../../src/lib/api';
 import {
   consumoLimite,
   descargarArchivoCampana,
+  descartarCampana,
+  eliminarCampana,
   importarReporte,
   listarCampanas,
+  listarDescartadas,
   listarExclusiones,
   obtenerConciliacion,
   crearSpeech,
   editarSpeech,
   guardarConfiguracion,
   previsualizarSpeech,
+  restaurarCampana,
 } from '../../src/lib/api-mowa-mes';
 
 function responderCon(estado: number, cuerpo: unknown = {}): ReturnType<typeof vi.fn> {
@@ -120,6 +124,44 @@ describe('campañas y seguimiento', () => {
     expect(url.pathname).toBe('/api/mowa-mes/campanas');
     expect(url.searchParams.get('limite')).toBe('20');
     expect(url.searchParams.get('desplazamiento')).toBe('40');
+  });
+
+  it('las descartadas mandan `mes` solo cuando se elige uno', async () => {
+    const todas = responderCon(200, { campanas: [], meses: [], total_descartadas: 0 });
+    await listarDescartadas();
+    const sinMes = new URL(llamada(todas).url, 'http://x');
+    expect(sinMes.pathname).toBe('/api/mowa-mes/campanas/descartadas');
+    expect(sinMes.searchParams.has('mes')).toBe(false);
+
+    const delMes = responderCon(200, { campanas: [], meses: [], total_descartadas: 0 });
+    await listarDescartadas('2026-10');
+    expect(new URL(llamada(delMes).url, 'http://x').searchParams.get('mes')).toBe('2026-10');
+  });
+
+  it('descartar y restaurar son POST sin cuerpo; eliminar es DELETE y contesta 204', async () => {
+    const descartar = responderCon(200, { id: 7 });
+    await descartarCampana(7);
+    expect(llamada(descartar).url).toBe('/api/mowa-mes/campanas/7/descartar');
+    expect(llamada(descartar).opciones.method).toBe('POST');
+    expect(llamada(descartar).opciones.body).toBeUndefined();
+
+    const restaurar = responderCon(200, { id: 7 });
+    await restaurarCampana(7);
+    expect(llamada(restaurar).url).toBe('/api/mowa-mes/campanas/7/restaurar');
+    expect(llamada(restaurar).opciones.method).toBe('POST');
+
+    const eliminar = responderCon(204);
+    await expect(eliminarCampana(7)).resolves.toBeUndefined();
+    expect(llamada(eliminar).url).toBe('/api/mowa-mes/campanas/7');
+    expect(llamada(eliminar).opciones.method).toBe('DELETE');
+  });
+
+  it('eliminar una activa llega como 409 con su código', async () => {
+    responderCon(409, { detail: 'activa', codigo: 'campana_no_descartada' });
+    const error = await eliminarCampana(7).catch((caido: unknown) => caido);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(409);
+    expect((error as ApiError).codigo).toBe('campana_no_descartada');
   });
 
   it('las exclusiones mandan `codigo` solo cuando hay filtro', async () => {

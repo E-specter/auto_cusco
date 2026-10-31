@@ -446,6 +446,44 @@
   flex: 1 1 16rem;
 }
 
+/* ---- Active and discarded campaigns (RF-MM-31, RF-MM-32) ------------------------------
+   The views control sits above the list with the line that announces what an action did; the month filter
+   only in the discarded view. A discarded row is told apart by its tag and the day it was set aside, never
+   by fading it: its text keeps its contrast. */
+.mm-vistas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mm-descartadas .field__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mm-descartadas .input {
+  max-inline-size: 20rem;
+}
+
+.mm-descartada__tag {
+  margin-inline-start: var(--space-2);
+}
+
+.mm-descartada__el {
+  display: block;
+  margin-block-start: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+/* The actions of a row sit side by side and wrap under each other when the column is narrow. */
+.mm-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 /* ---- To upload to MES (RF-MM-35) -----------------------------------------------
    Three numbered steps once the campaign exists: the files, the data of MES's form with a copy button
    each, and the link to its follow-up. The numbers are the list's own. */
