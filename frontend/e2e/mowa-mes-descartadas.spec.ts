@@ -187,6 +187,11 @@ test.describe('la vista de las descartadas', () => {
     await expect(page.locator('[data-pendiente-aviso]')).toBeHidden();
     await expect(page.getByLabel('Archivo del reporte')).toBeHidden();
     await expect(page.getByRole('button', { name: 'Importar reporte' })).toBeHidden();
+    // Where the form was, the hint says why and what to do.
+    await expect(page.locator('[data-reporte-descartada]')).toHaveText(
+      'Esta campaña está descartada: restáurala para importar su reporte.',
+    );
+    await expect(page.locator('[data-reporte-descartada]')).toHaveClass(/field__hint/);
     // Its files and its reconciliation are read as for any other.
     await expect(page.getByRole('heading', { name: 'Archivos de carga' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Conciliación' })).toBeVisible();
@@ -209,6 +214,35 @@ test.describe('la vista de las descartadas', () => {
     await expect(page.locator('#mm-reporte-error')).toHaveText('La campaña está descartada. Restáurala primero.');
     await expect(page.getByRole('dialog')).toHaveCount(0);
   });
+});
+
+test('una campaña activa no lleva el hint de «está descartada»', async ({ page }) => {
+  await abrir(page, conDescartadas());
+
+  await expect(detalle(page)).toHaveText('Campaña 5');
+  await expect(page.locator('[data-reporte-descartada]')).toBeHidden();
+  await expect(page.getByLabel('Archivo del reporte')).toBeVisible();
+});
+
+test('el mes del límite y el del filtro se escriben igual, con mayúscula', async ({ page }) => {
+  const api = conDescartadas();
+  await abrir(page, api, '?vista=descartadas');
+
+  const delLimite = (await page.locator('[data-mes]').textContent())!;
+  expect(delLimite).toMatch(/^[A-ZÁÉÍÓÚ][a-z]+ de \d{4}$/);
+  // The filter's options are the same label for each month.
+  const opciones = await mes(page).locator('option').allTextContents();
+  for (const opcion of opciones) expect(opcion).toMatch(/^[A-ZÁÉÍÓÚ][a-z]+ de \d{4}$/);
+  // And the limit's month, taken to the filter's month, reads the same way.
+  await page.getByRole('button', { name: 'Mes anterior' }).click();
+  await expect(page.locator('[data-mes]')).not.toHaveText(delLimite);
+  await expect(page.locator('[data-mes]')).toHaveText(/^[A-ZÁÉÍÓÚ][a-z]+ de \d{4}$/);
+});
+
+test('el «cuenta en» del detalle lleva el mes en minúscula, a mitad de frase', async ({ page }) => {
+  await abrir(page, conDescartadas());
+
+  await expect(page.locator('[data-detalle-meta]')).toContainText('cuenta en octubre de 2026');
 });
 
 test.describe('descartar', () => {

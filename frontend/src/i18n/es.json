@@ -732,6 +732,7 @@
   "mowaMes.seguimiento.descartadas.hint": "Las campañas descartadas no cuentan en el límite, el costo ni las cifras del mes.",
   "mowaMes.seguimiento.descartadas.vacio": "No hay campañas descartadas.",
   "mowaMes.seguimiento.descartadas.el": "Descartada el {fecha}",
+  "mowaMes.seguimiento.descartada.importar": "Esta campaña está descartada: restáurala para importar su reporte.",
   "mowaMes.estado.descartada": "Descartada",
   "mowaMes.accion.descartar": "Descartar",
   "mowaMes.accion.restaurar": "Restaurar",

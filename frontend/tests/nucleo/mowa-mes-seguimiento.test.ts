@@ -8,14 +8,13 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import type { Conciliacion } from '../../src/lib/api-mowa-mes';
-import { formatDate } from '../../src/lib/format';
+import { formatDate, formatMesGestion } from '../../src/lib/format';
 import {
   CODIGOS_EXCLUSION,
   advertirAlDescartar,
   busquedaConVista,
   campanaDeLaUrl,
   elegirMesDescartadas,
-  etiquetaDelMes,
   fechaDeDescarte,
   filasConciliacion,
   leerResumenDescarga,
@@ -230,9 +229,10 @@ describe('los meses de las descartadas (RF-MM-32)', () => {
     expect(ordenarMeses(['2026-13', '2026-00', '26-10', '2026-1', 'octubre', '', '2026-10'])).toEqual(['2026-10']);
   });
 
-  it('se escriben con la inicial en mayúscula', () => {
-    expect(etiquetaDelMes('2026-10')).toBe('Octubre de 2026');
-    expect(etiquetaDelMes('2025-01')).toBe('Enero de 2025');
+  it('el texto de cada opción es el del límite mensual: una sola función', () => {
+    for (const mes of ['2026-01', '2026-10', '2026-12']) {
+      expect(opcionesDeMeses([mes])[0].texto).toBe(formatMesGestion(mes));
+    }
   });
 
   it('las opciones del select salen ordenadas y con su texto', () => {

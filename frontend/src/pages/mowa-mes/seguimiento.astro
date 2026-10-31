@@ -173,6 +173,9 @@ import '../../styles/mowa-mes.css';
             <p class="mono muted mm-nota" data-descarga-estado role="status"></p>
 
             <h3 class="mm-subtitulo" data-reporte-titulo data-i18n="mowaMes.seguimiento.reporte.title">Reporte de enviados</h3>
+            <p class="field__hint" data-reporte-descartada hidden data-i18n="mowaMes.seguimiento.descartada.importar">
+              Esta campaña está descartada: restáurala para importar su reporte.
+            </p>
             <form class="mm-form" data-form-reporte novalidate>
               <p class="field__hint" data-i18n="mowaMes.seguimiento.reporte.intro">
                 Sube el reporte que descargas de MES para esta campaña. Cada id de MES del archivo queda asociado a ella.
@@ -358,7 +361,16 @@ import '../../styles/mowa-mes.css';
   } from '../../lib/api-mowa-mes';
   import { guardarArchivo } from '../../lib/descargas';
   import { openWhenFree } from '../../lib/dialogs';
-  import { formatBytes, formatDate, formatDateTime, formatNumber, formatSoles, formatTarifa } from '../../lib/format';
+  import {
+    formatBytes,
+    formatDate,
+    formatDateTime,
+    formatMes,
+    formatMesGestion,
+    formatNumber,
+    formatSoles,
+    formatTarifa,
+  } from '../../lib/format';
   import { applyTranslations, locale, t, traducirPorPrefijo } from '../../lib/i18n';
   import { presentarCosto, traducirCodigo, type PresentacionCosto } from '../../lib/mowa-mes';
   import {
@@ -496,13 +508,8 @@ import '../../styles/mowa-mes.css';
 
   // ---- Monthly limit -----------------------------------------------------------
 
-  function etiquetaMes(mes: string): string {
-    const [anio, numero] = mes.split('-').map(Number);
-    return new Intl.DateTimeFormat(locale(), { month: 'long', year: 'numeric' }).format(new Date(anio, numero - 1, 1));
-  }
-
   function pintarLimite(): void {
-    $<HTMLElement>('[data-mes]').textContent = etiquetaMes(estado.mes);
+    $<HTMLElement>('[data-mes]').textContent = formatMesGestion(estado.mes);
     const host = $<HTMLElement>('[data-limite-cifras]');
     host.replaceChildren();
     const consumo = estado.consumo;
@@ -542,7 +549,7 @@ import '../../styles/mowa-mes.css';
   async function cambiarMes(delta: -1 | 1): Promise<void> {
     const mes = moverMes(estado.mes, delta);
     estado.mes = mes;
-    $<HTMLElement>('[data-mes]').textContent = etiquetaMes(mes);
+    $<HTMLElement>('[data-mes]').textContent = formatMesGestion(mes);
     try {
       const consumo = await consumoLimite(mes);
       // A quick double click may have moved on; paint only the month in view.
@@ -937,6 +944,7 @@ import '../../styles/mowa-mes.css';
     // A discarded campaign takes no report until it is restored.
     const descartada = campana?.descartada_en != null;
     $<HTMLElement>('[data-reporte-titulo]').hidden = descartada;
+    $<HTMLElement>('[data-reporte-descartada]').hidden = !descartada;
     formReporte.hidden = descartada;
 
     if (!campana) {
@@ -952,7 +960,7 @@ import '../../styles/mowa-mes.css';
     $<HTMLElement>('[data-detalle-meta]').textContent = t('mowaMes.seguimiento.detalle.meta', {
       corte: formatDate(campana.fecha_corte),
       envio: formatDate(campana.fecha_envio),
-      mes: etiquetaMes(campana.mes_imputacion),
+      mes: formatMes(campana.mes_imputacion),
       speech: campana.speech.nombre,
     });
 

@@ -732,6 +732,7 @@
   "mowaMes.seguimiento.descartadas.hint": "Discarded campaigns do not count toward the month's limit, cost or figures.",
   "mowaMes.seguimiento.descartadas.vacio": "There are no discarded campaigns.",
   "mowaMes.seguimiento.descartadas.el": "Discarded on {fecha}",
+  "mowaMes.seguimiento.descartada.importar": "This campaign is discarded: restore it to import its report.",
   "mowaMes.estado.descartada": "Discarded",
   "mowaMes.accion.descartar": "Discard",
   "mowaMes.accion.restaurar": "Restore",

@@ -17,6 +17,24 @@ export function toApiDate(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+/**
+ * "octubre de 2026" (es) or "October 2026" (en): a `YYYY-MM` month as Intl writes it, for the middle of a
+ * sentence («cuenta en octubre de 2026»). English already comes with its capital.
+ */
+export function formatMes(mes: string): string {
+  const [anio, numero] = mes.split('-').map(Number);
+  return new Intl.DateTimeFormat(locale(), { month: 'long', year: 'numeric' }).format(new Date(anio, numero - 1, 1));
+}
+
+/**
+ * "Octubre de 2026": the same month alone, as a label (the limit's panel, the discarded filter), with its
+ * first letter in capitals.
+ */
+export function formatMesGestion(mes: string): string {
+  const texto = formatMes(mes);
+  return texto.charAt(0).toLocaleUpperCase(locale()) + texto.slice(1);
+}
+
 /** "10 sep 2026" — long enough to be unambiguous, short enough for a node. */
 export function formatDate(value: string): string {
   return new Intl.DateTimeFormat(locale(), {

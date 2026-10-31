@@ -13,8 +13,8 @@ import type {
   EstadoConteo,
   Exclusion,
 } from './api-mowa-mes';
-import { formatDate, toApiDate } from './format';
-import { locale, t } from './i18n';
+import { formatDate, formatMesGestion, toApiDate } from './format';
+import { t } from './i18n';
 import { traducirCodigo } from './mowa-mes';
 
 /** Exclusion reasons in evaluation order (docs/mowa-mes.md §12): the filter's options. */
@@ -202,13 +202,6 @@ export function elegirMesDescartadas(meses: readonly string[], elegido: string):
   return ordenados.includes(elegido) ? elegido : (ordenados[0] ?? '');
 }
 
-/** «Octubre de 2026» (es) or «October 2026» (en), with its first letter in capitals. */
-export function etiquetaDelMes(mes: string): string {
-  const [anio, numero] = mes.split('-').map(Number);
-  const texto = new Intl.DateTimeFormat(locale(), { month: 'long', year: 'numeric' }).format(new Date(anio, numero - 1, 1));
-  return texto.charAt(0).toLocaleUpperCase(locale()) + texto.slice(1);
-}
-
 /** The day a campaign was discarded, in the analyst's zone, as the site writes dates (`format.ts`). */
 export function fechaDeDescarte(descartadaEn: string): string {
   return formatDate(toApiDate(new Date(descartadaEn)));
@@ -232,5 +225,5 @@ export function pendienteVisible(campana: Pick<Campana, 'pendiente_reporte' | 'd
 
 /** The text of a month in a select, for each month the API lists. */
 export function opcionesDeMeses(meses: readonly string[]): Array<{ valor: string; texto: string }> {
-  return ordenarMeses(meses).map((mes) => ({ valor: mes, texto: etiquetaDelMes(mes) }));
+  return ordenarMeses(meses).map((mes) => ({ valor: mes, texto: formatMesGestion(mes) }));
 }
