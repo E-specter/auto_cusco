@@ -127,7 +127,8 @@ test.describe('el detalle', () => {
     await aviso(page).getByRole('button', { name: 'Importar el reporte' }).click();
 
     await expect(page.getByLabel('Archivo del reporte')).toBeFocused();
-    await expect(page.getByLabel('Archivo del reporte')).toBeInViewport();
+    // The <input type=file> is hidden on purpose (`filepick__input`): the visible control is what has to be in view.
+    await expect(page.locator('.filepick')).toBeInViewport();
   });
 
   test('al importar el reporte, el tag, la línea y el aviso se van', async ({ page }) => {

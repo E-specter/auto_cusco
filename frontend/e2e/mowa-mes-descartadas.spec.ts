@@ -130,7 +130,9 @@ test.describe('la vista de las descartadas', () => {
   test('el filtro «Mes de gestión» ofrece solo los meses con descartadas, del más reciente al más antiguo', async ({ page }) => {
     await abrir(page, conDescartadas(), '?vista=descartadas');
 
-    await expect(mes(page).locator('option')).toHaveText(['Octubre de 2026', 'Septiembre de 2026']);
+    // «Setiembre» is the es-PE form that ICU writes and that was decided to keep. The literal, not the function that
+    // writes it: the test must fail if the text the analyst sees changes.
+    await expect(mes(page).locator('option')).toHaveText(['Octubre de 2026', 'Setiembre de 2026']);
     await expect(mes(page)).toHaveValue('2026-10');
     await expect(filas(page)).toHaveCount(1);
     await expect(fila(page, 3)).toBeVisible();
@@ -358,7 +360,8 @@ test.describe('restaurar', () => {
     await expect(vista(page, 'Descartadas')).toHaveText('Descartadas (2)');
     await expect(estado(page)).toHaveText('Se restauró la campaña 3.');
     // It was the only one of October: the filter falls to the newest month left.
-    await expect(mes(page).locator('option')).toHaveText(['Septiembre de 2026']);
+    // «Setiembre»: the es-PE form of ICU that was decided to keep (see the first month filter test).
+    await expect(mes(page).locator('option')).toHaveText(['Setiembre de 2026']);
     await expect(mes(page)).toHaveValue('2026-09');
     await expect(filas(page)).toHaveCount(2);
     // Nothing follows it in its list: the focus goes to the views control.

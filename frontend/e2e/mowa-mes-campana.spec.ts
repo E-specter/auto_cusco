@@ -930,7 +930,8 @@ test.describe('F6-B: nombre de los archivos y costo estimado (RF-MM-24, RF-MM-25
 
     await page.getByRole('button', { name: 'Crear campaña' }).click();
 
-    await expect(page.getByRole('heading', { name: /creada$/ })).toBeVisible();
+    // Creating shows the panel «Para subir a MES» (M-F5), no longer a «creada» heading.
+    await expect(page.getByRole('heading', { name: 'Para subir a MES', level: 2 })).toBeVisible();
     const [envio] = api.pedidos.filter((p) => p.ruta === '/mowa-mes/campanas' && p.metodo === 'POST');
     expect((envio.cuerpo as Record<string, unknown>).plantilla_nombre_archivo).toBe('carga_{campana}');
     // The fake stores the real names the API would: {campana} became the id.
