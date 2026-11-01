@@ -16,6 +16,9 @@ import { expect, test, type Page } from '@playwright/test';
 import { apiVacia, montarApi, seleccionGuardada, version, type ApiFalsa } from './api-falsa';
 import { apiMowaMes, montarApiMowaMes, type ApiFalsaMowaMes } from './api-falsa-mowa-mes';
 
+// No animations: axe reads the contrast of what is painted, and a dialog that is still fading in is not what the analyst sees.
+test.use({ reducedMotion: 'reduce' });
+
 const REGLAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 const CAMPANA = '/mowa-mes/campana';
 const CLAVE = 'mowaMes.campana.borrador.v1';
@@ -45,7 +48,8 @@ function mundo(): Mundo {
 
 async function montarAmbas(page: Page, { general, mowa }: Mundo): Promise<void> {
   await montarApi(soloRutas(page, (ruta) => PROPIA.test(ruta)), general);
-  await montarApiMowaMes(soloRutas(page, (ruta) => !PROPIA.test(ruta)), mowa);
+  // Only the API's calls: the pages and the assets are not ours to answer, whatever their path.
+  await montarApiMowaMes(soloRutas(page, (ruta) => ruta.startsWith('/api/') && !PROPIA.test(ruta)), mowa);
 }
 
 const seleccion = (page: Page) => page.getByLabel('Selección guardada');

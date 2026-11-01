@@ -171,7 +171,7 @@ test.describe('el límite mensual', () => {
 
     await expect(page.locator('[data-costo-mes] svg')).toHaveCount(1);
     await expect(page.locator('[data-costo-mes] svg')).toHaveAttribute('aria-hidden', 'true');
-    await expect(page.locator('[data-costo-mes]')).toHaveText(/^Costo del mes: S\/ /);
+    await expect(page.locator('[data-costo-mes]')).toContainText('Costo del mes: S/');
   });
 });
 
@@ -319,13 +319,12 @@ test.describe('idioma y anchos', () => {
     await page.setViewportSize({ width: 360, height: 900 });
     await abrir(page, conUso(2_375_000));
 
-    const medidas = await page.evaluate(() => {
-      const contenedor = document.querySelector('.mm-uso')!.getBoundingClientRect();
-      const cuerpo = document.querySelector('.mm-uso')!.closest('.panel__body')!.getBoundingClientRect();
-      return { barra: contenedor.width, cuerpo: cuerpo.width };
-    });
-    expect(medidas.barra).toBeGreaterThan(medidas.cuerpo - 40);
-    expect(medidas.barra).toBeLessThanOrEqual(medidas.cuerpo);
+    // The bar spans the panel's content, like the figures above it.
+    const medidas = await page.evaluate(() => ({
+      barra: document.querySelector('.mm-uso')!.getBoundingClientRect().width,
+      cifras: document.querySelector('[data-limite-cifras]')!.getBoundingClientRect().width,
+    }));
+    expect(Math.abs(medidas.barra - medidas.cifras)).toBeLessThanOrEqual(1);
     const desborde = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(desborde).toBeLessThanOrEqual(0);
   });

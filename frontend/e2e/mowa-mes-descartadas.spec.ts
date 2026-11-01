@@ -190,6 +190,8 @@ test.describe('la vista de las descartadas', () => {
     await expect(page.getByLabel('Archivo del reporte')).toBeHidden();
     await expect(page.getByRole('button', { name: 'Importar reporte' })).toBeHidden();
     // Where the form was, the hint says why and what to do.
+    // `toHaveText` also passes on a hidden node: the hint has to be SEEN.
+    await expect(page.locator('[data-reporte-descartada]')).toBeVisible();
     await expect(page.locator('[data-reporte-descartada]')).toHaveText(
       'Esta campaña está descartada: restáurala para importar su reporte.',
     );

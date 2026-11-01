@@ -21,6 +21,9 @@ import { apiSpeechV2, montarApiSpeechV2, versionV2Sintetica } from './api-falsa-
 import { apiTextoEnriquecidoVacia } from './api-falsa-texto-enriquecido';
 import { montarSeleccion, seleccionFalsa } from './apoyo-seleccion';
 
+// No animations: axe reads the contrast of what is painted, and a dialog still fading in is not what the analyst sees.
+test.use({ reducedMotion: 'reduce' });
+
 const REGLAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 const RUTA = '/mowa-mes/configuracion';
 
@@ -155,7 +158,8 @@ test.describe('renombrar', () => {
     await expect(campo).toBeFocused();
     // Writing again takes the error away.
     await campo.fill('Otro nombre');
-    await expect(dialogo.getByRole('alert')).toHaveText('');
+    // An empty alert is not in the accessibility tree: the node itself is what has to be empty.
+    await expect(dialogo.locator('#mm-renombrar-error')).toBeEmpty();
   });
 
   test('Escape o «Cancelar» no renombran', async ({ page }) => {
@@ -301,7 +305,7 @@ test.describe('versiones deshabilitadas', () => {
     await fila(page, 4).getByRole('button', { name: 'Ver' }).click();
 
     await expect(version(page)).toHaveValue('4');
-    await expect(version(page).locator('option')).toHaveText(['Speech original (original)', 'Borrable uno (deshabilitada)']);
+    await expect(version(page).locator('option')).toHaveText(['Speech original (original)', 'Activa', 'Borrable uno (deshabilitada)']);
     await expect(candado(page)).toContainText('Esta versión está deshabilitada');
     await expect(page.locator('[data-speech-pie]')).toBeHidden();
     await expect(renombrar(page)).toBeHidden();
@@ -422,7 +426,7 @@ test.describe('eliminar definitivamente', () => {
     await abrirPanel(page);
 
     // A campaign used it after the list was read.
-    api.versiones = api.versiones.map((v) => (v.id === 4 ? { ...v, usada: true } : v));
+    api.versiones = api.versiones.map((v) => (v.id === 4 ? conEliminable({ ...v, usada: true }) : v));
     await fila(page, 4).getByRole('button', { name: 'Eliminar definitivamente' }).click();
     const dialogo = page.getByRole('dialog', { name: 'Eliminar definitivamente la versión «Borrable uno»' });
     await dialogo.getByLabel('Entiendo que no se puede deshacer').check();
