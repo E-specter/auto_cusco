@@ -8,7 +8,6 @@
  */
 import type { Page, Route } from '@playwright/test';
 
-import { caracteresQuitados, normalizarGsm7 } from './api-falsa-gsm7';
 import {
   esTelefono,
   estadoSupervisionCalendario,
@@ -27,106 +26,20 @@ import type {
   PeticionCampanaEntrada,
   PrevisualizacionCampana,
   ConfiguracionMowaMes,
-  PartesEntrada,
-  PartesSpeech,
-  PrevisualizacionSpeech,
-  PrevisualizacionSpeechEntrada,
-  Segmento,
-  SpeechEdicionEntrada,
-  SpeechNuevoEntrada,
   SpeechParcialEntrada,
   VersionSpeech,
 } from '../src/lib/api-mowa-mes';
 import { json, siguiente } from './apoyo';
+import { expresionesDelOriginal } from './speech-original';
 
 type Respuesta = { estado: number; cuerpo?: unknown };
 
-const SEGMENTOS: Array<{ segmento: Segmento; etiqueta: string; desde: number | null; hasta: number }> = [
-  { segmento: 'preventiva', etiqueta: 'Preventiva', desde: null, hasta: 0 },
-  { segmento: '1_a_8', etiqueta: '1 a 8', desde: 1, hasta: 8 },
-  { segmento: '9_a_30', etiqueta: '9 a 30', desde: 9, hasta: 30 },
-  { segmento: '31_a_60', etiqueta: '31 a 60', desde: 31, hasta: 60 },
-  { segmento: '61_a_90', etiqueta: '61 a 90', desde: 61, hasta: 90 },
-  { segmento: '91_a_120', etiqueta: '91 a 120', desde: 91, hasta: 120 },
-];
-
-/** RF-MM-18: the default speech, the only one sown by the migration. */
-const TEXTO_ORIGINAL: Record<Segmento, [string, string]> = {
-  preventiva: [' Caja Cusco te recuerda que tu cuota Vence el ', '. Si ya pagaste, omite este mensaje.'],
-  '1_a_8': [
-    ' Caja Cusco te informa que tu cuota venció el ',
-    ', acércate a pagar a nuestras agencias, agentes KASNET o a través de Wayki app.',
-  ],
-  '9_a_30': [
-    ' Caja Cusco te informa que tu cuota venció el ',
-    ', evita estar mal calificado, acércate a pagar a nuestras agencias y/o canales alternativos.',
-  ],
-  '31_a_60': [
-    ' Caja Cusco te informa que tu cuota venció el ',
-    ', ponte al día y participa del sorteo de 06 autos. INFO por [whatsapp]',
-  ],
-  '61_a_90': [
-    ' cancela tu deuda CAJA CUSCO vencida el ',
-    ', pague a tiempo y evite estar mal calificado. Más INFO por [whatsapp]',
-  ],
-  '91_a_120': [
-    ' cancela tu deuda CAJA CUSCO vencida el ',
-    ', pague a tiempo y evite estar mal calificado. Más INFO por [whatsapp]',
-  ],
-};
-
-const usaWhatsapp = (parte: { parte_1: string; parte_2: string }) =>
-  `${parte.parte_1}${parte.parte_2}`.includes('[whatsapp]');
-
-/** The missing and repeated segments in one sentence, or null when all six arrive once. */
-function problemaDeSegmentos(recibidas: PartesEntrada[] | null | undefined): string | null {
-  const partes = recibidas ?? [];
-  const faltan = SEGMENTOS.filter(({ segmento }) => !partes.some((p) => p.segmento === segmento)).map((s) => s.segmento);
-  const repetidos = SEGMENTOS.filter(({ segmento }) => partes.filter((p) => p.segmento === segmento).length > 1).map(
-    (s) => s.segmento,
-  );
-  const frases = [];
-  if (faltan.length) frases.push(`Faltan segmentos: ${faltan.join(', ')}`);
-  if (repetidos.length) frases.push(`Segmentos repetidos: ${repetidos.join(', ')}`);
-  return frases.length ? frases.join('. ') : null;
-}
-
-function partesCompletas(recibidas: PartesEntrada[] | null | undefined): PartesSpeech[] {
-  const partes = recibidas ?? [];
-  return SEGMENTOS.map(({ segmento, etiqueta, desde, hasta }) => {
-    const parte = partes.find((p) => p.segmento === segmento) ?? { segmento, parte_1: '', parte_2: '' };
-    return {
-      segmento,
-      etiqueta,
-      dias_desde: desde,
-      dias_hasta: hasta,
-      parte_1: parte.parte_1,
-      parte_2: parte.parte_2,
-      usa_whatsapp: usaWhatsapp(parte),
-    };
-  });
-}
-
-/** What the backend answers to a create or an edit with `partes` since M3 (B15). */
-export const VERSION_V1_RETIRADA = {
-  detail: 'Las versiones de dos partes (v1) ya no se crean ni se editan',
-  codigo: 'version_v1_retirada',
-  problemas: [],
-} as const;
-
-export function partesOriginales(): PartesEntrada[] {
-  return SEGMENTOS.map(({ segmento }) => ({
-    segmento,
-    parte_1: TEXTO_ORIGINAL[segmento][0],
-    parte_2: TEXTO_ORIGINAL[segmento][1],
-  }));
-}
-
+/** The Speech original, as the database holds it since M-B3: a v2, with the migration's expressions. */
 export function speechOriginal(): VersionSpeech {
   return {
     id: 1,
     nombre: 'Speech original',
-    formato: 'v1',
+    formato: 'v2',
     original: true,
     basada_en_id: null,
     usada: false,
@@ -135,8 +48,8 @@ export function speechOriginal(): VersionSpeech {
     deshabilitada_en: null,
     eliminable: false,
     motivo_no_eliminable: 'original',
-    partes: partesCompletas(partesOriginales()),
-    expresiones: [],
+    partes: [],
+    expresiones: expresionesDelOriginal(),
   };
 }
 
@@ -167,7 +80,7 @@ export function versionSpeech(parcial: Partial<VersionSpeech> = {}): VersionSpee
   return {
     id: 2,
     nombre: 'Speech 2',
-    formato: 'v1',
+    formato: 'v2',
     original: false,
     basada_en_id: 1,
     usada: false,
@@ -176,81 +89,10 @@ export function versionSpeech(parcial: Partial<VersionSpeech> = {}): VersionSpee
     deshabilitada_en: null,
     eliminable: false,
     motivo_no_eliminable: null,
-    partes: partesCompletas(partesOriginales()),
-    expresiones: [],
+    partes: [],
+    expresiones: expresionesDelOriginal(),
     ...parcial,
   };
-}
-
-/**
- * Mirrors the backend's worst case: titular of 8, date of 10 and a WhatsApp
- * link of 26 characters. Without a number, a segment that uses it cannot be
- * built, so it reports `falta_whatsapp` and no example.
- */
-export function previsualizacionSintetica(
-  entrada: PrevisualizacionSpeechEntrada,
-  whatsappConfigurado: string | null,
-): PrevisualizacionSpeech {
-  const whatsapp = entrada.whatsapp ?? whatsappConfigurado;
-  // Like the backend: the length always counts a 26-character link, with or
-  // without a number; only the example needs the real one.
-  const enlaceLargo = `https://wa.me/+51${'9'.repeat(9)}`;
-  const enlace = whatsapp ? `https://wa.me/+51${whatsapp}` : '';
-  const problemas: PrevisualizacionSpeech['problemas'] = [];
-  const segmentos: PrevisualizacionSpeech['segmentos'] = [];
-
-  // Like the backend: missing or repeated segments are ONE problem that lists
-  // them all, and those segments are left out of `segmentos`.
-  const detalleSegmentos = problemaDeSegmentos(entrada.partes);
-  if (detalleSegmentos) {
-    problemas.push({ segmento: null, campo: 'segmentos', detalle: detalleSegmentos, codigo: null, catalogo: null, ubicacion: null });
-  }
-
-  SEGMENTOS.forEach(({ segmento, etiqueta }) => {
-    const recibidas = (entrada.partes ?? []).filter((p) => p.segmento === segmento);
-    if (recibidas.length !== 1) return;
-    const [parte] = recibidas;
-    (['parte_1', 'parte_2'] as const).forEach((campo) => {
-      if (parte[campo].includes('[@')) {
-        problemas.push({
-          segmento,
-          campo,
-          detalle: 'La parte no puede contener [@',
-          // No code, so no catalogue: the real backend answers `catalogo: null` for a v1 problem.
-          codigo: null,
-          catalogo: null,
-          ubicacion: null,
-        });
-      }
-    });
-    const usa = usaWhatsapp(parte);
-    const falta = usa && !whatsapp;
-    // Like the backend (RF-MM-27): the length is the normalised message's.
-    const largo =
-      8 +
-      normalizarGsm7(parte.parte_1.replaceAll('[whatsapp]', enlaceLargo)).length +
-      10 +
-      normalizarGsm7(parte.parte_2.replaceAll('[whatsapp]', enlaceLargo)).length;
-    segmentos.push({
-      segmento,
-      etiqueta,
-      usa_whatsapp: usa,
-      falta_whatsapp: falta,
-      largo_maximo: largo,
-      sin_maximo: null,
-      codigo: largo > 160 ? 'mensaje_excede_160' : largo > 150 ? 'mensaje_excede_150' : null,
-      // The backend's worst case: an 8-character holder and the date as a pattern.
-      ejemplo: falta
-        ? null
-        : normalizarGsm7(
-            `XXXXXXXX${parte.parte_1.replaceAll('[whatsapp]', enlace)}dd/mm/yyyy${parte.parte_2.replaceAll('[whatsapp]', enlace)}`,
-          ),
-      // What the normalisation deletes from the segment's fixed text (not from a real row's data).
-      caracteres_quitados: caracteresQuitados(`${parte.parte_1} ${parte.parte_2}`),
-    });
-  });
-
-  return { whatsapp, largo_advertencia: 150, largo_maximo: 160, problemas, segmentos, campos_archivados: [] };
 }
 
 // ---- Costs and file names (T-MM-F6, B8's contract) ----------------------------------
@@ -564,7 +406,7 @@ export function previsualizacionCampanaSintetica(
     speech: {
       id: speechId,
       nombre: speechId === 1 ? 'Speech original' : `Speech ${speechId}`,
-      formato: 'v1',
+      formato: 'v2',
       huella: 'a'.repeat(64),
     },
     whatsapp: entrada.whatsapp?.trim() || '900000999',
@@ -877,22 +719,9 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
     if (ruta === '/mowa-mes/speech' && metodo === 'POST') {
       const guion = siguiente(estado.respuestas.crearSpeech);
       if (guion) return json(route, guion.estado, guion.cuerpo ?? {});
-      const entrada = cuerpo as SpeechNuevoEntrada;
-      // M3 (B15, RF-MM-17): a version of two parts is no longer created. A v2 is answered by
+      // Every version is a v2 (M-B3): creating one, and the preview of its expressions, are answered by
       // `api-falsa-speech-v2.ts`, layered over this one.
-      if (entrada.partes) return json(route, 400, VERSION_V1_RETIRADA);
-      return json(route, 404, { detail: 'sin ruta falsa para crear una v2 aqui: la contesta api-falsa-speech-v2' });
-    }
-    if (ruta === '/mowa-mes/speech/previsualizacion' && metodo === 'POST') {
-      const pedido = cuerpo as PrevisualizacionSpeechEntrada;
-      if (pedido.whatsapp && !esTelefono(pedido.whatsapp.trim())) {
-        return json(route, 400, { detail: 'El numero de WhatsApp no cumple RF-02' });
-      }
-      return json(
-        route,
-        200,
-        previsualizacionSintetica(cuerpo as PrevisualizacionSpeechEntrada, estado.configuracion.whatsapp_contacto),
-      );
+      return json(route, 404, { detail: 'sin ruta falsa para crear una version aqui: la contesta api-falsa-speech-v2' });
     }
     const unaVersion = ruta.match(/^\/mowa-mes\/speech\/(\d+)$/);
     // Rename and/or disable or enable (RF-MM-28, RF-MM-29); with both, a refused name changes nothing.
@@ -934,14 +763,10 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       const guion = siguiente(estado.respuestas.editarSpeech);
       if (guion) return json(route, guion.estado, guion.cuerpo ?? {});
       const id = Number(unaVersion[1]);
-      const entrada = cuerpo as SpeechEdicionEntrada;
-      // M3 (B15, RF-MM-17): a version of two parts is no longer edited either, whatever the version is
-      // (the backend looks at this before anything else); a v2 is answered by `api-falsa-speech-v2.ts`.
-      if (entrada.partes) return json(route, 400, VERSION_V1_RETIRADA);
       const actual = estado.versiones.find((v) => v.id === id);
       if (!actual) return json(route, 404, { detail: 'No existe la version' });
       if (!actual.editable) return json(route, 409, { detail: 'La version ya se uso y no se modifica' });
-      return json(route, 404, { detail: 'sin ruta falsa para editar una v2 aqui: la contesta api-falsa-speech-v2' });
+      return json(route, 404, { detail: 'sin ruta falsa para editar una version aqui: la contesta api-falsa-speech-v2' });
     }
 
     // ---- Follow-up -----------------------------------------------------------------

@@ -244,6 +244,7 @@ Prefijo `mowaMes.*` (es y en). No usan el prefijo `mowaMes.codigo.*`, que vigila
 | `mowaMes.speech.renombrar.repetido` | Ya existe una versión con ese nombre. Elige otro. | A version with that name already exists. Choose another one. |
 | `mowaMes.speech.renombrar.hecho` | Renombrada a «{nombre}». | Renamed to “{nombre}”. |
 | `mowaMes.speech.inmutable.deshabilitada` | Esta versión está deshabilitada: no aparece en la campaña y se ve en solo lectura. Para usarla o editarla, habilítala. | This version is disabled: it does not show in the campaign and is read-only. To use or edit it, enable it. |
+| `mowaMes.speech.inmutable.original` | Este es el Speech original: no se modifica. Tus cambios se guardan como una versión nueva basada en él. | This is the original speech: it is not modified. Your changes are saved as a new version based on it. |
 | `mowaMes.campana.speech.ninguna` | No hay versiones habilitadas | No enabled versions |
 | `mowaMes.campana.speech.ningunaAviso` | No hay ninguna versión de speech habilitada. Habilita una en la configuración para crear la campaña. | There is no enabled speech version. Enable one in the settings to create the campaign. |
 | `mowaMes.campana.speech.irConfiguracion` | Ir a la configuración | Go to the settings |

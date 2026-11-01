@@ -5,24 +5,19 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { LargoSegmento, PartesSpeech, VersionSpeech } from '../../src/lib/api-mowa-mes';
+import type { VersionSpeech } from '../../src/lib/api-mowa-mes';
 import {
-  borradorDesdeVersion,
   CAMPOS_DE_ERROR,
   campoDeError,
   insertarVariable,
   modoGuardado,
-  nivelDeFila,
-  nivelLargo,
   presentarCosto,
   problemasConfiguracion,
-  rangoSegmento,
   RANGOS_CONFIGURACION,
   tarifaEditable,
   textoDeRango,
   tarifaNormalizada,
   variablesDesconocidas,
-  resumenNiveles,
   traducirCodigo,
 } from '../../src/lib/mowa-mes';
 import { formatNumber } from '../../src/lib/format';
@@ -30,23 +25,11 @@ import { FILAS_POR_PAGINA, paginar } from '../../src/lib/paginacion';
 import { t } from '../../src/lib/i18n';
 import { setLanguageForTests } from './idioma';
 
-function parte(segmento: PartesSpeech['segmento'], parte_1 = ' p1 ', parte_2 = ' p2'): PartesSpeech {
-  return {
-    segmento,
-    etiqueta: segmento,
-    dias_desde: segmento === 'preventiva' ? null : 1,
-    dias_hasta: 8,
-    parte_1,
-    parte_2,
-    usa_whatsapp: false,
-  };
-}
-
 function version(parcial: Partial<VersionSpeech> = {}): VersionSpeech {
   return {
     id: 2,
     nombre: 'Speech 2',
-    formato: 'v1',
+    formato: 'v2',
     original: false,
     basada_en_id: 1,
     usada: false,
@@ -55,37 +38,11 @@ function version(parcial: Partial<VersionSpeech> = {}): VersionSpeech {
     deshabilitada_en: null,
     eliminable: false,
     motivo_no_eliminable: null,
-    // Desordenadas a propósito: el borrador sigue el orden de RF-MM-15.
-    partes: [parte('9_a_30'), parte('preventiva'), parte('1_a_8')],
+    partes: [],
     expresiones: [],
     ...parcial,
   };
 }
-
-function largo(parcial: Partial<LargoSegmento> = {}): LargoSegmento {
-  return {
-    segmento: '9_a_30',
-    etiqueta: '9 a 30',
-    usa_whatsapp: false,
-    falta_whatsapp: false,
-    largo_maximo: 120,
-    sin_maximo: null,
-    codigo: null,
-    ejemplo: 'ejemplo',
-    caracteres_quitados: [],
-    ...parcial,
-  };
-}
-
-describe('borrador de speech', () => {
-  it('ordena las partes por segmento y deja solo lo editable', () => {
-    expect(borradorDesdeVersion(version())).toEqual([
-      { segmento: 'preventiva', parte_1: ' p1 ', parte_2: ' p2' },
-      { segmento: '1_a_8', parte_1: ' p1 ', parte_2: ' p2' },
-      { segmento: '9_a_30', parte_1: ' p1 ', parte_2: ' p2' },
-    ]);
-  });
-});
 
 describe('modo de guardado (RF-MM-17)', () => {
   it('una versión sin uso se edita', () => {
@@ -102,89 +59,6 @@ describe('modo de guardado (RF-MM-17)', () => {
 
   it('lo que la API marca no editable crea otra', () => {
     expect(modoGuardado(version({ editable: false }))).toBe('nueva');
-  });
-});
-
-describe('lectura de la previsualización', () => {
-  it('sin código queda bien', () => {
-    expect(nivelLargo(largo())).toBe('ok');
-  });
-
-  it('más de 150 advierte y más de 160 excluye', () => {
-    expect(nivelLargo(largo({ largo_maximo: 156, codigo: 'mensaje_excede_150' }))).toBe('advertencia');
-    expect(nivelLargo(largo({ largo_maximo: 161, codigo: 'mensaje_excede_160' }))).toBe('excede');
-  });
-
-  it('la falta de WhatsApp manda sobre el largo', () => {
-    expect(
-      nivelLargo(largo({ falta_whatsapp: true, usa_whatsapp: true, codigo: 'mensaje_excede_160', ejemplo: null })),
-    ).toBe('falta_whatsapp');
-  });
-
-  it('el rango de preventiva no tiene inicio', () => {
-    expect(rangoSegmento({ dias_desde: null, dias_hasta: 0 })).toEqual({
-      clave: 'mowaMes.speech.rango.hasta',
-      params: { hasta: 0 },
-    });
-    expect(rangoSegmento({ dias_desde: 9, dias_hasta: 30 })).toEqual({
-      clave: 'mowaMes.speech.rango.entre',
-      params: { desde: 9, hasta: 30 },
-    });
-  });
-});
-
-describe('texto del rango', () => {
-  const texto = (desde: number | null, hasta: number) => {
-    const { clave, params } = rangoSegmento({ dias_desde: desde, dias_hasta: hasta });
-    return t(clave, params);
-  };
-
-  it('va entre paréntesis y no repite el nombre del segmento', () => {
-    setLanguageForTests('es');
-    expect(texto(9, 30)).toBe('(9–30 días)');
-    expect(texto(null, 0)).toBe('(hasta 0 días)');
-  });
-
-  it('se traduce al inglés con la misma forma', () => {
-    setLanguageForTests('en');
-    expect(texto(9, 30)).toBe('(9–30 days)');
-    expect(texto(null, 0)).toBe('(up to 0 days)');
-    setLanguageForTests('es');
-  });
-});
-
-describe('resumen de niveles para lectores de pantalla', () => {
-  it('sin previsualización no dice nada', () => {
-    expect(resumenNiveles([])).toBe('');
-  });
-
-  it('si todo cabe lo dice una vez', () => {
-    setLanguageForTests('es');
-    expect(resumenNiveles([largo(), largo({ segmento: 'preventiva' })])).toBe(
-      'Todos los segmentos caben en un SMS.',
-    );
-  });
-
-  it('cuenta en singular y en plural, lo más grave primero', () => {
-    setLanguageForTests('es');
-    const resumen = resumenNiveles([
-      largo({ codigo: 'mensaje_excede_150' }),
-      largo({ segmento: '31_a_60', falta_whatsapp: true, usa_whatsapp: true, ejemplo: null }),
-      largo({ segmento: '61_a_90', falta_whatsapp: true, usa_whatsapp: true, ejemplo: null }),
-      largo({ segmento: '1_a_8', codigo: 'mensaje_excede_160' }),
-      largo({ segmento: 'preventiva' }),
-    ]);
-    expect(resumen).toBe(
-      '2 segmentos no se pueden generar sin WhatsApp. 1 segmento pasa de 160 caracteres. 1 segmento pasa de 150 caracteres.',
-    );
-  });
-
-  it('se traduce al inglés', () => {
-    setLanguageForTests('en');
-    expect(resumenNiveles([largo({ codigo: 'mensaje_excede_150' }), largo({ codigo: 'mensaje_excede_150' })])).toBe(
-      '2 segments are longer than 150 characters.',
-    );
-    setLanguageForTests('es');
   });
 });
 
@@ -482,35 +356,6 @@ describe('campoDeError', () => {
   it('un cuerpo que no llegó (no era un objeto JSON) tampoco', () => {
     expect(campoDeError(null)).toBeNull();
     expect(campoDeError({})).toBeNull();
-  });
-});
-
-describe('nivelDeFila (un segmento sin máximo no tiene nivel)', () => {
-  const sinMaximo = {
-    largo_maximo: null,
-    // A real code of the engine, with the sentence it gives for it: the length of a variable depends on each product's data.
-    sin_maximo: {
-      codigo: 'sin_cota_variable',
-      detalle: "El largo de la variable 'monto' depende del dato de cada producto",
-      ubicacion: { nodo: 1, funcion: null, parametro: null },
-    },
-  } as const;
-
-  it('con largo máximo es el nivel de siempre', () => {
-    expect(nivelDeFila(largo())).toBe('ok');
-    expect(nivelDeFila(largo({ largo_maximo: 156, codigo: 'mensaje_excede_150' }))).toBe('advertencia');
-    expect(nivelDeFila(largo({ largo_maximo: 161, codigo: 'mensaje_excede_160' }))).toBe('excede');
-  });
-
-  it('sin largo máximo no hay nivel: no se afirma que «cabe»', () => {
-    expect(nivelDeFila(largo(sinMaximo))).toBeNull();
-    expect(nivelDeFila(largo({ ...sinMaximo, codigo: null }))).toBeNull();
-  });
-
-  it('faltar el WhatsApp es un estado propio y se muestra aunque no haya máximo', () => {
-    expect(nivelDeFila(largo({ ...sinMaximo, falta_whatsapp: true, usa_whatsapp: true, ejemplo: null }))).toBe(
-      'falta_whatsapp',
-    );
   });
 });
 

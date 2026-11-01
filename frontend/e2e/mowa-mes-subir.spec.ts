@@ -299,6 +299,27 @@ test.describe('anchos y accesibilidad', () => {
     expect(columnas.boton.size).toBe(1);
   });
 
+  for (const ancho of [1280, 768]) {
+    test(`a ${ancho} px la línea de cada fila es una sola: el nombre, el valor y el botón terminan a la misma altura`, async ({ page }) => {
+      await page.setViewportSize({ width: ancho, height: 900 });
+      await crearCampana(page);
+
+      const filas = panel(page).locator('dl > div');
+      expect(await filas.count()).toBeGreaterThan(0);
+      for (let i = 0; i < (await filas.count()); i++) {
+        const celdas = filas.nth(i).locator('dt, dd');
+        expect(await celdas.count()).toBe(3);
+        const bajos: number[] = [];
+        for (let c = 0; c < 3; c++) {
+          const caja = (await celdas.nth(c).boundingBox())!;
+          bajos.push(Math.round((caja.y + caja.height) * 10) / 10);
+        }
+        // The hairline is the bottom border of each cell: the three pieces of a row's line are one line.
+        expect(Math.max(...bajos) - Math.min(...bajos)).toBeLessThanOrEqual(0.5);
+      }
+    });
+  }
+
   test('el botón de copiar es el pequeño de solo icono, con su nombre', async ({ page }) => {
     await crearCampana(page);
 

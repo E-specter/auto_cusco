@@ -9,6 +9,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { apiSupervisionCalendario, apiVacia, montarApi, montarApiSupervisionCalendario } from './api-falsa';
 import { apiMowaMes, montarApiMowaMes } from './api-falsa-mowa-mes';
+import { montarConfiguracion } from './api-falsa-speech-v2';
 
 test.use({ reducedMotion: 'reduce', timezoneId: 'America/Lima' });
 
@@ -22,6 +23,7 @@ interface Pantalla {
 
 const sinDatos = (page: Page) => montarApi(page, apiVacia());
 const conMowaMes = (page: Page) => montarApiMowaMes(page, apiMowaMes());
+const conConfiguracionMowaMes = async (page: Page) => void (await montarConfiguracion(page, apiMowaMes()));
 const conSupervision = (page: Page) => montarApiSupervisionCalendario(page, apiSupervisionCalendario());
 
 const PANTALLAS: Pantalla[] = [
@@ -31,7 +33,7 @@ const PANTALLAS: Pantalla[] = [
   { nombre: 'Columnas', ruta: '/columnas', conCabecera: true, montar: sinDatos },
   { nombre: 'Campaña de MOWA MES', ruta: '/mowa-mes/campana', conCabecera: true, montar: conMowaMes },
   { nombre: 'Seguimiento de MOWA MES', ruta: '/mowa-mes/seguimiento', conCabecera: true, montar: conMowaMes },
-  { nombre: 'Configuración de MOWA MES', ruta: '/mowa-mes/configuracion', conCabecera: true, montar: conMowaMes },
+  { nombre: 'Configuración de MOWA MES', ruta: '/mowa-mes/configuracion', conCabecera: true, montar: conConfiguracionMowaMes },
   { nombre: 'Supervisores', ruta: '/supervisores', conCabecera: true, montar: conSupervision },
   { nombre: 'Calendario', ruta: '/calendario', conCabecera: true, montar: conSupervision },
 ];

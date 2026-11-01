@@ -2,19 +2,14 @@
  * MOWA MES configuration, end to end against an intercepted API.
  *
  * The paths covered are the ones where a wrong screen costs a campaign: the
- * original speech edited in place, a speech that cannot be generated because
+ * original speech saved over itself, a speech that cannot be generated because
  * the WhatsApp is missing, supervisors saved with the wrong shape, and a law
  * holiday deleted instead of withdrawn. Every number is synthetic (900000xxx).
  */
 import { expect, test, type Page } from '@playwright/test';
 
-import {
-  apiMowaMes,
-  montarApiMowaMes,
-  previsualizacionSintetica,
-  versionSpeech,
-  type ApiFalsaMowaMes,
-} from './api-falsa-mowa-mes';
+import { apiMowaMes, montarApiMowaMes, type ApiFalsaMowaMes } from './api-falsa-mowa-mes';
+import { montarConfiguracion } from './api-falsa-speech-v2';
 
 const RUTA = '/mowa-mes/configuracion';
 
@@ -25,12 +20,15 @@ const pedidosA = (api: ApiFalsaMowaMes, metodo: string, ruta: string) =>
     return p.metodo === metodo && (ruta.endsWith('/') ? camino.startsWith(ruta) : camino === ruta);
   });
 
+/** The screen with its whole API (the speech is always the v2 editor since M-B3) and the editor ready. */
 async function abrir(page: Page, api: ApiFalsaMowaMes): Promise<void> {
-  await montarApiMowaMes(page, api);
+  await montarConfiguracion(page, api);
   await page.goto(RUTA);
   await expect(page.getByRole('heading', { name: 'Configuración de MOWA MES' })).toBeVisible();
-  await expect(page.locator('[data-speech-filas] tr[data-segmento="9_a_30"] [data-largo]')).not.toHaveText('—');
+  await expect(segmentos(page)).toHaveCount(6);
 }
+
+const segmentos = (page: Page) => page.locator('#mm-speech-v2 [data-segmento-botones] button');
 
 test.describe('carga inicial', () => {
   test('muestra plataforma y speech, y avisa dónde están ahora los supervisores y el calendario', async ({ page }) => {
@@ -53,18 +51,9 @@ test.describe('carga inicial', () => {
     await expect(page.getByLabel('Número del supervisor 1')).toHaveCount(0);
     await expect(page.locator('[data-calendario]')).toHaveCount(0);
 
-    // RF-MM-19 corregido: con el Speech original, 9 a 30 mide 156 y se advierte.
-    const fila = page.locator('[data-speech-filas] tr[data-segmento="9_a_30"]');
-    await expect(fila.locator('[data-largo]')).toHaveText('156');
-    await expect(fila.getByText('Más de 150')).toBeVisible();
-    // El nombre de fila no repite el segmento.
-    await expect(fila.getByRole('rowheader')).toHaveText('9 a 30(9–30 días)');
-    // El ejemplo del peor caso describe las partes de su segmento, ya normalizado a GSM-7 (RF-MM-27): sin tildes.
-    await expect(fila.locator('[data-ejemplo]')).toHaveText(
-      /^Ejemplo en el peor caso: XXXXXXXX Caja Cusco te informa que tu cuota vencio el dd\/mm\/yyyy/,
-    );
-    await expect(page.locator('[data-speech-resumen]')).toHaveAttribute('role', 'status');
-    await expect(page.locator('[data-speech-resumen]')).toHaveText('1 segmento pasa de 150 caracteres.');
+    // RF-MM-19 corregido: con el Speech original, 9 a 30 mide 156 y se advierte (el nivel junto al segmento, que sale del backend).
+    await expect(segmentos(page).nth(2)).toContainText('Más de 150 · 156');
+    await expect(segmentos(page).nth(0)).toContainText('Cabe');
   });
 
   test('sin conexión con la API muestra el aviso en vez de paneles vacíos', async ({ page }) => {
@@ -79,73 +68,17 @@ test.describe('carga inicial', () => {
 });
 
 test.describe('speech (RF-MM-17)', () => {
-  const NOTICE_V1 = 'Versión de dos partes (v1): se usa en campañas tal como está y ya no se edita.';
-
-  /** Nothing of a v1 is a field: no textarea, no name, no save, no discard. */
-  async function esSoloLectura(page: Page) {
-    await expect(page.getByText(NOTICE_V1)).toBeVisible();
-    await expect(page.locator('[data-speech-filas] textarea')).toHaveCount(0);
-    await expect(page.locator('[data-speech-filas] input')).toHaveCount(0);
-    await expect(page.locator('[data-speech-pie]')).toBeHidden();
-    await expect(page.getByRole('button', { name: /^Guardar (cambios|como versión nueva)$/ })).toBeHidden();
-    await expect(page.locator('[data-form-speech]').getByRole('button', { name: 'Descartar cambios' })).toBeHidden();
-    await expect(page.getByLabel('Nombre de la versión')).toBeHidden();
-  }
-
-  test('el Speech original es solo lectura: sus partes son texto y «Convertir a v2» es lo único que se puede hacer', async ({ page }) => {
+  test('el Speech original se abre en el editor y solo se guarda como una versión nueva: abrirlo no guarda nada', async ({ page }) => {
     const api = apiMowaMes();
     await abrir(page, api);
 
-    await esSoloLectura(page);
-    await expect(page.locator('[data-speech-filas] tr[data-segmento="9_a_30"]')).toContainText('Caja Cusco');
-    await expect(page.getByRole('button', { name: 'Convertir a v2' })).toBeEnabled();
-    await expect(page.getByText('Para personalizarla, conviértela a v2:', { exact: false })).toBeVisible();
+    await expect(page.locator('#mm-speech-v2')).toBeVisible();
+    await expect(page.locator('[data-speech-inmutable]')).toBeVisible();
+    await expect(page.locator('[data-speech-inmutable]')).toContainText('Este es el Speech original: no se modifica.');
+    // Nothing to save until something is written: the original is read.
+    await expect(page.locator('[data-speech-guardar]')).toBeDisabled();
     expect(pedidosA(api, 'PUT', '/mowa-mes/speech/')).toEqual([]);
     expect(pedidosA(api, 'POST', '/mowa-mes/speech')).toEqual([]);
-  });
-
-  test('una v1 sin uso tampoco se edita: ya no hay editor de dos partes', async ({ page }) => {
-    const api = apiMowaMes();
-    api.versiones = [api.versiones[0], versionSpeech()];
-    await abrir(page, api);
-
-    await page.getByLabel('Versión', { exact: true }).selectOption('2');
-
-    await esSoloLectura(page);
-    await expect(page.getByRole('button', { name: 'Convertir a v2' })).toBeEnabled();
-  });
-
-  test('las partes se leen tal como se escribieron, con sus espacios', async ({ page }) => {
-    const api = apiMowaMes();
-    api.versiones = [api.versiones[0], versionSpeech()];
-    api.versiones[1].partes[0] = { ...api.versiones[1].partes[0], parte_1: '  dos espacios al inicio ' };
-    await abrir(page, api);
-    await page.getByLabel('Versión', { exact: true }).selectOption('2');
-
-    const celda = page.locator('[data-speech-filas] tr[data-segmento="preventiva"] [data-campo="parte_1"]');
-    // `toHaveText` normalizes spaces: the DOM text is what has to be exact.
-    expect(await celda.evaluate((e) => e.textContent)).toBe('  dos espacios al inicio ');
-    expect(await celda.evaluate((e) => getComputedStyle(e).whiteSpace)).toBe('pre-wrap');
-  });
-
-  test('el hint de estructura de una v1 explica lo que se ve y dónde va el WhatsApp', async ({ page }) => {
-    await abrir(page, apiMowaMes());
-
-    await expect(page.locator('p[data-speech-v1][class*="field__hint"]').first()).toHaveText(
-      'Mensaje = titular (8 caracteres) + parte 1 + fecha de vencimiento (dd/mm/aaaa) + parte 2. Donde dice [whatsapp] va el enlace al WhatsApp de contacto.',
-    );
-  });
-
-  test('el backend rechaza crear o editar con partes, y la pantalla nunca las manda', async ({ page }) => {
-    const api = apiMowaMes();
-    await abrir(page, api);
-    // What the real backend answers since M3 (B15): the page has no path that sends `partes`.
-    const respuestas = await page.evaluate(async () => {
-      const crear = await fetch('/api/mowa-mes/speech', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nombre: 'x', partes: [] }) });
-      const editar = await fetch('/api/mowa-mes/speech/1', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nombre: 'x', partes: [] }) });
-      return [crear.status, (await crear.json()).codigo, editar.status, (await editar.json()).codigo];
-    });
-    expect(respuestas).toEqual([400, 'version_v1_retirada', 400, 'version_v1_retirada']);
   });
 
   test('sin WhatsApp los segmentos que lo usan no se generan, y al configurarlo se recalcula', async ({ page }) => {
@@ -154,20 +87,14 @@ test.describe('speech (RF-MM-17)', () => {
     await abrir(page, api);
 
     await expect(page.getByText(/Falta el WhatsApp de contacto y hay segmentos que usan/)).toBeVisible();
-    const resumen = page.getByRole('status').filter({ hasText: /segmento/ });
-    await expect(resumen).toHaveText(
-      '3 segmentos no se pueden generar sin WhatsApp. 1 segmento pasa de 150 caracteres.',
-    );
-    const fila = page.locator('[data-speech-filas] tr[data-segmento="31_a_60"]');
-    await expect(fila.locator('[data-ejemplo]')).toHaveText('Sin ejemplo: falta el WhatsApp de contacto.');
-    await expect(fila.getByText('Falta WhatsApp')).toBeVisible();
-    await expect(fila.locator('[data-largo]')).toHaveText('—');
+    // The segments that use it say so beside their name (31 a 60, 61 a 90 and 91 a 120 do).
+    const fila = segmentos(page).nth(3);
+    await expect(fila).toContainText('Falta WhatsApp');
 
     await page.getByLabel('WhatsApp de contacto').fill('900000555');
     await page.getByRole('button', { name: 'Guardar plataforma' }).click();
 
-    await expect(fila.getByText('Falta WhatsApp')).toHaveCount(0);
-    await expect(resumen).not.toContainText('sin WhatsApp');
+    await expect(fila).not.toContainText('Falta WhatsApp');
     await expect(page.getByText(/Falta el WhatsApp de contacto y hay segmentos que usan/)).toBeHidden();
     expect(pedidosA(api, 'PUT', '/mowa-mes/configuracion')[0].cuerpo).toEqual({
       limite_mensual: 2500000,
@@ -236,7 +163,7 @@ test.describe('plataforma', () => {
       localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
     });
     const api = apiMowaMes();
-    await montarApiMowaMes(page, api);
+    await montarConfiguracion(page, api);
     await page.goto(RUTA);
     await expect(page.getByRole('heading', { name: 'MOWA MES settings' })).toBeVisible();
 
@@ -333,7 +260,7 @@ test.describe('límites por archivo (C1b, RF-MM-11)', () => {
 });
 
 test.describe('anchos (T-MM-F5, hallazgos 1 y 2)', () => {
-  test('a 360 px, la tabla de speech se apila sin desbordar la página', async ({ page }) => {
+  test('a 360 px, la página no desborda', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 900 });
     const api = apiMowaMes();
     await abrir(page, api);
@@ -341,71 +268,6 @@ test.describe('anchos (T-MM-F5, hallazgos 1 y 2)', () => {
     const desborda = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
     expect(desborda).toBe(false);
 
-    // The speech table stacks below 64rem (`.table--apilable-ancha`): its
-    // head is visually hidden and Largo/Estado read as labelled blocks,
-    // visible in the viewport without scrolling sideways.
-    // No horizontal overflow means a cell either sits at x=0 (full width,
-    // like a stacked block) or does not exist off to the right at all — a
-    // scrolling page is fine, a scrolling table (the pre-F5 behaviour) is not.
-    const sinDesbordeHorizontal = async (locator: ReturnType<Page['locator']>) => {
-      await locator.scrollIntoViewIfNeeded();
-      const caja = await locator.boundingBox();
-      expect(caja).not.toBeNull();
-      expect(caja!.x).toBeGreaterThanOrEqual(0);
-      expect(caja!.x + caja!.width).toBeLessThanOrEqual(361);
-    };
-
-    const filaSpeech = page.locator('[data-speech-filas] tr[data-segmento="preventiva"]');
-    const largoEtiqueta = await filaSpeech.locator('[data-largo]').evaluate(
-      (el) => getComputedStyle(el, '::before').content,
-    );
-    expect(largoEtiqueta).toContain('Largo máximo');
-    await sinDesbordeHorizontal(filaSpeech.locator('[data-largo]'));
-  });
-});
-
-test.describe('un segmento sin largo máximo (speech v2, B6)', () => {
-  test('la fila muestra «—», no afirma un nivel y la pantalla no se rompe', async ({ page }) => {
-    const errores: string[] = [];
-    page.on('pageerror', (error) => errores.push(error.message));
-    const api = apiMowaMes();
-    await montarApiMowaMes(page, api);
-    // The fake answers a v1 preview, where the maximum always exists: this one answers, for 9 a 30, as a
-    // preview with no maximum would (registered after the module's mock, so it runs first).
-    await page.route('**/api/mowa-mes/speech/previsualizacion', async (route) => {
-      const real = previsualizacionSintetica(
-        JSON.parse(route.request().postData() ?? '{}'),
-        api.configuracion.whatsapp_contacto,
-      );
-      const segmentos = real.segmentos.map((s) =>
-        s.segmento === '9_a_30'
-          ? {
-              ...s,
-              largo_maximo: null,
-              codigo: null,
-              sin_maximo: {
-                codigo: 'sin_cota_variable',
-                detalle: "El largo de la variable 'monto' depende del dato de cada producto",
-                ubicacion: { nodo: 1, funcion: null, parametro: null },
-              },
-            }
-          : s,
-      );
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...real, segmentos }) });
-    });
-    await page.goto(RUTA);
-    await expect(page.getByRole('heading', { name: 'Configuración de MOWA MES' })).toBeVisible();
-    // The other rows still read as before: the page painted past the segment without a maximum.
-    await expect(page.locator('[data-speech-filas] tr[data-segmento="preventiva"] [data-largo]')).not.toHaveText('—');
-
-    const fila = page.locator('[data-speech-filas] tr[data-segmento="9_a_30"]');
-    await expect(fila.locator('[data-largo]')).toHaveText('—');
-    // No level is claimed for it: neither "Cabe" nor the 150 or 160 warnings.
-    await expect(fila.locator('[data-nivel-tags]').getByText(/^(Cabe|Más de 150|Más de 160)$/)).toHaveCount(0);
-    // Nor any other level tag: the only tag left is the one that says it uses the WhatsApp.
-    await expect(fila.locator('[data-nivel-tags] .tag').filter({ hasNotText: 'Usa WhatsApp' })).toHaveCount(0);
-    await expect(fila).toHaveAttribute('data-nivel-largo', '');
-    expect(errores).toEqual([]);
   });
 });
 
@@ -414,21 +276,19 @@ test.describe('idioma', () => {
     await page.addInitScript(() => {
       localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
     });
-    const api = apiMowaMes();
-    await montarApiMowaMes(page, api);
+    await montarConfiguracion(page, apiMowaMes());
     await page.goto(RUTA);
 
     await expect(page.getByRole('heading', { name: 'MOWA MES settings' })).toBeVisible();
-    const fila = page.locator('[data-speech-filas] tr[data-segmento="9_a_30"]');
-    await expect(fila.getByText('Over 150')).toBeVisible();
-    await expect(fila.getByText(/longer than 150 characters/)).toBeVisible();
+    await expect(segmentos(page)).toHaveCount(6);
+    await expect(segmentos(page).nth(2)).toContainText('Over 150');
   });
 
   test('en inglés el aviso de las pantallas nuevas dice el texto completo, con el espacio antes del primer enlace', async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
     });
-    await montarApiMowaMes(page, apiMowaMes());
+    await montarConfiguracion(page, apiMowaMes());
     await page.goto(RUTA);
 
     await expect(page.locator('[data-pantallas-nuevas]')).toHaveText(
@@ -732,7 +592,7 @@ test.describe('F6-B: tarifa y nombre de los archivos (RF-MM-23, RF-MM-25)', () =
       localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
     });
     const api = apiMowaMes();
-    await montarApiMowaMes(page, api);
+    await montarConfiguracion(page, api);
     await page.goto(RUTA);
 
     await expect(page.getByLabel('Rate per SMS (S/)')).toHaveValue('0.02');

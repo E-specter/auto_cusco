@@ -1,21 +1,11 @@
 /**
  * What the v2 speech adds to the MOWA MES client (backend B6). The rest of the speech calls
  * (`listarSpeech`, `crearSpeech`, `editarSpeech`, `previsualizarSpeech`) are `api-mowa-mes.ts`'s and
- * already carry `expresiones`: this file only has the draft a v1 becomes and the reading of a
- * refused save.
+ * already carry `expresiones`: this file only has the reading of a refused save.
  */
 
-import { ApiError, request } from './api';
-import type { BorradorV2, ProblemaSpeech } from './mowa-mes-speech-v2';
-
-/**
- * The v2 draft of a v1: the same structure written with the engine, which gives the same messages
- * and lengths. It saves nothing; the analyst reviews it and saves it as a new version with
- * `crearSpeech({ basada_en_id, expresiones })`. A version that is already v2 answers 400.
- */
-export function obtenerComoV2(id: number, signal?: AbortSignal): Promise<BorradorV2> {
-  return request<BorradorV2>(`/mowa-mes/speech/${id}/como-v2`, { signal });
-}
+import { ApiError } from './api';
+import type { ProblemaSpeech } from './mowa-mes-speech-v2';
 
 function esProblema(valor: unknown): valor is ProblemaSpeech {
   if (typeof valor !== 'object' || valor === null) return false;

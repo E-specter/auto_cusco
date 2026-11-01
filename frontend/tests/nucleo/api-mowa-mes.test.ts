@@ -45,7 +45,7 @@ const llamada = (falso: ReturnType<typeof vi.fn>) => ({
 
 const cuerpoDe = (opciones: RequestInit) => JSON.parse(String(opciones.body));
 
-const PARTES = [{ segmento: 'preventiva' as const, parte_1: ' uno ', parte_2: ' dos' }];
+const EXPRESIONES = [{ segmento: 'preventiva' as const, expresion: { nodos: [{ tipo: 'texto' as const, valor: ' uno ' }] } }];
 
 beforeEach(() => vi.unstubAllGlobals());
 afterEach(() => vi.unstubAllGlobals());
@@ -80,19 +80,19 @@ describe('speech', () => {
   it('una versión nueva viaja con POST y su base', async () => {
     const falso = responderCon(201, {});
 
-    await crearSpeech({ nombre: null, basada_en_id: 1, partes: PARTES });
+    await crearSpeech({ nombre: null, basada_en_id: 1, expresiones: EXPRESIONES });
 
     const { url, opciones } = llamada(falso);
     expect(url).toBe('/api/mowa-mes/speech');
     expect(opciones.method).toBe('POST');
     // Los espacios de los extremos son parte del mensaje: no se recortan.
-    expect(cuerpoDe(opciones)).toEqual({ nombre: null, basada_en_id: 1, partes: PARTES });
+    expect(cuerpoDe(opciones)).toEqual({ nombre: null, basada_en_id: 1, expresiones: EXPRESIONES });
   });
 
   it('editar usa PUT sobre su id, y una versión usada responde 409', async () => {
     const falso = responderCon(409, { detail: 'La version ya se uso' });
 
-    const fallo = await editarSpeech(7, { nombre: 'Speech 2', partes: PARTES }).catch(
+    const fallo = await editarSpeech(7, { nombre: 'Speech 2', expresiones: EXPRESIONES }).catch(
       (error: unknown) => error,
     );
 
@@ -106,13 +106,13 @@ describe('speech', () => {
     const falso = responderCon(200, {});
     const control = new AbortController();
 
-    await previsualizarSpeech({ partes: PARTES }, control.signal);
+    await previsualizarSpeech({ expresiones: EXPRESIONES }, control.signal);
 
     const { url, opciones } = llamada(falso);
     expect(url).toBe('/api/mowa-mes/speech/previsualizacion');
     expect(opciones.method).toBe('POST');
     expect(opciones.signal).toBe(control.signal);
-    expect(cuerpoDe(opciones)).toEqual({ partes: PARTES });
+    expect(cuerpoDe(opciones)).toEqual({ expresiones: EXPRESIONES });
   });
 });
 

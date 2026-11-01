@@ -31,8 +31,8 @@ import {
 import { apiArchivosCarga, crearCompuerta, manejadorArchivosCarga } from './api-falsa-archivos-carga';
 import { apiDefiniciones, definicionFalsa, manejadorDefiniciones } from './api-falsa-definiciones';
 import { apiTextoEnriquecidoVacia, manejarTextoEnriquecido } from './api-falsa-texto-enriquecido';
-import { apiSpeechV2, montarApiSpeechV2, versionV2Sintetica } from './api-falsa-speech-v2';
-import { v1ConBorrados, v2ConBorrados } from './fixtures-gsm7';
+import { apiSpeechV2, montarConfiguracion, versionV2Sintetica } from './api-falsa-speech-v2';
+import { v2ConBorrados } from './fixtures-gsm7';
 import { montarSeleccion } from './apoyo-seleccion';
 
 const REGLAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
@@ -132,18 +132,17 @@ for (const tema of ['light', 'dark'] as const) {
     test('configuración de MOWA MES, con el aviso de WhatsApp faltante', async ({ page }) => {
       const api = apiMowaMes();
       api.configuracion = { ...api.configuracion, whatsapp_contacto: null };
-      await montarApiMowaMes(page, api);
+      await montarConfiguracion(page, api);
       await page.goto('/mowa-mes/configuracion');
       await expect(page.getByText('Falta WhatsApp').first()).toBeVisible();
       await sinViolaciones(page);
     });
 
-    test('configuración de MOWA MES, con una v1 en solo lectura: sin campos y con el aviso', async ({ page }) => {
-      await montarApiMowaMes(page, apiMowaMes());
+    test('configuración de MOWA MES, con el Speech original en el editor y su aviso', async ({ page }) => {
+      await montarConfiguracion(page, apiMowaMes());
       await page.goto('/mowa-mes/configuracion');
-      await expect(page.getByText('Versión de dos partes (v1): se usa en campañas tal como está y ya no se edita.')).toBeVisible();
-      await expect(page.locator('[data-speech-filas] textarea')).toHaveCount(0);
-      await expect(page.locator('[data-speech-filas] tr[data-segmento="9_a_30"] [data-largo]')).not.toHaveText('—');
+      await expect(page.getByText('Este es el Speech original: no se modifica.')).toBeVisible();
+      await expect(page.locator('#mm-speech-v2 [data-segmento-botones] button')).toHaveCount(6);
       await sinViolaciones(page);
     });
 
@@ -493,19 +492,17 @@ test('columnas de carga a 360 px: la fila abierta y las tablas se alcanzan con t
   await sinViolaciones(page);
 });
 
-// The v2 speech of the MOWA MES configuration: the segment editor, the unsaved draft a v1 becomes,
-// the backend's problems per segment and a segment with no maximum length.
+// The speech of the MOWA MES configuration: the segment editor, the backend's problems per segment and a
+// segment with no maximum length.
 async function abrirSpeechV2(
   page: Page,
   ajustar?: (api: ReturnType<typeof apiMowaMes>, v2: ReturnType<typeof apiSpeechV2>) => void,
 ) {
   const api = apiMowaMes();
-  const v2 = apiSpeechV2();
+  const { v2 } = await montarConfiguracion(page, api);
   ajustar?.(api, v2);
-  await montarApiMowaMes(page, api);
-  await montarApiSpeechV2(page, api, v2, apiTextoEnriquecidoVacia());
   await page.goto('/mowa-mes/configuracion');
-  await expect(page.locator('[data-speech-filas] tr[data-segmento="9_a_30"] [data-largo]')).not.toHaveText('—');
+  await expect(page.locator('#mm-speech-v2 [data-segmento-botones] button')).toHaveCount(6);
   return { api, v2 };
 }
 
@@ -524,27 +521,11 @@ for (const tema of ['light', 'dark'] as const) {
       await sinViolaciones(page);
     });
 
-    test('la línea de lo que GSM-7 borra, en una v2 y en una v1', async ({ page }) => {
-      await abrirSpeechV2(page, (api) => {
-        v2ConBorrados(api);
-        const v2 = api.versiones.at(-1)!;
-        v1ConBorrados(api);
-        api.versiones.push(v2);
-      });
+    test('la línea de lo que GSM-7 borra', async ({ page }) => {
+      await abrirSpeechV2(page, (api) => v2ConBorrados(api));
       await page.locator('#mm-version').selectOption({ label: 'Speech v2' });
       await page.locator('#mm-speech-v2 [data-segmento-botones] button').nth(0).click();
       await expect(page.locator('[data-borrados-v2]')).toBeVisible();
-      await sinViolaciones(page);
-
-      await page.locator('#mm-version').selectOption({ label: 'Speech con símbolos' });
-      await expect(page.locator('[data-speech-filas] tr[data-segmento="preventiva"] [data-borrados]')).toBeVisible();
-      await sinViolaciones(page);
-    });
-
-    test('el borrador que sale de convertir una v1, sin guardar', async ({ page }) => {
-      await abrirSpeechV2(page);
-      await page.getByRole('button', { name: 'Convertir a v2' }).click();
-      await expect(page.getByText(/Borrador a partir de/)).toBeVisible();
       await sinViolaciones(page);
     });
 
@@ -574,8 +555,8 @@ for (const tema of ['light', 'dark'] as const) {
           },
         },
       ];
-      await page.getByRole('button', { name: 'Convertir a v2' }).click();
-      await expect(page.locator('#mm-speech-v2')).toBeVisible();
+      await page.locator('#mm-speech-v2 [data-segmento-botones] button').nth(2).click();
+      await page.locator('#mm-speech-v2').getByRole('textbox').last().fill(', pague ya.');
       await expect(async () => {
         await page.locator('[data-speech-guardar]').click();
         await expect(page.locator('[data-speech-problemas-lista] li').first()).toBeVisible({ timeout: 1500 });
@@ -588,7 +569,6 @@ for (const tema of ['light', 'dark'] as const) {
 test('speech v2 a 360 px: el editor por segmento se alcanza con teclado', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await abrirSpeechV2(page);
-  await page.getByRole('button', { name: 'Convertir a v2' }).click();
   await expect(page.locator('#mm-speech-v2')).toBeVisible();
   await sinViolaciones(page);
 });
@@ -901,10 +881,10 @@ for (const tema of ['light', 'dark'] as const) {
     });
 
     test('configuración de MOWA MES, con el aviso de las pantallas nuevas', async ({ page }) => {
-      await montarApiMowaMes(page, apiMowaMes());
+      await montarConfiguracion(page, apiMowaMes());
       await page.goto('/mowa-mes/configuracion');
       await expect(page.locator('[data-pantallas-nuevas]')).toBeVisible();
-      await expect(page.locator('[data-speech-filas] tr[data-segmento="9_a_30"] [data-largo]')).not.toHaveText('—');
+      await expect(page.locator('#mm-speech-v2 [data-segmento-botones] button')).toHaveCount(6);
       await sinViolaciones(page);
     });
   });

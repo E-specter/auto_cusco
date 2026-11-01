@@ -9,16 +9,13 @@ import type {
   EstadoCosto,
   CampoError,
   EstadoCostoEstimado,
-  LargoSegmento,
-  PartesEntrada,
-  PartesSpeech,
   Segmento,
   VersionSpeech,
 } from './api-mowa-mes';
 import { formatNumber } from './format';
 import { t, traducirPorPrefijo } from './i18n';
 
-/** Segment order of RF-MM-15, the order every speech table reads in. */
+/** Segment order of RF-MM-15, the order the speech editor reads in. */
 export const ORDEN_SEGMENTOS: readonly Segmento[] = [
   'preventiva',
   '1_a_8',
@@ -28,16 +25,7 @@ export const ORDEN_SEGMENTOS: readonly Segmento[] = [
   '91_a_120',
 ];
 
-const posicion = (segmento: Segmento) => ORDEN_SEGMENTOS.indexOf(segmento);
-
 // ---- Speech ------------------------------------------------------------------
-
-/** The editable parts of a version, in segment order. */
-export function borradorDesdeVersion(version: VersionSpeech): PartesEntrada[] {
-  return [...version.partes]
-    .sort((a, b) => posicion(a.segmento) - posicion(b.segmento))
-    .map(({ segmento, parte_1, parte_2 }) => ({ segmento, parte_1, parte_2 }));
-}
 
 /**
  * RF-MM-17: a version that a campaign used, and the original, never change.
@@ -45,60 +33,6 @@ export function borradorDesdeVersion(version: VersionSpeech): PartesEntrada[] {
  */
 export function modoGuardado(version: VersionSpeech): 'editar' | 'nueva' {
   return version.editable && !version.original && !version.usada ? 'editar' : 'nueva';
-}
-
-export type NivelLargo = 'falta_whatsapp' | 'excede' | 'advertencia' | 'ok';
-
-/** How a segment's preview reads, worst first (RF-MM-16, RF-MM-19). */
-export function nivelLargo(segmento: LargoSegmento): NivelLargo {
-  if (segmento.falta_whatsapp) return 'falta_whatsapp';
-  if (segmento.codigo === 'mensaje_excede_160') return 'excede';
-  if (segmento.codigo === 'mensaje_excede_150') return 'advertencia';
-  return 'ok';
-}
-
-/**
- * The level a segment's row shows, or `null` when it has none to show: a segment
- * with no maximum length (`largo_maximo` is `null`) has nothing to fit under the
- * 150 or the 160, so no "Cabe" is claimed for it. Missing the WhatsApp is a state
- * of its own and does not depend on the length, so it still shows.
- */
-export function nivelDeFila(segmento: LargoSegmento): NivelLargo | null {
-  if (segmento.falta_whatsapp) return 'falta_whatsapp';
-  return segmento.largo_maximo === null ? null : nivelLargo(segmento);
-}
-
-/**
- * One sentence for assistive tech about the whole preview: how many segments
- * cannot be generated, are excluded or are warned. It is written once per
- * preview (after the same debounce), never per keystroke. No preview, no text.
- */
-export function resumenNiveles(segmentos: readonly LargoSegmento[]): string {
-  if (segmentos.length === 0) return '';
-  const cuenta = { falta_whatsapp: 0, excede: 0, advertencia: 0 };
-  segmentos.forEach((segmento) => {
-    const nivel = nivelLargo(segmento);
-    if (nivel !== 'ok') cuenta[nivel] += 1;
-  });
-  const frases = (['falta_whatsapp', 'excede', 'advertencia'] as const)
-    .filter((nivel) => cuenta[nivel] > 0)
-    .map((nivel) =>
-      t(`mowaMes.speech.resumen.${nivel}${cuenta[nivel] === 1 ? '.uno' : ''}`, { n: cuenta[nivel] }),
-    );
-  return frases.length > 0 ? frases.join(' ') : t('mowaMes.speech.resumen.ok');
-}
-
-/** The adjusted-days range of a segment, shown after its name as "(9–30 días)". */
-export function rangoSegmento(
-  parte: Pick<PartesSpeech, 'dias_desde' | 'dias_hasta'>,
-): { clave: string; params: Record<string, number> } {
-  if (parte.dias_desde === null) {
-    return { clave: 'mowaMes.speech.rango.hasta', params: { hasta: parte.dias_hasta } };
-  }
-  return {
-    clave: 'mowaMes.speech.rango.entre',
-    params: { desde: parte.dias_desde, hasta: parte.dias_hasta },
-  };
 }
 
 /**

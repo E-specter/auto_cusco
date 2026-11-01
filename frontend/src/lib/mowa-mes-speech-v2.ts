@@ -26,9 +26,6 @@ export type ExpresionSegmentoEntrada = Esquemas['ExpresionSegmentoEntrada'];
 const posicion = (segmento: string) => ORDEN_SEGMENTOS.indexOf(segmento as (typeof ORDEN_SEGMENTOS)[number]);
 const copia = <T>(valor: T): T => structuredClone(valor);
 
-/** Whether a version holds expressions (`expresiones`) and not parts (`partes`). */
-export const esV2 = (version: Pick<VersionSpeech, 'formato'>): boolean => version.formato === 'v2';
-
 type ConExpresion = { segmento: string; expresion: Expresion };
 
 /** The expressions of a version or of a draft, one per segment, in the segments' order. */

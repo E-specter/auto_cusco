@@ -10,11 +10,11 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
   DESHABILITADA_EN,
   apiMowaMes,
-  montarApiMowaMes,
   speechOriginal,
   versionAdministrable,
   type ApiFalsaMowaMes,
 } from './api-falsa-mowa-mes';
+import { montarConfiguracion } from './api-falsa-speech-v2';
 
 test.use({ timezoneId: 'America/Lima', reducedMotion: 'reduce' });
 
@@ -34,7 +34,7 @@ function conVersiones(): ApiFalsaMowaMes {
 }
 
 async function abrir(page: Page, api = conVersiones()): Promise<void> {
-  await montarApiMowaMes(page, api);
+  await montarConfiguracion(page, api);
   await page.goto(RUTA);
   await expect(page.getByRole('heading', { name: 'Configuración de MOWA MES' })).toBeVisible();
   await expect(page.locator('[data-deshabilitadas]')).toBeVisible();
@@ -167,7 +167,7 @@ test.describe('idioma y anchos', () => {
     await page.addInitScript(() => {
       localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
     });
-    await montarApiMowaMes(page, conVersiones());
+    await montarConfiguracion(page, conVersiones());
     await page.goto(RUTA);
     await page.locator('[data-deshabilitadas] summary').click();
 

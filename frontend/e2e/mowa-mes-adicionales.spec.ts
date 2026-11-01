@@ -367,7 +367,7 @@ test.describe('configuración: el editor v2 con campos adicionales', () => {
     await montarApiSpeechV2(page, api, v2, motor);
     await page.goto(RUTA);
     await expect(page.locator('#mm-speech-title')).toBeVisible();
-    await expect(page.locator('[data-speech-filas] tr[data-segmento="9_a_30"] [data-largo]')).not.toHaveText('—');
+    await expect(segmentos(page)).toHaveCount(6);
     return { api, v2 };
   }
 

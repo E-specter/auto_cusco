@@ -10,7 +10,6 @@ import { describe, expect, it } from 'vitest';
 import type { LargoSegmento, VersionSpeech } from '../../src/lib/api-mowa-mes';
 import {
   entradaDeExpresiones,
-  esV2,
   hayCambiosV2,
   mensajeDeProblema,
   nivelesDeV2,
@@ -77,13 +76,6 @@ function largo(parcial: Partial<LargoSegmento> = {}): LargoSegmento {
     ...parcial,
   };
 }
-
-describe('qué versión es v2', () => {
-  it('lo dice el formato, no la forma de sus datos', () => {
-    expect(esV2(versionV2())).toBe(true);
-    expect(esV2(versionV2({ formato: 'v1', expresiones: [] }))).toBe(false);
-  });
-});
 
 describe('el borrador que sale de una versión', () => {
   it('trae una expresión por segmento, en el orden de los segmentos', () => {

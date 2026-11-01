@@ -17,8 +17,7 @@ import {
   versionAdministrable,
   type ApiFalsaMowaMes,
 } from './api-falsa-mowa-mes';
-import { apiSpeechV2, montarApiSpeechV2, versionV2Sintetica } from './api-falsa-speech-v2';
-import { apiTextoEnriquecidoVacia } from './api-falsa-texto-enriquecido';
+import { montarConfiguracion, versionV2Sintetica } from './api-falsa-speech-v2';
 import { montarSeleccion, seleccionFalsa } from './apoyo-seleccion';
 
 // No animations: axe reads the contrast of what is painted, and a dialog still fading in is not what the analyst sees.
@@ -44,7 +43,8 @@ function conVersiones(): ApiFalsaMowaMes {
 }
 
 async function abrir(page: Page, api: ApiFalsaMowaMes): Promise<void> {
-  await montarApiMowaMes(page, api);
+  // Every version is a v2: the screen always mounts the editor, so it gets the whole API.
+  await montarConfiguracion(page, api);
   await page.goto(RUTA);
   await expect(page.getByRole('heading', { name: 'Configuración de MOWA MES' })).toBeVisible();
   await expect(page.locator('#mm-version option').first()).toBeAttached();
@@ -193,7 +193,6 @@ test.describe('deshabilitar', () => {
     await expect(renombrar(page)).toBeHidden();
     await expect(deshabilitar(page)).toBeHidden();
     await expect(page.locator('[data-speech-pie]')).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Convertir a v2' })).toBeHidden();
     await expect(version(page)).toBeFocused();
     // The selector still says what is on screen, with its mark; leaving it, it goes.
     await expect(version(page).locator('option')).toHaveText(['Speech original (original)', 'Activa (deshabilitada)']);
@@ -215,14 +214,10 @@ test.describe('deshabilitar', () => {
 
   test('con cambios sin guardar no deshabilita: lo dice y no manda nada', async ({ page }) => {
     const api = conVersiones();
-    const v2 = apiSpeechV2();
-    await montarApiMowaMes(page, api);
-    await montarApiSpeechV2(page, api, v2, apiTextoEnriquecidoVacia());
-    await page.goto(RUTA);
-    await expect(page.getByRole('heading', { name: 'Configuración de MOWA MES' })).toBeVisible();
-    // Converting the original makes a draft: a version with nothing saved.
-    await page.getByRole('button', { name: 'Convertir a v2' }).click();
-    await expect(page.locator('#mm-speech-v2')).toBeVisible();
+    await abrir(page, api);
+    // Typing in a segment of the original: a change nobody has saved.
+    await page.locator('#mm-speech-v2 [data-segmento-botones] button').nth(2).click();
+    await page.locator('#mm-speech-v2').getByRole('textbox').last().fill(', pague ya y evite el cobro.');
 
     await deshabilitar(page).click();
 
@@ -256,7 +251,7 @@ test.describe('versiones deshabilitadas', () => {
 
     const sin = apiMowaMes();
     const otra = await page.context().newPage();
-    await montarApiMowaMes(otra, sin);
+    await montarConfiguracion(otra, sin);
     await otra.goto(RUTA);
     await expect(otra.getByRole('heading', { name: 'Configuración de MOWA MES' })).toBeVisible();
     await expect(otra.locator('[data-deshabilitadas]')).toBeHidden();
@@ -329,10 +324,7 @@ test.describe('versiones deshabilitadas', () => {
       speechOriginal(),
       conEliminable(versionV2Sintetica(speechOriginal(), { id: 20, nombre: 'Speech v2 archivado', deshabilitada_en: DESHABILITADA_EN })),
     ];
-    await montarApiMowaMes(page, api);
-    await montarApiSpeechV2(page, api, apiSpeechV2(), apiTextoEnriquecidoVacia());
-    await page.goto(RUTA);
-    await expect(page.getByRole('heading', { name: 'Configuración de MOWA MES' })).toBeVisible();
+    await abrir(page, api);
 
     await resumen(page).click();
     await fila(page, 20).getByRole('button', { name: 'Ver' }).click();
@@ -516,7 +508,7 @@ test.describe('idioma y anchos', () => {
     await page.addInitScript(() => {
       localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
     });
-    await montarApiMowaMes(page, conVersiones());
+    await montarConfiguracion(page, conVersiones());
     await page.goto(RUTA);
     await expect(page.getByRole('button', { name: 'Rename' }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Disable' })).toBeVisible();
@@ -560,7 +552,7 @@ test.describe('idioma y anchos', () => {
         await expect(candado(page)).toBeVisible();
         // The preview of the version just opened is being calculated, and its lengths are dimmed meanwhile: axe reads
         // the contrast of what is painted, so it waits for the calculation to end (as accesibilidad.spec does).
-        await expect(page.locator('[data-speech-filas] tr[data-segmento] [data-largo]').first()).not.toHaveText('—');
+        await expect(page.locator('#mm-speech-v2 [data-segmento-botones] button')).toHaveCount(6);
         await expect(page.locator('[data-form-speech]')).not.toHaveAttribute('data-calculando', 'true');
 
         const lista = await new AxeBuilder({ page }).withTags(REGLAS).analyze();

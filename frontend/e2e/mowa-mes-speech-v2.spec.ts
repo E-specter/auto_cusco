@@ -1,17 +1,16 @@
 /**
- * The v2 speech of /mowa-mes/configuracion (T-MTE-F4), end to end against intercepted APIs: the
- * module's own fake, the engine's fake and `api-falsa-speech-v2.ts` over them.
+ * The speech of /mowa-mes/configuracion (T-MTE-F4), end to end against intercepted APIs: the module's own fake, the
+ * engine's fake and `api-falsa-speech-v2.ts` over them. Every version is a v2 since M-B3 (M-F1 took the screen of
+ * two parts out): one editor, one segment at a time.
  *
- * What costs a campaign when it is wrong: a v1 is never changed by looking at it as v2, the draft a
- * v1 becomes is not saved until the analyst confirms, a segment with nothing is never sent, a level
- * is never claimed without a maximum length, and a problem reads from the catalogue it came from.
- * v1's own behaviour is `mowa-mes-configuracion.spec.ts`, which this file does not touch.
+ * What costs a campaign when it is wrong: the original is never changed by looking at it, a segment with nothing is
+ * never sent, a level is never claimed without a maximum length, and a problem reads from the catalogue it came from.
  */
 import { expect, test, type Page } from '@playwright/test';
 
-import { apiMowaMes, montarApiMowaMes, type ApiFalsaMowaMes } from './api-falsa-mowa-mes';
-import { apiSpeechV2, montarApiSpeechV2, versionV2Sintetica, type ApiFalsaSpeechV2 } from './api-falsa-speech-v2';
-import { apiTextoEnriquecidoVacia, type ApiFalsaTextoEnriquecido } from './api-falsa-texto-enriquecido';
+import { apiMowaMes, type ApiFalsaMowaMes } from './api-falsa-mowa-mes';
+import { montarConfiguracion, versionV2Sintetica, type ApiFalsaSpeechV2 } from './api-falsa-speech-v2';
+import type { ApiFalsaTextoEnriquecido } from './api-falsa-texto-enriquecido';
 
 const RUTA = '/mowa-mes/configuracion';
 
@@ -26,14 +25,12 @@ async function abrir(
   ajustar?: (api: ApiFalsaMowaMes, v2: ApiFalsaSpeechV2, motor: ApiFalsaTextoEnriquecido) => void,
 ): Promise<Contexto> {
   const api = apiMowaMes();
-  const v2 = apiSpeechV2();
-  const motor = apiTextoEnriquecidoVacia();
+  // The module's fake first, so the scenario can change what the layers read; the layers read it when they answer.
+  const { v2, motor } = await montarConfiguracion(page, api);
   ajustar?.(api, v2, motor);
-  await montarApiMowaMes(page, api);
-  await montarApiSpeechV2(page, api, v2, motor);
   await page.goto(RUTA);
   await expect(page.getByRole('heading', { name: 'Configuración de MOWA MES' })).toBeVisible();
-  await expect(page.locator('[data-speech-filas] tr[data-segmento="9_a_30"] [data-largo]')).not.toHaveText('—');
+  await expect(segmentos(page)).toHaveCount(6);
   return { api, v2, motor };
 }
 
@@ -52,48 +49,27 @@ async function guardarYEsperar(page: Page, mensaje: string | RegExp) {
   }).toPass();
 }
 
-async function convertir(page: Page) {
-  await page.getByRole('button', { name: 'Convertir a v2' }).click();
-  await expect(editor(page)).toBeVisible();
-  await expect(segmentos(page)).toHaveCount(6);
+/** Something typed in the 9 a 30 segment: the original is never changed, so what is saved from it is a new version. */
+async function escribirEnSegmento(page: Page) {
+  await segmentos(page).nth(2).click();
+  await editor(page).getByRole('textbox').last().fill(', pague ya y evite el cobro.');
 }
 
-test.describe('v1 sigue siendo v1', () => {
-  test('con el Speech original se ven las partes y se ofrece convertir; el editor v2 no está', async ({ page }) => {
+test.describe('el Speech original', () => {
+  test('se abre en el editor, con sus seis segmentos y su aviso: no hay tabla de dos partes ni «Convertir a v2»', async ({ page }) => {
     await abrir(page);
 
-    await expect(page.locator('[data-speech-filas] tr[data-segmento]')).toHaveCount(6);
-    await expect(page.getByRole('button', { name: 'Convertir a v2' })).toBeVisible();
-    await expect(editor(page)).toBeHidden();
-  });
-});
-
-test.describe('convertir una v1 en un borrador v2', () => {
-  test('muestra el borrador con los seis segmentos y NO guarda nada', async ({ page }) => {
-    const { v2 } = await abrir(page);
-
-    await convertir(page);
-
-    await expect(page.getByText(/Borrador a partir de «Speech original», sin guardar/)).toBeVisible();
-    await expect(page.locator('[data-speech-filas]')).toBeHidden();
-    expect(pedidosV2(v2, 'GET', '/mowa-mes/speech/1/como-v2')).toHaveLength(1);
-    expect(pedidosV2(v2, 'POST', '/mowa-mes/speech')).toHaveLength(0);
+    await expect(editor(page)).toBeVisible();
+    await expect(segmentos(page)).toHaveCount(6);
+    await expect(page.locator('[data-speech-inmutable]')).toBeVisible();
+    await expect(page.locator('[data-speech-inmutable]')).toContainText('Este es el Speech original: no se modifica.');
+    await expect(page.getByRole('button', { name: 'Convertir a v2' })).toHaveCount(0);
+    await expect(page.locator('table.mm-speech__tabla')).toHaveCount(0);
   });
 
-  test('descartar vuelve a la v1 sin haber guardado nada', async ({ page }) => {
-    const { v2 } = await abrir(page);
-    await convertir(page);
-
-    await page.locator('[data-speech-descartar]').click();
-
-    await expect(editor(page)).toBeHidden();
-    await expect(page.locator('[data-speech-filas] tr[data-segmento]')).toHaveCount(6);
-    expect(pedidosV2(v2, 'POST', '/mowa-mes/speech')).toHaveLength(0);
-  });
-
-  test('guardarlo crea una versión v2 basada en la v1; la original sigue sin poder editarse', async ({ page }) => {
+  test('guardar desde él crea una versión nueva basada en él, y él no cambia', async ({ page }) => {
     const { api, v2 } = await abrir(page);
-    await convertir(page);
+    await escribirEnSegmento(page);
     await page.locator('#mm-speech-nombre').fill('Speech por piezas');
 
     await guardarYEsperar(page, 'Versión nueva creada.');
@@ -109,23 +85,25 @@ test.describe('convertir una v1 en un borrador v2', () => {
     expect(cuerpo).not.toHaveProperty('partes');
     expect(cuerpo.expresiones.map((e) => e.segmento)).toEqual(['preventiva', '1_a_8', '9_a_30', '31_a_60', '61_a_90', '91_a_120']);
     expect(api.versiones.at(-1)).toMatchObject({ nombre: 'Speech por piezas', formato: 'v2' });
-    expect(api.versiones[0]).toMatchObject({ original: true, formato: 'v1' });
+    expect(api.versiones[0]).toMatchObject({ original: true, formato: 'v2' });
+    expect(pedidosV2(v2, 'PUT', '/mowa-mes/speech/1')).toHaveLength(0);
 
-    // The original keeps its immutable notice and its own table.
+    // The original keeps its notice and its messages.
     await version(page).selectOption({ label: 'Speech original (original)' });
-    await expect(page.getByText('Versión de dos partes (v1): se usa en campañas tal como está y ya no se edita.')).toBeVisible();
-    await expect(page.locator('[data-speech-filas] tr[data-segmento]')).toHaveCount(6);
+    await expect(page.locator('[data-speech-inmutable]')).toBeVisible();
+    await expect(page.locator('[data-speech-inmutable]')).toContainText('Este es el Speech original');
   });
 
-  test('un nombre repetido se dice y el borrador se conserva', async ({ page }) => {
+  test('un nombre repetido se dice y lo escrito se conserva', async ({ page }) => {
     const { v2 } = await abrir(page, (_api, speech) => {
       speech.respuestasCrear = [{ estado: 409, cuerpo: { detail: 'Ya existe', codigo: null } }];
     });
-    await convertir(page);
+    await escribirEnSegmento(page);
 
     await guardarYEsperar(page, 'Ya existe una versión con ese nombre.');
 
     await expect(editor(page)).toBeVisible();
+    await expect(editor(page).getByRole('textbox').last()).toHaveValue(/pague ya y evite el cobro\.$/);
     expect(pedidosV2(v2, 'POST', '/mowa-mes/speech').length).toBeGreaterThan(0);
   });
 });
@@ -143,15 +121,15 @@ test.describe('una versión v2 guardada', () => {
     return contexto;
   }
 
-  test('conviven con la v1 en el selector y cada una abre su pantalla', async ({ page }) => {
+  test('cada versión abre su editor, con su aviso: el original dice que no se modifica, una propia no dice nada', async ({ page }) => {
     await conV2(page);
-    await expect(page.locator('[data-speech-filas]')).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Convertir a v2' })).toBeHidden();
+    await expect(page.locator('[data-speech-inmutable]')).toBeHidden();
 
     await version(page).selectOption({ label: 'Speech original (original)' });
 
-    await expect(page.locator('[data-speech-filas] tr[data-segmento]')).toHaveCount(6);
-    await expect(editor(page)).toBeHidden();
+    await expect(editor(page)).toBeVisible();
+    await expect(page.locator('[data-speech-inmutable]')).toBeVisible();
+    await expect(page.locator('[data-speech-inmutable]')).toContainText('Este es el Speech original');
   });
 
   test('armar un segmento no pide teclear sintaxis y viaja como expresión', async ({ page }) => {
@@ -227,7 +205,7 @@ test.describe('una versión v2 guardada', () => {
     ];
     // An immutable base is saved as a new version: the scripted answer is the create call's.
     await version(page).selectOption({ label: 'Speech original (original)' });
-    await convertir(page);
+    await escribirEnSegmento(page);
 
     await guardarYEsperar(page, /Sin teléfono válido/);
 
@@ -249,7 +227,7 @@ test.describe('una versión v2 guardada', () => {
 });
 
 test.describe('en inglés', () => {
-  test('la rama v2 no deja claves sin traducir', async ({ page }) => {
+  test('el editor no deja claves sin traducir', async ({ page }) => {
     await page.addInitScript(() => {
       try {
         localStorage.setItem('app:appearance', JSON.stringify({ language: 'en', theme: 'light' }));
@@ -257,44 +235,22 @@ test.describe('en inglés', () => {
         /* storage blocked: the page keeps its default */
       }
     });
-    const api = apiMowaMes();
-    const v2 = apiSpeechV2();
-    await montarApiMowaMes(page, api);
-    await montarApiSpeechV2(page, api, v2, apiTextoEnriquecidoVacia());
+    await montarConfiguracion(page, apiMowaMes());
     await page.goto(RUTA);
 
-    await expect(page.getByRole('button', { name: 'Convert to v2' })).toBeVisible();
-    await page.getByRole('button', { name: 'Convert to v2' }).click();
     await expect(editor(page)).toBeVisible();
+    await expect(segmentos(page)).toHaveCount(6);
     await expect(page.locator('body')).not.toContainText('mowaMes.');
-    await expect(page.getByText(/Draft from/)).toBeVisible();
+    await expect(page.locator('[data-speech-inmutable]')).toBeVisible();
+    await expect(page.locator('[data-speech-inmutable]')).toContainText('This is the original speech');
   });
 });
 
 test.describe('teclado y anchos', () => {
-  test('convertir se hace con el teclado y el foco llega al editor', async ({ page }) => {
-    await abrir(page);
-    const boton = page.getByRole('button', { name: 'Convertir a v2' });
-    await boton.focus();
-
-    await page.keyboard.press('Enter');
-
-    await expect(editor(page)).toBeVisible();
-    // The first segment control the analyst can see: a button on wide screens, the select on narrow ones.
-    const primero = editor(page).locator('[data-segmento-botones] button:visible, [data-segmento-select]:visible').first();
-    await expect(primero).toBeFocused();
-
-    // The editor validates every segment after the button was pressed, and the focus has to survive
-    // that: wait until it has finished, and the focus must still be on the same control.
-    await expect(editor(page)).toHaveAttribute('data-pendiente', 'false');
-    await expect(primero).toBeFocused();
-  });
-
   for (const ancho of [360, 768, 1440]) {
     test(`a ${ancho} px el editor v2 no desborda la página y sus segmentos se alcanzan`, async ({ page }) => {
       await page.setViewportSize({ width: ancho, height: 900 });
       await abrir(page);
-      await convertir(page);
 
       const desborde = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       expect(desborde).toBeLessThanOrEqual(0);

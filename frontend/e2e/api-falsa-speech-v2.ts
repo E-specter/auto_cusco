@@ -11,14 +11,14 @@
  */
 import type { Page } from '@playwright/test';
 
-import type { LargoSegmento, PartesSpeech, VersionSpeech } from '../src/lib/api-mowa-mes';
-import type { BorradorV2, ExpresionSegmentoEntrada, ProblemaSpeech } from '../src/lib/mowa-mes-speech-v2';
+import type { LargoSegmento, VersionSpeech } from '../src/lib/api-mowa-mes';
+import type { ExpresionSegmentoEntrada, ProblemaSpeech } from '../src/lib/mowa-mes-speech-v2';
 import type { components } from '../src/lib/contrato-api';
 import { caracteresQuitados, normalizarGsm7 } from './api-falsa-gsm7';
-import type { ApiFalsaMowaMes } from './api-falsa-mowa-mes';
-import type { ApiFalsaTextoEnriquecido, } from './api-falsa-texto-enriquecido';
-import { manejarTextoEnriquecido } from './api-falsa-texto-enriquecido';
+import { montarApiMowaMes, type ApiFalsaMowaMes } from './api-falsa-mowa-mes';
+import { apiTextoEnriquecidoVacia, manejarTextoEnriquecido, type ApiFalsaTextoEnriquecido } from './api-falsa-texto-enriquecido';
 import { json } from './apoyo';
+import { SEGMENTOS, expresionRespuesta } from './speech-original';
 
 type Esquemas = components['schemas'];
 type ExpresionRespuesta = Esquemas['ExpresionSegmentoRespuesta'];
@@ -43,35 +43,7 @@ const variable = (nombre: string, funciones: Array<{ nombre: string; args: Array
   obligatoria,
 });
 
-/** The expressions of a v1 as the engine writes them: titular(8) + part 1 + date + part 2. */
-function expresionDeSegmento(parte: PartesSpeech): ExpresionRespuesta {
-  const conWhatsapp = (cadena: string): NodoGuardado[] =>
-    cadena
-      .split('[whatsapp]')
-      .flatMap((trozo, i, todos) => [
-        ...(trozo ? [texto(trozo)] : []),
-        ...(i < todos.length - 1 ? [variable('whatsapp_contacto', [{ nombre: 'enlace_whatsapp', args: [] }])] : []),
-      ]);
-  const nodos: NodoGuardado[] = [
-    variable('titular', [{ nombre: 'primeros', args: [8] }], true),
-    ...conWhatsapp(parte.parte_1),
-    variable('fecha_vencimiento_cuota', [{ nombre: 'formato_fecha', args: ['dd/mm/aaaa'] }], true),
-    ...conWhatsapp(parte.parte_2),
-  ];
-  const usa = (nombre: string) => nodos.some((n) => n.tipo === 'variable' && n.nombre === nombre);
-  return {
-    segmento: parte.segmento,
-    etiqueta: parte.etiqueta,
-    dias_desde: parte.dias_desde,
-    dias_hasta: parte.dias_hasta,
-    expresion: { nodos },
-    usa_titular: usa('titular'),
-    usa_vencimiento: usa('fecha_vencimiento_cuota'),
-    usa_whatsapp: usa('whatsapp_contacto'),
-  };
-}
-
-/** A v2 saved version, for specs that start from one. */
+/** A saved version, for specs that start from one: it has the Speech original's messages, as a copy of `base`. */
 export function versionV2Sintetica(base: VersionSpeech, parcial: Partial<VersionSpeech> = {}): VersionSpeech {
   return {
     id: 20,
@@ -86,7 +58,7 @@ export function versionV2Sintetica(base: VersionSpeech, parcial: Partial<Version
     eliminable: false,
     motivo_no_eliminable: null,
     partes: [],
-    expresiones: base.partes.map(expresionDeSegmento),
+    expresiones: structuredClone(base.expresiones),
     ...parcial,
   };
 }
@@ -158,28 +130,6 @@ export async function montarApiSpeechV2(
     // The engine's routes (catalogue, validation, preview of an expression).
     if (await manejarMotor(route, ruta, metodo, url)) return;
 
-    const coincidencia = ruta.match(/^\/mowa-mes\/speech\/(\d+)\/como-v2$/);
-    if (coincidencia && metodo === 'GET') {
-      estado.pedidos.push({ metodo, ruta, cuerpo });
-      const version = api.versiones.find((v) => v.id === Number(coincidencia[1]));
-      if (!version) return json(route, 404, { detail: 'No existe la version' });
-      if (version.formato === 'v2') {
-        return json(route, 400, {
-          detail: 'La version ya es v2: no hay nada que convertir',
-          problemas: [
-            { segmento: null, campo: 'formato', detalle: 'La version ya es v2', codigo: null, catalogo: null, ubicacion: null },
-          ],
-        });
-      }
-      const borrador: BorradorV2 = {
-        basada_en_id: version.id,
-        nombre_sugerido: `Speech ${api.versiones.length + 1}`,
-        expresiones: version.partes.map(expresionDeSegmento),
-        problemas: [],
-      };
-      return json(route, 200, borrador);
-    }
-
     if (ruta === '/mowa-mes/speech/previsualizacion' && metodo === 'POST' && cuerpo && 'expresiones' in cuerpo) {
       estado.pedidos.push({ metodo, ruta, cuerpo });
       const expresiones = (cuerpo.expresiones ?? []) as ExpresionSegmentoEntrada[];
@@ -197,7 +147,7 @@ export async function montarApiSpeechV2(
         };
         const { maximo, sinCota } = maximoDe(guardada);
         const usaWhatsapp = guardada.nodos.some((n) => n.tipo === 'variable' && n.nombre === 'whatsapp_contacto');
-        const etiqueta = api.versiones[0]?.partes.find((p) => p.segmento === e.segmento)?.etiqueta ?? String(e.segmento);
+        const etiqueta = SEGMENTOS.find((s) => s.segmento === e.segmento)?.etiqueta ?? String(e.segmento);
         segmentos.push({
           segmento: e.segmento,
           etiqueta,
@@ -230,9 +180,7 @@ export async function montarApiSpeechV2(
       if (guion) return json(route, guion.estado, guion.cuerpo);
       const expresiones = cuerpo.expresiones as ExpresionSegmentoEntrada[];
       const problemas = problemasDe(expresiones);
-      const base = api.versiones.find((v) => v.id === cuerpo?.basada_en_id) ?? api.versiones[0];
-      const segmentosBase = base.partes.length > 0 ? base.partes : (api.versiones.find((v) => v.partes.length > 0)?.partes ?? []);
-      const vacios = segmentosBase.filter((p) => !expresiones.some((e) => e.segmento === p.segmento && e.expresion.nodos.length > 0));
+      const vacios = SEGMENTOS.filter((p) => !expresiones.some((e) => e.segmento === p.segmento && e.expresion.nodos.length > 0));
       if (vacios.length > 0) {
         return json(route, 400, {
           detail: 'Hay segmentos sin contenido',
@@ -264,24 +212,14 @@ export async function montarApiSpeechV2(
         eliminable: false,
         motivo_no_eliminable: null,
         partes: [],
-        expresiones: segmentosBase.map((p) => {
+        expresiones: SEGMENTOS.map((p) => {
           const entrada = expresiones.find((e) => e.segmento === p.segmento)!;
           const nodos: NodoGuardado[] = entrada.expresion.nodos.map((n) =>
             n.tipo === 'texto'
               ? texto(n.valor ?? '')
               : variable(n.nombre ?? '', (n.funciones ?? []).map((f) => ({ nombre: f.nombre, args: (f.args ?? []) as Array<string | number> })), Boolean(n.obligatoria)),
           );
-          const usa = (x: string) => nodos.some((n) => n.tipo === 'variable' && n.nombre === x);
-          return {
-            segmento: p.segmento,
-            etiqueta: p.etiqueta,
-            dias_desde: p.dias_desde,
-            dias_hasta: p.dias_hasta,
-            expresion: { nodos },
-            usa_titular: usa('titular'),
-            usa_vencimiento: usa('fecha_vencimiento_cuota'),
-            usa_whatsapp: usa('whatsapp_contacto'),
-          };
+          return expresionRespuesta(p.segmento, nodos);
         }),
       };
       api.versiones.push(nueva);
@@ -306,4 +244,20 @@ export async function montarApiSpeechV2(
 
     return route.fallback();
   });
+}
+
+/**
+ * Everything the configuration screen asks the API for: the module's fake, the v2 speech over it and the engine's
+ * under that. Every version is a v2 since M-B3, so the screen always mounts the editor and always previews
+ * expressions: a spec that opens `/mowa-mes/configuracion` mounts this, never the module's fake alone.
+ */
+export async function montarConfiguracion(
+  page: Page,
+  api: ApiFalsaMowaMes,
+): Promise<{ v2: ApiFalsaSpeechV2; motor: ApiFalsaTextoEnriquecido }> {
+  const v2 = apiSpeechV2();
+  const motor = apiTextoEnriquecidoVacia();
+  await montarApiMowaMes(page, api);
+  await montarApiSpeechV2(page, api, v2, motor);
+  return { v2, motor };
 }
