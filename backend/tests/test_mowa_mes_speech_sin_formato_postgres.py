@@ -60,6 +60,7 @@ TEXTO_USADA = [
 TEXTO_LIBRE = [{"segmento": s, "parte_1": " a ", "parte_2": " b"} for s in SEGMENTOS]
 USADA_EN = datetime(2026, 9, 1, 12, 0, tzinfo=UTC)
 TABLA = "mowa_mes_speech_version"
+CK_LISTA = "ck_mowa_mes_speech_version_expresiones_es_una_lista"
 
 
 def _configuracion() -> Config:
@@ -174,6 +175,11 @@ def test_el_downgrade_deja_el_esquema_y_las_filas_como_los_dejo_m_b3(cliente) ->
         assert esquema_nuevo["columnas"]["texto_v1"][2] == "YES"  # nulable
         assert esquema_nuevo["columnas"]["expresiones"][2] == "NO"
         assert not any("formato" in nombre for nombre in esquema_nuevo["restricciones"])
+        # El CHECK nuevo existe en `head` (con su definicion) y NO sobrevive al downgrade (abajo, el
+        # esquema entero es igual al de M-B3): NOT NULL no basta, el JSON `null` no es NULL de SQL.
+        tipo, definicion = esquema_nuevo["restricciones"][CK_LISTA]
+        assert tipo == "c" and "jsonb_typeof(expresiones)" in definicion and "array" in definicion
+        assert CK_LISTA not in esquema_m_b3["restricciones"]
         # Las filas: `texto_v1` es el `partes` de antes (NULL en la v2 nativa); nada mas cambia.
         assert [f["id"] for f in filas_nuevas] == [f["id"] for f in filas_m_b3]
         for antes, ahora in zip(filas_m_b3, filas_nuevas, strict=True):

@@ -262,11 +262,34 @@ def _insertar(engine, **valores):
 
 
 def test_la_base_rechaza_una_version_sin_expresiones(cliente) -> None:
-    # M-B4: `expresiones` es NOT NULL (sin CHECK): toda version es v2.
+    # M-B4: `expresiones` es NOT NULL: toda version es v2. Un None de Python viaja como NULL de SQL
+    # (`none_as_null`); sin esa opcion se guardaria como el JSON `null` y pasaria el NOT NULL.
     _, engine = cliente
 
     with pytest.raises(IntegrityError):
         _insertar(engine, expresiones=None)
+
+
+@pytest.mark.parametrize("contenido", ["null", "{}", '"texto"', "7"])
+def test_la_base_rechaza_expresiones_que_no_sea_una_lista_json_aunque_no_sea_null(
+    cliente, contenido
+) -> None:
+    # El JSON `null` no es NULL de SQL y pasa el NOT NULL: lo cierra el CHECK
+    # `expresiones_es_una_lista`, tambien por SQL directo (sin pasar por el modelo).
+    _, engine = cliente
+
+    with pytest.raises(IntegrityError), engine.begin() as cx:
+        cx.execute(
+            text(
+                "INSERT INTO mowa_mes_speech_version (nombre, nombre_normalizado, expresiones) "
+                "VALUES (:nombre, :normalizado, CAST(:contenido AS jsonb))"
+            ),
+            {
+                "nombre": f"{PREFIJO}no lista",
+                "normalizado": f"{PREFIJO}no lista".casefold(),
+                "contenido": contenido,
+            },
+        )
 
 
 def test_la_base_ya_no_tiene_formato_ni_partes_ni_los_check_de_formato(cliente) -> None:
@@ -293,6 +316,7 @@ def test_la_base_ya_no_tiene_formato_ni_partes_ni_los_check_de_formato(cliente) 
     assert {"texto_v1", "expresiones"} <= columnas
     assert not {"formato", "partes"} & columnas
     assert not any("formato" in nombre for nombre in cheques)
+    assert "ck_mowa_mes_speech_version_expresiones_es_una_lista" in cheques
 
 
 # --- Editar --------------------------------------------------------------------------------------

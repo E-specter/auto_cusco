@@ -22,6 +22,7 @@ REVISION = "e2c6b4a8d195"
 TABLA = "mowa_mes_speech_version"
 CK_FORMATO = "ck_mowa_mes_speech_version_formato_valido"
 CK_CONTENIDO = "ck_mowa_mes_speech_version_contenido_segun_formato"
+CK_LISTA = "ck_mowa_mes_speech_version_expresiones_es_una_lista"
 SOLO_V2 = cargar_migracion("d7a3e5b9c241_speech_solo_v2.py")
 MIGRACION = cargar_migracion("e2c6b4a8d195_speech_sin_formato.py")
 
@@ -58,6 +59,7 @@ def test_los_nombres_y_textos_de_los_check_son_los_que_dejo_m_b3() -> None:
     assert MIGRACION.CK_CONTENIDO == CK_CONTENIDO == SOLO_V2.CHECK
     assert MIGRACION.CK_FORMATO == CK_FORMATO
     assert MIGRACION.CK_CONTENIDO_TEXTO == SOLO_V2.CHECK_NUEVO  # el texto con que M-B3 lo dejo
+    assert MIGRACION.CK_LISTA == CK_LISTA  # el nuevo de M-B4: expresiones es una lista JSON
 
 
 def test_el_upgrade_quita_los_check_antes_que_la_columna_y_nombra_los_check_sin_duplicar() -> None:
@@ -76,15 +78,18 @@ def test_el_upgrade_quita_los_check_antes_que_la_columna_y_nombra_los_check_sin_
 def test_el_upgrade_renombra_partes_la_deja_nulable_y_pasa_a_null_solo_las_vacias() -> None:
     sql = _sql(subir=True)
 
-    nulable, renombrar, a_null, quitar_formato, no_nula = _orden(
+    nulable, renombrar, a_null, quitar_formato, no_nula, lista = _orden(
         sql,
         f"ALTER TABLE {TABLA} ALTER COLUMN partes DROP NOT NULL;",
         f"ALTER TABLE {TABLA} RENAME partes TO texto_v1;",
         f"UPDATE {TABLA} SET texto_v1 = NULL WHERE texto_v1 = '[]'::jsonb;",
         f"ALTER TABLE {TABLA} DROP COLUMN formato;",
         f"ALTER TABLE {TABLA} ALTER COLUMN expresiones SET NOT NULL;",
+        f"ALTER TABLE {TABLA} ADD CONSTRAINT {CK_LISTA} "
+        "CHECK (jsonb_typeof(expresiones) = 'array');",
     )
-    assert nulable < renombrar < a_null < quitar_formato < no_nula
+    # NOT NULL no basta (el JSON `null` no es NULL de SQL): el CHECK de la lista llega despues
+    assert nulable < renombrar < a_null < quitar_formato < no_nula < lista
     assert sql.count("UPDATE " + TABLA) == 1  # nada mas se reescribe: ni expresiones ni formato
     assert "DELETE" not in sql and "DROP TABLE" not in sql
     assert sql.count("DROP COLUMN") == 1  # solo `formato`: ningun dato de las versiones se pierde
@@ -94,6 +99,7 @@ def test_el_downgrade_devuelve_la_tabla_como_la_dejo_m_b3() -> None:
     sql = _sql(subir=False)
 
     (
+        quitar_lista,
         expresiones_nulable,
         agregar_formato,
         check_formato,
@@ -103,6 +109,7 @@ def test_el_downgrade_devuelve_la_tabla_como_la_dejo_m_b3() -> None:
         nombre,
     ) = _orden(
         sql,
+        f"ALTER TABLE {TABLA} DROP CONSTRAINT {CK_LISTA};",
         f"ALTER TABLE {TABLA} ALTER COLUMN expresiones DROP NOT NULL;",
         f"ALTER TABLE {TABLA} ADD COLUMN formato VARCHAR(2) DEFAULT 'v2' NOT NULL;",
         f"ALTER TABLE {TABLA} ADD CONSTRAINT {CK_FORMATO} CHECK (formato IN ('v1', 'v2'));",
@@ -113,7 +120,8 @@ def test_el_downgrade_devuelve_la_tabla_como_la_dejo_m_b3() -> None:
         f"ALTER TABLE {TABLA} RENAME texto_v1 TO partes;",
     )
     # `formato` entra antes que los CHECK que lo nombran; los NULL se rellenan antes de NOT NULL
-    assert expresiones_nulable < agregar_formato < check_formato < check_contenido
+    # el CHECK de la lista se quita primero: M-B3 no lo tenia
+    assert quitar_lista < expresiones_nulable < agregar_formato < check_formato < check_contenido
     assert check_contenido < a_vacia < no_nula < nombre
     assert "ck_ck_" not in sql
     assert "DROP COLUMN" not in sql  # el downgrade no pierde ninguna columna
@@ -126,3 +134,5 @@ def test_el_modelo_declara_lo_mismo_que_la_migracion_deja() -> None:
     assert tabla.c["texto_v1"].nullable and not tabla.c["expresiones"].nullable
     nombres_de_check = {c.name for c in tabla.constraints if hasattr(c, "sqltext")}
     assert not {CK_FORMATO, CK_CONTENIDO} & nombres_de_check
+    lista = next(c for c in tabla.constraints if getattr(c, "name", None) == CK_LISTA)
+    assert str(lista.sqltext) == MIGRACION.CK_LISTA_TEXTO == "jsonb_typeof(expresiones) = 'array'"

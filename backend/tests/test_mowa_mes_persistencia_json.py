@@ -3,7 +3,9 @@
 Un `None` de Python en una columna JSONB se escribe por defecto como el JSON `null`, que para un
 `IS NULL` no es NULL. La columna `texto_v1` (el texto de dos partes que tuvo una version antes de
 convertirse a v2, M-B4) lleva `none_as_null`: el `None` es NULL de SQL, que es como se distingue una
-version que nunca fue v1 o que se edito despues. Se razona con la sentencia compilada para el
+version que nunca fue v1 o que se edito despues. `expresiones` es NOT NULL y TAMBIEN la lleva: sin
+ella, un `None` se guardaria como el JSON `null`, que pasa el NOT NULL y deja una version sin
+expresiones (el fallo que encontro `-ConBase` en M-B4). Se razona con la sentencia compilada para el
 dialecto de PostgreSQL porque la prueba contra la base (`test_mowa_mes_speech_v2_postgres.py`) no
 corre en todos los entornos.
 """
@@ -14,7 +16,7 @@ from sqlalchemy import insert, update
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import JSONB
 
-from app.adapters.persistence.modelos import MowaMesSpeechVersion
+from app.adapters.persistence.modelos import Base, MowaMesSpeechVersion
 from app.adapters.persistence.repositorio_mowa_mes_postgres import _valores_de_contenido
 from tests.test_mowa_mes_speech import DATOS_DEL_ORIGINAL
 from tests.test_mowa_mes_speech_v2 import _texto, _v2
@@ -31,12 +33,74 @@ def _como_viaja(sentencia, columna: str):
     return valor if procesador is None else procesador(valor)
 
 
-def test_las_columnas_jsonb_que_aceptan_nulo_lo_escriben_como_null_de_sql() -> None:
-    nulables = [c for c in _TABLA.columns if isinstance(c.type, JSONB) and c.nullable]
+# JSONB que no llevan `none_as_null`, fuera de la version del speech (inventario de M-B4; 5 son de
+# MOWA MES: campana y fila cargada; el resto, de otros modulos). No se tocan: cambiarlas
+# cambia la semantica de NULL frente a JSON null en datos que ya existen). En una columna NOT NULL
+# de la lista un `None` se colaria pasando el NOT NULL como JSON `null`; en una nulable quedaria
+# como JSON `null` y no como NULL. Una columna nueva NO puede sumarse a la lista sin decidirlo a
+# proposito, y si una de la lista recibe la opcion, hay que quitarla de aqui.
+JSONB_SIN_NONE_AS_NULL = {
+    # NOT NULL
+    "borrador_carga_archivo.opciones",
+    "borrador_carga_archivo.analisis",
+    "carga.opciones_lectura",
+    "definicion_carga_version.contenido",
+    "mowa_mes_campana.filtros",
+    "mowa_mes_campana.herramientas",
+    "mowa_mes_campana.envios",
+    "mowa_mes_campana.supervisores",
+    "mowa_mes_fila_cargada.advertencias",
+    "seleccion.filtros",
+    "seleccion.indicadores",
+    # nulables
+    "carga.cabeceras_originales",
+    "carga.mapeo",
+    "carga_auditoria.detalle",
+    "carga_fila.extras",
+}
 
-    assert [c.name for c in nulables] == ["texto_v1"]
-    assert all(c.type.none_as_null for c in nulables)
+
+def _jsonb_del_modelo() -> dict[str, JSONB]:
+    return {
+        f"{tabla.name}.{c.name}": c
+        for tabla in Base.metadata.tables.values()
+        for c in tabla.columns
+        if isinstance(c.type, JSONB)
+    }
+
+
+def test_las_columnas_jsonb_de_la_version_escriben_none_como_null_de_sql() -> None:
+    columnas = [c for c in _TABLA.columns if isinstance(c.type, JSONB)]
+
+    assert {c.name for c in columnas} == {"texto_v1", "expresiones"}
+    assert all(c.type.none_as_null for c in columnas)  # nulables o no: ver el docstring
+    assert [c.name for c in columnas if c.nullable] == ["texto_v1"]
     assert not _TABLA.c["expresiones"].nullable  # toda version es v2 (M-B4)
+
+
+def test_un_none_en_expresiones_viaja_como_null_de_sql_y_no_como_json_null() -> None:
+    # Lo que el NOT NULL rechaza; como JSON `null` pasaria y dejaria `expresiones = null`.
+    insercion = insert(_TABLA).values(nombre="x", nombre_normalizado="x", expresiones=None)
+    edicion = update(_TABLA).values(expresiones=None)
+
+    for sentencia in (insercion, edicion):
+        assert _como_viaja(sentencia, "expresiones") is None
+
+
+def test_toda_jsonb_not_null_del_modelo_lleva_none_as_null_salvo_las_conocidas() -> None:
+    sin_la_opcion = {n for n, c in _jsonb_del_modelo().items() if not c.type.none_as_null}
+
+    # Ninguna JSONB NOT NULL nueva sin la opcion; y la lista no guarda columnas que ya la tienen.
+    assert sin_la_opcion == JSONB_SIN_NONE_AS_NULL
+    assert not any(n.startswith("mowa_mes_speech_version.") for n in sin_la_opcion)
+
+
+def test_el_modelo_declara_el_check_de_que_expresiones_es_una_lista() -> None:
+    cheques = {c.name: str(c.sqltext) for c in _TABLA.constraints if hasattr(c, "sqltext")}
+
+    assert cheques["ck_mowa_mes_speech_version_expresiones_es_una_lista"] == (
+        "jsonb_typeof(expresiones) = 'array'"
+    )
 
 
 def test_guardar_una_version_deja_texto_v1_en_null_de_sql_y_las_expresiones_como_lista() -> None:

@@ -499,8 +499,11 @@ class MowaMesSpeechVersion(Base):
     # downgrade: nada lo lee. NULL en una version que nunca fue v1 o que se edito despues.
     # `none_as_null`: un None de Python es NULL de SQL, no el JSON `null`.
     texto_v1: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB(none_as_null=True))
-    # Una expresion del motor por segmento: lista de {segmento, expresion}.
-    expresiones: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    # Una expresion del motor por segmento: lista de {segmento, expresion}. `none_as_null` aunque
+    # sea NOT NULL: sin la opcion, un None de Python se guarda como el JSON `null`, que no es NULL
+    # de SQL, pasa el NOT NULL y dejaria una version sin expresiones. Con ella, el None viaja como
+    # NULL y la base lo rechaza; el CHECK de abajo cierra tambien el JSON `null` escrito a mano.
+    expresiones: Mapped[list[dict[str, Any]]] = mapped_column(JSONB(none_as_null=True))
     original: Mapped[bool] = mapped_column(Boolean, server_default="false")
     basada_en_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("mowa_mes_speech_version.id", ondelete="SET NULL")
@@ -513,6 +516,7 @@ class MowaMesSpeechVersion(Base):
 
     __table_args__ = (
         UniqueConstraint("nombre_normalizado"),
+        CheckConstraint("jsonb_typeof(expresiones) = 'array'", name="expresiones_es_una_lista"),
         Index(
             "uq_mowa_mes_speech_version_original",
             "original",
