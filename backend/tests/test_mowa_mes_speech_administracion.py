@@ -13,7 +13,6 @@ from app.core.entities.mowa_mes import (
     CodigoErrorSpeech,
     CodigoMowaMes,
     DatosSpeech,
-    FormatoSpeech,
     MotivoNoEliminable,
     NombreDeSpeechRepetido,
     Programacion,
@@ -217,14 +216,14 @@ def test_una_deshabilitada_no_se_edita() -> None:
     with pytest.raises(SpeechInmutable, match="deshabilitada"):
         servicio.actualizar_speech(
             version.id,
-            DatosSpeech("Nuevo", expresiones=version.datos.expresiones, formato=FormatoSpeech.V2),
+            DatosSpeech("Nuevo", expresiones=version.datos.expresiones),
         )
 
     servicio.habilitar_speech(version.id)
     assert (
         servicio.actualizar_speech(
             version.id,
-            DatosSpeech("Nuevo", expresiones=version.datos.expresiones, formato=FormatoSpeech.V2),
+            DatosSpeech("Nuevo", expresiones=version.datos.expresiones),
         ).datos.nombre
         == "Nuevo"
     )

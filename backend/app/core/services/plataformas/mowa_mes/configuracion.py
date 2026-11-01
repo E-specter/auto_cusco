@@ -4,13 +4,12 @@ Una version de speech usada por una campana no se modifica (RF-MM-17), y el
 Speech original tampoco: es la referencia de RF-MM-18. Editar cualquiera de las
 dos crea una version nueva.
 
-Una version es v1 (dos partes por segmento) o v2 (una expresion del motor por segmento, M2); el
-formato no cambia al editarla. `como_v2` convierte una v1 en el borrador de una v2 que da los
-mismos mensajes, sin guardar nada: guardarlo es crear una version nueva basada en la v1.
+Una version es una expresion del motor por segmento (M2). Desde M-B4 (RF-MM-17) no hay versiones
+de dos partes: la migracion `d7a3e5b9c241` las convirtio en su lugar.
 """
 
 import re
-from dataclasses import dataclass, replace
+from dataclasses import replace
 
 from app.core.entities.mowa_mes import (
     BYTES_POR_ARCHIVO,
@@ -18,14 +17,11 @@ from app.core.entities.mowa_mes import (
     REGISTROS_POR_ARCHIVO,
     CampoConfiguracion,
     CodigoErrorSpeech,
-    CodigoMowaMes,
     ConfiguracionInvalida,
     ConfiguracionMowaMes,
     DatosSpeech,
     ExpresionSegmento,
-    FormatoSpeech,
     LargoSegmento,
-    PartesSegmento,
     ProblemaSpeech,
     Segmento,
     SpeechInmutable,
@@ -51,37 +47,6 @@ def nombre_siguiente(nombres: list[str]) -> str:
         if (coincidencia := _NOMBRE_AUTOMATICO.fullmatch(nombre.strip()))
     ]
     return f"Speech {max([1, *numeros]) + 1}"
-
-
-MENSAJE_V1_RETIRADA = (
-    "Las versiones nuevas del speech se arman con el motor de texto, una expresion por segmento "
-    "(v2): una version de dos partes ya no se crea ni se edita. Convierte la que quieras "
-    "personalizar con como-v2 y guarda el resultado"
-)
-
-
-def version_v1_retirada() -> SpeechInvalido:
-    """El rechazo de crear o editar una version de dos partes (RF-MM-17, M3)."""
-    return SpeechInvalido(
-        (
-            ProblemaSpeech(
-                None,
-                "formato",
-                MENSAJE_V1_RETIRADA,
-                codigo_mowa_mes=CodigoMowaMes.VERSION_V1_RETIRADA,
-            ),
-        )
-    )
-
-
-@dataclass(frozen=True)
-class BorradorV2:
-    """Una v1 convertida a v2, sin guardar: lo que el editor muestra para seguir editando."""
-
-    basada_en_id: int
-    nombre_sugerido: str
-    expresiones: tuple[ExpresionSegmento, ...]
-    problemas: tuple[ProblemaSpeech, ...]
 
 
 class ConfiguracionMowaMesService:
@@ -169,28 +134,14 @@ class ConfiguracionMowaMesService:
             raise SpeechNoEncontrado(speech_id)
         return version
 
-    def crear_speech(
-        self, nombre: str | None, partes: tuple[PartesSegmento, ...], basada_en_id: int | None
-    ) -> VersionSpeech:
-        """Ya no se crean versiones de dos partes (RF-MM-17, M3): siempre `SpeechInvalido` con el
-        codigo `version_v1_retirada`, antes de mirar el resto del pedido. Las v1 que ya existen
-        se siguen leyendo, usando en campanas y convirtiendo con `como_v2`.
-
-        La firma se mantiene aunque ningun argumento se use: es la de siempre del caso de uso, la
-        que llama el endpoint con lo que trae el pedido, y asi el rechazo sigue siendo UN solo
-        lugar (aqui) y no un `if` en cada adaptador. Si un dia se quita la ruta con `partes`, se
-        borra este metodo entero.
-        """
-        raise version_v1_retirada()
-
     def crear_speech_v2(
         self,
         nombre: str | None,
         expresiones: tuple[ExpresionSegmento, ...],
         basada_en_id: int | None,
     ) -> VersionSpeech:
-        """Una version v2 nueva: una expresion por segmento, validada con el motor (RF-46)."""
-        datos = DatosSpeech(nombre="", expresiones=expresiones, formato=FormatoSpeech.V2)
+        """Una version nueva: una expresion por segmento, validada con el motor (RF-46)."""
+        datos = DatosSpeech(nombre="", expresiones=expresiones)
         return self._crear(nombre, datos, basada_en_id)
 
     def _crear(
@@ -202,21 +153,6 @@ class ConfiguracionMowaMesService:
             nombre = nombre_siguiente([v.datos.nombre for v in self._repositorio.listar_speech()])
         datos = self._validos(replace(contenido, nombre=nombre))
         return self._repositorio.crear_speech(datos, basada_en_id)
-
-    def como_v2(self, speech_id: int) -> BorradorV2:
-        """El borrador v2 de una v1: sus mismos mensajes, con titular y fecha obligatorios (C-5)."""
-        version = self.obtener_speech(speech_id)
-        if version.datos.formato is not FormatoSpeech.V1:
-            raise SpeechInvalido(
-                (ProblemaSpeech(None, "formato", "La version ya es v2: no hay nada que convertir"),)
-            )
-        expresiones = speech.convertir_a_v2(version.datos.partes)
-        nombre = nombre_siguiente([v.datos.nombre for v in self._repositorio.listar_speech()])
-        problemas = speech.problemas_de(
-            DatosSpeech(nombre=nombre, expresiones=expresiones, formato=FormatoSpeech.V2),
-            adicionales=speech.adicionales_de(self._catalogo),
-        )
-        return BorradorV2(version.id, nombre, expresiones, problemas)
 
     def renombrar_speech(self, speech_id: int, nombre: str) -> VersionSpeech:
         """RF-MM-28: cualquier version, la usada y el original incluidos. No cambia el contenido
@@ -258,38 +194,14 @@ class ConfiguracionMowaMesService:
             )
 
     def actualizar_speech(self, speech_id: int, datos: DatosSpeech) -> VersionSpeech:
-        if datos.formato is FormatoSpeech.V1:
-            raise version_v1_retirada()  # tampoco se editan en dos partes (RF-MM-17, M3)
         version = self.obtener_speech(speech_id)
         if not version.editable:
             raise SpeechInmutable(version)
-        if datos.formato is not version.datos.formato:
-            raise SpeechInvalido(
-                (
-                    ProblemaSpeech(
-                        None,
-                        "formato",
-                        f"La version es {version.datos.formato.value} y no cambia de formato al "
-                        "editarla; guarda el cambio como una version nueva",
-                    ),
-                )
-            )
         actualizada = self._repositorio.actualizar_speech(speech_id, self._validos(datos))
         if actualizada is None:
             # Entre la lectura y la escritura, una campana la uso o alguien la borro.
             raise SpeechInmutable(self.obtener_speech(speech_id))
         return actualizada
-
-    def previsualizar_speech(
-        self, partes: tuple[PartesSegmento, ...], whatsapp: str | None
-    ) -> tuple[str | None, tuple[ProblemaSpeech, ...], tuple[LargoSegmento, ...]]:
-        """Largo maximo por segmento con el WhatsApp dado o, si no viene, el configurado."""
-        if whatsapp is not None and not speech.whatsapp_valido(whatsapp):
-            raise ConfiguracionInvalida("El WhatsApp debe tener 9 digitos y empezar con 9")
-        numero = whatsapp or self._repositorio.obtener_configuracion().whatsapp_contacto
-        # El nombre no se revisa aqui: la previsualizacion no guarda nada.
-        problemas = speech.problemas_de(DatosSpeech(nombre="previsualizacion", partes=partes))
-        return numero, problemas, speech.previsualizar(partes, numero)
 
     def previsualizar_speech_v2(
         self, expresiones: tuple[ExpresionSegmento, ...], whatsapp: str | None
@@ -299,7 +211,7 @@ class ConfiguracionMowaMesService:
         tuple[LargoSegmento, ...],
         tuple[tuple[str, str], ...],
     ]:
-        """Largo maximo (la cota), nivel y ejemplo por segmento de una v2, sin guardar (C-6), y los
+        """Largo maximo (la cota), nivel y ejemplo por segmento, sin guardar (C-6), y los
         campos archivados que usa, como (nombre, etiqueta): un aviso, nunca un bloqueo (RF-65).
 
         Un segmento sin cota se informa con `largo_maximo` nulo y su motivo; el control por fila
@@ -310,9 +222,7 @@ class ConfiguracionMowaMesService:
         numero = whatsapp or self._repositorio.obtener_configuracion().whatsapp_contacto
         adicionales = speech.adicionales_de(self._catalogo)
         problemas = speech.problemas_de(
-            DatosSpeech(
-                nombre="previsualizacion", expresiones=expresiones, formato=FormatoSpeech.V2
-            ),
+            DatosSpeech(nombre="previsualizacion", expresiones=expresiones),
             adicionales=adicionales,
         )
         largos = speech.previsualizar_v2(expresiones, numero, adicionales=adicionales)
@@ -338,6 +248,5 @@ class ConfiguracionMowaMesService:
         orden = {segmento: i for i, segmento in enumerate(Segmento)}
         return replace(
             limpios,
-            partes=tuple(sorted(limpios.partes, key=lambda p: orden[p.segmento])),
             expresiones=tuple(sorted(limpios.expresiones, key=lambda e: orden[e.segmento])),
         )

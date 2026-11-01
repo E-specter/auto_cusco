@@ -27,6 +27,7 @@ from app.core.services.plataformas.mowa_mes.campana import CampanasMowaMesServic
 from app.core.services.plataformas.mowa_mes.reportes import ReportesMowaMesService
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
 from app.main import app
+from tests.speech_congelado import a_expresiones
 from tests.test_gestiones_digitales import PROCEDENCIAS, SUPERVISORES, RepositorioSupervisionFalso
 from tests.test_mowa_mes_campana import (
     HUELLA_ORIGINAL,
@@ -35,7 +36,11 @@ from tests.test_mowa_mes_campana import (
     RepositorioCarteraFalso,
     producto,
 )
-from tests.test_mowa_mes_speech import WHATSAPP, RepositorioMowaMesFalso
+from tests.test_mowa_mes_speech import (
+    TEXTO_V1_DEL_ORIGINAL,
+    WHATSAPP,
+    RepositorioMowaMesFalso,
+)
 
 CUERPO = {
     "fecha_corte": "2026-09-10",
@@ -102,7 +107,6 @@ def test_previsualizacion_de_una_campana_valida() -> None:
     assert cuerpo["speech"] == {
         "id": 1,
         "nombre": "Speech original",
-        "formato": "v1",
         "huella": HUELLA_ORIGINAL,
     }
     assert (cuerpo["productos_cargados"], cuerpo["supervision_cargados"]) == (1, 5)
@@ -481,17 +485,21 @@ def test_la_muestra_de_la_campana_trae_el_mensaje_normalizado_y_su_largo_en_unid
     # cada extendido y 3 por la elipsis, como el control de los 150 y los 160.
     entorno = Entorno()
     version = entorno.mowa_mes.versiones[1]
-    partes = tuple(
-        replace(
-            p,
-            parte_1=" venci\N{LATIN SMALL LETTER O WITH ACUTE} \N{THUMBS UP SIGN}\N{EURO SIGN}10",
-            parte_2=" \N{HORIZONTAL ELLIPSIS}",
-        )
-        if p.segmento.value == "1_a_8"
+    texto = [
+        {
+            **p,
+            "parte_1": (
+                " venci\N{LATIN SMALL LETTER O WITH ACUTE} \N{THUMBS UP SIGN}\N{EURO SIGN}10"
+            ),
+            "parte_2": " \N{HORIZONTAL ELLIPSIS}",
+        }
+        if p["segmento"] == "1_a_8"
         else p
-        for p in version.datos.partes
+        for p in TEXTO_V1_DEL_ORIGINAL
+    ]
+    entorno.mowa_mes.versiones[1] = replace(
+        version, datos=replace(version.datos, expresiones=a_expresiones(texto))
     )
-    entorno.mowa_mes.versiones[1] = replace(version, datos=replace(version.datos, partes=partes))
     client = _cliente(entorno)
 
     cuerpo = client.post("/mowa-mes/campanas/previsualizacion", json=CUERPO).json()

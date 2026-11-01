@@ -11,7 +11,7 @@ from datetime import date
 from decimal import Decimal
 
 from app.core.entities.campos_adicionales import CampoAdicional, TipoAdicional
-from app.core.entities.mowa_mes import DatosSpeech, ExpresionSegmento, FormatoSpeech, Segmento
+from app.core.entities.mowa_mes import DatosSpeech, ExpresionSegmento, Segmento
 from app.core.entities.texto_enriquecido import Expresion, NodoTexto
 from app.core.services.plataformas.mowa_mes.campana import huella_de
 from app.main import app
@@ -57,7 +57,6 @@ def _por_segmento(**expresiones: tuple) -> DatosSpeech:
             ExpresionSegmento(s, Expresion(expresiones.get(f"s_{s.value}", (NodoTexto("x"),))))
             for s in Segmento
         ),
-        formato=FormatoSpeech.V2,
     )
 
 

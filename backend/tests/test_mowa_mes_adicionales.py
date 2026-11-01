@@ -21,7 +21,6 @@ from app.core.entities.mowa_mes import (
     CodigoMowaMes,
     DatosSpeech,
     ExpresionSegmento,
-    FormatoSpeech,
     Segmento,
     SpeechInvalido,
     VersionSpeech,
@@ -85,7 +84,6 @@ def _v2(*nodos, nombre="Con adicionales") -> DatosSpeech:
     return DatosSpeech(
         nombre,
         expresiones=tuple(ExpresionSegmento(s, Expresion(tuple(nodos))) for s in Segmento),
-        formato=FormatoSpeech.V2,
     )
 
 
@@ -320,7 +318,7 @@ def test_guardar_una_v2_acotada_la_guarda_con_el_catalogo_y_no_sin_el() -> None:
 
     guardada = con.crear_speech_v2("Acotada", COMPLETO.expresiones, None)
 
-    assert guardada.datos.formato is FormatoSpeech.V2
+    assert guardada.datos.nombre == "Acotada"
     with pytest.raises(SpeechInvalido):
         sin.crear_speech_v2("Acotada", COMPLETO.expresiones, None)
 
@@ -531,4 +529,4 @@ def test_sin_archivados_sale_vacio_y_nunca_bloquea() -> None:
     )
 
     assert archivados == ()
-    assert guardada.datos.formato is FormatoSpeech.V2  # guardar una que lo usa se permite
+    assert guardada.datos.nombre == "Con archivado"  # guardar una que lo usa se permite

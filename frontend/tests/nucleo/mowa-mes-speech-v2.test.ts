@@ -41,7 +41,6 @@ function versionV2(parcial: Partial<VersionSpeech> = {}): VersionSpeech {
   return {
     id: 5,
     nombre: 'Speech 2',
-    formato: 'v2',
     original: false,
     basada_en_id: 1,
     usada: false,
@@ -50,7 +49,6 @@ function versionV2(parcial: Partial<VersionSpeech> = {}): VersionSpeech {
     deshabilitada_en: null,
     eliminable: false,
     motivo_no_eliminable: null,
-    partes: [],
     expresiones: [...RANGOS].reverse().map((r) => ({
       ...r,
       expresion: { nodos: [VARIABLE('titular', true), TEXTO(` te recuerda tu cuota de ${r.etiqueta}`)] },

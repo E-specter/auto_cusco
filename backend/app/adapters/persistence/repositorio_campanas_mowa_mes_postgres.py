@@ -226,13 +226,13 @@ class RepositorioCampanasMowaMesPostgres(RepositorioCampanasMowaMesPort):
     ) -> CampanaRegistrada:
         with self._engine.begin() as cx:
             version = cx.execute(
-                select(_SPEECH.c.partes, _SPEECH.c.formato, _SPEECH.c.expresiones)
+                select(_SPEECH.c.expresiones)
                 .where(_SPEECH.c.id == armada.speech.id)
                 .with_for_update()
             ).one_or_none()
             if version is None:
                 raise SpeechNoEncontrado(armada.speech.id)
-            guardada = datos_de_fila("", version.partes, version.formato, version.expresiones)
+            guardada = datos_de_fila("", version.expresiones)
             if huella_de(guardada) != armada.speech_huella:
                 raise SpeechCambiado(armada.speech.id)
             cx.execute(

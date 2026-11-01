@@ -18,20 +18,17 @@ from app.core.entities.mowa_mes import (
     CodigoMowaMes,
     DatosSpeech,
     ExpresionSegmento,
-    FormatoSpeech,
-    PartesSegmento,
     ProblemaSpeech,
     Segmento,
 )
 from app.core.entities.texto_enriquecido import (
     CodigoTexto,
     Expresion,
-    NodoTexto,
     NodoVariable,
     Problema,
 )
 from app.core.services.plataformas.mowa_mes import speech
-from tests.test_mowa_mes_speech import ORIGINAL
+from tests.test_mowa_mes_speech import DATOS_DEL_ORIGINAL
 
 APP = Path(__file__).resolve().parents[1] / "app"
 
@@ -50,7 +47,7 @@ def test_un_problema_del_motor_va_con_el_catalogo_texto() -> None:
 
 def test_un_problema_de_mowa_mes_va_con_el_catalogo_mowa_mes() -> None:
     problema = ProblemaSpeech(
-        None, "formato", "x", codigo_mowa_mes=CodigoMowaMes.MENSAJE_EXCEDE_160
+        None, "segmentos", "x", codigo_mowa_mes=CodigoMowaMes.MENSAJE_EXCEDE_160
     )
 
     respuesta = _problema(problema)
@@ -66,7 +63,7 @@ def test_telefono_invalido_se_distingue_por_el_catalogo() -> None:
 
     por_el_motor = _problema(ProblemaSpeech(Segmento.PREVENTIVA, "expresion", "x", del_motor))
     por_mowa_mes = _problema(
-        ProblemaSpeech(None, "formato", "x", codigo_mowa_mes=CodigoMowaMes.TELEFONO_INVALIDO)
+        ProblemaSpeech(None, "segmentos", "x", codigo_mowa_mes=CodigoMowaMes.TELEFONO_INVALIDO)
     )
 
     assert (por_el_motor.codigo, por_el_motor.catalogo) == ("telefono_invalido", "texto")
@@ -94,19 +91,14 @@ def _con_expresion(nodos) -> DatosSpeech:
     expresiones = tuple(
         ExpresionSegmento(rango.segmento, Expresion(tuple(nodos))) for rango in RANGOS_SEGMENTO
     )
-    return DatosSpeech("v2", expresiones=expresiones, formato=FormatoSpeech.V2)
+    return DatosSpeech("v2", expresiones=expresiones)
 
 
 def _campos_que_el_servicio_emite() -> set[str]:
-    v1 = DatosSpeech("v1", ORIGINAL)
-    con_arroba = tuple(PartesSegmento(p.segmento, "hola [@x]", "chao [@y]") for p in ORIGINAL)
-    v2 = _con_expresion([NodoTexto("ok")])
+    base = DATOS_DEL_ORIGINAL
     escenarios = [
-        replace(v1, nombre=""),  # nombre
-        replace(v1, partes=ORIGINAL[1:]),  # segmentos
-        replace(v1, partes=con_arroba),  # parte_1 y parte_2
-        replace(v1, expresiones=v2.expresiones),  # formato (v1 con expresiones)
-        replace(v2, partes=ORIGINAL),  # formato (v2 con partes)
+        replace(base, nombre=""),  # nombre
+        replace(base, expresiones=base.expresiones[1:]),  # segmentos
         _con_expresion([]),  # expresion (sin contenido)
         _con_expresion([NodoVariable("inventada", ())]),  # expresion (el motor)
     ]

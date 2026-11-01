@@ -48,7 +48,6 @@ export function versionV2Sintetica(base: VersionSpeech, parcial: Partial<Version
   return {
     id: 20,
     nombre: 'Speech v2',
-    formato: 'v2',
     original: false,
     basada_en_id: base.id,
     usada: false,
@@ -57,7 +56,6 @@ export function versionV2Sintetica(base: VersionSpeech, parcial: Partial<Version
     deshabilitada_en: null,
     eliminable: false,
     motivo_no_eliminable: null,
-    partes: [],
     expresiones: structuredClone(base.expresiones),
     ...parcial,
   };
@@ -202,7 +200,6 @@ export async function montarApiSpeechV2(
       const nueva: VersionSpeech = {
         id: Math.max(...api.versiones.map((v) => v.id)) + 1,
         nombre,
-        formato: 'v2',
         original: false,
         basada_en_id: (cuerpo.basada_en_id as number | null) ?? null,
         usada: false,
@@ -211,7 +208,6 @@ export async function montarApiSpeechV2(
         deshabilitada_en: null,
         eliminable: false,
         motivo_no_eliminable: null,
-        partes: [],
         expresiones: SEGMENTOS.map((p) => {
           const entrada = expresiones.find((e) => e.segmento === p.segmento)!;
           const nodos: NodoGuardado[] = entrada.expresion.nodos.map((n) =>

@@ -44,14 +44,14 @@ from app.adapters.persistence.repositorio_supervision_postgres import (
     RepositorioSupervisionPostgres,
 )
 from app.core.entities.gestiones_digitales import ConfiguracionSupervision, Supervisor
-from app.core.entities.mowa_mes import CodigoMowaMes, DatosSpeech, FormatoSpeech, PartesSegmento
+from app.core.entities.mowa_mes import CodigoMowaMes, DatosSpeech
 from app.core.entities.mowa_mes_reporte import COLUMNAS_REPORTE, FilaReporte
 from app.core.entities.nombres import normalizar_nombre
 from app.core.services.ingesta_sabana.servicio import IngestaSabanaService
 from app.core.services.plataformas.mowa_mes.campana import huella_de
-from app.core.services.plataformas.mowa_mes.speech import convertir_a_v2
 from app.core.services.texto_enriquecido.gsm7 import largo_gsm7
 from app.main import app
+from tests.speech_congelado import a_expresiones
 from tests.test_sabana_cabeceras import CABECERAS_10_09
 from tests.test_sabana_normalizador import _fila_sintetica
 from tests.test_speech_original import speech_del_documento
@@ -392,16 +392,9 @@ def test_una_campana_con_una_version_heredada_la_usa_y_registra_su_huella(client
     # convertidas. Ya no se crea por HTTP (RF-MM-17), asi que se siembra por el repositorio, ya
     # convertida; la campana debe poder usarla de punta a punta, con la huella de su v2.
     client, engine = cliente
-    partes = tuple(
-        PartesSegmento(p.segmento, p.parte_1, p.parte_2 + " Heredada.")
-        for p in speech_del_documento()
-    )
+    partes = [{**p, "parte_2": p["parte_2"] + " Heredada."} for p in speech_del_documento()]
     heredada = RepositorioMowaMesPostgres(engine).crear_speech(
-        DatosSpeech(
-            f"{PREFIJO}heredada",
-            expresiones=convertir_a_v2(partes),
-            formato=FormatoSpeech.V2,
-        ),
+        DatosSpeech(f"{PREFIJO}heredada", expresiones=a_expresiones(partes)),
         None,
     )
     huella = huella_de(heredada.datos)
@@ -420,7 +413,7 @@ def test_una_campana_con_una_version_heredada_la_usa_y_registra_su_huella(client
             select(_SPEECH.c.usada_en).where(_SPEECH.c.id == heredada.id)
         ).scalar_one()
 
-    assert previa["speech"]["huella"] == huella and previa["speech"]["formato"] == "v2"
+    assert previa["speech"]["huella"] == huella
     assert creada.status_code == 201, creada.text
     assert (guardada.speech_huella, guardada.speech_version_id) == (huella, heredada.id)
     assert campana["speech"] == {"id": heredada.id, "nombre": f"{PREFIJO}heredada"}

@@ -6,8 +6,8 @@ reporte leido de verdad, pero sin base de datos. Lo que solo se ve con PostgreSQ
 `mowa_mes_fila_cargada` y `mowa_mes_reporte_fila`, `enviados_conciliados` en la fila de la campana)
 queda en la prueba de integracion.
 
-La cartera trae un producto SIN titular (el 10). Con una v2 creada por `como-v2` desde el Speech
-original, que usa el titular, se excluye con `falta_titular`, igual que con la v1; con una v2 que no
+La cartera trae un producto SIN titular (el 10). Con una v2 copiada del Speech
+original (ya v2 desde M-B3), que usa el titular, se excluye con `falta_titular`; con una v2 que no
 lo usa se carga (RF-MM-13) y la conciliacion lo empareja con su fila del reporte. Datos sinteticos.
 """
 
@@ -89,9 +89,8 @@ def _guardar_v2(client: TestClient, nombre: str, expresiones: list[dict], **extr
 
 def _v2_desde_el_original(client: TestClient) -> int:
     original = next(v for v in client.get("/mowa-mes/speech").json() if v["original"])
-    borrador = client.get(f"/mowa-mes/speech/{original['id']}/como-v2").json()
     expresiones = [
-        {"segmento": e["segmento"], "expresion": e["expresion"]} for e in borrador["expresiones"]
+        {"segmento": e["segmento"], "expresion": e["expresion"]} for e in original["expresiones"]
     ]
     return _guardar_v2(client, "como v2", expresiones, basada_en_id=original["id"])
 
@@ -163,18 +162,18 @@ def _exclusiones(client, campana) -> list[tuple[int, str]]:
     return sorted((int(e["pagare"]), e["codigo"]) for e in cuerpo["exclusiones"])
 
 
-def test_una_v2_por_como_v2_sale_como_la_v1_y_se_concilia_entera(client, entorno) -> None:
-    de_la_v1 = _crear_campana(client)  # el Speech original: el punto de comparacion
+def test_una_v2_copiada_del_original_sale_igual_y_se_concilia_entera(client, entorno) -> None:
+    del_original = _crear_campana(client)  # el Speech original: el punto de comparacion
     v2_id = _v2_desde_el_original(client)
 
     campana = _crear_campana(client, speech_id=v2_id)
     cargadas = entorno.campanas.filas_cargadas(campana["id"])
 
-    # Las mismas filas, mensajes y exclusiones que la v1; la v2 convertida usa el titular, asi que
-    # el producto sin titular se excluye igual (RF-MM-13).
+    # Las mismas filas, mensajes y exclusiones que el original; la copia usa el titular, asi que el
+    # producto sin titular se excluye igual (RF-MM-13).
     assert (campana["productos_cargados"], campana["supervision_cargados"]) == (6, 5)
-    assert campana["total_cargados"] == de_la_v1["total_cargados"] == 11
-    assert cargadas == entorno.campanas.filas_cargadas(de_la_v1["id"])
+    assert campana["total_cargados"] == del_original["total_cargados"] == 11
+    assert cargadas == entorno.campanas.filas_cargadas(del_original["id"])
     assert _exclusiones(client, campana) == [
         (4, "telefono_invalido"),
         (5, "falta_documento"),

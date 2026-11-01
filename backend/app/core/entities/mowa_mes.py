@@ -107,7 +107,6 @@ class CodigoMowaMes(StrEnum):
     FALTA_WHATSAPP = "falta_whatsapp"
     SIN_SUPERVISORES = "sin_supervisores"
     SIN_PRODUCTOS_CARGABLES = "sin_productos_cargables"
-    VERSION_V1_RETIRADA = "version_v1_retirada"  # RF-MM-17 (M3): no se crean versiones de 2 partes
     SPEECH_DESHABILITADO = "speech_deshabilitado"  # RF-MM-29: la campana no usa una deshabilitada
 
 
@@ -126,7 +125,6 @@ TIPO_CODIGO: dict[CodigoMowaMes, TipoCodigo] = {
     CodigoMowaMes.FALTA_WHATSAPP: TipoCodigo.ERROR,
     CodigoMowaMes.SIN_SUPERVISORES: TipoCodigo.ERROR,
     CodigoMowaMes.SIN_PRODUCTOS_CARGABLES: TipoCodigo.ERROR,
-    CodigoMowaMes.VERSION_V1_RETIRADA: TipoCodigo.ERROR,
     CodigoMowaMes.SPEECH_DESHABILITADO: TipoCodigo.ERROR,
 }
 
@@ -150,29 +148,6 @@ class ConfiguracionMowaMes:
 
 
 @dataclass(frozen=True)
-class PartesSegmento:
-    """Texto de un segmento: mensaje = [titular 8] + parte_1 + [fecha] + parte_2 (RF-MM-14).
-
-    Los espacios de los extremos son parte del texto y no se recortan.
-    """
-
-    segmento: Segmento
-    parte_1: str
-    parte_2: str
-
-
-class FormatoSpeech(StrEnum):
-    """Como se guarda el contenido de una version del speech.
-
-    `v1` es la estructura fija de siempre (dos partes por segmento, RF-MM-14), incluido el Speech
-    original. `v2` es una expresion del motor de texto enriquecido por segmento (RF-42 a RF-48).
-    """
-
-    V1 = "v1"
-    V2 = "v2"
-
-
-@dataclass(frozen=True)
 class ExpresionSegmento:
     """El contenido de un segmento de una version v2: la expresion completa del mensaje."""
 
@@ -182,12 +157,12 @@ class ExpresionSegmento:
 
 @dataclass(frozen=True)
 class DatosSpeech:
-    """El contenido de una version: `partes` si es v1, `expresiones` si es v2 (nunca las dos)."""
+    """El contenido de una version: una expresion del motor de texto enriquecido por segmento
+    (RF-42 a RF-48). Desde M-B4 (RF-MM-17) no hay otro formato: las versiones de dos partes se
+    convirtieron en su lugar (migracion `d7a3e5b9c241`)."""
 
     nombre: str
-    partes: tuple[PartesSegmento, ...] = ()
     expresiones: tuple[ExpresionSegmento, ...] = ()
-    formato: FormatoSpeech = FormatoSpeech.V1
 
 
 class CodigoErrorSpeech(StrEnum):
@@ -264,7 +239,7 @@ class VersionSpeech:
 
 
 # Los campos que un problema de speech puede senalar: la API los publica tal cual.
-CampoProblemaSpeech = Literal["nombre", "segmentos", "formato", "parte_1", "parte_2", "expresion"]
+CampoProblemaSpeech = Literal["nombre", "segmentos", "expresion"]
 
 
 @dataclass(frozen=True)

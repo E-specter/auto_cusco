@@ -4,12 +4,13 @@ from datetime import date
 
 import pytest
 
-from app.core.entities.mowa_mes import CodigoMowaMes, PartesSegmento, Segmento
+from app.core.entities.mowa_mes import CodigoMowaMes, Segmento
 from app.core.entities.mowa_mes_campana import FilaCarga
 from app.core.entities.mowa_mes_reporte import FilaReporte
 from app.core.services.plataformas.mowa_mes import speech
 from app.core.services.plataformas.mowa_mes.conciliacion import conciliar, normalizar_mensaje
 from app.core.services.texto_enriquecido.gsm7 import a_gsm7
+from tests.speech_congelado import a_v2
 
 MES_ID = 70001
 
@@ -81,12 +82,12 @@ _EURO = "\N{EURO SIGN}"
 def _mensaje_nuevo_de_mowa_mes() -> str:
     """El mensaje tal como lo arma MOWA MES hoy: un emoji que se borra, una guillemet que se
     transliteran, un espacio duro, tildes y el euro, que pasa a `EUR` (RF-MM-27, 2026-10-26)."""
-    partes = PartesSegmento(
-        Segmento.DE_1_A_8,
-        f" tu cuota venció {_EMOJI}{_ANGULAR_I}mañana{_ANGULAR_D}{_NBSP}paga {_EURO}10",
-        " gracias",
-    )
-    return speech.ConstructorMensajes((partes,), None).mensaje_de(
+    partes = {
+        "segmento": Segmento.DE_1_A_8.value,
+        "parte_1": f" tu cuota venció {_EMOJI}{_ANGULAR_I}mañana{_ANGULAR_D}{_NBSP}paga {_EURO}10",
+        "parte_2": " gracias",
+    }
+    return speech.ConstructorMensajes(a_v2([partes]), None).mensaje_de(
         Segmento.DE_1_A_8, "ZZPRUEBA", date(2026, 9, 5)
     )
 

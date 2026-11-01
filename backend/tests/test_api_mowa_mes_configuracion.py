@@ -14,18 +14,27 @@ from app.api.calendario import obtener_servicio_calendario
 from app.api.mowa_mes import obtener_servicio_mowa_mes
 from app.api.supervisores import obtener_servicio_supervision
 from app.core.entities.calendario import ExcepcionCalendario, TipoExcepcion
-from app.core.entities.mowa_mes import DatosSpeech
 from app.core.services.calendario.servicio import CalendarioService
 from app.core.services.gestiones_digitales.servicio import SupervisionService
 from app.core.services.plataformas.mowa_mes.configuracion import ConfiguracionMowaMesService
+from app.core.services.texto_enriquecido.serializacion import expresion_a_dict
 from app.main import app
+from tests.speech_congelado import a_expresiones
 from tests.test_calendario import RepositorioCalendarioFalso
 from tests.test_gestiones_digitales import RepositorioSupervisionFalso
-from tests.test_mowa_mes_speech import ORIGINAL, RepositorioMowaMesFalso
+from tests.test_mowa_mes_speech import ORIGINAL, TEXTO_V1_DEL_ORIGINAL, RepositorioMowaMesFalso
 
-PARTES = [
-    {"segmento": p.segmento.value, "parte_1": p.parte_1, "parte_2": p.parte_2} for p in ORIGINAL
-]
+
+def a_cuerpo(expresiones) -> list[dict]:
+    """Las expresiones de una version como las manda el frontend: `{segmento, expresion}`."""
+    return [
+        {"segmento": e.segmento.value, "expresion": expresion_a_dict(e.expresion)}
+        for e in expresiones
+    ]
+
+
+# El cuerpo de un pedido con el Speech original (su v2, desde M-B3), listo para un POST o un PUT.
+EXPRESIONES_DEL_ORIGINAL = a_cuerpo(ORIGINAL)
 
 
 @pytest.fixture
@@ -180,23 +189,24 @@ def test_listar_y_obtener_speech(cliente) -> None:
         True,
         False,
     )
-    assert original["partes"][2] == {
-        "segmento": "9_a_30",
-        "etiqueta": "9 a 30",
-        "dias_desde": 9,
-        "dias_hasta": 30,
-        "parte_1": ORIGINAL[2].parte_1,
-        "parte_2": ORIGINAL[2].parte_2,
-        "usa_whatsapp": False,
-    }
-    assert original["partes"][0]["dias_desde"] is None
+    segmento = original["expresiones"][2]
+    assert (segmento["segmento"], segmento["etiqueta"]) == ("9_a_30", "9 a 30")
+    assert (segmento["dias_desde"], segmento["dias_hasta"]) == (9, 30)
+    assert (segmento["usa_titular"], segmento["usa_vencimiento"], segmento["usa_whatsapp"]) == (
+        True,
+        True,
+        False,
+    )
+    assert segmento["expresion"] == EXPRESIONES_DEL_ORIGINAL[2]["expresion"]
+    assert original["expresiones"][0]["dias_desde"] is None
+    assert "partes" not in original and "formato" not in original  # M-B4: solo hay v2
     assert client.get("/mowa-mes/speech/1").json() == original
     assert no_existe.status_code == 404
 
 
 EXPRESIONES = [
     {"segmento": p["segmento"], "expresion": {"nodos": [{"tipo": "texto", "valor": "Hola"}]}}
-    for p in PARTES
+    for p in EXPRESIONES_DEL_ORIGINAL
 ]
 
 
@@ -221,7 +231,6 @@ def test_crear_editar_y_proteger_versiones(cliente) -> None:
 
     assert creada.status_code == 201
     assert (creada.json()["nombre"], creada.json()["basada_en_id"]) == ("Speech 2", 1)
-    assert creada.json()["formato"] == "v2"
     assert editada.status_code == 200
     assert repetida.status_code == 409
     assert original.status_code == 409
@@ -245,77 +254,19 @@ def test_versiones_invalidas(cliente, cuerpo, estado) -> None:
     assert client.post("/mowa-mes/speech", json=cuerpo).status_code == estado
 
 
-# --- Ya no se crean ni se editan versiones de dos partes (RF-MM-17, M3) ----------------------
+# --- Previsualizacion (RF-MM-19) --------------------------------------------------------------
 
 
-def _retirada(respuesta) -> None:
-    cuerpo = respuesta.json()
-    assert respuesta.status_code == 400
-    (problema,) = cuerpo["problemas"]
-    assert (problema["segmento"], problema["campo"]) == (None, "formato")
-    # `catalogo` dice que la clave i18n es mowaMes.codigo.version_v1_retirada, no la del motor
-    assert (problema["codigo"], problema["catalogo"]) == ("version_v1_retirada", "mowa_mes")
-    assert problema["ubicacion"] is None
-
-
-@pytest.mark.parametrize(
-    "extra",
-    [
-        {},
-        {"nombre": "Con nombre"},
-        {"basada_en_id": 1},
-        {"basada_en_id": 99},  # la regla va antes que mirar si la base existe
-        {"partes": PARTES[:5]},  # ni su contenido se revisa
-    ],
-)
-def test_crear_con_partes_es_400_version_v1_retirada(cliente, extra) -> None:
-    client, repositorio = cliente
-    cuerpo = {"partes": PARTES, **extra}
-
-    respuesta = client.post("/mowa-mes/speech", json=cuerpo)
-
-    _retirada(respuesta)
-    assert list(repositorio.versiones) == [1]  # no se creo nada
-
-
-def test_editar_con_partes_es_400_version_v1_retirada_incluso_la_original_y_las_heredadas(
-    cliente,
-) -> None:
-    client, repositorio = cliente
-    heredada = repositorio.crear_speech(DatosSpeech("Heredada", ORIGINAL), None)
-
-    original = client.put("/mowa-mes/speech/1", json={"nombre": "Otro", "partes": PARTES})
-    sin_usar = client.put(
-        f"/mowa-mes/speech/{heredada.id}", json={"nombre": "Heredada 2", "partes": PARTES}
+def _previsualizar(client, expresiones, **extra):
+    return client.post(
+        "/mowa-mes/speech/previsualizacion", json={"expresiones": expresiones, **extra}
     )
-    inexistente = client.put("/mowa-mes/speech/999", json={"nombre": "x", "partes": PARTES})
-
-    for respuesta in (original, sin_usar, inexistente):
-        _retirada(respuesta)  # 400 y no 409 ni 404: es la forma del pedido
-    assert repositorio.versiones[heredada.id].datos.nombre == "Heredada"
 
 
-def test_las_versiones_de_dos_partes_que_ya_existen_se_siguen_leyendo_y_convirtiendo(
-    cliente,
-) -> None:
-    client, repositorio = cliente
-    heredada = repositorio.crear_speech(DatosSpeech("Heredada", ORIGINAL), None)
-
-    leida = client.get(f"/mowa-mes/speech/{heredada.id}")
-    listada = [v["formato"] for v in client.get("/mowa-mes/speech").json()]
-    borrador = client.get(f"/mowa-mes/speech/{heredada.id}/como-v2")
-
-    assert (leida.status_code, leida.json()["formato"]) == (200, "v1")
-    assert listada == ["v1", "v1"]  # el Speech original y la heredada
-    assert borrador.status_code == 200 and len(borrador.json()["expresiones"]) == 6
-
-
-def test_la_previsualizacion_sigue_aceptando_partes_para_medir_una_v1_guardada(cliente) -> None:
+def test_la_previsualizacion_mide_el_speech_original(cliente) -> None:
     client, _ = cliente
 
-    respuesta = client.post(
-        "/mowa-mes/speech/previsualizacion", json={"partes": PARTES, "whatsapp": "900000123"}
-    )
+    respuesta = _previsualizar(client, EXPRESIONES_DEL_ORIGINAL, whatsapp="900000123")
 
     por_segmento = {s["segmento"]: s for s in respuesta.json()["segmentos"]}
     assert respuesta.status_code == 200
@@ -326,7 +277,7 @@ def test_la_previsualizacion_sigue_aceptando_partes_para_medir_una_v1_guardada(c
 def test_previsualizacion_sin_whatsapp_marca_los_segmentos_que_lo_necesitan(cliente) -> None:
     client, _ = cliente
 
-    cuerpo = client.post("/mowa-mes/speech/previsualizacion", json={"partes": PARTES}).json()
+    cuerpo = _previsualizar(client, EXPRESIONES_DEL_ORIGINAL).json()
 
     por_segmento = {s["segmento"]: s for s in cuerpo["segmentos"]}
     assert (cuerpo["whatsapp"], cuerpo["largo_advertencia"], cuerpo["largo_maximo"]) == (
@@ -340,22 +291,20 @@ def test_previsualizacion_sin_whatsapp_marca_los_segmentos_que_lo_necesitan(clie
     assert por_segmento["preventiva"]["falta_whatsapp"] is False
 
 
-def test_la_previsualizacion_v1_normaliza_el_ejemplo_y_trae_la_lista_de_borrados(cliente) -> None:
+def test_la_previsualizacion_normaliza_el_ejemplo_y_trae_la_lista_de_borrados(cliente) -> None:
     client, _ = cliente
     emoji = "\N{THUMBS UP SIGN}"
     o_tilde = "\N{LATIN SMALL LETTER O WITH ACUTE}"
-    partes = [
-        PARTES[0],
-        {**PARTES[1], "parte_1": f" venci{o_tilde} {emoji}", "parte_2": "."},
-        *PARTES[2:],
+    texto = [
+        TEXTO_V1_DEL_ORIGINAL[0],
+        {**TEXTO_V1_DEL_ORIGINAL[1], "parte_1": f" venci{o_tilde} {emoji}", "parte_2": "."},
+        *TEXTO_V1_DEL_ORIGINAL[2:],
     ]
 
-    cuerpo = client.post(
-        "/mowa-mes/speech/previsualizacion", json={"partes": partes, "whatsapp": "900000123"}
-    ).json()
+    cuerpo = _previsualizar(client, a_cuerpo(a_expresiones(texto)), whatsapp="900000123").json()
 
     por_segmento = {s["segmento"]: s for s in cuerpo["segmentos"]}
-    assert por_segmento["1_a_8"]["ejemplo"] == "XXXXXXXX vencio dd/mm/yyyy."
+    assert por_segmento["1_a_8"]["ejemplo"] == "XXXXXXXX vencio 05/10/2026."
     assert por_segmento["1_a_8"]["caracteres_quitados"] == [
         {"caracter": emoji, "punto_de_codigo": "U+1F44D"}
     ]
@@ -378,26 +327,19 @@ def test_el_contrato_declara_los_caracteres_quitados_por_grafema() -> None:
 
 def test_previsualizacion_con_whatsapp_y_problemas(cliente) -> None:
     client, _ = cliente
-    partes = [{**PARTES[0], "parte_2": " [@"}, *PARTES[1:]]
+    mala = {"nodos": [{"tipo": "variable", "nombre": "inventada"}]}
+    expresiones = [
+        {**EXPRESIONES_DEL_ORIGINAL[0], "expresion": mala},
+        *EXPRESIONES_DEL_ORIGINAL[1:],
+    ]
 
-    cuerpo = client.post(
-        "/mowa-mes/speech/previsualizacion", json={"partes": partes, "whatsapp": "900000123"}
-    ).json()
-    invalido = client.post(
-        "/mowa-mes/speech/previsualizacion", json={"partes": PARTES, "whatsapp": "123"}
-    )
+    cuerpo = _previsualizar(client, expresiones, whatsapp="900000123").json()
+    invalido = _previsualizar(client, EXPRESIONES_DEL_ORIGINAL, whatsapp="123")
 
     assert cuerpo["whatsapp"] == "900000123"
-    assert cuerpo["problemas"] == [
-        {
-            "segmento": "preventiva",
-            "campo": "parte_2",
-            "detalle": "El texto no puede contener '[@'",
-            "codigo": None,  # los problemas de una v1 no vienen del motor
-            "catalogo": None,
-            "ubicacion": None,
-        }
-    ]
+    (problema,) = cuerpo["problemas"]
+    assert (problema["segmento"], problema["campo"]) == ("preventiva", "expresion")
+    assert (problema["codigo"], problema["catalogo"]) == ("variable_desconocida", "texto")
     assert all(not s["falta_whatsapp"] for s in cuerpo["segmentos"])
     assert invalido.status_code == 400
 

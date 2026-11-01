@@ -26,7 +26,6 @@ function version(parcial: Partial<VersionSpeech> = {}): VersionSpeech {
   return {
     id: 2,
     nombre: 'Speech 2',
-    formato: 'v2',
     original: false,
     basada_en_id: 1,
     usada: false,
@@ -35,7 +34,6 @@ function version(parcial: Partial<VersionSpeech> = {}): VersionSpeech {
     deshabilitada_en: null,
     eliminable: false,
     motivo_no_eliminable: null,
-    partes: [],
     expresiones: [],
     ...parcial,
   };

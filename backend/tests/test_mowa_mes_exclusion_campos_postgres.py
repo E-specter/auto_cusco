@@ -54,9 +54,7 @@ _EXCLUSION = MowaMesExclusion.__table__
 def _campana_con_exclusiones(engine):
     """Crea una campana por el caso de uso real: un producto cargado y uno con campos vacios."""
     speech = RepositorioMowaMesPostgres(engine).crear_speech(
-        DatosSpeech(
-            f"{base.PREFIJO}adicionales", expresiones=COMPLETO.expresiones, formato=COMPLETO.formato
-        ),
+        DatosSpeech(f"{base.PREFIJO}adicionales", expresiones=COMPLETO.expresiones),
         None,
     )
     servicio = CampanasMowaMesService(

@@ -18,9 +18,12 @@ from app.core.entities.mowa_mes import (
 from app.core.entities.texto_enriquecido import CodigoTexto
 from app.core.services.plataformas.mowa_mes import speech
 from app.core.services.plataformas.mowa_mes.campana import FilaCarga, evaluar_producto
-from tests.test_api_mowa_mes_configuracion import PARTES, cliente  # noqa: F401
+from tests.test_api_mowa_mes_configuracion import (  # noqa: F401
+    EXPRESIONES_DEL_ORIGINAL,
+    cliente,
+)
 from tests.test_mowa_mes_campana import armar_servicio, peticion, producto
-from tests.test_mowa_mes_speech import ORIGINAL
+from tests.test_mowa_mes_speech import DATOS_DEL_ORIGINAL, ORIGINAL
 
 WHATSAPP = "900000123"
 INVALIDO = "51900000456"  # 11 digitos: no es un numero de RF-02
@@ -42,7 +45,7 @@ def test_una_campana_sin_productos_en_segmentos_con_whatsapp_se_genera_sin_numer
 
 
 def test_sin_numero_sigue_siendo_sin_whatsapp_y_no_un_error_de_mensaje() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, None)
+    constructor = speech.ConstructorMensajes(DATOS_DEL_ORIGINAL, None)
 
     for segmento in CON_WHATSAPP:
         assert constructor.requiere_whatsapp_faltante(segmento)
@@ -70,7 +73,8 @@ def test_previsualizar_el_speech_con_un_numero_invalido_sigue_dando_400_y_no_un_
 
     for numero in ("123", INVALIDO, "800000123", "9000001234"):
         respuesta = client.post(
-            "/mowa-mes/speech/previsualizacion", json={"partes": PARTES, "whatsapp": numero}
+            "/mowa-mes/speech/previsualizacion",
+            json={"expresiones": EXPRESIONES_DEL_ORIGINAL, "whatsapp": numero},
         )
 
         assert respuesta.status_code == 400, numero
@@ -78,16 +82,17 @@ def test_previsualizar_el_speech_con_un_numero_invalido_sigue_dando_400_y_no_un_
 
 
 def test_previsualizar_el_speech_no_depende_del_numero_y_no_pliega_nada() -> None:
-    con = speech.previsualizar(ORIGINAL, WHATSAPP)
-    sin = speech.previsualizar(ORIGINAL, None)
+    con = speech.previsualizar_v2(ORIGINAL, WHATSAPP)
+    sin = speech.previsualizar_v2(ORIGINAL, None)
 
     assert [x.largo_maximo for x in con] == [x.largo_maximo for x in sin]
-    assert speech.compilar_segmento(ORIGINAL[3]).nodos_plegados == 0  # sin numero: sin constante
-    assert speech.compilar_segmento(ORIGINAL[3], WHATSAPP).nodos_plegados == 1
+    expresion = ORIGINAL[3].expresion
+    assert speech.compilar_expresion(expresion).nodos_plegados == 0  # sin numero: sin constante
+    assert speech.compilar_expresion(expresion, WHATSAPP).nodos_plegados == 1
 
 
 def test_dos_filas_del_mismo_segmento_solo_difieren_por_titular_y_vencimiento() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+    constructor = speech.ConstructorMensajes(DATOS_DEL_ORIGINAL, WHATSAPP)
     enlace = "https://wa.me/+51" + WHATSAPP
 
     a = constructor.mensaje_de(Segmento.DE_31_A_60, "AAAAAAAA", date(2026, 9, 5))
@@ -100,7 +105,9 @@ def test_dos_filas_del_mismo_segmento_solo_difieren_por_titular_y_vencimiento() 
 
 
 def test_un_numero_invalido_afecta_solo_a_los_segmentos_que_lo_usan() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, INVALIDO)  # no rompe el constructor
+    constructor = speech.ConstructorMensajes(
+        DATOS_DEL_ORIGINAL, INVALIDO
+    )  # no rompe el constructor
 
     for segmento in SIN_WHATSAPP:
         assert not constructor.requiere_whatsapp_faltante(segmento)
@@ -114,7 +121,7 @@ def test_un_numero_invalido_afecta_solo_a_los_segmentos_que_lo_usan() -> None:
 
 
 def test_el_problema_del_numero_se_detecta_al_construir_y_no_en_cada_fila() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, INVALIDO)
+    constructor = speech.ConstructorMensajes(DATOS_DEL_ORIGINAL, INVALIDO)
 
     primera = _problemas_de(constructor, Segmento.DE_61_A_90)
     segunda = _problemas_de(constructor, Segmento.DE_61_A_90)
@@ -131,7 +138,7 @@ def _problemas_de(constructor, segmento):
 def test_un_producto_en_un_segmento_con_numero_invalido_no_sale_como_fila_cargada() -> None:
     # Inalcanzable hoy (configuracion y campana validan el numero); si se colara, `evaluar_producto`
     # lanza en lugar de entregar un SMS sin enlace.
-    constructor = speech.ConstructorMensajes(ORIGINAL, INVALIDO)
+    constructor = speech.ConstructorMensajes(DATOS_DEL_ORIGINAL, INVALIDO)
     datos = producto(1, dias_atraso=40)
 
     with pytest.raises(MensajeNoGenerable):
@@ -143,7 +150,7 @@ def test_un_producto_en_un_segmento_con_numero_invalido_no_sale_como_fila_cargad
 
 
 def test_el_numero_de_la_fila_ya_no_cuenta_porque_la_constante_manda() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+    constructor = speech.ConstructorMensajes(DATOS_DEL_ORIGINAL, WHATSAPP)
 
     mensaje = constructor.mensaje(
         Segmento.DE_31_A_60,
@@ -154,7 +161,7 @@ def test_el_numero_de_la_fila_ya_no_cuenta_porque_la_constante_manda() -> None:
 
 
 def test_el_problema_se_detecta_al_construir_y_pedir_el_mensaje_no_evalua_nada(monkeypatch) -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, INVALIDO)
+    constructor = speech.ConstructorMensajes(DATOS_DEL_ORIGINAL, INVALIDO)
 
     def _no_debe_evaluar(self, producto):
         raise AssertionError("se evaluo una fila de un segmento que ya se sabe no generable")
@@ -168,14 +175,14 @@ def test_el_problema_se_detecta_al_construir_y_pedir_el_mensaje_no_evalua_nada(m
 
 def test_previsualizar_compila_los_segmentos_sin_pasar_el_numero(monkeypatch) -> None:
     recibidos = []
-    original = speech.compilar_segmento
+    original = speech.compilar_expresion
 
-    def _espia(partes, whatsapp=None):
+    def _espia(expresion, whatsapp=None, **kwargs):
         recibidos.append(whatsapp)
-        return original(partes, whatsapp)
+        return original(expresion, whatsapp, **kwargs)
 
-    monkeypatch.setattr(speech, "compilar_segmento", _espia)
+    monkeypatch.setattr(speech, "compilar_expresion", _espia)
 
-    speech.previsualizar(ORIGINAL, WHATSAPP)
+    speech.previsualizar_v2(ORIGINAL, WHATSAPP)
 
     assert recibidos == [None] * len(ORIGINAL)

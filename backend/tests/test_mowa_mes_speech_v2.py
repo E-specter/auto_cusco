@@ -1,13 +1,13 @@
 """Speech v2 de MOWA MES (B6, M2): una expresion del motor de texto enriquecido por segmento.
 
 Cubre lo que decidieron el usuario y architec para M2:
-- una v2 convertida desde una v1 da los mismos mensajes, largos, exclusiones y orden que la v1,
-  sobre la matriz completa del oro de B5 (el Speech original y las 12 versiones sinteticas);
+- una v2 convertida desde una v1 da los mismos mensajes y largos que la v1 (desde M-B4 esa
+  comparacion vive en la prueba de oro, contra hashes congelados por version);
 - `falta_titular` y `falta_vencimiento` solo si la expresion del segmento USA la variable (se
   decide sobre los nodos, nunca buscando el nombre en el texto), en los dos sentidos y sin cambiar
   el orden;
 - el mensaje de un segmento que no usa una variable sale sin huecos;
-- la huella de una v2 es propia y la de una v1 no cambia;
+- la huella de una v2 es propia y estable (la del Speech original convertido esta fijada);
 - el largo maximo (la cota), el nivel y el ejemplo de la previsualizacion, y "sin maximo calculable"
   con su motivo, mientras `mensaje_excede_160` sigue excluyendo por fila sobre el mensaje real.
 
@@ -26,8 +26,6 @@ from app.core.entities.mowa_mes import (
     CodigoMowaMes,
     DatosSpeech,
     ExpresionSegmento,
-    FaltaWhatsapp,
-    FormatoSpeech,
     MensajeNoGenerable,
     Segmento,
 )
@@ -46,21 +44,14 @@ from app.core.services.plataformas.mowa_mes.campana import (
     evaluar_producto,
     huella_de,
     huella_expresiones,
-    huella_speech,
 )
 from app.core.services.texto_enriquecido.uso import variables_usadas
-from tests.oro_mowa_mes_datos import (
-    NUMEROS,
-    ORIGINAL,
-    TITULARES,
-    TODAS_LAS_VERSIONES,
-    VENCIMIENTOS,
-    WHATSAPP,
-)
+from tests.oro_mowa_mes_datos import ORIGINAL, WHATSAPP
+from tests.speech_congelado import a_expresiones, a_v2
 
 CORTE = date(2026, 9, 14)
 VENCIMIENTO = date(2026, 9, 6)
-HUELLA_DEL_SPEECH_ORIGINAL = "297c227cfdd0bb5e1636e08d4ed6cebab971d724c84223acfdb0cfebc2fcf88a"
+HUELLA_DEL_ORIGINAL_CONVERTIDO = "5b1c556c283ceccd59007114c0da16df3f323ef98b4122d5dc1628b0ef1992b1"
 HUELLA_V2_FIJADA = "cab702335fdd2be3f5b731c300baf875dd45903a48b8f01ce7cdeb5984b5be49"
 
 
@@ -84,13 +75,7 @@ def _v2(nombre: str = "v2", **por_segmento: tuple) -> DatosSpeech:
     for rango in RANGOS_SEGMENTO:
         nodos = por_segmento.get(rango.segmento.name, por_segmento.get("TODOS", ()))
         expresiones.append(ExpresionSegmento(rango.segmento, Expresion(tuple(nodos))))
-    return DatosSpeech(nombre, expresiones=tuple(expresiones), formato=FormatoSpeech.V2)
-
-
-def _convertida(version) -> DatosSpeech:
-    return DatosSpeech(
-        "convertida", expresiones=speech.convertir_a_v2(version), formato=FormatoSpeech.V2
-    )
+    return DatosSpeech(nombre, expresiones=tuple(expresiones))
 
 
 def _producto(**cambios) -> dict:
@@ -114,11 +99,9 @@ def _evaluar(datos: DatosSpeech, whatsapp: str | None = WHATSAPP, **cambios):
 # --- Huellas --------------------------------------------------------------------------------------
 
 
-def test_la_huella_de_una_v1_es_la_de_siempre() -> None:
-    v1 = DatosSpeech("Speech original", ORIGINAL)
-
-    assert huella_speech(ORIGINAL) == HUELLA_DEL_SPEECH_ORIGINAL
-    assert huella_de(v1) == HUELLA_DEL_SPEECH_ORIGINAL
+def test_la_huella_del_speech_original_convertido_es_la_de_las_campanas_nuevas() -> None:
+    # El mensaje es el mismo que el de la v1 (297c...), la huella no: lleva el marcador "v2".
+    assert huella_de(a_v2(ORIGINAL, "Speech original")) == HUELLA_DEL_ORIGINAL_CONVERTIDO
 
 
 def test_la_huella_de_una_v2_es_propia_estable_y_depende_del_contenido() -> None:
@@ -156,105 +139,18 @@ def test_la_huella_de_una_v2_esta_fijada() -> None:
     assert huella_de(datos) == HUELLA_V2_FIJADA
 
 
-def test_una_v2_convertida_tiene_huella_distinta_de_la_v1_de_la_que_sale() -> None:
-    v1 = DatosSpeech("Speech original", ORIGINAL)
-
-    assert huella_de(_convertida(ORIGINAL)) != huella_de(v1)
-
-
-# --- Una v2 convertida desde una v1 es la misma v1 (C-5) ------------------------------------------
-
-
-def _resultados_por_producto(datos: DatosSpeech, whatsapp: str | None):
-    """Lo que la campana hace con cada producto de la matriz: fila, exclusion o falta de numero."""
-    constructor = speech.ConstructorMensajes(datos, whatsapp)
-    resultados = []
-    for rango in RANGOS_SEGMENTO:
-        dias = rango.desde if rango.desde is not None else rango.hasta
-        for titular in TITULARES:
-            for vencimiento in VENCIMIENTOS:
-                producto = _producto(
-                    dias_atraso=dias, titular=titular, fecha_vencimiento_cuota=vencimiento
-                )
-                resultados.append(evaluar_producto(producto, CORTE, CORTE, constructor))
-    return resultados
-
-
-@pytest.mark.parametrize("nombre", list(TODAS_LAS_VERSIONES))
-def test_la_v2_convertida_da_las_mismas_filas_exclusiones_y_advertencias_que_la_v1(nombre) -> None:
-    version = TODAS_LAS_VERSIONES[nombre]
-    v1 = DatosSpeech(nombre, version)
-    v2 = _convertida(version)
-
-    comparados: list = []
-    for whatsapp in NUMEROS:
-        de_v1 = _resultados_por_producto(v1, whatsapp)
-        de_v2 = _resultados_por_producto(v2, whatsapp)
-
-        assert de_v2 == de_v1, (nombre, whatsapp)
-        comparados += de_v1
-    assert any(isinstance(r, FilaCarga) for r in comparados)  # se comparan filas de verdad
-    assert any(isinstance(r, Exclusion) for r in comparados)  # exclusiones
-
-
-@pytest.mark.parametrize("nombre", list(TODAS_LAS_VERSIONES))
-def test_la_v2_convertida_da_los_mismos_mensajes_byte_a_byte(nombre) -> None:
-    version = TODAS_LAS_VERSIONES[nombre]
-    comparados = 0
-
-    for whatsapp in NUMEROS:
-        de_v1 = speech.ConstructorMensajes(DatosSpeech(nombre, version), whatsapp)
-        de_v2 = speech.ConstructorMensajes(_convertida(version), whatsapp)
-        for partes in version:
-            for titular in TITULARES:
-                for vencimiento in VENCIMIENTOS:
-                    if not (titular and titular.strip()) or vencimiento is None:
-                        continue  # sin dato, la campana excluye antes de pedir el mensaje
-                    try:
-                        esperado = de_v1.mensaje_de(partes.segmento, titular, vencimiento)
-                    except FaltaWhatsapp:
-                        with pytest.raises(FaltaWhatsapp):
-                            de_v2.mensaje_de(partes.segmento, titular, vencimiento)
-                        assert de_v2.requiere_whatsapp_faltante(partes.segmento)
-                        continue
-                    obtenido = de_v2.mensaje_de(partes.segmento, titular, vencimiento)
-                    assert obtenido.encode("utf-8") == esperado.encode("utf-8")
-                    comparados += 1
-
-    assert comparados > 100
-
-
-@pytest.mark.parametrize("nombre", list(TODAS_LAS_VERSIONES))
-@pytest.mark.parametrize("whatsapp", NUMEROS)
-def test_la_v2_convertida_da_los_mismos_largos_niveles_y_uso_de_whatsapp(nombre, whatsapp) -> None:
-    version = TODAS_LAS_VERSIONES[nombre]
-
-    de_v1 = speech.previsualizar(version, whatsapp)
-    de_v2 = speech.previsualizar_v2(speech.convertir_a_v2(version), whatsapp)
-
-    campos = lambda largos: [  # noqa: E731
-        (x.rango.segmento, x.usa_whatsapp, x.largo_maximo, x.codigo) for x in largos
-    ]
-    assert campos(de_v2) == campos(de_v1)
-    assert all(x.motivo_sin_cota is None for x in de_v2)
+# --- Una v2 convertida desde una v1 (C-5) -------------------------------------------------------
+# Que da los mismos mensajes, largos y exclusiones que la v1 de la que sale lo prueba la prueba de
+# oro (`test_mowa_mes_speech_oro.py`) contra hashes congelados por version, sobre toda la matriz.
 
 
 def test_la_conversion_marca_obligatorios_el_titular_y_la_fecha_y_nada_mas() -> None:
-    for convertida in speech.convertir_a_v2(ORIGINAL):
+    for convertida in a_expresiones(ORIGINAL):
         variables = [n for n in convertida.expresion.nodos if isinstance(n, NodoVariable)]
         obligatorias = {n.nombre for n in variables if n.obligatoria}
 
         assert obligatorias == {"titular", "fecha_vencimiento_cuota"}
         assert not any(n.obligatoria for n in variables if n.nombre == "whatsapp_contacto")
-
-
-def test_convertir_no_toca_la_expresion_de_una_v1() -> None:
-    antes = speech.expresion_de(ORIGINAL[0])
-
-    speech.convertir_a_v2(ORIGINAL)
-
-    assert speech.expresion_de(ORIGINAL[0]) == antes
-    assert not any(isinstance(n, NodoVariable) and n.obligatoria for n in antes.nodos)
 
 
 # --- Exclusiones: solo si la expresion del segmento usa la variable -------------------------------
@@ -350,14 +246,6 @@ def test_el_uso_se_decide_por_segmento() -> None:
         False,
         False,
     ]
-
-
-def test_una_v1_siempre_necesita_el_titular_y_la_fecha() -> None:
-    constructor = speech.ConstructorMensajes(DatosSpeech("v1", ORIGINAL), WHATSAPP)
-
-    assert all(constructor.usa_titular(r.segmento) for r in RANGOS_SEGMENTO)
-    assert all(constructor.usa_vencimiento(r.segmento) for r in RANGOS_SEGMENTO)
-    assert all(constructor.usa_titular(r.segmento) for r in RANGOS_SEGMENTO)
 
 
 # --- El orden de las exclusiones no cambia --------------------------------------------------------
@@ -601,23 +489,8 @@ def test_el_limite_de_nodos_del_motor_aplica_a_una_v2() -> None:
     ]
 
 
-def test_el_nombre_de_una_v2_se_valida_como_el_de_una_v1() -> None:
+def test_el_nombre_de_una_version_se_valida() -> None:
     assert _problemas(replace(_v2(TODOS=CON_AMBAS), nombre="  ")) == [(None, "nombre", None)]
-
-
-def test_una_v1_con_expresiones_o_una_v2_con_partes_es_un_problema_de_formato() -> None:
-    v1_con_expresiones = DatosSpeech("x", ORIGINAL, _v2(TODOS=CON_AMBAS).expresiones)
-    v2_con_partes = replace(_v2(TODOS=CON_AMBAS), partes=ORIGINAL)
-
-    assert (None, "formato", None) in _problemas(v1_con_expresiones)
-    assert (None, "formato", None) in _problemas(v2_con_partes)
-
-
-def test_una_v2_puede_usar_funciones_y_los_problemas_de_una_v1_no_cambian() -> None:
-    v1_mala = DatosSpeech("v1", tuple(replace(p, parte_1="a [@titular]") for p in ORIGINAL))
-
-    assert {p.campo for p in speech.problemas_de(v1_mala)} == {"parte_1"}
-    assert all(p.problema is None for p in speech.problemas_de(v1_mala))
 
 
 # --- El constructor de una v2 ---------------------------------------------------------------------
@@ -678,22 +551,18 @@ def test_variables_usadas_mira_nodos_y_argumentos_y_no_el_texto() -> None:
 # --- Lo que el repositorio guarda, sin base ---------------------------------------------------
 
 
-def test_el_repositorio_guarda_una_v1_con_partes_y_una_v2_con_expresiones() -> None:
+def test_el_repositorio_guarda_las_expresiones_y_deja_texto_v1_en_null() -> None:
     from app.adapters.persistence.repositorio_mowa_mes_postgres import (
         _valores_de_contenido,
         datos_de_fila,
     )
 
-    v1 = _valores_de_contenido(DatosSpeech("v1", ORIGINAL))
-    datos_v2 = _v2(TODOS=(_texto("a"), _titular()))
-    v2 = _valores_de_contenido(datos_v2)
+    datos = _v2(TODOS=(_texto("a"), _titular()))
+    valores = _valores_de_contenido(datos)
 
-    assert (v1["formato"], v1["expresiones"], len(v1["partes"])) == ("v1", None, 6)
-    assert (v2["formato"], v2["partes"], len(v2["expresiones"])) == ("v2", [], 6)
-    assert datos_de_fila("v2", v2["partes"], v2["formato"], v2["expresiones"]) == replace(
-        datos_v2, nombre="v2"
-    )
-    assert datos_de_fila("v1", v1["partes"], v1["formato"], v1["expresiones"]).partes == ORIGINAL
+    assert valores["texto_v1"] is None  # una version nueva o editada ya no es la v1 que fue
+    assert len(valores["expresiones"]) == 6
+    assert datos_de_fila("v2", valores["expresiones"]) == replace(datos, nombre="v2")
 
 
 def test_una_v2_con_tildes_argumentos_y_obligatoria_sobrevive_al_viaje_por_json() -> None:
@@ -713,7 +582,7 @@ def test_una_v2_con_tildes_argumentos_y_obligatoria_sobrevive_al_viaje_por_json(
     valores = _valores_de_contenido(datos)
 
     de_la_base = json.loads(json.dumps(valores["expresiones"], ensure_ascii=False))
-    leidos = datos_de_fila("v2", json.loads(json.dumps(valores["partes"])), "v2", de_la_base)
+    leidos = datos_de_fila("v2", de_la_base)
 
     assert leidos == replace(datos, nombre="v2")
     assert huella_de(leidos) == huella_de(datos)

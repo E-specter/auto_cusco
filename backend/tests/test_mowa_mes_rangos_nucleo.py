@@ -22,7 +22,7 @@ from app.core.services import segmentacion as nucleo
 from app.core.services.plataformas.mowa_mes import segmentos, speech
 from app.core.services.plataformas.mowa_mes.campana import Exclusion, FilaCarga, evaluar_producto
 from tests.test_mowa_mes_campana import producto
-from tests.test_mowa_mes_speech import ORIGINAL
+from tests.test_mowa_mes_speech import DATOS_DEL_ORIGINAL
 
 # Los valores de hoy, escritos a mano: no salen de la tabla que se esta comprobando.
 RANGOS_DE_HOY = [
@@ -78,7 +78,7 @@ def test_sin_dias_no_hay_segmento_en_el_nucleo_y_en_mowa_mes() -> None:
 
 
 def test_un_producto_sin_dias_de_atraso_termina_en_sin_speech_por_evaluar_producto() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, "900000123")
+    constructor = speech.ConstructorMensajes(DATOS_DEL_ORIGINAL, "900000123")
     dia = date(2026, 9, 1)
 
     sin_dias = evaluar_producto(producto(1, dias_atraso=None), dia, dia, constructor)

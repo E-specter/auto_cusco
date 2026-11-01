@@ -36,6 +36,7 @@ from tests.campos_adicionales_memoria import (
     catalogo_con,
 )
 from tests.test_api_mowa_mes_campanas import CUERPO, Entorno
+from tests.test_api_mowa_mes_configuracion import EXPRESIONES_DEL_ORIGINAL
 from tests.test_mowa_mes_adicionales import COMPLETO, ZONA_ACOTADA, _f, _v2, _var
 from tests.test_mowa_mes_campana import MOMENTO, producto
 from tests.test_mowa_mes_speech import WHATSAPP, RepositorioMowaMesFalso
@@ -117,23 +118,16 @@ def test_la_previsualizacion_avisa_los_campos_archivados_con_su_etiqueta(speech_
     assert cuerpo["campos_archivados"] == [{"nombre": ANTIGUO, "etiqueta": "Campo antiguo"}]
 
 
-def test_sin_archivados_o_en_una_v1_el_aviso_sale_vacio(speech_api) -> None:
-    client, repositorio = speech_api
-    v2 = client.post(
+def test_sin_archivados_el_aviso_sale_vacio(speech_api) -> None:
+    client, _ = speech_api
+    con_adicionales = client.post(
         "/mowa-mes/speech/previsualizacion", json={"expresiones": _expresiones_json(COMPLETO)}
     ).json()
-    original = repositorio.versiones[1].datos.partes
-    v1 = client.post(
-        "/mowa-mes/speech/previsualizacion",
-        json={
-            "partes": [
-                {"segmento": p.segmento.value, "parte_1": p.parte_1, "parte_2": p.parte_2}
-                for p in original
-            ]
-        },
+    original = client.post(
+        "/mowa-mes/speech/previsualizacion", json={"expresiones": EXPRESIONES_DEL_ORIGINAL}
     ).json()
 
-    assert v2["campos_archivados"] == [] and v1["campos_archivados"] == []
+    assert con_adicionales["campos_archivados"] == [] and original["campos_archivados"] == []
 
 
 def test_guardar_una_v2_que_usa_un_archivado_se_permite(speech_api) -> None:

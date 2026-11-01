@@ -1,4 +1,4 @@
-"""Los endpoints del speech v2 de MOWA MES (B6, M2): crear, editar, convertir y previsualizar.
+"""Los endpoints del speech de MOWA MES (B6, M2; desde M-B4 solo v2): crear, editar, previsualizar.
 
 Sobre el repositorio en memoria; la campana con una v2 (previsualizar, crear y el 409 de la huella)
 usa el entorno de `test_api_mowa_mes_campanas.py`. La integracion con PostgreSQL esta en
@@ -77,7 +77,8 @@ def test_se_crea_una_v2_con_una_expresion_por_segmento(cliente) -> None:
 
     cuerpo = respuesta.json()
     assert respuesta.status_code == 201
-    assert (cuerpo["nombre"], cuerpo["formato"], cuerpo["partes"]) == ("Mi speech v2", "v2", [])
+    assert cuerpo["nombre"] == "Mi speech v2"
+    assert "formato" not in cuerpo and "partes" not in cuerpo  # M-B4: solo hay v2
     assert [e["segmento"] for e in cuerpo["expresiones"]] == SEGMENTOS
     assert (cuerpo["original"], cuerpo["usada"], cuerpo["editable"]) == (False, False, True)
     primero = cuerpo["expresiones"][0]
@@ -130,27 +131,26 @@ def test_se_marca_de_cual_se_basa(cliente) -> None:
     assert cuerpo["basada_en_id"] == 1
 
 
-def test_la_v1_sigue_siendo_v1_con_sus_partes_y_sin_expresiones(cliente) -> None:
+def test_el_speech_original_es_una_version_con_seis_expresiones(cliente) -> None:
     client, _ = cliente
 
     original = client.get("/mowa-mes/speech/1").json()
 
-    assert (original["formato"], original["expresiones"]) == ("v1", [])
-    assert len(original["partes"]) == 6
+    assert [e["segmento"] for e in original["expresiones"]] == SEGMENTOS
+    assert "formato" not in original and "partes" not in original
 
 
-def test_partes_y_expresiones_a_la_vez_o_ninguna_es_400_en_formato(cliente) -> None:
+def test_un_pedido_sin_expresiones_es_422_aunque_traiga_partes(cliente) -> None:
+    # M-B4: ya no hay versiones de dos partes; `partes` no es un campo del pedido.
     client, _ = cliente
-    partes = client.get("/mowa-mes/speech/1").json()["partes"]
-    partes = [{k: p[k] for k in ("segmento", "parte_1", "parte_2")} for p in partes]
+    partes = [{"segmento": s, "parte_1": "a", "parte_2": "b"} for s in SEGMENTOS]
 
-    for cuerpo in ({"partes": partes, "expresiones": CUERPO_V2}, {"nombre": "x"}):
-        respuesta = client.post("/mowa-mes/speech", json=cuerpo)
+    for cuerpo in ({"nombre": "x", "partes": partes}, {"nombre": "x"}):
+        creada = client.post("/mowa-mes/speech", json=cuerpo)
+        editada = client.put("/mowa-mes/speech/1", json=cuerpo)
+        previa = client.post("/mowa-mes/speech/previsualizacion", json=cuerpo)
 
-        assert respuesta.status_code == 400
-        assert [(p["segmento"], p["campo"]) for p in respuesta.json()["problemas"]] == [
-            (None, "formato")
-        ]
+        assert (creada.status_code, editada.status_code, previa.status_code) == (422, 422, 422)
 
 
 def test_una_forma_imposible_es_un_problema_con_su_segmento_y_su_nodo_no_un_422(cliente) -> None:
@@ -212,80 +212,19 @@ def test_un_nombre_repetido_es_409_y_una_base_inexistente_404(cliente) -> None:
     assert (repetido.status_code, sin_base.status_code) == (409, 404)
 
 
-# --- Convertir una v1 en el borrador de una v2 (C-5) ----------------------------------------------
+# --- Lo que M-B4 quito ----------------------------------------------------------------------------
 
 
-def test_como_v2_devuelve_el_borrador_sin_guardar_nada(cliente) -> None:
-    client, repositorio = cliente
-    antes = len(repositorio.versiones)
-
-    respuesta = client.get("/mowa-mes/speech/1/como-v2")
-
-    cuerpo = respuesta.json()
-    assert respuesta.status_code == 200
-    assert (cuerpo["basada_en_id"], cuerpo["nombre_sugerido"], cuerpo["problemas"]) == (
-        1,
-        "Speech 2",
-        [],
-    )
-    assert [e["segmento"] for e in cuerpo["expresiones"]] == SEGMENTOS
-    assert all(e["usa_titular"] and e["usa_vencimiento"] for e in cuerpo["expresiones"])
-    assert len(repositorio.versiones) == antes and repositorio.escrituras == 0
-
-
-def test_el_borrador_marca_obligatorios_el_titular_y_la_fecha(cliente) -> None:
+def test_como_v2_ya_no_existe(cliente) -> None:
     client, _ = cliente
 
-    nodos = client.get("/mowa-mes/speech/1/como-v2").json()["expresiones"][0]["expresion"]["nodos"]
-
-    obligatorias = {n["nombre"] for n in nodos if n["tipo"] == "variable" and n["obligatoria"]}
-    assert obligatorias == {"titular", "fecha_vencimiento_cuota"}
-
-
-def test_guardar_el_borrador_da_una_v2_con_los_mismos_largos_que_la_v1(cliente) -> None:
-    client, _ = cliente
-    borrador = client.get("/mowa-mes/speech/1/como-v2").json()
-    expresiones = [
-        {"segmento": e["segmento"], "expresion": e["expresion"]} for e in borrador["expresiones"]
-    ]
-
-    v2 = _crear(client, expresiones, nombre=borrador["nombre_sugerido"], basada_en_id=1)
-    partes = [
-        {k: p[k] for k in ("segmento", "parte_1", "parte_2")}
-        for p in client.get("/mowa-mes/speech/1").json()["partes"]
-    ]
-    de_v1 = client.post(
-        "/mowa-mes/speech/previsualizacion", json={"partes": partes, "whatsapp": WHATSAPP}
-    ).json()
-    de_v2 = client.post(
-        "/mowa-mes/speech/previsualizacion",
-        json={"expresiones": expresiones, "whatsapp": WHATSAPP},
-    ).json()
-
-    campos = lambda cuerpo: [  # noqa: E731
-        (s["segmento"], s["usa_whatsapp"], s["largo_maximo"], s["codigo"])
-        for s in cuerpo["segmentos"]
-    ]
-    assert v2.status_code == 201 and v2.json()["basada_en_id"] == 1
-    assert campos(de_v2) == campos(de_v1)
-    assert client.get("/mowa-mes/speech/1").json()["formato"] == "v1"  # la v1 queda intacta
-
-
-def test_como_v2_de_una_v2_es_400_y_de_una_inexistente_404(cliente) -> None:
-    client, _ = cliente
-    v2 = _crear(client).json()["id"]
-
-    de_v2 = client.get(f"/mowa-mes/speech/{v2}/como-v2")
-    inexistente = client.get("/mowa-mes/speech/99/como-v2")
-
-    assert (de_v2.status_code, inexistente.status_code) == (400, 404)
-    assert de_v2.json()["problemas"][0]["campo"] == "formato"
+    assert client.get("/mowa-mes/speech/1/como-v2").status_code == 404
 
 
 # --- Editar ---------------------------------------------------------------------------------------
 
 
-def test_una_v2_sin_usar_se_edita_en_su_formato(cliente) -> None:
+def test_una_v2_sin_usar_se_edita(cliente) -> None:
     client, _ = cliente
     id_ = _crear(client).json()["id"]
     nuevas = _por_segmento(_texto("Cuota vencida"))
@@ -296,25 +235,8 @@ def test_una_v2_sin_usar_se_edita_en_su_formato(cliente) -> None:
 
     cuerpo = respuesta.json()
     assert respuesta.status_code == 200
-    assert (cuerpo["nombre"], cuerpo["formato"]) == ("Renombrada", "v2")
+    assert cuerpo["nombre"] == "Renombrada"
     assert cuerpo["expresiones"][0]["usa_titular"] is False
-
-
-def test_el_formato_no_cambia_al_editar(cliente) -> None:
-    client, repositorio = cliente
-    id_v2 = _crear(client).json()["id"]
-    partes = [{"segmento": s, "parte_1": "a", "parte_2": "b"} for s in SEGMENTOS]
-    v1 = repositorio.crear_speech(DatosSpeech("una v1", ORIGINAL), None).id  # una heredada
-
-    v2_con_partes = client.put(f"/mowa-mes/speech/{id_v2}", json={"nombre": "x", "partes": partes})
-    v1_con_expresiones = client.put(
-        f"/mowa-mes/speech/{v1}", json={"nombre": "y", "expresiones": CUERPO_V2}
-    )
-
-    assert (v2_con_partes.status_code, v1_con_expresiones.status_code) == (400, 400)
-    assert v2_con_partes.json()["problemas"][0]["campo"] == "formato"
-    assert v2_con_partes.json()["problemas"][0]["codigo"] == "version_v1_retirada"
-    assert client.get(f"/mowa-mes/speech/{v1}").json()["formato"] == "v1"
 
 
 def test_una_v2_usada_no_se_modifica_y_el_original_tampoco(cliente) -> None:
@@ -483,21 +405,6 @@ def test_un_whatsapp_invalido_o_una_forma_imposible_en_la_previsualizacion_son_4
     assert imposible.json()["problemas"][0]["codigo"] == "expresion_invalida"
 
 
-def test_la_previsualizacion_v1_sigue_igual_y_trae_los_campos_nuevos_nulos(cliente) -> None:
-    client, _ = cliente
-    partes = [
-        {k: p[k] for k in ("segmento", "parte_1", "parte_2")}
-        for p in client.get("/mowa-mes/speech/1").json()["partes"]
-    ]
-
-    segmentos = client.post(
-        "/mowa-mes/speech/previsualizacion", json={"partes": partes, "whatsapp": WHATSAPP}
-    ).json()["segmentos"]
-
-    assert all(s["sin_maximo"] is None and s["largo_maximo"] is not None for s in segmentos)
-    assert {s["segmento"]: s["largo_maximo"] for s in segmentos}["9_a_30"] == 156
-
-
 # --- Una campana con una v2 -----------------------------------------------------------------------
 
 
@@ -513,7 +420,7 @@ def _entorno_con_v2(expresiones=None, productos=None) -> tuple[Entorno, TestClie
     return entorno, cliente_http, id_
 
 
-def test_la_campana_con_una_v2_previsualiza_con_su_formato_y_su_huella() -> None:
+def test_la_campana_con_una_v2_previsualiza_con_su_huella() -> None:
     entorno, client, id_ = _entorno_con_v2()
 
     cuerpo = client.post(
@@ -524,7 +431,6 @@ def test_la_campana_con_una_v2_previsualiza_con_su_formato_y_su_huella() -> None
     assert cuerpo["speech"] == {
         "id": id_,
         "nombre": "v2 de campana",
-        "formato": "v2",
         "huella": huella_de(version.datos),
     }
     assert cuerpo["productos_cargados"] == 1
@@ -598,18 +504,18 @@ def test_se_crea_la_campana_con_la_huella_vigente_de_la_v2_y_la_marca_usada() ->
     assert len(entorno.campanas.campanas) == 1
 
 
-def test_la_huella_de_una_v1_no_vale_para_una_v2() -> None:
+def test_la_huella_del_original_no_vale_para_otra_version() -> None:
     entorno, client, id_ = _entorno_con_v2()
-    huella_v1 = client.post("/mowa-mes/campanas/previsualizacion", json=CUERPO).json()["speech"][
-        "huella"
-    ]
+    huella_original = client.post("/mowa-mes/campanas/previsualizacion", json=CUERPO).json()[
+        "speech"
+    ]["huella"]
 
     creada = client.post(
-        "/mowa-mes/campanas", json={**CUERPO, "speech_id": id_, "speech_huella": huella_v1}
+        "/mowa-mes/campanas", json={**CUERPO, "speech_id": id_, "speech_huella": huella_original}
     )
 
     assert creada.status_code == 409 and creada.json()["codigo"] == "huella_cambiada"
-    assert huella_v1 == huella_de(DatosSpeech("Speech original", ORIGINAL))
+    assert huella_original == huella_de(DatosSpeech("Speech original", ORIGINAL))
 
 
 def test_el_dia_de_atraso_ajustado_llega_a_la_expresion_de_la_campana() -> None:

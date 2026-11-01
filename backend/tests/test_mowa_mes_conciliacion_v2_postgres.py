@@ -11,7 +11,7 @@ configuracion y supervisores que se restituyen, limpieza de las campanas de esa 
 versiones de speech con el prefijo de prueba) con una sabana propia: la de siempre sin el
 producto 9 (el carne) y con el 10, que **no tiene titular**. Con el mismo dato:
 
-- una v2 creada por `como-v2` desde el Speech original usa el titular, asi que el producto 10 se
+- una v2 copiada del Speech original (ya v2 desde M-B3) usa el titular, asi que el producto 10 se
   excluye con `falta_titular` (igual que la v1), y el resto sale igual que con la v1;
 - una v2 que no usa el titular lo carga (RF-MM-13) y la conciliacion lo empareja con su fila.
 
@@ -121,7 +121,6 @@ def _guardar_v2(client, nombre: str, expresiones: list[dict], **extra) -> int:
         json={"nombre": f"{PREFIJO}{nombre}", "expresiones": expresiones, **extra},
     )
     assert respuesta.status_code == 201, respuesta.text
-    assert respuesta.json()["formato"] == "v2"
     return respuesta.json()["id"]
 
 
@@ -129,11 +128,10 @@ def _v2_desde_el_original(client) -> int:
     """Una v2 copiada del Speech original, guardada como version nueva (C-5).
 
     Antes la daba `como-v2`; desde M-B3 el original ya es v2 (la migracion lo convirtio con la misma
-    conversion) y `como-v2` responde 400, asi que se copian sus expresiones tal como las expone la
-    API.
+    conversion) y desde M-B4 `como-v2` no existe, asi que se copian sus expresiones tal como las
+    expone la API.
     """
     original = next(v for v in client.get("/mowa-mes/speech").json() if v["original"])
-    assert original["formato"] == "v2"
     expresiones = [
         {"segmento": e["segmento"], "expresion": e["expresion"]} for e in original["expresiones"]
     ]
@@ -241,13 +239,13 @@ def _por_id_esperado(enviadas) -> list[dict]:
     ]
 
 
-# --- Una v2 desde el Speech original (como-v2) --------------------------------------------------
+# --- Una v2 copiada del Speech original --------------------------------------------------
 
 
-def test_una_v2_por_como_v2_sale_como_la_v1_y_se_concilia_entera(cliente) -> None:
+def test_una_v2_copiada_del_original_sale_igual_y_se_concilia_entera(cliente) -> None:
     client, engine = cliente
     repositorio = RepositorioCampanasMowaMesPostgres(engine)
-    de_la_v1 = _crear_campana(client)  # el Speech original, el punto de comparacion
+    del_original = _crear_campana(client)  # el Speech original, el punto de comparacion
     v2_id = _v2_desde_el_original(client)
 
     campana = _crear_campana(client, speech_id=v2_id)
@@ -255,11 +253,11 @@ def test_una_v2_por_como_v2_sale_como_la_v1_y_se_concilia_entera(cliente) -> Non
     exclusiones = client.get(f"/mowa-mes/campanas/{campana['id']}/exclusiones").json()
     descarga = _filas_xlsx(client.get(f"/mowa-mes/campanas/{campana['id']}/archivos/1").content)
 
-    # Las mismas filas, mensajes y exclusiones que la v1 de la que sale (RF-MM-13: la v2 convertida
-    # usa el titular, asi que el producto sin titular se excluye igual).
+    # Las mismas filas, mensajes y exclusiones que el original del que sale (RF-MM-13: usa el
+    # titular, asi que el producto sin titular se excluye igual).
     assert (campana["productos_cargados"], campana["supervision_cargados"]) == (6, 5)
-    assert campana["total_cargados"] == 11 == de_la_v1["total_cargados"]
-    assert cargadas == repositorio.filas_cargadas(de_la_v1["id"])
+    assert campana["total_cargados"] == 11 == del_original["total_cargados"]
+    assert cargadas == repositorio.filas_cargadas(del_original["id"])
     assert sorted((int(e["pagare"]), e["codigo"]) for e in exclusiones["exclusiones"]) == [
         (4, "telefono_invalido"),
         (5, "falta_documento"),

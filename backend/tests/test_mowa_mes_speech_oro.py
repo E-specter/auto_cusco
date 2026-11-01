@@ -1,18 +1,17 @@
 # ruff: noqa: E501  (las huellas SHA-256 son constantes de 64 caracteres)
-"""Prueba de oro de MOWA MES M1 (B5, RF-54): el speech evaluado con el motor de texto enriquecido
-da exactamente lo mismo que el camino de antes.
+"""Prueba de oro de MOWA MES (B5, RF-54; T-MM-C11, M-B4): el speech evaluado con el motor de texto
+enriquecido da exactamente lo mismo que el camino de antes.
 
-Se compara contra CONSTANTES congeladas en HEAD 3e567d7 con el codigo viejo
-(`oro_mowa_mes_congelados.py`: los 6 mensajes del Speech original y un SHA-256 de toda la matriz).
-El camino viejo (`plantilla_mensaje` + `GeneradorCargas` + `contexto_fila`) se retiro en B6 (M2) junto
-con las comparaciones en vivo: las constantes son lo que queda de referencia. `previsualizar` se
-compara contra una copia textual de su aritmetica anterior y contra los valores del Speech original
-congelados en HEAD.
+Se compara contra CONSTANTES congeladas con el codigo viejo (`oro_mowa_mes_congelados.py`): los 6
+mensajes del Speech original (HEAD 3e567d7) y, desde M-B4, un hash POR VERSION de la matriz de
+mensajes (9818e8d, con la v1 todavia viva). Ya no hay codigo v1 en la app: una v1 es un dato (su
+texto de dos partes) que se pasa a v2 con el convertidor CONGELADO de la migracion `d7a3e5b9c241`
+(`tests/speech_congelado.py`). `previsualizar_v2` se compara contra una copia textual de la
+aritmetica de antes y contra los valores del Speech original congelados en HEAD.
 
 Titulares, numeros y textos sinteticos.
 """
 
-from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -25,11 +24,8 @@ from app.core.entities.mowa_mes import (
     RANGOS_SEGMENTO,
     VARIABLE_WHATSAPP,
     CodigoMowaMes,
-    DatosSpeech,
     FaltaWhatsapp,
-    FormatoSpeech,
     MensajeNoGenerable,
-    PartesSegmento,
     Segmento,
 )
 from app.core.entities.texto_enriquecido import PREFIJO_WHATSAPP as PREFIJO_DEL_NUCLEO
@@ -47,9 +43,9 @@ from app.core.services.plataformas.mowa_mes.campana import (
     Exclusion,
     FilaCarga,
     evaluar_producto,
-    huella_speech,
 )
 from app.core.services.texto_enriquecido import evaluador
+from app.core.services.texto_enriquecido.funciones.enlaces import enlace_whatsapp
 from app.core.services.texto_enriquecido.gsm7 import (
     a_gsm7,
     caracteres_borrados,
@@ -57,28 +53,35 @@ from app.core.services.texto_enriquecido.gsm7 import (
     largo_gsm7_normalizado,
 )
 from tests.oro_mowa_mes_congelados import (
+    FILAS_COMPARABLES_CON_ESPACIO_ESPECIAL,
+    FILAS_COMPARABLES_CON_MENSAJE,
+    FILAS_COMPARABLES_POR_VERSION,
+    FILAS_COMPARABLES_QUE_CAMBIAN_A_GSM7,
+    FILAS_V2_POR_VERSION,
+    HASHES_POR_VERSION,
     MATRIZ_CASOS,
     MATRIZ_CASOS_SIN_WHATSAPP,
-    MATRIZ_FILAS_CON_ESPACIO_ESPECIAL,
-    MATRIZ_FILAS_QUE_CAMBIAN_A_GSM7,
-    MATRIZ_HUELLA,
-    MATRIZ_HUELLA_GSM7,
     MENSAJES_DEL_ORIGINAL,
 )
 from tests.oro_mowa_mes_datos import (
     NUMEROS,
     ORIGINAL,
+    SIN_MENSAJE,
     TITULARES,
     TODAS_LAS_VERSIONES,
     VENCIMIENTO,
     VENCIMIENTOS,
     VERSIONES_SINTETICAS,
     WHATSAPP,
+    ConvertidaALaV2,
     huella_de_la_matriz,
     mensajes_de_la_matriz,
 )
+from tests.speech_congelado import a_expresiones, a_v2, huella_del_texto_v1
 
-# --- Huellas (RF-MM-17): fijadas en HEAD 3e567d7 antes de tocar speech.py -------------------
+# --- Huellas del texto v1 (RF-MM-17): fijadas en HEAD 3e567d7 antes de tocar speech.py -----------
+# Son la huella del TEXTO de dos partes (lo que guarda `texto_v1`), no la de la expresion: la app ya
+# no calcula ninguna de las dos formas de v1; `huella_del_texto_v1` es el algoritmo de antes.
 
 HUELLA_DEL_SPEECH_ORIGINAL = "297c227cfdd0bb5e1636e08d4ed6cebab971d724c84223acfdb0cfebc2fcf88a"
 HUELLAS_SINTETICAS = {
@@ -109,27 +112,38 @@ LARGOS_DEL_ORIGINAL = {
     Segmento.DE_91_A_120: (144, None, True),
 }
 
+V2_DEL_ORIGINAL = a_v2(ORIGINAL, "Speech original")
 
-def test_las_huellas_del_speech_original_y_de_las_partes_sinteticas_no_cambian() -> None:
-    assert huella_speech(ORIGINAL) == HUELLA_DEL_SPEECH_ORIGINAL
+
+def _constructor(version, whatsapp):
+    """El constructor de mensajes de una version v1 (un dato) ya convertida a v2."""
+    return speech.ConstructorMensajes(a_v2(version), whatsapp)
+
+
+def _segmentos(version):
+    return [Segmento(p["segmento"]) for p in version]
+
+
+def test_las_huellas_del_texto_v1_del_speech_original_y_de_las_sinteticas_no_cambian() -> None:
+    assert huella_del_texto_v1(ORIGINAL) == HUELLA_DEL_SPEECH_ORIGINAL
     assert set(HUELLAS_SINTETICAS) == set(VERSIONES_SINTETICAS)
     for nombre, version in VERSIONES_SINTETICAS.items():
-        assert huella_speech(version) == HUELLAS_SINTETICAS[nombre], nombre
+        assert huella_del_texto_v1(version) == HUELLAS_SINTETICAS[nombre], nombre
 
 
 # --- Referencias: el camino de antes -----------------------------------------------------------
 
 
-def _previsualizar_de_antes(partes, whatsapp):
+def _previsualizar_de_antes(version, whatsapp):
     """Copia textual de `previsualizar` antes de M1: aritmetica fija de 8 + 10 + texto + enlace."""
-    por_segmento = {p.segmento: p for p in partes}
+    por_segmento = {p["segmento"]: p for p in version}
     largo_enlace = len(PREFIJO_WHATSAPP) + LARGO_NUMERO_WHATSAPP
     resultado = []
     for rango in RANGOS_SEGMENTO:
-        segmento = por_segmento.get(rango.segmento)
-        if segmento is None:
+        partes = por_segmento.get(rango.segmento.value)
+        if partes is None:
             continue
-        texto = segmento.parte_1 + segmento.parte_2
+        texto = partes["parte_1"] + partes["parte_2"]
         cantidad_variables = texto.count(VARIABLE_WHATSAPP)
         # RF-MM-27: la misma aritmetica de antes, con el texto fijo medido ya normalizado a
         # GSM-7 (la elipsis y el euro miden 3; ya no hay extendidos) en lugar de contar caracteres.
@@ -141,36 +155,23 @@ def _previsualizar_de_antes(partes, whatsapp):
             # eran extendidos), y se reemplaza por el enlace de 26
             - cantidad_variables * (largo_gsm7_normalizado(VARIABLE_WHATSAPP) - largo_enlace)
         )
-        ejemplo = None
-        if not cantidad_variables or whatsapp:
-            enlace = speech.enlace_whatsapp(whatsapp) if whatsapp else ""
-            ejemplo = a_gsm7(  # el ejemplo sale como se enviaria (RF-MM-27)
-                "X" * LARGO_TITULAR
-                + segmento.parte_1.replace(VARIABLE_WHATSAPP, enlace)
-                + "dd/mm/yyyy"
-                + segmento.parte_2.replace(VARIABLE_WHATSAPP, enlace)
-            )
-        resultado.append(
-            (rango, cantidad_variables > 0, largo, speech.codigo_por_largo(largo), ejemplo)
-        )
+        resultado.append((rango, cantidad_variables > 0, largo, speech.codigo_por_largo(largo)))
     return tuple(resultado)
 
 
 def _de_ahora(largos):
-    return tuple((x.rango, x.usa_whatsapp, x.largo_maximo, x.codigo, x.ejemplo) for x in largos)
+    return tuple((x.rango, x.usa_whatsapp, x.largo_maximo, x.codigo) for x in largos)
 
 
-# --- Mensajes: byte a byte contra el camino de antes --------------------------------------------
+# --- Mensajes: byte a byte contra lo congelado -------------------------------------------------
 
 
 def test_los_seis_mensajes_del_speech_original_son_los_congelados_en_head() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+    constructor = speech.ConstructorMensajes(V2_DEL_ORIGINAL, WHATSAPP)
 
     obtenidos = {
-        partes.segmento.value: constructor.mensaje_de(
-            partes.segmento, "ZZPRUEBA SINTETICO", VENCIMIENTO
-        )
-        for partes in ORIGINAL
+        e.segmento.value: constructor.mensaje_de(e.segmento, "ZZPRUEBA SINTETICO", VENCIMIENTO)
+        for e in V2_DEL_ORIGINAL.expresiones
     }
 
     # RF-MM-27 (T-MM-B9): el constructor normaliza a GSM-7 como ultimo paso. Lo unico que cambia
@@ -179,67 +180,49 @@ def test_los_seis_mensajes_del_speech_original_son_los_congelados_en_head() -> N
     assert len(MENSAJES_DEL_ORIGINAL) == len(RANGOS_SEGMENTO)
 
 
-def test_toda_la_matriz_de_mensajes_da_la_huella_gsm7_de_la_congelada_en_head() -> None:
-    # Versiones x segmentos x numeros x titulares x vencimientos, en orden estable. La matriz de
-    # 3e567d7 (MATRIZ_HUELLA) es la referencia historica; con RF-MM-27 el constructor entrega cada
-    # mensaje ya normalizado, y su SHA es MATRIZ_HUELLA_GSM7 (la misma matriz con a_gsm7 aplicada).
-    filas = mensajes_de_la_matriz(speech.ConstructorMensajes)
+def _predicado_de_la_campana(fila) -> bool:
+    """Lo que la campana excluye antes de pedir el mensaje (`campana.evaluar_producto`): el titular
+    con `vacia` (None o solo espacios) y la fecha con `is None`."""
+    _, _, _, titular, fecha, _ = fila
+    return vacia(titular) or fecha is None
+
+
+def test_la_matriz_del_v2_convertido_da_los_hashes_congelados_por_version() -> None:
+    # T-MM-C11, M-B4: la matriz (versiones x segmentos x numeros x titulares x vencimientos) del v2
+    # que sale de convertir cada v1. `v2_completa` fija TODAS las filas del v2 (con SIN_MENSAJE
+    # donde falta el dato obligatorio); `v1_comparable` es el hash de la v1 VIVA en 9818e8d, sobre
+    # las filas que la campana si carga: el v2 convertido da en ellas el mismo mensaje, byte a byte.
+    filas = mensajes_de_la_matriz(ConvertidaALaV2)
 
     assert len(filas) == MATRIZ_CASOS
     assert sum(fila[-1] is None for fila in filas) == MATRIZ_CASOS_SIN_WHATSAPP
-    assert huella_de_la_matriz(filas) == MATRIZ_HUELLA_GSM7
+    assert set(HASHES_POR_VERSION) == set(TODAS_LAS_VERSIONES)
+    for nombre, esperado in HASHES_POR_VERSION.items():
+        de_la_version = [f for f in filas if f[0] == nombre]
+        comparables = [f for f in de_la_version if not _predicado_de_la_campana(f)]
+
+        assert len(de_la_version) == FILAS_V2_POR_VERSION, nombre
+        assert len(comparables) == FILAS_COMPARABLES_POR_VERSION, nombre
+        assert huella_de_la_matriz(de_la_version) == esperado["v2_completa"], nombre
+        assert huella_de_la_matriz(comparables) == esperado["v1_comparable"], nombre
 
 
-class _ConvertidaALaV2:
-    """El constructor de una v1 convertida a v2; un dato obligatorio vacio no arma mensaje."""
+def test_lo_que_no_arma_mensaje_es_exactamente_lo_que_la_campana_excluye() -> None:
+    # El titular y la fecha del v2 convertido son obligatorios: sin uno de los dos no arma mensaje.
+    # La campana ya excluye ese producto (`falta_titular` o `falta_vencimiento`) antes de pedirlo,
+    # igual que con la v1. En los dos sentidos, salvo donde falta el WhatsApp (que va antes).
+    filas = mensajes_de_la_matriz(ConvertidaALaV2)
 
-    def __init__(self, version, whatsapp) -> None:
-        convertida = DatosSpeech(
-            "convertida", expresiones=speech.convertir_a_v2(version), formato=FormatoSpeech.V2
-        )
-        self._constructor = speech.ConstructorMensajes(convertida, whatsapp)
-
-    def mensaje_de(self, segmento, titular, vencimiento):
-        try:
-            return self._constructor.mensaje_de(segmento, titular, vencimiento)
-        except MensajeNoGenerable:
-            return SIN_MENSAJE
-
-
-SIN_MENSAJE = "<sin mensaje: dato obligatorio vacio>"
-
-
-def test_el_v2_convertido_da_el_mismo_mensaje_byte_a_byte_que_el_v1_congelado() -> None:
-    # T-MM-C11, M-B3 (RF-MM-17): la migracion pasa cada v1 a v2 con `convertir_a_v2`. La unica
-    # afirmacion que se agrega al oro: en TODA la matriz, el mensaje del v2 convertido es el mismo,
-    # caracter por caracter (y el mismo error donde falta el WhatsApp), que el del v1 congelado.
-    # Una excepcion, que no es de los bytes: el titular y la fecha del v2 convertido son
-    # obligatorios, asi que con uno de los dos vacio no arma mensaje; en la campana ese producto
-    # ya se excluye (`falta_titular` o `falta_vencimiento`) antes de pedirlo, igual que con la v1.
-    de_la_v1 = mensajes_de_la_matriz(speech.ConstructorMensajes)
-    de_la_v2 = mensajes_de_la_matriz(_ConvertidaALaV2)
-
-    assert len(de_la_v2) == len(de_la_v1) == MATRIZ_CASOS
-    sin_mensaje = [fila for fila in de_la_v2 if fila[-1] == SIN_MENSAJE]
-    # El mismo predicado que la campana (`campana.evaluar_producto`): el titular con `vacia` (None o
-    # solo espacios) y la fecha con `is None`. Se comprueba en los dos sentidos: lo que no arma
-    # mensaje es exactamente lo que la campana excluye (salvo donde falta el WhatsApp, que va antes).
-    for fila in de_la_v2:
-        _, _, _, titular, fecha, mensaje = fila
-        excluye_la_campana = vacia(titular) or fecha is None
+    sin_mensaje = [fila for fila in filas if fila[-1] == SIN_MENSAJE]
+    assert sin_mensaje and len(sin_mensaje) < len(filas)  # el caso existe y casi todo se compara
+    for fila in filas:
+        mensaje = fila[-1]
         if mensaje is not None:  # None: falta el WhatsApp, un error que va antes que el dato
-            assert (mensaje == SIN_MENSAJE) is excluye_la_campana, fila
-    comparables = [
-        (v1, v2) for v1, v2 in zip(de_la_v1, de_la_v2, strict=True) if v2 not in sin_mensaje
-    ]
-    assert len(comparables) == MATRIZ_CASOS - len(sin_mensaje)
-    assert sin_mensaje and comparables  # el caso existe y la mayoria de la matriz se compara
-    for v1, v2 in comparables:
-        assert v2 == v1, (v1, v2)  # el mensaje, byte a byte (o None donde falta el WhatsApp)
+            assert (mensaje == SIN_MENSAJE) is _predicado_de_la_campana(fila), fila
 
 
 def test_el_mensaje_del_speech_original_conserva_su_texto_conocido() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+    constructor = speech.ConstructorMensajes(V2_DEL_ORIGINAL, WHATSAPP)
 
     assert constructor.mensaje_de(Segmento.DE_1_A_8, "ZZPRUEBA SINTETICO", VENCIMIENTO) == a_gsm7(
         "ZZPRUEBA Caja Cusco te informa que tu cuota venció el 05/09/2026, acércate a pagar"
@@ -251,58 +234,49 @@ def test_el_mensaje_del_speech_original_conserva_su_texto_conocido() -> None:
 
 
 def test_los_segmentos_con_whatsapp_sin_numero_quedan_sin_compilar() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, None)
+    constructor = speech.ConstructorMensajes(V2_DEL_ORIGINAL, None)
 
-    con_whatsapp = {p.segmento for p in ORIGINAL if speech.usa_whatsapp(p)}
+    con_whatsapp = {
+        Segmento(p["segmento"])
+        for p in ORIGINAL
+        if VARIABLE_WHATSAPP in p["parte_1"] + p["parte_2"]
+    }
     assert con_whatsapp == {Segmento.DE_31_A_60, Segmento.DE_61_A_90, Segmento.DE_91_A_120}
-    for partes in ORIGINAL:
-        assert constructor.requiere_whatsapp_faltante(partes.segmento) == (
-            partes.segmento in con_whatsapp
-        )
-        if partes.segmento in con_whatsapp:
+    for segmento in _segmentos(ORIGINAL):
+        assert constructor.requiere_whatsapp_faltante(segmento) == (segmento in con_whatsapp)
+        if segmento in con_whatsapp:
             with pytest.raises(FaltaWhatsapp) as error:
-                constructor.mensaje_de(partes.segmento, "ZZPRUEBA", VENCIMIENTO)
-            assert error.value.segmentos == (partes.segmento,)
+                constructor.mensaje_de(segmento, "ZZPRUEBA", VENCIMIENTO)
+            assert error.value.segmentos == (segmento,)
 
 
 def test_el_texto_del_usuario_con_corchetes_no_se_interpreta_nunca() -> None:
-    # `problemas_de` rechaza '[@' al guardar; aunque llegara una version asi, el motor la recibe
-    # como texto fijo (la expresion se arma sin pasar por la sintaxis de texto).
-    partes = replace(ORIGINAL[0], parte_1=" [@titular] [@@] [@ ", parte_2=" [@")
-    constructor = speech.ConstructorMensajes((partes,), WHATSAPP)
+    # Aunque llegara una version asi, el motor la recibe como texto fijo (la expresion se arma sin
+    # pasar por la sintaxis de texto).
+    partes = {**ORIGINAL[0], "parte_1": " [@titular] [@@] [@ ", "parte_2": " [@"}
+    constructor = _constructor((partes,), WHATSAPP)
 
-    mensaje = constructor.mensaje_de(partes.segmento, "ZZPRUEBA", VENCIMIENTO)
+    mensaje = constructor.mensaje_de(Segmento(partes["segmento"]), "ZZPRUEBA", VENCIMIENTO)
 
     # y los corchetes salen como parentesis al normalizar (RF-MM-27)
     assert mensaje == "ZZPRUEBA (@titular) (@@) (@ 05/09/2026 (@"
 
 
-def test_problemas_de_sigue_rechazando_la_referencia_a_campos() -> None:
-    for texto in ("[@x]", " [@", "a[@@]b", "[titular] [fecha] [@"):
-        version = DatosSpeech("con referencia", tuple(replace(p, parte_2=texto) for p in ORIGINAL))
-
-        problemas = speech.problemas_de(version)
-
-        assert {(p.segmento, p.campo) for p in problemas} == {
-            (p.segmento, "parte_2") for p in ORIGINAL
-        }
-
-
-def test_un_titular_en_blanco_no_llega_al_mensaje_y_si_llegara_el_motor_lo_da_por_vacio() -> None:
+def test_un_titular_en_blanco_no_arma_mensaje_en_el_v2_convertido() -> None:
     # Camino real: campana.py excluye un titular en blanco (falta_titular) antes de armar el
-    # mensaje. Solo si se llamara directo, el motor lo trata como vacio (D10) en lugar de conservar
-    # los espacios como hacia `titular[:8]`.
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+    # mensaje. Solo si se llamara directo, el titular obligatorio lanza en lugar de dejar un hueco.
+    constructor = speech.ConstructorMensajes(V2_DEL_ORIGINAL, WHATSAPP)
 
-    mensaje = constructor.mensaje_de(Segmento.DE_1_A_8, "   ", VENCIMIENTO)
+    with pytest.raises(MensajeNoGenerable) as error:
+        constructor.mensaje_de(Segmento.DE_1_A_8, "   ", VENCIMIENTO)
 
-    assert mensaje.startswith(a_gsm7(ORIGINAL[1].parte_1))  # normalizada (RF-MM-27)
+    assert error.value.segmento is Segmento.DE_1_A_8
 
 
 def test_un_whatsapp_invalido_no_sale_como_un_sms_sin_enlace_sino_como_error() -> None:
     # La configuracion y la campana validan el numero (RF-02) antes de construir. Si uno invalido
     # llegara igual, el motor lo informa y el constructor lanza: no sale un SMS sin enlace en silencio.
-    constructor = speech.ConstructorMensajes(ORIGINAL, "51900000456")
+    constructor = speech.ConstructorMensajes(V2_DEL_ORIGINAL, "51900000456")
 
     with pytest.raises(MensajeNoGenerable) as error:
         constructor.mensaje_de(Segmento.DE_31_A_60, "ZZPRUEBA", VENCIMIENTO)
@@ -316,7 +290,7 @@ def test_un_whatsapp_invalido_no_sale_como_un_sms_sin_enlace_sino_como_error() -
 
 
 def test_un_segmento_sin_whatsapp_no_se_ve_afectado_por_un_numero_invalido() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, "51900000456")
+    constructor = speech.ConstructorMensajes(V2_DEL_ORIGINAL, "51900000456")
 
     mensaje = constructor.mensaje_de(Segmento.DE_9_A_30, "ZZPRUEBA", VENCIMIENTO)
 
@@ -324,7 +298,7 @@ def test_un_segmento_sin_whatsapp_no_se_ve_afectado_por_un_numero_invalido() -> 
 
 
 def test_un_dato_que_no_es_del_tipo_del_campo_lanza_en_lugar_de_dejar_un_hueco() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+    constructor = speech.ConstructorMensajes(V2_DEL_ORIGINAL, WHATSAPP)
 
     with pytest.raises(MensajeNoGenerable) as error:
         constructor.mensaje_de(Segmento.DE_9_A_30, "ZZPRUEBA", "no es una fecha")
@@ -332,34 +306,41 @@ def test_un_dato_que_no_es_del_tipo_del_campo_lanza_en_lugar_de_dejar_un_hueco()
     assert error.value.codigos == (CodigoTexto.NO_ES_FECHA,)
 
 
-def test_los_datos_validos_y_los_vacios_no_lanzan() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+def test_los_datos_validos_no_lanzan_y_los_vacios_si() -> None:
+    constructor = speech.ConstructorMensajes(V2_DEL_ORIGINAL, WHATSAPP)
 
     for titular in TITULARES:
         for vencimiento in VENCIMIENTOS:
-            constructor.mensaje_de(Segmento.DE_31_A_60, titular, vencimiento)
+            if vacia(titular) or vencimiento is None:
+                with pytest.raises(MensajeNoGenerable):
+                    constructor.mensaje_de(Segmento.DE_31_A_60, titular, vencimiento)
+            else:
+                constructor.mensaje_de(Segmento.DE_31_A_60, titular, vencimiento)
 
 
-def test_partes_muy_largas_y_con_muchos_whatsapp_no_topan_con_los_limites_del_motor() -> None:
-    parte_1 = ("x" * 40 + VARIABLE_WHATSAPP) * 300  # 300 variables y 12 000 caracteres de texto
-    parte_2 = "y" * 20_000
-    partes = PartesSegmento(Segmento.DE_9_A_30, parte_1, parte_2)
-    constructor = speech.ConstructorMensajes((partes,), WHATSAPP)
+def test_partes_largas_y_con_muchos_whatsapp_caben_en_los_limites_del_motor() -> None:
+    # 90 variables (180 nodos de los 200 que permite RF-48) y un literal de 4 000 caracteres (de
+    # 5 000). Pasados los limites, la v2 convertida se rechaza con `limite_excedido`, como cualquier
+    # v2; la v1 de antes tenia limites propios, mas holgados, que ya no existen (M-B4).
+    parte_1 = ("x" * 40 + VARIABLE_WHATSAPP) * 90
+    parte_2 = "y" * 4_000
+    partes = {"segmento": Segmento.DE_9_A_30.value, "parte_1": parte_1, "parte_2": parte_2}
+    constructor = _constructor((partes,), WHATSAPP)
 
-    mensaje = constructor.mensaje_de(partes.segmento, "ZZPRUEBA", VENCIMIENTO)
+    mensaje = constructor.mensaje_de(Segmento.DE_9_A_30, "ZZPRUEBA", VENCIMIENTO)
 
-    enlace = speech.enlace_whatsapp(WHATSAPP)
+    enlace = enlace_whatsapp(WHATSAPP)
     assert mensaje == (
         "ZZPRUEBA"
-        + partes.parte_1.replace(VARIABLE_WHATSAPP, enlace)
+        + parte_1.replace(VARIABLE_WHATSAPP, enlace)
         + VENCIMIENTO.strftime("%d/%m/%Y")
-        + partes.parte_2
+        + parte_2
     )
-    largo = speech.previsualizar((partes,), WHATSAPP)[0]
+    largo = speech.previsualizar_v2(a_expresiones((partes,)), WHATSAPP)[0]
     assert largo.largo_maximo == len(mensaje)
 
 
-# --- Previsualizacion: largo, codigo, usa_whatsapp y ejemplo ------------------------------------
+# --- Previsualizacion: largo, codigo y usa_whatsapp ---------------------------------------------
 
 
 @pytest.mark.parametrize("nombre", list(TODAS_LAS_VERSIONES))
@@ -367,13 +348,15 @@ def test_partes_muy_largas_y_con_muchos_whatsapp_no_topan_con_los_limites_del_mo
 def test_previsualizar_entero_es_identico_al_de_antes(nombre, whatsapp) -> None:
     version = TODAS_LAS_VERSIONES[nombre]
 
-    ahora = _de_ahora(speech.previsualizar(version, whatsapp))
+    ahora = _de_ahora(speech.previsualizar_v2(a_expresiones(version), whatsapp))
 
     assert ahora == _previsualizar_de_antes(version, whatsapp)
 
 
 def test_previsualizar_el_speech_original_da_los_valores_congelados_en_head() -> None:
-    largos = {x.rango.segmento: x for x in speech.previsualizar(ORIGINAL, WHATSAPP)}
+    largos = {
+        x.rango.segmento: x for x in speech.previsualizar_v2(V2_DEL_ORIGINAL.expresiones, WHATSAPP)
+    }
 
     assert {
         segmento: (x.largo_maximo, x.codigo, x.usa_whatsapp) for segmento, x in largos.items()
@@ -383,18 +366,18 @@ def test_previsualizar_el_speech_original_da_los_valores_congelados_en_head() ->
 
 def test_el_largo_previsto_es_el_del_mensaje_mas_largo_que_se_construye() -> None:
     for nombre, version in TODAS_LAS_VERSIONES.items():
-        constructor = speech.ConstructorMensajes(version, WHATSAPP)
-        for largo in speech.previsualizar(version, WHATSAPP):
+        constructor = _constructor(version, WHATSAPP)
+        for largo in speech.previsualizar_v2(a_expresiones(version), WHATSAPP):
             mensaje = constructor.mensaje_de(largo.rango.segmento, "12345678", date(2026, 12, 31))
             assert largo.largo_maximo == largo_gsm7(mensaje), (nombre, largo.rango.segmento)
 
 
-def _con_parte_2(largo_total: int) -> tuple[PartesSegmento, ...]:
+def _con_parte_2(largo_total: int):
     # mensaje = titular 8 + parte 1 + fecha 10 + parte 2, en el segmento 1 a 8 (sin whatsapp)
     base = ORIGINAL[1]
-    relleno = "x" * (largo_total - LARGO_TITULAR - len(base.parte_1) - LARGO_VENCIMIENTO)
+    relleno = "x" * (largo_total - LARGO_TITULAR - len(base["parte_1"]) - LARGO_VENCIMIENTO)
     return tuple(
-        replace(p, parte_2=relleno) if p.segmento is base.segmento else p for p in ORIGINAL
+        {**p, "parte_2": relleno} if p["segmento"] == base["segmento"] else p for p in ORIGINAL
     )
 
 
@@ -412,10 +395,10 @@ def _con_parte_2(largo_total: int) -> tuple[PartesSegmento, ...]:
 def test_los_bordes_de_150_y_160_por_previsualizar_y_por_el_mensaje(largo, codigo) -> None:
     version = _con_parte_2(largo)
 
-    previsto = {x.rango.segmento: x for x in speech.previsualizar(version, WHATSAPP)}[
-        Segmento.DE_1_A_8
-    ]
-    fila = _evaluar(speech.ConstructorMensajes(version, WHATSAPP))
+    previsto = {
+        x.rango.segmento: x for x in speech.previsualizar_v2(a_expresiones(version), WHATSAPP)
+    }[Segmento.DE_1_A_8]
+    fila = _evaluar(_constructor(version, WHATSAPP))
 
     assert (previsto.largo_maximo, previsto.codigo) == (largo, codigo)
     if codigo is CodigoMowaMes.MENSAJE_EXCEDE_160:
@@ -450,7 +433,7 @@ def _evaluar(constructor, **cambios):
 
 @pytest.mark.parametrize("titular", [None, "", "   ", "\t\n"])
 def test_un_titular_vacio_o_en_blanco_se_excluye_antes_del_mensaje(titular) -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+    constructor = speech.ConstructorMensajes(V2_DEL_ORIGINAL, WHATSAPP)
 
     assert _evaluar(constructor, titular=titular) == Exclusion(
         "000000000000000001", CodigoMowaMes.FALTA_TITULAR
@@ -458,7 +441,7 @@ def test_un_titular_vacio_o_en_blanco_se_excluye_antes_del_mensaje(titular) -> N
 
 
 def test_un_vencimiento_vacio_se_excluye_despues_del_titular() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+    constructor = speech.ConstructorMensajes(V2_DEL_ORIGINAL, WHATSAPP)
 
     assert _evaluar(constructor, fecha_vencimiento_cuota=None) == Exclusion(
         "000000000000000001", CodigoMowaMes.FALTA_VENCIMIENTO
@@ -469,7 +452,7 @@ def test_un_vencimiento_vacio_se_excluye_despues_del_titular() -> None:
 
 
 def test_la_falta_de_whatsapp_va_despues_del_titular_y_del_vencimiento() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, None)
+    constructor = speech.ConstructorMensajes(V2_DEL_ORIGINAL, None)
     # 45 dias de atraso: segmento 31 a 60, que usa [whatsapp]
     con_whatsapp = {"dias_atraso": 45}
 
@@ -484,16 +467,16 @@ def test_la_falta_de_whatsapp_va_despues_del_titular_y_del_vencimiento() -> None
 
 
 def test_una_fila_cargada_lleva_el_mensaje_del_speech_con_titular_de_8_y_fecha() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+    constructor = speech.ConstructorMensajes(V2_DEL_ORIGINAL, WHATSAPP)
 
     fila = _evaluar(constructor, dias_atraso=45, titular="  Peña Ruiz Jose")
 
-    enlace = speech.enlace_whatsapp(WHATSAPP)
+    enlace = enlace_whatsapp(WHATSAPP)
     esperado = (  # titular de 8 caracteres, tal cual (con sus espacios), y la fecha dd/mm/aaaa
         "  Peña R"
-        + ORIGINAL[3].parte_1.replace(VARIABLE_WHATSAPP, enlace)
+        + ORIGINAL[3]["parte_1"].replace(VARIABLE_WHATSAPP, enlace)
         + "05/09/2026"
-        + ORIGINAL[3].parte_2.replace(VARIABLE_WHATSAPP, enlace)
+        + ORIGINAL[3]["parte_2"].replace(VARIABLE_WHATSAPP, enlace)
     )
     assert fila.segmento is Segmento.DE_31_A_60
     assert fila.mensaje == a_gsm7(esperado)  # el titular "Peña" sale "Pena" (RF-MM-27)
@@ -511,7 +494,7 @@ def test_el_prefijo_de_whatsapp_tiene_un_solo_dueno_y_mide_26_con_el_numero() ->
     assert PREFIJO_WHATSAPP == "https://wa.me/+51"
     assert len(PREFIJO_WHATSAPP) + LARGO_NUMERO_WHATSAPP == 26
     assert LARGO_NUMERO_WHATSAPP == enlaces.LARGO_TELEFONO
-    assert speech.enlace_whatsapp(WHATSAPP) == "https://wa.me/+51900000123"
+    assert enlace_whatsapp(WHATSAPP) == "https://wa.me/+51900000123"
 
 
 def test_la_cota_de_enlace_whatsapp_con_el_prefijo_por_defecto_es_26() -> None:
@@ -523,19 +506,28 @@ def test_la_cota_de_enlace_whatsapp_con_el_prefijo_por_defecto_es_26() -> None:
     assert len(compilada.evaluar({"telefono": WHATSAPP}).texto) == 26
 
 
-# --- La expresion de un segmento -----------------------------------------------------------------
+# --- La expresion de un segmento: el convertidor congelado ---------------------------------------
+# La conversion de una v1 ya no esta en la app: vive en la migracion `d7a3e5b9c241`, congelada. Se
+# prueba aqui su resultado sobre unos textos (la comparacion con 200 juegos esta en
+# `test_mowa_mes_speech_solo_v2_migracion.py`).
 
-_TITULAR = NodoVariable("titular", (LlamadaFuncion("primeros", (8,)),))
+# titular y fecha son obligatorios en el v2 convertido (M-B3): sin ellos no hay mensaje
+_TITULAR = NodoVariable("titular", (LlamadaFuncion("primeros", (8,)),), obligatoria=True)
 _FECHA = NodoVariable(
-    "fecha_vencimiento_cuota", (LlamadaFuncion("formato_fecha", ("dd/mm/aaaa",)),)
+    "fecha_vencimiento_cuota",
+    (LlamadaFuncion("formato_fecha", ("dd/mm/aaaa",)),),
+    obligatoria=True,
 )
 _ENLACE = NodoVariable("whatsapp_contacto", (LlamadaFuncion("enlace_whatsapp"),))
 
 
-def test_cada_segmento_se_convierte_a_una_expresion_en_orden() -> None:
-    partes = PartesSegmento(Segmento.DE_31_A_60, " a [whatsapp] b ", " c [whatsapp][whatsapp] ")
+def _expresion_de(segmento: Segmento, parte_1: str, parte_2: str) -> Expresion:
+    parte = {"segmento": segmento.value, "parte_1": parte_1, "parte_2": parte_2}
+    return a_expresiones((parte,))[0].expresion
 
-    expresion = speech.expresion_de(partes)
+
+def test_cada_segmento_se_convierte_a_una_expresion_en_orden() -> None:
+    expresion = _expresion_de(Segmento.DE_31_A_60, " a [whatsapp] b ", " c [whatsapp][whatsapp] ")
 
     assert expresion == Expresion(
         (
@@ -553,23 +545,21 @@ def test_cada_segmento_se_convierte_a_una_expresion_en_orden() -> None:
 
 
 def test_una_parte_vacia_no_deja_nodos_de_texto_vacios() -> None:
-    expresion = speech.expresion_de(PartesSegmento(Segmento.PREVENTIVA, "", ""))
+    expresion = _expresion_de(Segmento.PREVENTIVA, "", "")
 
     assert expresion == Expresion((_TITULAR, _FECHA))
 
 
 def test_el_espacio_de_los_extremos_y_los_corchetes_sueltos_se_conservan_en_el_texto_fijo() -> None:
-    partes = PartesSegmento(Segmento.PREVENTIVA, "  [ ]  [whatsapp ", "[whatsapp]x]")
-
-    expresion = speech.expresion_de(partes)
+    expresion = _expresion_de(Segmento.PREVENTIVA, "  [ ]  [whatsapp ", "[whatsapp]x]")
 
     assert expresion.nodos[1] == NodoTexto("  [ ]  [whatsapp ")
     assert expresion.nodos[-2:] == (_ENLACE, NodoTexto("x]"))
 
 
 def test_la_expresion_valida_contra_las_variables_del_mensaje() -> None:
-    for partes in (*ORIGINAL, *VERSIONES_SINTETICAS["corchetes_sueltos"]):
-        compilada = evaluador.compilar(speech.expresion_de(partes), speech.VARIABLES_DEL_MENSAJE)
+    for e in (*a_expresiones(ORIGINAL), *a_expresiones(VERSIONES_SINTETICAS["corchetes_sueltos"])):
+        compilada = evaluador.compilar(e.expresion, speech.VARIABLES_DEL_MENSAJE)
 
         assert compilada.cota is not None
         assert set(compilada.variables) <= {
@@ -580,7 +570,9 @@ def test_la_expresion_valida_contra_las_variables_del_mensaje() -> None:
 
 
 def test_el_motor_no_informa_problemas_con_un_whatsapp_valido() -> None:
-    compilada = evaluador.compilar(speech.expresion_de(ORIGINAL[3]), speech.VARIABLES_DEL_MENSAJE)
+    compilada = evaluador.compilar(
+        a_expresiones(ORIGINAL)[3].expresion, speech.VARIABLES_DEL_MENSAJE
+    )
     contexto = {
         "titular": "ZZPRUEBA",
         "fecha_vencimiento_cuota": VENCIMIENTO,
@@ -614,7 +606,7 @@ class ConstructorEspia(speech.ConstructorMensajes):
 
 @pytest.mark.parametrize("titular", [None, "", "   ", "\t\n "])
 def test_un_titular_vacio_o_en_blanco_no_llega_nunca_a_pedir_el_mensaje(titular) -> None:
-    constructor = ConstructorEspia(ORIGINAL, WHATSAPP)
+    constructor = ConstructorEspia(V2_DEL_ORIGINAL, WHATSAPP)
 
     resultado = _evaluar(constructor, titular=titular)
 
@@ -623,7 +615,7 @@ def test_un_titular_vacio_o_en_blanco_no_llega_nunca_a_pedir_el_mensaje(titular)
 
 
 def test_un_vencimiento_vacio_no_llega_nunca_a_pedir_el_mensaje() -> None:
-    constructor = ConstructorEspia(ORIGINAL, WHATSAPP)
+    constructor = ConstructorEspia(V2_DEL_ORIGINAL, WHATSAPP)
 
     resultado = _evaluar(constructor, fecha_vencimiento_cuota=None)
 
@@ -632,7 +624,7 @@ def test_un_vencimiento_vacio_no_llega_nunca_a_pedir_el_mensaje() -> None:
 
 
 def test_solo_un_producto_completo_pide_el_mensaje_y_lo_pide_una_vez() -> None:
-    constructor = ConstructorEspia(ORIGINAL, WHATSAPP)
+    constructor = ConstructorEspia(V2_DEL_ORIGINAL, WHATSAPP)
 
     resultado = _evaluar(constructor, dias_atraso=45)
 
@@ -641,7 +633,7 @@ def test_solo_un_producto_completo_pide_el_mensaje_y_lo_pide_una_vez() -> None:
 
 
 def test_sin_whatsapp_el_segmento_que_lo_usa_tampoco_pide_el_mensaje() -> None:
-    constructor = ConstructorEspia(ORIGINAL, None)
+    constructor = ConstructorEspia(V2_DEL_ORIGINAL, None)
 
     resultado = _evaluar(constructor, dias_atraso=45)
 
@@ -663,34 +655,37 @@ class _ConstructorCrudo(speech.ConstructorMensajes):
     def mensaje(self, segmento, contexto):
         if segmento in self._sin_whatsapp:
             raise FaltaWhatsapp((segmento,))
-        return self._compiladas[segmento].evaluar(contexto).texto
+        resultado = self._compiladas[segmento].evaluar(contexto)
+        if resultado.problemas:
+            raise MensajeNoGenerable(segmento, resultado.problemas)
+        return resultado.texto
 
 
-def _compilar_como_b9(partes: PartesSegmento):
+def _compilar_como_b9(e):
     """El segmento tal como lo armara MOWA MES con GSM-7 (T-MM-B9): la expresion de siempre, cruda
     (sin `a_gsm7` en las variables), compilada con `medida=largo_gsm7_normalizado`; despues se
     evalua y `a_gsm7` se aplica al texto ya evaluado."""
     return evaluador.compilar(
-        speech.expresion_de(partes),
+        e.expresion,
         speech.VARIABLES_DEL_MENSAJE,
         constantes={speech.VARIABLE_CONTACTO: WHATSAPP},
         medida=largo_gsm7_normalizado,
     )
 
 
-def _mensaje_como_b9(partes: PartesSegmento, fila: dict) -> str:
-    return a_gsm7(_compilar_como_b9(partes).evaluar(fila).texto)
+def _mensaje_como_b9(e, fila: dict) -> str:
+    return a_gsm7(_compilar_como_b9(e).evaluar(fila).texto)
 
 
 def test_los_seis_mensajes_normalizados_son_a_gsm7_de_los_congelados() -> None:
     fila = {"titular": "ZZPRUEBA SINTETICO", "fecha_vencimiento_cuota": VENCIMIENTO}
 
-    obtenidos = {partes.segmento.value: _mensaje_como_b9(partes, fila) for partes in ORIGINAL}
+    obtenidos = {e.segmento.value: _mensaje_como_b9(e, fila) for e in V2_DEL_ORIGINAL.expresiones}
 
     assert obtenidos == {s: a_gsm7(m) for s, m in MENSAJES_DEL_ORIGINAL.items()}
     # y lo que cambia es solo la tilde: ni un caracter de mas ni de menos
     assert obtenidos["1_a_8"].endswith("a traves de Wayki app.")
-    assert "venci\u00f3" not in obtenidos["1_a_8"] and "vencio el 05/09/2026" in obtenidos["1_a_8"]
+    assert "venció" not in obtenidos["1_a_8"] and "vencio el 05/09/2026" in obtenidos["1_a_8"]
     assert "Mas INFO por https://wa.me/+51900000123" in obtenidos["61_a_90"]
 
 
@@ -702,36 +697,50 @@ def test_normalizar_el_speech_original_no_borra_nada_y_no_cambia_ningun_largo() 
 
 
 def test_la_cota_del_speech_original_en_unidades_gsm7_es_la_de_siempre() -> None:
-    cotas = {p.segmento: _compilar_como_b9(p).cota for p in ORIGINAL}
+    cotas = {e.segmento: _compilar_como_b9(e).cota for e in V2_DEL_ORIGINAL.expresiones}
 
     esperadas = {segmento: largo for segmento, (largo, _, _) in LARGOS_DEL_ORIGINAL.items()}
     assert cotas == esperadas
     assert cotas[Segmento.DE_9_A_30] == 156  # sigue pasando de 150 (RF-MM-19)
-    sin_normalizar = {p.segmento: speech.compilar_segmento(p, WHATSAPP).cota for p in ORIGINAL}
+    sin_normalizar = {
+        e.segmento: evaluador.compilar(
+            e.expresion,
+            speech.VARIABLES_DEL_MENSAJE,
+            constantes={speech.VARIABLE_CONTACTO: WHATSAPP},
+        ).cota
+        for e in V2_DEL_ORIGINAL.expresiones
+    }
     assert cotas == sin_normalizar
 
 
-def test_toda_la_matriz_normalizada_da_la_huella_gsm7() -> None:
-    filas = mensajes_de_la_matriz(_ConstructorCrudo)
-    normalizadas = [[*f[:-1], None if f[-1] is None else a_gsm7(f[-1])] for f in filas]
+def test_lo_que_entrega_mowa_mes_es_la_matriz_cruda_con_a_gsm7_aplicada() -> None:
+    crudas = mensajes_de_la_matriz(lambda v, w: ConvertidaALaV2(v, w, _ConstructorCrudo))
+    normalizadas = [
+        [*f[:-1], f[-1] if f[-1] in (None, SIN_MENSAJE) else a_gsm7(f[-1])] for f in crudas
+    ]
 
-    assert huella_de_la_matriz(filas) == MATRIZ_HUELLA  # la de 3e567d7, intacta
-    assert huella_de_la_matriz(normalizadas) == MATRIZ_HUELLA_GSM7
-    assert sum(a != b for a, b in zip(filas, normalizadas, strict=True)) == (
-        MATRIZ_FILAS_QUE_CAMBIAN_A_GSM7
-    )
-    # y lo que entrega MOWA MES es exactamente esa matriz normalizada
-    assert mensajes_de_la_matriz(speech.ConstructorMensajes) == normalizadas
+    assert mensajes_de_la_matriz(ConvertidaALaV2) == normalizadas
+    # y la normalizacion es la unica diferencia: cambia el texto de muchas filas, no su cantidad
+    assert len(crudas) == len(normalizadas) == MATRIZ_CASOS
+    assert sum(a != b for a, b in zip(crudas, normalizadas, strict=True)) > 0
 
 
-def test_las_filas_que_cambian_por_los_espacios_son_las_de_la_tabulacion_sintetica() -> None:
-    filas = mensajes_de_la_matriz(_ConstructorCrudo)
+def _tiene_espacio_especial(mensaje: str) -> bool:
+    """Un espacio que no es el normal y que `a_gsm7` pasa a un espacio normal."""
+    return any(c != " " and c.isspace() and a_gsm7(c) == " " for c in mensaje)
 
-    # El Speech original no tiene espacios especiales ni tabulacion.
-    assert not any(
-        c == "\t" or c.isspace() and c != " " for p in ORIGINAL for c in p.parte_1 + p.parte_2
-    )
-    con_tabulacion = [f for f in filas if f[-1] is not None and "\t" in f[-1]]
-    assert len(con_tabulacion) == MATRIZ_FILAS_CON_ESPACIO_ESPECIAL
-    assert {f[0] for f in con_tabulacion} == {"saltos_de_linea"}  # una version sintetica
-    assert all("\t" not in a_gsm7(f[-1]) and " " in a_gsm7(f[-1]) for f in con_tabulacion)
+
+def test_los_conteos_congelados_de_las_filas_comparables_se_cumplen_sobre_el_v2() -> None:
+    # Congelados en 9818e8d con el v1 vivo (ver oro_mowa_mes_congelados.py): dentro de las filas que
+    # la campana no excluye, cuantas cambian al pasar a GSM-7 y cuantas traen un espacio especial.
+    crudas = mensajes_de_la_matriz(lambda v, w: ConvertidaALaV2(v, w, _ConstructorCrudo))
+    comparables = [f for f in crudas if not _predicado_de_la_campana(f) and f[-1] is not None]
+
+    assert len(comparables) == FILAS_COMPARABLES_CON_MENSAJE
+    assert sum(a_gsm7(f[-1]) != f[-1] for f in comparables) == FILAS_COMPARABLES_QUE_CAMBIAN_A_GSM7
+    con_especial = [f for f in comparables if _tiene_espacio_especial(f[-1])]
+    assert len(con_especial) == FILAS_COMPARABLES_CON_ESPACIO_ESPECIAL
+    assert {f[0] for f in con_especial} == {"saltos_de_linea"}  # una version sintetica
+    assert all("	" not in a_gsm7(f[-1]) for f in con_especial)
+    # el Speech original no tiene espacios especiales ni tabulacion
+    assert not any(_tiene_espacio_especial(p["parte_1"] + p["parte_2"]) for p in ORIGINAL)

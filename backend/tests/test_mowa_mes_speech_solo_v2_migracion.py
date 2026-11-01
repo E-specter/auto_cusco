@@ -1,13 +1,16 @@
 """La migracion que deja todas las versiones de speech en v2, sin base (T-MM-C11, M-B3; RF-MM-17).
 
-La migracion no importa nada de `app`: lleva su propia copia congelada de la conversion. Estas
-pruebas la comparan contra la de la aplicacion (`speech.convertir_a_v2`), fijan el SQL del upgrade y
-del downgrade, y simulan sobre un doble de la conexion lo que hace con las filas. Datos sinteticos;
-las partes generadas usan una semilla fija.
+La migracion no importa nada de `app`: lleva su propia copia congelada de la conversion. Hasta
+M-B3 estas pruebas la comparaban contra la de la aplicacion (`speech.convertir_a_v2`); en M-B4 esa
+funcion se borro con la v1 y la comparacion pasa a ser contra un ORACULO CONGELADO (ver abajo). Las
+pruebas tambien fijan el SQL del upgrade y del downgrade, y simulan sobre un doble de la conexion lo
+que hace con las filas. Datos sinteticos; las partes generadas usan una semilla fija.
 """
 
+import hashlib
 import importlib.util
 import io
+import json
 import random
 from pathlib import Path
 from types import ModuleType
@@ -16,10 +19,8 @@ from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
-from app.adapters.persistence.modelos import MowaMesSpeechVersion
-from app.core.entities.mowa_mes import ExpresionSegmento, PartesSegmento, Segmento
+from app.core.entities.mowa_mes import ExpresionSegmento, Segmento
 from app.core.services.plataformas.mowa_mes.campana import huella_expresiones
-from app.core.services.plataformas.mowa_mes.speech import convertir_a_v2
 from app.core.services.texto_enriquecido.serializacion import expresion_a_dict, expresion_desde_dict
 from tests.test_mowa_mes_speech_v2_postgres import CUERPO_V2 as CUERPO_V2_DE_LAS_PRUEBAS_DE_BASE
 
@@ -54,16 +55,7 @@ def normalizado(cuerpo: list[dict]) -> list[dict]:
     ]
 
 
-def _de_la_app(partes: list[dict]) -> list[dict]:
-    """Lo que hoy da la aplicacion: `convertir_a_v2` y la forma que `_expresiones_a_json` guarda."""
-    objetos = [PartesSegmento(Segmento(p["segmento"]), p["parte_1"], p["parte_2"]) for p in partes]
-    return [
-        {"segmento": e.segmento.value, "expresion": expresion_a_dict(e.expresion)}
-        for e in convertir_a_v2(objetos)
-    ]
-
-
-# --- El convertidor congelado contra el de la aplicacion -----------------------------------------
+# --- El convertidor congelado y su oraculo -------------------------------------------------------
 
 
 def test_el_literal_del_original_es_la_conversion_del_original() -> None:
@@ -80,13 +72,6 @@ def test_la_huella_del_original_convertido_es_la_de_las_campanas_nuevas() -> Non
     assert huella_expresiones(expresiones) == (
         "5b1c556c283ceccd59007114c0da16df3f323ef98b4122d5dc1628b0ef1992b1"
     )
-
-
-def test_el_convertidor_de_la_migracion_da_lo_mismo_que_la_aplicacion_para_el_original() -> None:
-    assert MIGRACION._convertir(SIEMBRA.SPEECH_ORIGINAL) == _de_la_app(
-        list(SIEMBRA.SPEECH_ORIGINAL)
-    )
-    assert MIGRACION.EXPRESIONES_ORIGINAL == _de_la_app(list(SIEMBRA.SPEECH_ORIGINAL))
 
 
 _TROZOS = [
@@ -118,13 +103,283 @@ def _juego_sintetico(azar: random.Random) -> list[dict]:
     return [{"segmento": s, "parte_1": parte(), "parte_2": parte()} for s in SEGMENTOS]
 
 
-def test_el_convertidor_da_lo_mismo_que_la_aplicacion_en_200_juegos_sinteticos() -> None:
-    azar = random.Random(20261031)
+# El ORACULO del convertidor (T-MM-C11, M-B4). Hasta M-B3 el convertidor congelado de la migracion
+# se comparaba, en 200 juegos sinteticos y en vivo, con `speech.convertir_a_v2` de la aplicacion. Al
+# borrarse esa funcion, la salida de entonces quedo congelada UNA vez, con el codigo v1 vivo en el
+# commit 9818e8d, y es lo que se compara ahora:
+#
+# - `HUELLA_DEL_ORACULO`: SHA-256 de la salida de `convertir_a_v2` (cada segmento como lo guarda
+#   la app: `{"segmento", "expresion": expresion_a_dict(..)}`) para los 200 juegos de
+#   `_juego_sintetico` con la semilla 20261031, serializada con
+#   `json.dumps([salida de cada juego, ...], ensure_ascii=False, sort_keys=True,
+#   separators=(",", ":"))`, en UTF-8.
+# - `CASOS_DE_BORDE`: la salida completa de 8 casos (un solo segmento, `31_a_60`) para leerla a ojo.
+#
+# Para regenerarlos: en un `git worktree add` de 9818e8d, desde `backend/`, correr la misma
+# generacion (`_juego_sintetico` y `random.Random(20261031)`) aplicando `speech.convertir_a_v2` a
+# `PartesSegmento(Segmento(..), parte_1, parte_2)`; nunca con el codigo actual.
+SEMILLA_DEL_ORACULO = 20261031
+HUELLA_DEL_ORACULO = "0330d59aab105fcc5fac3ce621cb4478a1845126baf73f42e2a3570ed373f18e"
 
-    for _ in range(200):
-        juego = _juego_sintetico(azar)
+CASOS_DE_BORDE = [
+    (
+        "vacio",
+        "",
+        "",
+        [
+            {
+                "segmento": "31_a_60",
+                "expresion": {
+                    "nodos": [
+                        {
+                            "tipo": "variable",
+                            "nombre": "titular",
+                            "funciones": [{"nombre": "primeros", "args": [8]}],
+                            "obligatoria": True,
+                        },
+                        {
+                            "tipo": "variable",
+                            "nombre": "fecha_vencimiento_cuota",
+                            "funciones": [{"nombre": "formato_fecha", "args": ["dd/mm/aaaa"]}],
+                            "obligatoria": True,
+                        },
+                    ]
+                },
+            }
+        ],
+    ),
+    (
+        "solo espacios",
+        "  ",
+        " ",
+        [
+            {
+                "segmento": "31_a_60",
+                "expresion": {
+                    "nodos": [
+                        {
+                            "tipo": "variable",
+                            "nombre": "titular",
+                            "funciones": [{"nombre": "primeros", "args": [8]}],
+                            "obligatoria": True,
+                        },
+                        {"tipo": "texto", "valor": "  "},
+                        {
+                            "tipo": "variable",
+                            "nombre": "fecha_vencimiento_cuota",
+                            "funciones": [{"nombre": "formato_fecha", "args": ["dd/mm/aaaa"]}],
+                            "obligatoria": True,
+                        },
+                        {"tipo": "texto", "valor": " "},
+                    ]
+                },
+            }
+        ],
+    ),
+    (
+        "un whatsapp",
+        " INFO por [whatsapp]",
+        "",
+        [
+            {
+                "segmento": "31_a_60",
+                "expresion": {
+                    "nodos": [
+                        {
+                            "tipo": "variable",
+                            "nombre": "titular",
+                            "funciones": [{"nombre": "primeros", "args": [8]}],
+                            "obligatoria": True,
+                        },
+                        {"tipo": "texto", "valor": " INFO por "},
+                        {
+                            "tipo": "variable",
+                            "nombre": "whatsapp_contacto",
+                            "funciones": [{"nombre": "enlace_whatsapp", "args": []}],
+                            "obligatoria": False,
+                        },
+                        {
+                            "tipo": "variable",
+                            "nombre": "fecha_vencimiento_cuota",
+                            "funciones": [{"nombre": "formato_fecha", "args": ["dd/mm/aaaa"]}],
+                            "obligatoria": True,
+                        },
+                    ]
+                },
+            }
+        ],
+    ),
+    (
+        "whatsapp doble",
+        "[whatsapp][whatsapp]",
+        " fin",
+        [
+            {
+                "segmento": "31_a_60",
+                "expresion": {
+                    "nodos": [
+                        {
+                            "tipo": "variable",
+                            "nombre": "titular",
+                            "funciones": [{"nombre": "primeros", "args": [8]}],
+                            "obligatoria": True,
+                        },
+                        {
+                            "tipo": "variable",
+                            "nombre": "whatsapp_contacto",
+                            "funciones": [{"nombre": "enlace_whatsapp", "args": []}],
+                            "obligatoria": False,
+                        },
+                        {
+                            "tipo": "variable",
+                            "nombre": "whatsapp_contacto",
+                            "funciones": [{"nombre": "enlace_whatsapp", "args": []}],
+                            "obligatoria": False,
+                        },
+                        {
+                            "tipo": "variable",
+                            "nombre": "fecha_vencimiento_cuota",
+                            "funciones": [{"nombre": "formato_fecha", "args": ["dd/mm/aaaa"]}],
+                            "obligatoria": True,
+                        },
+                        {"tipo": "texto", "valor": " fin"},
+                    ]
+                },
+            }
+        ],
+    ),
+    (
+        "corchetes sueltos",
+        "[ y ] y [@campo]",
+        "[titular]",
+        [
+            {
+                "segmento": "31_a_60",
+                "expresion": {
+                    "nodos": [
+                        {
+                            "tipo": "variable",
+                            "nombre": "titular",
+                            "funciones": [{"nombre": "primeros", "args": [8]}],
+                            "obligatoria": True,
+                        },
+                        {"tipo": "texto", "valor": "[ y ] y [@campo]"},
+                        {
+                            "tipo": "variable",
+                            "nombre": "fecha_vencimiento_cuota",
+                            "funciones": [{"nombre": "formato_fecha", "args": ["dd/mm/aaaa"]}],
+                            "obligatoria": True,
+                        },
+                        {"tipo": "texto", "valor": "[titular]"},
+                    ]
+                },
+            }
+        ],
+    ),
+    (
+        "tilde y euro",
+        "ñandú — €10",
+        "…",
+        [
+            {
+                "segmento": "31_a_60",
+                "expresion": {
+                    "nodos": [
+                        {
+                            "tipo": "variable",
+                            "nombre": "titular",
+                            "funciones": [{"nombre": "primeros", "args": [8]}],
+                            "obligatoria": True,
+                        },
+                        {"tipo": "texto", "valor": "ñandú — €10"},
+                        {
+                            "tipo": "variable",
+                            "nombre": "fecha_vencimiento_cuota",
+                            "funciones": [{"nombre": "formato_fecha", "args": ["dd/mm/aaaa"]}],
+                            "obligatoria": True,
+                        },
+                        {"tipo": "texto", "valor": "…"},
+                    ]
+                },
+            }
+        ],
+    ),
+    (
+        "tabulacion y espacio duro",
+        "a\tb",
+        "1.\xa0Preventiva",
+        [
+            {
+                "segmento": "31_a_60",
+                "expresion": {
+                    "nodos": [
+                        {
+                            "tipo": "variable",
+                            "nombre": "titular",
+                            "funciones": [{"nombre": "primeros", "args": [8]}],
+                            "obligatoria": True,
+                        },
+                        {"tipo": "texto", "valor": "a\tb"},
+                        {
+                            "tipo": "variable",
+                            "nombre": "fecha_vencimiento_cuota",
+                            "funciones": [{"nombre": "formato_fecha", "args": ["dd/mm/aaaa"]}],
+                            "obligatoria": True,
+                        },
+                        {"tipo": "texto", "valor": "1.\xa0Preventiva"},
+                    ]
+                },
+            }
+        ],
+    ),
+    (
+        "texto largo",
+        "x" * 90,
+        "y",
+        [
+            {
+                "segmento": "31_a_60",
+                "expresion": {
+                    "nodos": [
+                        {
+                            "tipo": "variable",
+                            "nombre": "titular",
+                            "funciones": [{"nombre": "primeros", "args": [8]}],
+                            "obligatoria": True,
+                        },
+                        {
+                            "tipo": "texto",
+                            "valor": "x" * 90,
+                        },
+                        {
+                            "tipo": "variable",
+                            "nombre": "fecha_vencimiento_cuota",
+                            "funciones": [{"nombre": "formato_fecha", "args": ["dd/mm/aaaa"]}],
+                            "obligatoria": True,
+                        },
+                        {"tipo": "texto", "valor": "y"},
+                    ]
+                },
+            }
+        ],
+    ),
+]
 
-        assert MIGRACION._convertir(juego) == _de_la_app(juego), juego
+
+def test_el_convertidor_da_la_salida_congelada_en_200_juegos_sinteticos() -> None:
+    azar = random.Random(SEMILLA_DEL_ORACULO)
+    salidas = [MIGRACION._convertir(_juego_sintetico(azar)) for _ in range(200)]
+
+    canonico = json.dumps(salidas, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    assert hashlib.sha256(canonico.encode("utf-8")).hexdigest() == HUELLA_DEL_ORACULO
+
+
+def test_el_convertidor_da_la_salida_congelada_en_los_casos_de_borde() -> None:
+    assert len(CASOS_DE_BORDE) == 8
+    for nombre, parte_1, parte_2, esperado in CASOS_DE_BORDE:
+        partes = [{"segmento": "31_a_60", "parte_1": parte_1, "parte_2": parte_2}]
+
+        assert MIGRACION._convertir(partes) == esperado, nombre
 
 
 def test_lo_que_convierte_la_migracion_lo_lee_la_aplicacion_y_es_una_expresion_valida() -> None:
@@ -242,14 +497,6 @@ def test_en_modo_offline_solo_emite_ddl_no_toca_filas_ni_borra() -> None:
 
         assert "UPDATE mowa_mes_speech_version" not in sql
         assert "DELETE" not in sql and "DROP TABLE" not in sql and "DROP COLUMN" not in sql
-
-
-def test_el_modelo_declara_lo_mismo_que_la_migracion() -> None:
-    tabla = MowaMesSpeechVersion.__table__
-    cheques = {c.name: str(c.sqltext) for c in tabla.constraints if hasattr(c, "sqltext")}
-
-    assert cheques[MIGRACION.CHECK] == MIGRACION.CHECK_NUEVO
-    assert tabla.c["formato"].server_default.arg == "v2"
 
 
 # --- Lo que hace con las filas, sobre un doble de la conexion ------------------------------

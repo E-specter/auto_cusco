@@ -1,12 +1,12 @@
 /**
  * The v2 speech of MOWA MES (docs/motor-texto-enriquecido-interfaz.md §5.6; backend B6): one
- * expression of the rich-text engine per segment, instead of the two fixed parts of v1.
+ * expression of the rich-text engine per segment.
  *
  * What the screen decides from a version, a draft and the API's answers, kept out of the page so it
  * can be tested without a browser. It evaluates nothing and validates nothing: lengths, levels and
  * problems are the backend's; this only says how they read and where they go.
  *
- * v1 is not touched: `mowa-mes.ts` keeps its parts, its levels and its tests as they were.
+ * Every version is one expression per segment (M-B3, M-B4): the two-part v1 has no code left here.
  */
 
 import type { components } from './contrato-api';
@@ -20,7 +20,6 @@ import { estaVacia, type Segmento, type Variante } from './variantes';
 type Esquemas = components['schemas'];
 
 export type ProblemaSpeech = Esquemas['ProblemaSpeechRespuesta'];
-export type BorradorV2 = Esquemas['BorradorV2Respuesta'];
 export type ExpresionSegmentoEntrada = Esquemas['ExpresionSegmentoEntrada'];
 
 const posicion = (segmento: string) => ORDEN_SEGMENTOS.indexOf(segmento as (typeof ORDEN_SEGMENTOS)[number]);

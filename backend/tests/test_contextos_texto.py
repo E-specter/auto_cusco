@@ -190,7 +190,7 @@ def test_la_segmentacion_del_speech_usa_los_dias_ajustados_y_la_tabla_de_mowa_me
 
 def test_el_ejemplo_del_speech_da_el_enlace_de_26_caracteres() -> None:
     variables = {v.nombre: v.tipo for v in SPEECH.variables}
-    compilada = evaluador.compilar(speech.expresion_de(ORIGINAL[3]), variables)
+    compilada = evaluador.compilar(ORIGINAL[3].expresion, variables)
 
     resultado = compilada.evaluar(SPEECH.ejemplo)
 

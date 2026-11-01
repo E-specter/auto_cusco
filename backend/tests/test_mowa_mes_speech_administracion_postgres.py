@@ -81,8 +81,8 @@ def test_renombrar_no_cambia_el_contenido_ni_la_huella(cliente) -> None:
     assert renombrada.status_code == 200
     assert renombrada.json()["nombre"] == f"{PREFIJO}renombrada"
     assert despues.nombre_normalizado == f"{PREFIJO}renombrada".strip().casefold()
-    assert despues.expresiones == antes.expresiones and despues.formato == antes.formato
-    assert despues.partes == antes.partes
+    assert despues.expresiones == antes.expresiones
+    assert despues.texto_v1 == antes.texto_v1
     assert _huella(client, version["id"]) == _huella_de_fila(antes)
 
 
@@ -92,7 +92,7 @@ def _huella(client, speech_id: int) -> str:
 
 
 def _huella_de_fila(fila) -> str:
-    return huella_de(datos_de_fila("", fila.partes, fila.formato, fila.expresiones))
+    return huella_de(datos_de_fila("", fila.expresiones))
 
 
 def test_una_usada_y_el_original_se_renombran_y_la_usada_conserva_su_uso(cliente) -> None:

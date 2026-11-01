@@ -45,7 +45,6 @@ from app.core.entities.mowa_mes import (
     TIPO_CODIGO,
     CampoConfiguracion,
     CodigoMowaMes,
-    FormatoSpeech,
     Programacion,
     Segmento,
     SpeechNoEncontrado,
@@ -356,7 +355,6 @@ class ConsumoLimiteRespuesta(ModeloRespuesta):
 class SpeechCampanaRespuesta(ModeloRespuesta):
     id: int
     nombre: str
-    formato: FormatoSpeech
     huella: str
 
 
@@ -648,7 +646,6 @@ def _previsualizacion(
         speech=SpeechCampanaRespuesta(
             id=armada.speech.id,
             nombre=armada.speech.datos.nombre,
-            formato=armada.speech.datos.formato,
             huella=armada.speech_huella,
         ),
         whatsapp=armada.whatsapp,

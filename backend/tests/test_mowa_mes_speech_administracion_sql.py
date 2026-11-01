@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy.dialects import postgresql
 
 from app.adapters.persistence.repositorio_mowa_mes_postgres import RepositorioMowaMesPostgres
-from app.core.entities.mowa_mes import DatosSpeech, FormatoSpeech
+from app.core.entities.mowa_mes import DatosSpeech
 
 
 class _Resultado:
@@ -105,7 +105,7 @@ def test_renombrar_solo_toca_el_nombre_y_su_clave(repositorio) -> None:
 def test_editar_excluye_a_las_deshabilitadas(repositorio) -> None:
     repo, sentencias = repositorio
 
-    repo.actualizar_speech(7, DatosSpeech("x", formato=FormatoSpeech.V2))
+    repo.actualizar_speech(7, DatosSpeech("x"))
 
     (edicion,) = sentencias
     assert "deshabilitada_en IS NULL" in edicion

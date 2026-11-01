@@ -15,8 +15,6 @@ from app.core.entities.gestiones_digitales import ConfiguracionSupervision, Supe
 from app.core.entities.mowa_mes import (
     CodigoMowaMes,
     DatosSpeech,
-    FormatoSpeech,
-    PartesSegmento,
     Programacion,
     Segmento,
     SpeechNoEncontrado,
@@ -45,21 +43,28 @@ from app.core.services.plataformas.mowa_mes.campana import (
     descripcion_sugerida,
     documento_estandar,
     evaluar_producto,
-    huella_speech,
+    huella_expresiones,
 )
 from app.core.services.plataformas.mowa_mes.reportes import ReportesMowaMesService
 from app.core.services.seleccion_cartera import expresiones
 from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
 from app.core.services.texto_enriquecido.gsm7 import a_gsm7
+from tests.speech_congelado import a_expresiones, a_v2
 from tests.test_gestiones_digitales import PROCEDENCIAS, SUPERVISORES, RepositorioSupervisionFalso
-from tests.test_mowa_mes_speech import ORIGINAL, WHATSAPP, RepositorioMowaMesFalso
+from tests.test_mowa_mes_speech import (
+    DATOS_DEL_ORIGINAL,
+    ORIGINAL,
+    TEXTO_V1_DEL_ORIGINAL,
+    WHATSAPP,
+    RepositorioMowaMesFalso,
+)
 
 MOMENTO = datetime(2026, 9, 13, 15, 0, tzinfo=UTC)  # domingo 13, 10:00 en Lima
 FECHA_CORTE = date(2026, 9, 10)
 ENVIO = datetime(2026, 9, 14, 9, 0)  # sin zona: hora de Lima
 VENCIMIENTO = date(2026, 9, 6)
-HUELLA_ORIGINAL = huella_speech(ORIGINAL)
+HUELLA_ORIGINAL = huella_expresiones(ORIGINAL)
 
 
 def producto(i: int, **cambios) -> dict:
@@ -328,10 +333,15 @@ def test_un_telefono_repetido_no_es_motivo_de_exclusion() -> None:
     assert armada.productos_cargados == 2 and armada.exclusiones == ()
 
 
-def _con_parte_2(largo_total: int) -> list[PartesSegmento]:
-    # mensaje = titular 8 + parte 1 (46) + fecha 10 + parte 2
-    relleno = "x" * (largo_total - 8 - len(ORIGINAL[1].parte_1) - 10)
-    return [replace(p, parte_2=relleno) if p.segmento is Segmento.DE_1_A_8 else p for p in ORIGINAL]
+def _con_parte_2(largo_total: int) -> DatosSpeech:
+    # mensaje = titular 8 + parte 1 (46) + fecha 10 + parte 2 (el texto v1 del original, ya en v2)
+    relleno = "x" * (largo_total - 8 - len(TEXTO_V1_DEL_ORIGINAL[1]["parte_1"]) - 10)
+    return a_v2(
+        [
+            {**p, "parte_2": relleno} if p["segmento"] == Segmento.DE_1_A_8.value else p
+            for p in TEXTO_V1_DEL_ORIGINAL
+        ]
+    )
 
 
 @pytest.mark.parametrize(
@@ -357,7 +367,7 @@ def test_largo_del_mensaje(largo, resultado) -> None:
 
 
 def test_el_segmento_sale_de_los_dias_ajustados_al_envio() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+    constructor = speech.ConstructorMensajes(DATOS_DEL_ORIGINAL, WHATSAPP)
 
     # 4 de atraso al corte y el envio 21 dias despues: 25, segmento 9 a 30.
     fila = evaluar_producto(producto(1), FECHA_CORTE, date(2026, 10, 1), constructor)
@@ -521,10 +531,11 @@ def test_crear_exige_la_huella_del_speech_que_se_previsualizo() -> None:
 
 
 def test_la_huella_cambia_si_cambia_cualquier_parte() -> None:
-    cambiado = [replace(ORIGINAL[0], parte_2=ORIGINAL[0].parte_2 + " ")] + list(ORIGINAL[1:])
+    primero, *resto = TEXTO_V1_DEL_ORIGINAL
+    cambiado = a_expresiones([{**primero, "parte_2": primero["parte_2"] + " "}, *resto])
 
-    assert huella_speech(cambiado) != HUELLA_ORIGINAL
-    assert huella_speech(list(ORIGINAL)) == HUELLA_ORIGINAL
+    assert huella_expresiones(cambiado) != HUELLA_ORIGINAL
+    assert huella_expresiones(tuple(ORIGINAL)) == HUELLA_ORIGINAL
 
 
 def test_una_version_de_speech_elegida_que_no_existe() -> None:
@@ -535,17 +546,18 @@ def test_una_version_de_speech_elegida_que_no_existe() -> None:
 
 
 def _heredada(mowa_mes, nombre: str = "Heredada 92"):
-    """Una v1 como las que ya existian (la 92 del usuario): distinta de la original y sin usar."""
-    partes = tuple(replace(p, parte_2=p.parte_2 + " Heredada.") for p in ORIGINAL)
-    return mowa_mes.crear_speech(DatosSpeech(nombre, partes), None), partes
+    """Una version como las que ya existian (la 92 del usuario): distinta de la original, sin usar.
+    Antes de M-B3 era una v1; hoy es la v2 que salio de convertirla."""
+    expresiones = a_expresiones(
+        [{**p, "parte_2": p["parte_2"] + " Heredada."} for p in TEXTO_V1_DEL_ORIGINAL]
+    )
+    return mowa_mes.crear_speech(DatosSpeech(nombre, expresiones), None), expresiones
 
 
-def test_una_campana_con_una_v1_heredada_que_no_es_la_original_la_usa_y_registra_su_huella() -> (
-    None
-):
+def test_una_campana_con_una_heredada_que_no_es_la_original_la_usa_y_registra_su_huella() -> None:
     servicio, campanas, mowa_mes = armar_servicio([producto(1), producto(2, dias_atraso=40)])
-    heredada, partes = _heredada(mowa_mes)
-    huella = huella_speech(partes)
+    heredada, expresiones = _heredada(mowa_mes)
+    huella = huella_expresiones(expresiones)
     assert huella != HUELLA_ORIGINAL
 
     previa = servicio.previsualizar(peticion(speech_id=heredada.id, speech_huella=huella))
@@ -554,14 +566,13 @@ def test_una_campana_con_una_v1_heredada_que_no_es_la_original_la_usa_y_registra
     armada = campanas.guardadas[creada.id][0]
     assert not previa.errores
     assert (creada.speech_id, creada.speech_nombre) == (heredada.id, "Heredada 92")
-    assert armada.speech_huella == huella  # la de las partes de la heredada, no la de la original
-    assert armada.speech.datos.formato is FormatoSpeech.V1
-    # los mensajes salen de las partes de la heredada
+    assert armada.speech_huella == huella  # la de la heredada, no la de la original
+    # los mensajes salen de la heredada
     mensajes = [f.mensaje for f in campanas.filas_cargadas(creada.id) if not f.supervision]
     assert len(mensajes) == 2 and all(m.endswith(" Heredada.") for m in mensajes)
 
 
-def test_una_v1_heredada_con_la_huella_de_la_original_es_speech_cambiado() -> None:
+def test_una_heredada_con_la_huella_de_la_original_es_speech_cambiado() -> None:
     servicio, campanas, mowa_mes = armar_servicio([producto(1)])
     heredada, _ = _heredada(mowa_mes)
 

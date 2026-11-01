@@ -11,9 +11,7 @@ from app.core.entities.mowa_mes import (
     ConfiguracionMowaMes,
     DatosSpeech,
     ExpresionSegmento,
-    FormatoSpeech,
     NombreDeSpeechRepetido,
-    PartesSegmento,
     Segmento,
     VersionSpeech,
 )
@@ -30,12 +28,6 @@ _RESTRICCION_NOMBRE = "uq_mowa_mes_speech_version_nombre_normalizado"
 _FILA_CONFIGURACION = 1
 
 
-def _partes_a_json(partes: tuple[PartesSegmento, ...]) -> list[dict[str, str]]:
-    return [
-        {"segmento": p.segmento.value, "parte_1": p.parte_1, "parte_2": p.parte_2} for p in partes
-    ]
-
-
 def _expresiones_a_json(expresiones: tuple[ExpresionSegmento, ...]) -> list[dict[str, Any]]:
     return [
         {"segmento": e.segmento.value, "expresion": expresion_a_dict(e.expresion)}
@@ -44,40 +36,18 @@ def _expresiones_a_json(expresiones: tuple[ExpresionSegmento, ...]) -> list[dict
 
 
 def _valores_de_contenido(datos: DatosSpeech) -> dict[str, Any]:
-    """Columnas del contenido: una v1 guarda `partes`; una v2, `expresiones` (y `partes` vacio)."""
-    if datos.formato is FormatoSpeech.V2:
-        return {
-            "formato": FormatoSpeech.V2.value,
-            "partes": [],
-            "expresiones": _expresiones_a_json(datos.expresiones),
-        }
-    return {
-        "formato": FormatoSpeech.V1.value,
-        "partes": _partes_a_json(datos.partes),
-        "expresiones": None,
-    }
+    """Columnas del contenido. `texto_v1` queda en NULL: una version nueva o editada ya no es la
+    v1 que fue (y el downgrade de M-B4 no debe resucitarla)."""
+    return {"texto_v1": None, "expresiones": _expresiones_a_json(datos.expresiones)}
 
 
-def datos_de_fila(
-    nombre: str,
-    partes: list[dict[str, Any]],
-    formato: str,
-    expresiones: list[dict[str, Any]] | None,
-) -> DatosSpeech:
+def datos_de_fila(nombre: str, expresiones: list[dict[str, Any]]) -> DatosSpeech:
     """El contenido de una version tal como esta guardado (lo que la huella y los mensajes leen)."""
-    if formato == FormatoSpeech.V2.value:
-        return DatosSpeech(
-            nombre=nombre,
-            expresiones=tuple(
-                ExpresionSegmento(Segmento(e["segmento"]), expresion_desde_dict(e["expresion"]))
-                for e in expresiones or []
-            ),
-            formato=FormatoSpeech.V2,
-        )
     return DatosSpeech(
         nombre=nombre,
-        partes=tuple(
-            PartesSegmento(Segmento(p["segmento"]), p["parte_1"], p["parte_2"]) for p in partes
+        expresiones=tuple(
+            ExpresionSegmento(Segmento(e["segmento"]), expresion_desde_dict(e["expresion"]))
+            for e in expresiones
         ),
     )
 
@@ -85,7 +55,7 @@ def datos_de_fila(
 def _version(fila: Row) -> VersionSpeech:
     return VersionSpeech(
         id=fila.id,
-        datos=datos_de_fila(fila.nombre, fila.partes, fila.formato, fila.expresiones),
+        datos=datos_de_fila(fila.nombre, fila.expresiones),
         original=fila.original,
         basada_en_id=fila.basada_en_id,
         usada_en=fila.usada_en,
@@ -185,8 +155,6 @@ class RepositorioMowaMesPostgres(RepositorioMowaMesPort):
                 _SPEECH.c.usada_en.is_(None),
                 _SPEECH.c.original.is_(False),
                 _SPEECH.c.deshabilitada_en.is_(None),
-                # El formato no cambia al editar: una v1 sigue siendo v1 y una v2, v2.
-                _SPEECH.c.formato == datos.formato.value,
             )
             .values(
                 nombre=datos.nombre,

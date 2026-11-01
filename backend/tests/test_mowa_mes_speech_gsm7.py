@@ -1,8 +1,9 @@
 """El mensaje de MOWA MES en GSM-7 (RF-MM-27, RF-MM-19 ampliado; T-MM-B9).
 
 Lo que se prueba, sobre el constructor, la previsualizacion y la campana (nada de PostgreSQL):
-- el mensaje de una v1 y de una v2 sale normalizado, con `a_gsm7` aplicada al texto YA evaluado y no
-  a las variables (el titular se recorta a 8 caracteres antes de normalizarse);
+- el mensaje de una version sale normalizado (la v1 de la que viene, o una v2 nativa), con `a_gsm7`
+  aplicada al texto YA evaluado y no a las variables (el titular se recorta a 8 caracteres antes
+  de normalizarse);
 - el largo se mide DESPUES de normalizar y en unidades GSM-7: la elipsis y el euro (`EUR`) miden 3 y
   ya no queda ningun extendido que mida 2, para el control de los 150 y los 160 y para la cota de
   la previsualizacion;
@@ -24,8 +25,6 @@ from app.core.entities.mowa_mes import (
     CodigoMowaMes,
     DatosSpeech,
     ExpresionSegmento,
-    FormatoSpeech,
-    PartesSegmento,
     Segmento,
     VersionSpeech,
 )
@@ -34,6 +33,7 @@ from app.core.services.plataformas.mowa_mes import speech
 from app.core.services.plataformas.mowa_mes.campana import Exclusion, FilaCarga, evaluar_producto
 from app.core.services.texto_enriquecido.gsm7 import a_gsm7, largo_gsm7
 from tests.oro_mowa_mes_datos import ORIGINAL
+from tests.speech_congelado import a_expresiones, a_v2, huella_del_texto_v1
 from tests.test_mowa_mes_campana import (
     MOMENTO,
     armar_servicio,
@@ -58,12 +58,15 @@ REGIONAL_E = "\N{REGIONAL INDICATOR SYMBOL LETTER E}"
 TONO_DE_PIEL = "\N{EMOJI MODIFIER FITZPATRICK TYPE-4}"
 
 
-def _v1(**por_segmento: tuple[str, str]) -> tuple[PartesSegmento, ...]:
-    """Las partes del Speech original, cambiando las de los segmentos dados por nombre."""
-    return tuple(
-        PartesSegmento(p.segmento, *por_segmento.get(p.segmento.name, (p.parte_1, p.parte_2)))
-        for p in ORIGINAL
-    )
+def _v1(**por_segmento: tuple[str, str]) -> tuple[dict[str, str], ...]:
+    """El texto v1 del Speech original (un dato), cambiando el de los segmentos dados por nombre."""
+    resultado = []
+    for p in ORIGINAL:
+        parte_1, parte_2 = por_segmento.get(
+            Segmento(p["segmento"]).name, (p["parte_1"], p["parte_2"])
+        )
+        resultado.append({"segmento": p["segmento"], "parte_1": parte_1, "parte_2": parte_2})
+    return tuple(resultado)
 
 
 def _titular() -> NodoVariable:
@@ -77,12 +80,25 @@ def _fecha() -> NodoVariable:
 
 
 def _v2(*nodos) -> DatosSpeech:
-    expresiones = tuple(ExpresionSegmento(p.segmento, Expresion(tuple(nodos))) for p in ORIGINAL)
-    return DatosSpeech("v2", expresiones=expresiones, formato=FormatoSpeech.V2)
+    expresiones = tuple(
+        ExpresionSegmento(Segmento(p["segmento"]), Expresion(tuple(nodos))) for p in ORIGINAL
+    )
+    return DatosSpeech("v2", expresiones=expresiones)
+
+
+def _previsto(version, whatsapp, segmento):
+    """La previsualizacion de un segmento del texto v1 (un dato) ya convertido a v2."""
+    largos = speech.previsualizar_v2(a_expresiones(version), whatsapp)
+    return {x.rango.segmento: x for x in largos}[segmento]
+
+
+def _datos(version) -> DatosSpeech:
+    """Una version v2 tal cual, o el texto v1 (un dato) ya convertido a v2."""
+    return version if isinstance(version, DatosSpeech) else a_v2(version)
 
 
 def _mensaje(version, segmento=Segmento.DE_1_A_8, titular="ZZPRUEBA", whatsapp=WHATSAPP):
-    return speech.ConstructorMensajes(version, whatsapp).mensaje_de(
+    return speech.ConstructorMensajes(_datos(version), whatsapp).mensaje_de(
         segmento, titular, VENCIMIENTO, dias_ajustados=4
     )
 
@@ -90,7 +106,7 @@ def _mensaje(version, segmento=Segmento.DE_1_A_8, titular="ZZPRUEBA", whatsapp=W
 # --- El mensaje sale normalizado -----------------------------------------------------------------
 
 
-def test_el_mensaje_de_una_v1_sale_normalizado() -> None:
+def test_el_mensaje_de_una_version_convertida_de_v1_sale_normalizado() -> None:
     version = _v1(
         DE_1_A_8=(f" venci{O_TILDE} {EMOJI}{ANGULAR_I}ma{N_TILDE}ana{ANGULAR_D}{ESP_DURO}", ".")
     )
@@ -100,7 +116,7 @@ def test_el_mensaje_de_una_v1_sale_normalizado() -> None:
     assert mensaje == 'ZZPRUEBA vencio "manana" 06/09/2026.'  # el emoji se borra
 
 
-def test_el_mensaje_de_una_v2_sale_normalizado() -> None:
+def test_el_mensaje_de_una_v2_nativa_sale_normalizado() -> None:
     nodos = (
         NodoTexto(f"Hola {ELIPSIS} {EMOJI}"),
         _titular(),
@@ -148,15 +164,16 @@ def test_la_supervision_hereda_el_mensaje_normalizado_de_la_primera_fila() -> No
 
 
 def test_la_version_se_guarda_como_se_escribio_y_su_huella_no_cambia() -> None:
-    from app.core.services.plataformas.mowa_mes.campana import huella_speech
+    from app.core.services.plataformas.mowa_mes.campana import huella_de
 
     version = _v1(DE_1_A_8=(f" venci{O_TILDE} {EMOJI}", "."))
-    antes = huella_speech(version)
+    datos = a_v2(version)
+    antes = huella_de(datos)
 
-    _mensaje(version)  # armar mensajes no toca la version
+    _mensaje(datos)  # armar mensajes no toca la version
 
-    assert huella_speech(version) == antes
-    assert O_TILDE in version[1].parte_1 and EMOJI in version[1].parte_1
+    assert huella_de(datos) == antes
+    assert O_TILDE in version[1]["parte_1"] and EMOJI in version[1]["parte_1"]
 
 
 # --- Se mide despues de normalizar y en unidades GSM-7 -----------------------------------------
@@ -189,12 +206,12 @@ def test_los_150_y_los_160_se_miden_en_unidades_gsm7_del_mensaje_normalizado(
     relleno, unidades, codigo
 ) -> None:
     version = _con_parte_2(relleno)
-    constructor = speech.ConstructorMensajes(version, WHATSAPP)
+    constructor = speech.ConstructorMensajes(_datos(version), WHATSAPP)
 
     fila = evaluar_producto(_producto(), CORTE, CORTE, constructor)
-    previsto = {x.rango.segmento: x for x in speech.previsualizar(version, WHATSAPP)}[
-        Segmento.DE_1_A_8
-    ]
+    previsto = {
+        x.rango.segmento: x for x in speech.previsualizar_v2(a_expresiones(version), WHATSAPP)
+    }[Segmento.DE_1_A_8]
 
     assert (previsto.largo_maximo, previsto.codigo) == (unidades, codigo)
     if codigo is CodigoMowaMes.MENSAJE_EXCEDE_160:
@@ -211,7 +228,7 @@ def test_el_texto_con_la_elipsis_no_pasa_de_160_caracteres_pero_si_en_gsm7() -> 
     assert _largo_total(relleno) == 158 < LARGO_MAXIMO
 
     fila = evaluar_producto(
-        _producto(), CORTE, CORTE, speech.ConstructorMensajes(_con_parte_2(relleno), WHATSAPP)
+        _producto(), CORTE, CORTE, speech.ConstructorMensajes(a_v2(_con_parte_2(relleno)), WHATSAPP)
     )
 
     assert isinstance(fila, FilaCarga) and len(fila.mensaje) == 160
@@ -243,7 +260,9 @@ def test_la_cota_de_una_v2_se_cuenta_en_unidades_gsm7() -> None:
 
 
 def test_la_cota_del_speech_original_sigue_en_156_para_9_a_30() -> None:
-    largos = {x.rango.segmento: x for x in speech.previsualizar(ORIGINAL, WHATSAPP)}
+    largos = {
+        x.rango.segmento: x for x in speech.previsualizar_v2(a_expresiones(ORIGINAL), WHATSAPP)
+    }
 
     assert largos[Segmento.DE_9_A_30].largo_maximo == 156  # no se cuelga a_gsm7 de las variables
     assert largos[Segmento.DE_9_A_30].codigo is CodigoMowaMes.MENSAJE_EXCEDE_150
@@ -276,7 +295,9 @@ def test_propiedad_el_largo_maximo_de_una_v1_es_el_del_mensaje_con_variables_al_
         if "[@" in parte_1 + parte_2:
             continue
         version = _v1(DE_1_A_8=(parte_1, parte_2))
-        previsto = {x.rango.segmento: x for x in speech.previsualizar(version, None)}
+        previsto = {
+            x.rango.segmento: x for x in speech.previsualizar_v2(a_expresiones(version), None)
+        }
         mensaje = _mensaje(version, titular="ABCDEFGH", whatsapp=None)
 
         assert a_gsm7(mensaje) == mensaje, repr(mensaje)
@@ -292,25 +313,23 @@ def test_propiedad_el_largo_maximo_de_una_v1_es_el_del_mensaje_con_variables_al_
 def test_el_ejemplo_de_una_v1_sale_normalizado_y_sin_sus_borrados() -> None:
     version = _v1(DE_1_A_8=(f" venci{O_TILDE} {EMOJI}", f" {ELIPSIS}"))
 
-    previsto = {x.rango.segmento: x for x in speech.previsualizar(version, WHATSAPP)}[
-        Segmento.DE_1_A_8
-    ]
+    previsto = {
+        x.rango.segmento: x for x in speech.previsualizar_v2(a_expresiones(version), WHATSAPP)
+    }[Segmento.DE_1_A_8]
 
-    assert previsto.ejemplo == "XXXXXXXX vencio dd/mm/yyyy ..."
+    assert previsto.ejemplo == "XXXXXXXX vencio 05/10/2026 ..."
     assert previsto.caracteres_quitados == (EMOJI,)  # la elipsis se transliteran: no se pierde
 
 
 def test_sin_borrados_la_lista_esta_vacia() -> None:
-    for largo in speech.previsualizar(ORIGINAL, WHATSAPP):
+    for largo in speech.previsualizar_v2(a_expresiones(ORIGINAL), WHATSAPP):
         assert largo.caracteres_quitados == (), largo.rango.segmento
 
 
 def test_los_borrados_salen_aunque_no_haya_ejemplo_por_falta_de_whatsapp() -> None:
     version = _v1(DE_31_A_60=(f" mira {EMOJI} [whatsapp]", f" y {EMOJI}{EMOJI}"))
 
-    previsto = {x.rango.segmento: x for x in speech.previsualizar(version, None)}[
-        Segmento.DE_31_A_60
-    ]
+    previsto = _previsto(version, None, Segmento.DE_31_A_60)
 
     assert previsto.ejemplo is None
     assert previsto.caracteres_quitados == (EMOJI,)  # sin repetir
@@ -319,9 +338,9 @@ def test_los_borrados_salen_aunque_no_haya_ejemplo_por_falta_de_whatsapp() -> No
 def test_los_borrados_de_una_v1_no_incluyen_lo_que_solo_pierde_su_tilde() -> None:
     version = _v1(DE_1_A_8=(f" venci{O_TILDE} ma{N_TILDE}ana", "."))
 
-    previsto = {x.rango.segmento: x for x in speech.previsualizar(version, WHATSAPP)}[
-        Segmento.DE_1_A_8
-    ]
+    previsto = {
+        x.rango.segmento: x for x in speech.previsualizar_v2(a_expresiones(version), WHATSAPP)
+    }[Segmento.DE_1_A_8]
 
     assert previsto.caracteres_quitados == ()
 
@@ -356,9 +375,9 @@ def test_dos_partes_de_una_v1_no_fingen_una_bandera_que_la_fecha_separa() -> Non
     # La parte 1 termina en la P y la parte 2 empieza con la E: entre las dos va la fecha.
     version = _v1(DE_1_A_8=(f" a {REGIONAL_P}", f"{REGIONAL_E} b"))
 
-    previsto = {x.rango.segmento: x for x in speech.previsualizar(version, WHATSAPP)}[
-        Segmento.DE_1_A_8
-    ]
+    previsto = {
+        x.rango.segmento: x for x in speech.previsualizar_v2(a_expresiones(version), WHATSAPP)
+    }[Segmento.DE_1_A_8]
 
     assert previsto.caracteres_quitados == (REGIONAL_P, REGIONAL_E)
 
@@ -367,18 +386,18 @@ def test_el_enlace_entre_dos_trozos_de_una_v1_tampoco_los_une() -> None:
     version = _v1(DE_31_A_60=(f" {REGIONAL_P}[whatsapp]{REGIONAL_E}", "."))
 
     for numero in (None, WHATSAPP):  # con ejemplo y sin el
-        previsto = {x.rango.segmento: x for x in speech.previsualizar(version, numero)}[
-            Segmento.DE_31_A_60
-        ]
+        previsto = {
+            x.rango.segmento: x for x in speech.previsualizar_v2(a_expresiones(version), numero)
+        }[Segmento.DE_31_A_60]
         assert previsto.caracteres_quitados == (REGIONAL_P, REGIONAL_E), numero
 
 
 def test_un_emoji_y_un_tono_de_piel_en_trozos_separados_son_dos_elementos() -> None:
     version = _v1(DE_1_A_8=(f" a {EMOJI}", f"{TONO_DE_PIEL} b"))
 
-    previsto = {x.rango.segmento: x for x in speech.previsualizar(version, WHATSAPP)}[
-        Segmento.DE_1_A_8
-    ]
+    previsto = {
+        x.rango.segmento: x for x in speech.previsualizar_v2(a_expresiones(version), WHATSAPP)
+    }[Segmento.DE_1_A_8]
 
     assert previsto.caracteres_quitados == (EMOJI, TONO_DE_PIEL)
 
@@ -398,17 +417,15 @@ def test_los_textos_fijos_de_una_v2_sin_ejemplo_se_agrupan_cada_uno_por_su_lado(
 def test_un_grafema_completo_dentro_de_un_trozo_sigue_siendo_uno_solo() -> None:
     version = _v1(DE_1_A_8=(f" a {EMOJI}{TONO_DE_PIEL}", f" {REGIONAL_P}{REGIONAL_E}"))
 
-    previsto = {x.rango.segmento: x for x in speech.previsualizar(version, WHATSAPP)}[
-        Segmento.DE_1_A_8
-    ]
+    previsto = {
+        x.rango.segmento: x for x in speech.previsualizar_v2(a_expresiones(version), WHATSAPP)
+    }[Segmento.DE_1_A_8]
 
     assert previsto.caracteres_quitados == (EMOJI + TONO_DE_PIEL, REGIONAL_P + REGIONAL_E)
 
 
-def test_las_versiones_guardadas_siguen_con_sus_huellas() -> None:
-    from app.core.services.plataformas.mowa_mes.campana import huella_speech
-
-    assert huella_speech(ORIGINAL) == (
+def test_el_texto_v1_del_original_sigue_con_su_huella() -> None:
+    assert huella_del_texto_v1(ORIGINAL) == (
         "297c227cfdd0bb5e1636e08d4ed6cebab971d724c84223acfdb0cfebc2fcf88a"
     )
     assert VersionSpeech is not None and MOMENTO is not None  # imports usados por otras pruebas

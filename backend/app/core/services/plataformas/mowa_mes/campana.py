@@ -23,8 +23,6 @@ from app.core.entities.mowa_mes import (
     CodigoMowaMes,
     DatosSpeech,
     ExpresionSegmento,
-    FormatoSpeech,
-    PartesSegmento,
     Programacion,
     Segmento,
     SpeechNoEncontrado,
@@ -97,39 +95,28 @@ _SIMBOLOS = {
 # --- Piezas puras ---------------------------------------------------------
 
 
-def huella_speech(partes: Sequence[PartesSegmento]) -> str:
-    """SHA-256 del texto de las partes de una v1: con esto la creacion sabe si el speech cambio.
-
-    No cambia nunca: las huellas de las versiones v1 ya usadas (el Speech original y las del
-    usuario) son las que registraron sus campanas.
-    """
-    datos = [[p.segmento.value, p.parte_1, p.parte_2] for p in partes]
-    texto = json.dumps(datos, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.sha256(texto.encode("utf-8")).hexdigest()
+FORMATO_DE_LA_HUELLA = "v2"
 
 
 def huella_expresiones(expresiones: Sequence[ExpresionSegmento]) -> str:
-    """SHA-256 de la forma canonica de las expresiones de una v2, en el orden de los segmentos.
+    """SHA-256 de la forma canonica de las expresiones, en el orden de los segmentos.
 
-    Propia de la v2: lleva el formato por delante, asi que no puede coincidir con la de una v1
-    aunque el texto de los mensajes fuera igual.
+    Lleva por delante el marcador `v2` ("FORMATO_DE_LA_HUELLA"), que ya no es un formato de nada
+    (desde M-B4 no hay otro) pero sigue en el texto que se hashea: las huellas que las campanas
+    registraron no pueden cambiar. La del Speech original convertido es `5b1c556c...`.
     """
     orden = {s: i for i, s in enumerate(Segmento)}
     canonica = [
         [e.segmento.value, expresion_a_dict(e.expresion)]
         for e in sorted(expresiones, key=lambda e: orden[e.segmento])
     ]
-    texto = json.dumps(
-        [FormatoSpeech.V2.value, canonica], ensure_ascii=False, separators=(",", ":")
-    )
+    texto = json.dumps([FORMATO_DE_LA_HUELLA, canonica], ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(texto.encode("utf-8")).hexdigest()
 
 
 def huella_de(datos: DatosSpeech) -> str:
-    """La huella de una version, segun su formato: la creacion de campanas compara esta."""
-    if datos.formato is FormatoSpeech.V2:
-        return huella_expresiones(datos.expresiones)
-    return huella_speech(datos.partes)
+    """La huella de una version: la creacion de campanas compara esta."""
+    return huella_expresiones(datos.expresiones)
 
 
 VACIO = "(vacío)"  # el elemento vacio de una lista (`None` en el filtro), nunca «None»
@@ -237,8 +224,8 @@ def evaluar_producto(
     rango = segmentos.rango_de(dias_ajustados)
     if rango is None:
         return Exclusion(pagare, CodigoMowaMes.SIN_SPEECH)
-    # Una v1 siempre necesita el titular y la fecha; una v2, solo si la expresion del segmento usa
-    # la variable (RF-MM-13). El orden de las exclusiones no cambia.
+    # El titular y la fecha solo se necesitan si la expresion del segmento usa la variable
+    # (RF-MM-13). El orden de las exclusiones no cambia.
     titular = producto.get("titular")
     if constructor.usa_titular(rango.segmento) and vacia(titular):
         return Exclusion(pagare, CodigoMowaMes.FALTA_TITULAR)

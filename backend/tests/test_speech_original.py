@@ -9,7 +9,7 @@ import importlib.util
 import re
 from pathlib import Path
 
-from app.core.entities.mowa_mes import RANGOS_SEGMENTO, PartesSegmento, Segmento
+from app.core.entities.mowa_mes import RANGOS_SEGMENTO
 
 RAIZ = Path(__file__).resolve().parents[2]
 DOCUMENTO = RAIZ / "docs" / "requerimientos-mowa-mes.md"
@@ -19,12 +19,13 @@ _ETIQUETAS = {rango.etiqueta: rango.segmento for rango in RANGOS_SEGMENTO}
 _FILA = re.compile(r"^\s*\| (?P<etiqueta>[^|`]+?) \| `(?P<p1>[^`]*)` \| `(?P<p2>[^`]*)` \|\s*$")
 
 
-def speech_del_documento() -> tuple[PartesSegmento, ...]:
+def speech_del_documento() -> tuple[dict[str, str], ...]:
+    """El texto v1 del Speech original, como dato: {segmento, parte_1, parte_2} por segmento."""
     texto = DOCUMENTO.read_text(encoding="utf-8")
     inicio = texto.index("**RF-MM-18")
     fin = texto.index("**RF-MM-19")
     partes = [
-        PartesSegmento(_ETIQUETAS[m["etiqueta"]], m["p1"], m["p2"])
+        {"segmento": _ETIQUETAS[m["etiqueta"]].value, "parte_1": m["p1"], "parte_2": m["p2"]}
         for linea in texto[inicio:fin].splitlines()
         if (m := _FILA.match(linea)) and m["etiqueta"] in _ETIQUETAS
     ]
@@ -34,13 +35,13 @@ def speech_del_documento() -> tuple[PartesSegmento, ...]:
     return tuple(partes)
 
 
-def speech_de_la_migracion() -> tuple[PartesSegmento, ...]:
+def speech_de_la_migracion() -> tuple[dict[str, str], ...]:
     assert MIGRACION.exists(), f"No se encontro la migracion {MIGRACION}"
     spec = importlib.util.spec_from_file_location("migracion_mowa_mes", MIGRACION)
     modulo = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(modulo)
     return tuple(
-        PartesSegmento(Segmento(p["segmento"]), p["parte_1"], p["parte_2"])
+        {"segmento": p["segmento"], "parte_1": p["parte_1"], "parte_2": p["parte_2"]}
         for p in modulo.SPEECH_ORIGINAL
     )
 
@@ -50,4 +51,6 @@ def test_la_semilla_de_la_migracion_es_el_texto_exacto_de_rf_mm_18() -> None:
 
 
 def test_el_documento_trae_los_seis_segmentos_en_orden() -> None:
-    assert [p.segmento for p in speech_del_documento()] == [r.segmento for r in RANGOS_SEGMENTO]
+    assert [p["segmento"] for p in speech_del_documento()] == [
+        r.segmento.value for r in RANGOS_SEGMENTO
+    ]

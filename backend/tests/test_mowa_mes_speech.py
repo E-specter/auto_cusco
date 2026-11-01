@@ -18,9 +18,7 @@ from app.core.entities.mowa_mes import (
     DatosSpeech,
     ExpresionSegmento,
     FaltaWhatsapp,
-    FormatoSpeech,
     NombreDeSpeechRepetido,
-    PartesSegmento,
     Programacion,
     Segmento,
     SpeechInmutable,
@@ -35,11 +33,17 @@ from app.core.services.plataformas.mowa_mes.configuracion import (
     nombre_siguiente,
 )
 from app.core.services.texto_enriquecido.gsm7 import a_gsm7
+from tests.speech_congelado import a_expresiones
 from tests.test_speech_original import speech_de_la_migracion
 
 MOMENTO = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
 WHATSAPP = "900000123"
-ORIGINAL = speech_de_la_migracion()
+# El Speech original: su texto v1 (un dato, trazabilidad de `texto_v1`) y su v2, que es la que usa
+# la app desde M-B3 y la unica desde M-B4 (T-MM-C11). `ORIGINAL` son sus expresiones, una por
+# segmento; `DATOS_DEL_ORIGINAL`, el `DatosSpeech` que recibe el constructor de mensajes.
+TEXTO_V1_DEL_ORIGINAL = speech_de_la_migracion()
+ORIGINAL = a_expresiones(TEXTO_V1_DEL_ORIGINAL)
+DATOS_DEL_ORIGINAL = DatosSpeech("Speech original", ORIGINAL)
 VENCIMIENTO = date(2026, 9, 5)
 
 
@@ -129,10 +133,6 @@ def _servicio(
     return ConfiguracionMowaMesService(repositorio), repositorio
 
 
-def _partes(segmento: Segmento) -> PartesSegmento:
-    return next(p for p in ORIGINAL if p.segmento is segmento)
-
-
 # --- Dias ajustados y segmento (RF-MM-15) -------------------------------
 
 
@@ -203,7 +203,7 @@ def test_programacion_sin_las_fechas_que_corresponden(programacion, fechas) -> N
 
 
 def test_el_mensaje_une_titular_8_parte_1_fecha_y_parte_2() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+    constructor = speech.ConstructorMensajes(DATOS_DEL_ORIGINAL, WHATSAPP)
 
     mensaje = constructor.mensaje_de(Segmento.DE_1_A_8, "ZZPRUEBA SINTETICO", VENCIMIENTO)
 
@@ -214,7 +214,7 @@ def test_el_mensaje_une_titular_8_parte_1_fecha_y_parte_2() -> None:
 
 
 def test_un_titular_corto_se_usa_completo() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+    constructor = speech.ConstructorMensajes(DATOS_DEL_ORIGINAL, WHATSAPP)
 
     mensaje = constructor.mensaje_de(Segmento.PREVENTIVA, "ZZ", VENCIMIENTO)
 
@@ -222,7 +222,7 @@ def test_un_titular_corto_se_usa_completo() -> None:
 
 
 def test_la_variable_de_whatsapp_se_reemplaza_por_el_enlace() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+    constructor = speech.ConstructorMensajes(DATOS_DEL_ORIGINAL, WHATSAPP)
 
     mensaje = constructor.mensaje_de(Segmento.DE_31_A_60, "ZZPRUEBA", VENCIMIENTO)
 
@@ -231,7 +231,7 @@ def test_la_variable_de_whatsapp_se_reemplaza_por_el_enlace() -> None:
 
 
 def test_sin_whatsapp_los_segmentos_que_lo_usan_no_generan_enlace_roto() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, None)
+    constructor = speech.ConstructorMensajes(DATOS_DEL_ORIGINAL, None)
 
     assert constructor.requiere_whatsapp_faltante(Segmento.DE_61_A_90)
     assert not constructor.requiere_whatsapp_faltante(Segmento.DE_9_A_30)
@@ -240,14 +240,6 @@ def test_sin_whatsapp_los_segmentos_que_lo_usan_no_generan_enlace_roto() -> None
     )
     with pytest.raises(FaltaWhatsapp):
         constructor.mensaje_de(Segmento.DE_61_A_90, "ZZPRUEBA", VENCIMIENTO)
-
-
-def test_el_texto_del_usuario_con_corchetes_no_se_interpreta_como_campo() -> None:
-    partes = [replace(p, parte_2=" [titular] [fecha] [@") for p in ORIGINAL]
-
-    problemas = speech.problemas_de(DatosSpeech("con referencia", tuple(partes)))
-
-    assert {(p.segmento, p.campo) for p in problemas} == {(p.segmento, "parte_2") for p in ORIGINAL}
 
 
 @pytest.mark.parametrize(
@@ -267,15 +259,15 @@ def test_bordes_del_largo(largo, codigo) -> None:
 
 
 def test_el_largo_previsto_es_el_del_mensaje_mas_largo_que_se_construye() -> None:
-    constructor = speech.ConstructorMensajes(ORIGINAL, WHATSAPP)
+    constructor = speech.ConstructorMensajes(DATOS_DEL_ORIGINAL, WHATSAPP)
 
-    for largo in speech.previsualizar(ORIGINAL, WHATSAPP):
+    for largo in speech.previsualizar_v2(ORIGINAL, WHATSAPP):
         mensaje = constructor.mensaje_de(largo.rango.segmento, "ZZPRUEBA SINTETICO", VENCIMIENTO)
         assert largo.largo_maximo == len(mensaje), largo.rango.segmento
 
 
 def test_con_el_speech_original_solo_9_a_30_pasa_de_150() -> None:
-    largos = {largo.rango.segmento: largo for largo in speech.previsualizar(ORIGINAL, WHATSAPP)}
+    largos = {largo.rango.segmento: largo for largo in speech.previsualizar_v2(ORIGINAL, WHATSAPP)}
 
     assert largos[Segmento.DE_9_A_30].largo_maximo == 156
     assert {s: largo.codigo for s, largo in largos.items() if largo.codigo} == {
@@ -284,8 +276,8 @@ def test_con_el_speech_original_solo_9_a_30_pasa_de_150() -> None:
 
 
 def test_sin_whatsapp_la_previsualizacion_mide_igual_pero_no_da_ejemplo() -> None:
-    con = {largo.rango.segmento: largo for largo in speech.previsualizar(ORIGINAL, WHATSAPP)}
-    sin = {largo.rango.segmento: largo for largo in speech.previsualizar(ORIGINAL, None)}
+    con = {largo.rango.segmento: largo for largo in speech.previsualizar_v2(ORIGINAL, WHATSAPP)}
+    sin = {largo.rango.segmento: largo for largo in speech.previsualizar_v2(ORIGINAL, None)}
 
     assert {s: largo.largo_maximo for s, largo in sin.items()} == {
         s: largo.largo_maximo for s, largo in con.items()
@@ -299,9 +291,9 @@ def test_sin_whatsapp_la_previsualizacion_mide_igual_pero_no_da_ejemplo() -> Non
 
 
 def test_faltan_o_se_repiten_segmentos() -> None:
-    partes = (*ORIGINAL[:-1], ORIGINAL[0])
+    expresiones = (*ORIGINAL[:-1], ORIGINAL[0])
 
-    (problema,) = speech.problemas_de(DatosSpeech("incompleta", partes))
+    (problema,) = speech.problemas_de(DatosSpeech("incompleta", expresiones))
 
     assert problema.campo == "segmentos"
     assert "faltan: 91_a_120" in problema.detalle
@@ -329,66 +321,7 @@ def _v2(contenido: str = "Hola") -> tuple[ExpresionSegmento, ...]:
 
 
 def _datos_v2(nombre: str, contenido: str = "Hola") -> DatosSpeech:
-    return DatosSpeech(nombre, expresiones=_v2(contenido), formato=FormatoSpeech.V2)
-
-
-def _codigos(error: SpeechInvalido) -> list:
-    return [p.codigo_mowa_mes for p in error.problemas]
-
-
-@pytest.mark.parametrize(
-    ("partes", "basada_en_id"),
-    [
-        (ORIGINAL, None),  # una v1 perfectamente valida
-        (ORIGINAL, 1),
-        (ORIGINAL, 99),  # ni siquiera mira si la base existe
-        ((replace(ORIGINAL[0], parte_1=" [@titular]"), *ORIGINAL[1:]), None),  # ni su contenido
-        (ORIGINAL[:5], None),
-    ],
-)
-def test_ya_no_se_crean_versiones_de_dos_partes(partes, basada_en_id) -> None:
-    servicio, repositorio = _servicio()
-
-    with pytest.raises(SpeechInvalido) as error:
-        servicio.crear_speech("Nueva", partes, basada_en_id=basada_en_id)
-
-    assert _codigos(error.value) == [CodigoMowaMes.VERSION_V1_RETIRADA]
-    assert (error.value.problemas[0].segmento, error.value.problemas[0].campo) == (None, "formato")
-    assert repositorio.escrituras == 0
-    assert list(repositorio.versiones) == [1]
-
-
-@pytest.mark.parametrize("version_id", [1, "v1 sin usar"])
-def test_ya_no_se_editan_versiones_de_dos_partes_ni_la_original(version_id) -> None:
-    servicio, repositorio = _servicio()
-    if version_id != 1:  # una v1 que ya existia y nadie uso
-        version_id = repositorio.crear_speech(DatosSpeech("Heredada", ORIGINAL), None).id
-        repositorio.escrituras = 0
-
-    with pytest.raises(SpeechInvalido) as error:
-        servicio.actualizar_speech(version_id, DatosSpeech("Otro", ORIGINAL))
-
-    assert _codigos(error.value) == [CodigoMowaMes.VERSION_V1_RETIRADA]  # 400 y no 409
-    assert repositorio.escrituras == 0
-
-
-def test_la_regla_de_dos_partes_no_depende_de_que_la_version_exista() -> None:
-    servicio, _ = _servicio()
-
-    with pytest.raises(SpeechInvalido):
-        servicio.actualizar_speech(999, DatosSpeech("Otro", ORIGINAL))
-
-
-def test_una_v1_que_ya_existe_se_sigue_leyendo_y_convirtiendo() -> None:
-    servicio, repositorio = _servicio()
-    heredada = repositorio.crear_speech(DatosSpeech("Heredada", ORIGINAL), None)
-
-    leida = servicio.obtener_speech(heredada.id)
-    borrador = servicio.como_v2(heredada.id)
-
-    assert leida.datos.formato is FormatoSpeech.V1 and leida.datos.partes == ORIGINAL
-    assert borrador.basada_en_id == heredada.id and len(borrador.expresiones) == 6
-    assert heredada.id in [v.id for v in servicio.listar_speech()]
+    return DatosSpeech(nombre, expresiones=_v2(contenido))
 
 
 def test_crear_una_v2_sin_nombre_asigna_el_siguiente_y_la_ordena_por_segmento() -> None:
@@ -597,10 +530,10 @@ def test_revisar_la_plantilla_da_dos_nombres_de_muestra_sin_guardar() -> None:
 def test_la_previsualizacion_usa_el_whatsapp_configurado_si_no_se_indica_otro() -> None:
     servicio, _ = _servicio(WHATSAPP)
 
-    numero, problemas, largos = servicio.previsualizar_speech(ORIGINAL, None)
-    otro, _, _ = servicio.previsualizar_speech(ORIGINAL, "900000456")
+    numero, problemas, largos, _ = servicio.previsualizar_speech_v2(ORIGINAL, None)
+    otro, _, _, _ = servicio.previsualizar_speech_v2(ORIGINAL, "900000456")
 
     assert (numero, problemas, otro) == (WHATSAPP, (), "900000456")
     assert len(largos) == 6
     with pytest.raises(ConfiguracionInvalida):
-        servicio.previsualizar_speech(ORIGINAL, "123")
+        servicio.previsualizar_speech_v2(ORIGINAL, "123")

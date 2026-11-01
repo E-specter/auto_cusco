@@ -1,10 +1,15 @@
 """La migracion a solo v2 contra PostgreSQL real, de ida y vuelta (T-MM-C11, M-B3; RF-MM-17).
 La corre `architec` con `-ConBase`.
 
-Baja la base de pruebas un paso (`alembic downgrade c5d9f2a8e714`: el mundo de antes, con versiones
-v1), siembra lo que habia entonces, sube (`d7a3e5b9c241`), vuelve a bajar y sube a `head` al
+Baja la base de pruebas hasta `alembic downgrade c5d9f2a8e714` (el mundo de antes, con versiones
+v1), siembra lo que habia entonces, sube a `d7a3e5b9c241`, vuelve a bajar y sube a `head` al
 terminar, pase lo que pase. Sigue el patron de `test_mapeador_postgres.py`: la sesion se niega a
 correr contra una base que no sea `_test` (conftest.py).
+
+Desde M-B4 la aplicacion ya no conoce las columnas `partes` ni `formato`, asi que mientras la base
+esta en una revision anterior a `e2c6b4a8d195` NADA puede pasar por el modelo ni por la API: todo
+se lee y se escribe con SQL crudo (`SELECT *`, `INSERT` con las columnas de entonces). La API solo
+se usa en `head`.
 
 Se usa una campana real: el Speech original ya la tiene como version usada, y ademas se siembra una
 v1 usada, una v1 sin usar y una v2 nativa. Despues del upgrade quedan iguales el `id`, el nombre,
@@ -12,6 +17,7 @@ v1 usada, una v1 sin usar y una v2 nativa. Despues del upgrade quedan iguales el
 de la conversion. Despues del downgrade, cada fila es IDENTICA a la de antes. Datos sinteticos.
 """
 
+import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,10 +25,10 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import insert, select, text
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 
-from app.adapters.persistence.modelos import MowaMesCampana, MowaMesSpeechVersion
+from app.adapters.persistence.modelos import MowaMesCampana
 from tests import test_mowa_mes_campanas_postgres as base
 from tests.test_mowa_mes_campanas_postgres import PREFIJO, _crear, _previsualizar
 from tests.test_mowa_mes_speech_solo_v2_migracion import MIGRACION, SIEMBRA, normalizado
@@ -40,7 +46,6 @@ cliente = base.cliente
 BACKEND = Path(__file__).resolve().parents[1]
 REVISION_ANTERIOR = "c5d9f2a8e714"
 REVISION = "d7a3e5b9c241"
-_SPEECH = MowaMesSpeechVersion.__table__
 _CAMPANA = MowaMesCampana.__table__
 SEGMENTOS = ["preventiva", "1_a_8", "9_a_30", "31_a_60", "61_a_90", "91_a_120"]
 PARTES_USADA = [
@@ -57,26 +62,48 @@ def _configuracion() -> Config:
     return configuracion
 
 
+def _json(valor) -> str | None:
+    return None if valor is None else json.dumps(valor, ensure_ascii=False)
+
+
 def _fila(engine, speech_id: int) -> dict:
+    """Todas las columnas que la tabla tenga en la revision actual, sin pasar por el modelo."""
     with engine.connect() as cx:
-        return dict(cx.execute(select(_SPEECH).where(_SPEECH.c.id == speech_id)).one()._mapping)
+        fila = cx.execute(
+            text("SELECT * FROM mowa_mes_speech_version WHERE id = :id"), {"id": speech_id}
+        ).one()
+    return dict(fila._mapping)
+
+
+def _sembrar(engine, nombre: str, partes: list[dict], formato: str, expresiones, usada_en) -> int:
+    """Una version como las de antes de la migracion (el CHECK de entonces las admitia)."""
+    with engine.begin() as cx:
+        return cx.execute(
+            text(
+                "INSERT INTO mowa_mes_speech_version "
+                "(nombre, nombre_normalizado, partes, formato, expresiones, usada_en) "
+                "VALUES (:nombre, :normalizado, CAST(:partes AS jsonb), :formato, "
+                "CAST(:expresiones AS jsonb), :usada_en) RETURNING id"
+            ),
+            {
+                "nombre": f"{PREFIJO}{nombre}",
+                "normalizado": f"{PREFIJO}{nombre}".casefold(),
+                "partes": _json(partes),
+                "formato": formato,
+                "expresiones": _json(expresiones),
+                "usada_en": usada_en,
+            },
+        ).scalar_one()
 
 
 def _sembrar_v1(engine, nombre: str, partes: list[dict], usada_en) -> int:
-    """Una v1 como las de antes de la migracion (el CHECK de entonces la admitia)."""
-    with engine.begin() as cx:
-        return cx.execute(
-            insert(_SPEECH)
-            .values(
-                nombre=f"{PREFIJO}{nombre}",
-                nombre_normalizado=f"{PREFIJO}{nombre}".casefold(),
-                partes=partes,
-                formato="v1",
-                expresiones=None,
-                usada_en=usada_en,
-            )
-            .returning(_SPEECH.c.id)
-        ).scalar_one()
+    return _sembrar(engine, nombre, partes, "v1", None, usada_en)
+
+
+_DEFECTO_DEL_FORMATO = text(
+    "SELECT column_default FROM information_schema.columns "
+    "WHERE table_name = 'mowa_mes_speech_version' AND column_name = 'formato'"
+)
 
 
 def test_ida_y_vuelta_con_una_v1_usada_por_una_campana(cliente) -> None:
@@ -90,18 +117,7 @@ def test_ida_y_vuelta_con_una_v1_usada_por_una_campana(cliente) -> None:
     try:
         usada = _sembrar_v1(engine, "v1 usada", PARTES_USADA, USADA_EN)
         libre = _sembrar_v1(engine, "v1 libre", PARTES_LIBRE, None)
-        with engine.begin() as cx:
-            nativa = cx.execute(
-                insert(_SPEECH)
-                .values(
-                    nombre=f"{PREFIJO}v2 nativa",
-                    nombre_normalizado=f"{PREFIJO}v2 nativa".casefold(),
-                    partes=[],
-                    formato="v2",
-                    expresiones=CUERPO_V2,
-                )
-                .returning(_SPEECH.c.id)
-            ).scalar_one()
+        nativa = _sembrar(engine, "v2 nativa", [], "v2", CUERPO_V2, None)
         ids = (original_id, usada, libre, nativa)
         antes = {i: _fila(engine, i) for i in ids}
         assert [antes[i]["formato"] for i in ids] == ["v1", "v1", "v1", "v2"]
@@ -124,12 +140,7 @@ def test_ida_y_vuelta_con_una_v1_usada_por_una_campana(cliente) -> None:
             apunta = cx.execute(
                 select(_CAMPANA.c.speech_version_id).where(_CAMPANA.c.id == creada.json()["id"])
             ).scalar_one()
-            por_defecto = cx.execute(
-                text(
-                    "SELECT column_default FROM information_schema.columns "
-                    "WHERE table_name = 'mowa_mes_speech_version' AND column_name = 'formato'"
-                )
-            ).scalar_one()
+            por_defecto = cx.execute(_DEFECTO_DEL_FORMATO).scalar_one()
         assert apunta == original_id
         assert "'v2'" in por_defecto
         with pytest.raises(IntegrityError):  # el CHECK nuevo: ninguna v1
@@ -140,31 +151,31 @@ def test_ida_y_vuelta_con_una_v1_usada_por_una_campana(cliente) -> None:
 
         assert de_vuelta == antes  # cada fila, identica a la de antes (columna por columna)
         with engine.connect() as cx:
-            por_defecto = cx.execute(
-                text(
-                    "SELECT column_default FROM information_schema.columns "
-                    "WHERE table_name = 'mowa_mes_speech_version' AND column_name = 'formato'"
-                )
-            ).scalar_one()
+            por_defecto = cx.execute(_DEFECTO_DEL_FORMATO).scalar_one()
         assert "'v1'" in por_defecto  # el formato por defecto vuelve a v1
     finally:
         command.upgrade(configuracion, "head")
 
 
 def test_una_convertida_y_editada_se_queda_v2_en_el_downgrade(cliente) -> None:
-    """Editar una convertida deja `partes = []`: ya no es la v1 de antes y no vuelve."""
+    """Editar una convertida le borra el texto v1: ya no es la v1 de antes y no vuelve.
+
+    Se siembra una v1 en el mundo de antes, se sube a `head` (las dos migraciones: a solo v2 y sin
+    formato), se edita por la API (que es lo que borra `texto_v1`) y se baja otra vez al mundo de
+    antes: la fila queda v2 con `partes = []`, no resucita como v1.
+    """
     client, engine = cliente
     configuracion = _configuracion()
     command.downgrade(configuracion, REVISION_ANTERIOR)
     try:
         libre = _sembrar_v1(engine, "v1 para editar", PARTES_LIBRE, None)
-        command.upgrade(configuracion, REVISION)
+        command.upgrade(configuracion, "head")
         editada = client.put(
             f"/mowa-mes/speech/{libre}",
             json={"nombre": f"{PREFIJO}v1 para editar", "expresiones": CUERPO_V2},
         )
         assert editada.status_code == 200, editada.text
-        assert _fila(engine, libre)["partes"] == []
+        assert _fila(engine, libre)["texto_v1"] is None
 
         command.downgrade(configuracion, REVISION_ANTERIOR)
 

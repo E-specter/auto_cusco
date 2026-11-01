@@ -29,10 +29,11 @@ from app.adapters.persistence.repositorio_supervision_postgres import (
     RepositorioSupervisionPostgres,
 )
 from app.core.entities.calendario import ExcepcionCalendario, ExcepcionRepetida, TipoExcepcion
-from app.core.entities.mowa_mes import DatosSpeech, FormatoSpeech
+from app.core.entities.mowa_mes import DatosSpeech
 from app.core.entities.nombres import normalizar_nombre
-from app.core.services.plataformas.mowa_mes.speech import convertir_a_v2
 from app.main import app
+from tests.speech_congelado import a_expresiones
+from tests.test_api_mowa_mes_configuracion import EXPRESIONES_DEL_ORIGINAL
 from tests.test_speech_original import speech_del_documento
 
 pytestmark = [
@@ -51,22 +52,13 @@ _SPEECH = MowaMesSpeechVersion.__table__
 _SUPERVISOR = SupervisorDigital.__table__
 
 
-def _partes_json(partes) -> list[dict]:
-    return [
-        {"segmento": p.segmento.value, "parte_1": p.parte_1, "parte_2": p.parte_2} for p in partes
-    ]
-
-
-PARTES = _partes_json(speech_del_documento())
+# El texto v1 de RF-MM-18: el de la columna `texto_v1` del original, como lo sembro la migracion.
+TEXTO_V1 = list(speech_del_documento())
 
 
 def _v2_del_documento(nombre: str) -> DatosSpeech:
     """El texto de RF-MM-18 ya convertido a v2: lo unico que una version puede ser desde M-B3."""
-    return DatosSpeech(
-        nombre,
-        expresiones=convertir_a_v2(speech_del_documento()),
-        formato=FormatoSpeech.V2,
-    )
+    return DatosSpeech(nombre, expresiones=a_expresiones(speech_del_documento()))
 
 
 def _limpiar(engine) -> None:
@@ -101,7 +93,7 @@ def engine():
                 .values(
                     nombre=original_antes.nombre,
                     nombre_normalizado=original_antes.nombre_normalizado,
-                    partes=original_antes.partes,
+                    texto_v1=original_antes.texto_v1,
                     usada_en=original_antes.usada_en,
                 )
             )
@@ -121,15 +113,15 @@ def cliente(engine):
 
 def test_la_migracion_siembra_el_speech_original_con_el_texto_de_rf_mm_18(engine) -> None:
     # Antes: el original se leia como v1 (`datos.partes == speech_del_documento()`). Desde M-B3 es
-    # v2: se lee por sus expresiones, y el texto de RF-MM-18 sigue intacto en la columna `partes`.
+    # v2: se lee por sus expresiones, y el texto de RF-MM-18 sigue intacto en la columna `texto_v1`
+    # (antes `partes`, M-B4).
     (original,) = [v for v in RepositorioMowaMesPostgres(engine).listar_speech() if v.original]
     with engine.connect() as cx:
-        partes = cx.execute(select(_SPEECH.c.partes).where(_SPEECH.c.original)).scalar_one()
+        texto_v1 = cx.execute(select(_SPEECH.c.texto_v1).where(_SPEECH.c.original)).scalar_one()
 
     assert original.datos.nombre == "Speech original"
-    assert original.datos.formato is FormatoSpeech.V2
-    assert original.datos.expresiones == convertir_a_v2(speech_del_documento())
-    assert partes == PARTES  # el texto de RF-MM-18, tal como lo sembro a4c8e2f6b913
+    assert original.datos.expresiones == a_expresiones(speech_del_documento())
+    assert texto_v1 == TEXTO_V1  # el texto de RF-MM-18, tal como lo sembro a4c8e2f6b913
 
 
 def test_la_migracion_no_siembra_feriados_ni_numeros(engine) -> None:
@@ -247,7 +239,7 @@ def test_configuracion_por_http(cliente) -> None:
 
 EXPRESIONES = [
     {"segmento": p["segmento"], "expresion": {"nodos": [{"tipo": "texto", "valor": "Hola"}]}}
-    for p in PARTES
+    for p in TEXTO_V1
 ]
 
 
@@ -286,7 +278,6 @@ def test_speech_por_http_de_punta_a_punta(cliente, engine) -> None:
     )
 
     assert creada.status_code == 201
-    assert creada.json()["formato"] == "v2"
     assert editada.status_code == 200
     assert editada.json()["expresiones"] == creada.json()["expresiones"]
     assert repetida.status_code == 409
@@ -297,31 +288,23 @@ def test_speech_por_http_de_punta_a_punta(cliente, engine) -> None:
     assert derivada.json()["basada_en_id"] == speech_id
 
 
-def test_ya_no_se_crean_ni_se_editan_versiones_de_dos_partes_por_http(cliente, engine) -> None:
+def test_un_pedido_con_partes_y_sin_expresiones_es_422_y_no_hay_como_v2(cliente, engine) -> None:
+    # M-B4: ya no existen las versiones de dos partes ni su conversion (`como-v2`).
     repositorio = RepositorioMowaMesPostgres(engine)
     heredada = repositorio.crear_speech(_v2_del_documento(f"{PREFIJO}heredada"), None)
     antes = len(cliente.get("/mowa-mes/speech").json())
 
     creada = cliente.post(
-        "/mowa-mes/speech", json={"nombre": f"{PREFIJO}nueva v1", "partes": PARTES}
+        "/mowa-mes/speech", json={"nombre": f"{PREFIJO}nueva v1", "partes": TEXTO_V1}
     )
     editada = cliente.put(
-        f"/mowa-mes/speech/{heredada.id}", json={"nombre": f"{PREFIJO}editada", "partes": PARTES}
-    )
-    original_id = next(v["id"] for v in cliente.get("/mowa-mes/speech").json() if v["original"])
-    original = cliente.put(
-        f"/mowa-mes/speech/{original_id}", json={"nombre": f"{PREFIJO}z", "partes": PARTES}
+        f"/mowa-mes/speech/{heredada.id}", json={"nombre": f"{PREFIJO}editada", "partes": TEXTO_V1}
     )
 
-    for respuesta in (creada, editada, original):
-        (problema,) = respuesta.json()["problemas"]
-        assert respuesta.status_code == 400
-        assert (problema["codigo"], problema["catalogo"]) == ("version_v1_retirada", "mowa_mes")
+    assert (creada.status_code, editada.status_code) == (422, 422)
     assert len(cliente.get("/mowa-mes/speech").json()) == antes  # no se creo nada
     assert repositorio.obtener_speech(heredada.id).datos.nombre == f"{PREFIJO}heredada"
-    # y la heredada (antes v1: formato v1 y `como-v2` 200) ahora es v2 y no hay nada que convertir
-    assert cliente.get(f"/mowa-mes/speech/{heredada.id}").json()["formato"] == "v2"
-    assert cliente.get(f"/mowa-mes/speech/{heredada.id}/como-v2").status_code == 400
+    assert cliente.get(f"/mowa-mes/speech/{heredada.id}/como-v2").status_code == 404
 
 
 def test_la_escritura_misma_no_modifica_una_version_usada_ni_la_original(engine) -> None:
@@ -345,7 +328,9 @@ def test_previsualizacion_con_el_whatsapp_configurado(cliente) -> None:
         json={"limite_mensual": 2_500_000, "whatsapp_contacto": "900000123"},
     )
 
-    cuerpo = cliente.post("/mowa-mes/speech/previsualizacion", json={"partes": PARTES}).json()
+    cuerpo = cliente.post(
+        "/mowa-mes/speech/previsualizacion", json={"expresiones": EXPRESIONES_DEL_ORIGINAL}
+    ).json()
 
     por_segmento = {s["segmento"]: s for s in cuerpo["segmentos"]}
     assert cuerpo["whatsapp"] == "900000123"

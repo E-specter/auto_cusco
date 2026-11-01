@@ -78,14 +78,12 @@ test.describe('el Speech original', () => {
     const cuerpo = creacion.cuerpo as {
       nombre: string;
       basada_en_id: number;
-      partes?: unknown;
       expresiones: Array<{ segmento: string; expresion: { nodos: unknown[] } }>;
     };
     expect(cuerpo).toMatchObject({ nombre: 'Speech por piezas', basada_en_id: 1 });
-    expect(cuerpo).not.toHaveProperty('partes');
     expect(cuerpo.expresiones.map((e) => e.segmento)).toEqual(['preventiva', '1_a_8', '9_a_30', '31_a_60', '61_a_90', '91_a_120']);
-    expect(api.versiones.at(-1)).toMatchObject({ nombre: 'Speech por piezas', formato: 'v2' });
-    expect(api.versiones[0]).toMatchObject({ original: true, formato: 'v2' });
+    expect(api.versiones.at(-1)).toMatchObject({ nombre: 'Speech por piezas' });
+    expect(api.versiones[0]).toMatchObject({ original: true });
     expect(pedidosV2(v2, 'PUT', '/mowa-mes/speech/1')).toHaveLength(0);
 
     // The original keeps its notice and its messages.

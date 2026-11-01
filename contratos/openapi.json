@@ -2550,7 +2550,7 @@
           "mowa-mes"
         ],
         "summary": "Crear Speech",
-        "description": "Guarda una version v2 nueva (`expresiones`). Con `partes` (una v1) es 400 con el codigo\n`version_v1_retirada`: ya no se crean versiones de dos partes (RF-MM-17). 404 si\n`basada_en_id` no existe.",
+        "description": "Guarda una version nueva (`expresiones`, una por segmento). 404 si `basada_en_id` no\nexiste.",
         "operationId": "crear_speech_mowa_mes_speech_post",
         "requestBody": {
           "content": {
@@ -2622,7 +2622,7 @@
           "mowa-mes"
         ],
         "summary": "Previsualizar Speech",
-        "description": "Largo maximo de cada segmento, con titular de 8 y fecha de 10 (RF-MM-19).\n\nCon `expresiones` (v2) devuelve por segmento el largo maximo (la cota de la expresion), el\nnivel (`codigo`: 150 o 160 si lo cruza) y el ejemplo evaluado; sin maximo calculable,\n`largo_maximo` es nulo y `sin_maximo` dice por que. El control de los 160 caracteres de la\ncampana es por fila, sobre el mensaje real.\n\nUn segmento que usa [whatsapp] sin numero se marca con `falta_whatsapp` y sin\nejemplo: nunca se muestra un enlace roto.",
+        "description": "Largo maximo de cada segmento, con titular de 8 y fecha de 10 (RF-MM-19).\n\nDevuelve por segmento el largo maximo (la cota de la expresion), el nivel (`codigo`: 150 o 160\nsi lo cruza) y el ejemplo evaluado; sin maximo calculable, `largo_maximo` es nulo y\n`sin_maximo` dice por que. El control de los 160 caracteres de la campana es por fila, sobre\nel mensaje real.\n\nUn segmento que usa [whatsapp] sin numero se marca con `falta_whatsapp` y sin\nejemplo: nunca se muestra un enlace roto.",
         "operationId": "previsualizar_speech_mowa_mes_speech_previsualizacion_post",
         "requestBody": {
           "content": {
@@ -2859,7 +2859,7 @@
           "mowa-mes"
         ],
         "summary": "Actualizar Speech",
-        "description": "Reemplaza una version v2 que nadie uso. Con `partes` es 400 `version_v1_retirada` (ni se\ncrean ni se editan versiones de dos partes, RF-MM-17); si ya se uso o es la original, 409; si\nes una v1 y el contenido es v2, 400.",
+        "description": "Reemplaza una version que nadie uso. Si ya se uso, es la original o esta deshabilitada,\n409.",
         "operationId": "actualizar_speech_mowa_mes_speech__speech_id__put",
         "parameters": [
           {
@@ -2915,69 +2915,6 @@
           },
           "409": {
             "description": "La operacion choca con el estado actual",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DetalleError"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/mowa-mes/speech/{speech_id}/como-v2": {
-      "get": {
-        "tags": [
-          "mowa-mes"
-        ],
-        "summary": "Convertir A V2",
-        "description": "El borrador v2 de una v1: la misma estructura expresada con el motor, que da los mismos\nmensajes y largos (con el titular y la fecha obligatorios). No guarda nada: se edita y se\nguarda con `POST /speech` y `basada_en_id`, como una version nueva con huella propia. La v1\nqueda intacta. Una version que ya es v2 responde 400.",
-        "operationId": "convertir_a_v2_mowa_mes_speech__speech_id__como_v2_get",
-        "parameters": [
-          {
-            "name": "speech_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Speech Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BorradorV2Respuesta"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "La peticion no vale: `detail` es el motivo y `problemas` dice donde",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DetalleErrorSpeech"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No existe lo pedido",
             "content": {
               "application/json": {
                 "schema": {
@@ -4755,41 +4692,6 @@
         ],
         "title": "Body_subir_sabana_cargas_post"
       },
-      "BorradorV2Respuesta": {
-        "properties": {
-          "basada_en_id": {
-            "type": "integer",
-            "title": "Basada En Id"
-          },
-          "nombre_sugerido": {
-            "type": "string",
-            "title": "Nombre Sugerido"
-          },
-          "expresiones": {
-            "items": {
-              "$ref": "#/components/schemas/ExpresionSegmentoRespuesta"
-            },
-            "type": "array",
-            "title": "Expresiones"
-          },
-          "problemas": {
-            "items": {
-              "$ref": "#/components/schemas/ProblemaSpeechRespuesta"
-            },
-            "type": "array",
-            "title": "Problemas"
-          }
-        },
-        "type": "object",
-        "required": [
-          "basada_en_id",
-          "nombre_sugerido",
-          "expresiones",
-          "problemas"
-        ],
-        "title": "BorradorV2Respuesta",
-        "description": "Una v1 convertida a v2, sin guardar: se edita y se guarda como version nueva."
-      },
       "CambioCampoAdicionalEntrada": {
         "properties": {
           "nombre_legible": {
@@ -5615,7 +5517,6 @@
           "falta_whatsapp",
           "sin_supervisores",
           "sin_productos_cargables",
-          "version_v1_retirada",
           "speech_deshabilitado"
         ],
         "title": "CodigoMowaMes",
@@ -7837,15 +7738,6 @@
         ],
         "title": "FormatoRespuesta"
       },
-      "FormatoSpeech": {
-        "type": "string",
-        "enum": [
-          "v1",
-          "v2"
-        ],
-        "title": "FormatoSpeech",
-        "description": "Como se guarda el contenido de una version del speech.\n\n`v1` es la estructura fija de siempre (dos partes por segmento, RF-MM-14), incluido el Speech\noriginal. `v2` es una expresion del motor de texto enriquecido por segmento (RF-42 a RF-48)."
-      },
       "FormatoTabla": {
         "type": "string",
         "enum": [
@@ -9134,79 +9026,6 @@
         ],
         "title": "ParteSeleccion"
       },
-      "PartesEntrada": {
-        "properties": {
-          "segmento": {
-            "$ref": "#/components/schemas/Segmento"
-          },
-          "parte_1": {
-            "type": "string",
-            "maxLength": 500,
-            "title": "Parte 1"
-          },
-          "parte_2": {
-            "type": "string",
-            "maxLength": 500,
-            "title": "Parte 2"
-          }
-        },
-        "type": "object",
-        "required": [
-          "segmento",
-          "parte_1",
-          "parte_2"
-        ],
-        "title": "PartesEntrada"
-      },
-      "PartesRespuesta": {
-        "properties": {
-          "segmento": {
-            "$ref": "#/components/schemas/Segmento"
-          },
-          "etiqueta": {
-            "type": "string",
-            "title": "Etiqueta"
-          },
-          "dias_desde": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dias Desde"
-          },
-          "dias_hasta": {
-            "type": "integer",
-            "title": "Dias Hasta"
-          },
-          "parte_1": {
-            "type": "string",
-            "title": "Parte 1"
-          },
-          "parte_2": {
-            "type": "string",
-            "title": "Parte 2"
-          },
-          "usa_whatsapp": {
-            "type": "boolean",
-            "title": "Usa Whatsapp"
-          }
-        },
-        "type": "object",
-        "required": [
-          "segmento",
-          "etiqueta",
-          "dias_desde",
-          "dias_hasta",
-          "parte_1",
-          "parte_2",
-          "usa_whatsapp"
-        ],
-        "title": "PartesRespuesta"
-      },
       "PatronFechaRespuesta": {
         "properties": {
           "patron": {
@@ -9766,35 +9585,13 @@
       },
       "PrevisualizacionEntrada": {
         "properties": {
-          "partes": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PartesEntrada"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Partes",
-            "description": "Las `partes` de una v1 o las `expresiones` de una v2: una de las dos"
-          },
           "expresiones": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ExpresionSegmentoEntrada"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "items": {
+              "$ref": "#/components/schemas/ExpresionSegmentoEntrada"
+            },
+            "type": "array",
             "title": "Expresiones",
-            "description": "Las `partes` de una v1 o las `expresiones` de una v2: una de las dos"
+            "description": "Una expresion por segmento: los seis, cada uno una vez"
           },
           "whatsapp": {
             "anyOf": [
@@ -9811,6 +9608,9 @@
           }
         },
         "type": "object",
+        "required": [
+          "expresiones"
+        ],
         "title": "PrevisualizacionEntrada"
       },
       "PrevisualizacionTextoRespuesta": {
@@ -9968,9 +9768,6 @@
             "enum": [
               "nombre",
               "segmentos",
-              "formato",
-              "parte_1",
-              "parte_2",
               "expresion"
             ],
             "title": "Campo"
@@ -10676,9 +10473,6 @@
             "type": "string",
             "title": "Nombre"
           },
-          "formato": {
-            "$ref": "#/components/schemas/FormatoSpeech"
-          },
           "huella": {
             "type": "string",
             "title": "Huella"
@@ -10688,7 +10482,6 @@
         "required": [
           "id",
           "nombre",
-          "formato",
           "huella"
         ],
         "title": "SpeechCampanaRespuesta"
@@ -10701,40 +10494,19 @@
             "minLength": 1,
             "title": "Nombre"
           },
-          "partes": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PartesEntrada"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Partes",
-            "description": "Las `partes` de una v1 o las `expresiones` de una v2: una de las dos"
-          },
           "expresiones": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ExpresionSegmentoEntrada"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "items": {
+              "$ref": "#/components/schemas/ExpresionSegmentoEntrada"
+            },
+            "type": "array",
             "title": "Expresiones",
-            "description": "Las `partes` de una v1 o las `expresiones` de una v2: una de las dos"
+            "description": "Una expresion por segmento: los seis, cada uno una vez"
           }
         },
         "type": "object",
         "required": [
-          "nombre"
+          "nombre",
+          "expresiones"
         ],
         "title": "SpeechEdicionEntrada"
       },
@@ -10764,38 +10536,19 @@
             ],
             "title": "Basada En Id"
           },
-          "partes": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PartesEntrada"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Partes",
-            "description": "Las `partes` de una v1 o las `expresiones` de una v2: una de las dos"
-          },
           "expresiones": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ExpresionSegmentoEntrada"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "items": {
+              "$ref": "#/components/schemas/ExpresionSegmentoEntrada"
+            },
+            "type": "array",
             "title": "Expresiones",
-            "description": "Las `partes` de una v1 o las `expresiones` de una v2: una de las dos"
+            "description": "Una expresion por segmento: los seis, cada uno una vez"
           }
         },
         "type": "object",
+        "required": [
+          "expresiones"
+        ],
         "title": "SpeechNuevoEntrada"
       },
       "SpeechParcialEntrada": {
@@ -11545,9 +11298,6 @@
             "type": "string",
             "title": "Nombre"
           },
-          "formato": {
-            "$ref": "#/components/schemas/FormatoSpeech"
-          },
           "original": {
             "type": "boolean",
             "title": "Original"
@@ -11605,13 +11355,6 @@
             ],
             "description": "Por que no se podra eliminar por mas que se deshabilite: `original` o `usada` (RF-MM-30). null en las demas: una habilitada sin uso no es eliminable todavia (`eliminable` false), pero basta deshabilitarla"
           },
-          "partes": {
-            "items": {
-              "$ref": "#/components/schemas/PartesRespuesta"
-            },
-            "type": "array",
-            "title": "Partes"
-          },
           "expresiones": {
             "items": {
               "$ref": "#/components/schemas/ExpresionSegmentoRespuesta"
@@ -11624,7 +11367,6 @@
         "required": [
           "id",
           "nombre",
-          "formato",
           "original",
           "basada_en_id",
           "usada",
@@ -11633,11 +11375,10 @@
           "deshabilitada_en",
           "eliminable",
           "motivo_no_eliminable",
-          "partes",
           "expresiones"
         ],
         "title": "VersionSpeechRespuesta",
-        "description": "`partes` si es v1 y `expresiones` si es v2; la otra lista viene vacia."
+        "description": "Una version del speech: su contenido son las `expresiones`, una por segmento."
       },
       "app__api__archivos_carga__PrevisualizacionRespuesta": {
         "properties": {

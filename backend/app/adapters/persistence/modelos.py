@@ -39,7 +39,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from app.core.entities.calendario import TipoExcepcion
 from app.core.entities.campos_adicionales import TipoAdicional
 from app.core.entities.carga import EstadoCarga, EventoAuditoria
-from app.core.entities.mowa_mes import FormatoSpeech, Programacion
+from app.core.entities.mowa_mes import Programacion
 from app.core.entities.mowa_mes_campana import Salida, TipoCarga
 from app.core.entities.sabana import Severidad, TipoDocumento
 
@@ -487,20 +487,20 @@ class MowaMesConfiguracion(Base):
 
 
 class MowaMesSpeechVersion(Base):
-    """Version trazable del speech (RF-MM-17). `partes`: lista de {segmento, parte_1, parte_2}."""
+    """Version trazable del speech (RF-MM-17): una expresion del motor por segmento."""
 
     __tablename__ = "mowa_mes_speech_version"
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     nombre: Mapped[str] = mapped_column(Text)
     nombre_normalizado: Mapped[str] = mapped_column(Text)
-    partes: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
-    # M2 (B6): `v1` es la estructura fija de partes; `v2`, una expresion del motor por segmento
-    # (`expresiones`: lista de {segmento, expresion}, nula en las v1; `partes` queda en `[]`).
-    formato: Mapped[str] = mapped_column(String(2), server_default=FormatoSpeech.V2.value)
-    # `none_as_null`: un None de Python es NULL de SQL, no el JSON `null` (que para el CHECK de
-    # arriba no es NULL y rechazaria toda v1).
-    expresiones: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB(none_as_null=True))
+    # El texto de dos partes que tenia la version antes de convertirse a v2 (M-B3), tal cual lo
+    # sembro la migracion: {segmento, parte_1, parte_2} por segmento. Solo trazabilidad y el
+    # downgrade: nada lo lee. NULL en una version que nunca fue v1 o que se edito despues.
+    # `none_as_null`: un None de Python es NULL de SQL, no el JSON `null`.
+    texto_v1: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB(none_as_null=True))
+    # Una expresion del motor por segmento: lista de {segmento, expresion}.
+    expresiones: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     original: Mapped[bool] = mapped_column(Boolean, server_default="false")
     basada_en_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("mowa_mes_speech_version.id", ondelete="SET NULL")
@@ -513,11 +513,6 @@ class MowaMesSpeechVersion(Base):
 
     __table_args__ = (
         UniqueConstraint("nombre_normalizado"),
-        CheckConstraint(f"formato IN ({_en(FormatoSpeech)})", name="formato_valido"),
-        CheckConstraint(
-            "formato = 'v2' AND expresiones IS NOT NULL",
-            name="contenido_segun_formato",
-        ),
         Index(
             "uq_mowa_mes_speech_version_original",
             "original",

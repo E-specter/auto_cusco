@@ -39,7 +39,6 @@ export function speechOriginal(): VersionSpeech {
   return {
     id: 1,
     nombre: 'Speech original',
-    formato: 'v2',
     original: true,
     basada_en_id: null,
     usada: false,
@@ -48,7 +47,6 @@ export function speechOriginal(): VersionSpeech {
     deshabilitada_en: null,
     eliminable: false,
     motivo_no_eliminable: 'original',
-    partes: [],
     expresiones: expresionesDelOriginal(),
   };
 }
@@ -80,7 +78,6 @@ export function versionSpeech(parcial: Partial<VersionSpeech> = {}): VersionSpee
   return {
     id: 2,
     nombre: 'Speech 2',
-    formato: 'v2',
     original: false,
     basada_en_id: 1,
     usada: false,
@@ -89,7 +86,6 @@ export function versionSpeech(parcial: Partial<VersionSpeech> = {}): VersionSpee
     deshabilitada_en: null,
     eliminable: false,
     motivo_no_eliminable: null,
-    partes: [],
     expresiones: expresionesDelOriginal(),
     ...parcial,
   };
@@ -406,7 +402,6 @@ export function previsualizacionCampanaSintetica(
     speech: {
       id: speechId,
       nombre: speechId === 1 ? 'Speech original' : `Speech ${speechId}`,
-      formato: 'v2',
       huella: 'a'.repeat(64),
     },
     whatsapp: entrada.whatsapp?.trim() || '900000999',

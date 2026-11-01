@@ -7,17 +7,15 @@ Primer corte (B6a), configuracion:
     POST /mowa-mes/plantilla-nombre-archivo/previsualizacion   nombres de muestra, sin guardar
     GET  /mowa-mes/speech                     versiones, la original primero
     GET  /mowa-mes/speech/{id}
-    POST /mowa-mes/speech                     version nueva (solo v2: con `partes`, 400)
-    PUT  /mowa-mes/speech/{id}                solo v2, si no se uso; si no, 409 (con `partes`, 400)
-    POST /mowa-mes/speech/previsualizacion    largo maximo por segmento, sin guardar (v1 o v2)
-    GET  /mowa-mes/speech/{id}/como-v2        el borrador v2 de una v1 (sus mismos mensajes)
+    POST /mowa-mes/speech                     version nueva
+    PUT  /mowa-mes/speech/{id}                reemplaza una que nadie uso; si no, 409
+    PATCH /mowa-mes/speech/{id}               renombra y/o deshabilita o habilita
+    DELETE /mowa-mes/speech/{id}              borra una deshabilitada que nadie uso
+    POST /mowa-mes/speech/previsualizacion    largo maximo por segmento, sin guardar
 
-Una version es v1 (`partes`, dos por segmento) o v2 (`expresiones`, una del motor de texto
-enriquecido por segmento, M2); el pedido lleva `partes` o `expresiones`, no las dos. Desde M3
-(RF-MM-17) solo se crean y editan versiones v2: crear o editar con `partes` es 400 con el codigo
-`version_v1_retirada`; las v1 que existen se leen, se usan en campanas y se convierten con
-`como-v2`, y la previsualizacion sigue aceptando `partes`. Un 400 de una version trae `problemas`,
-cada uno con su segmento, su campo y, en una v2, su codigo y su ubicacion.
+Una version es `expresiones`: una del motor de texto enriquecido por segmento (M2). Desde M-B4
+(RF-MM-17) no hay versiones de dos partes: las que existian se convirtieron en su lugar. Un 400 de
+una version trae `problemas`, cada uno con su segmento, su campo, su codigo y su ubicacion.
 """
 
 from datetime import datetime
@@ -51,10 +49,8 @@ from app.core.entities.mowa_mes import (
     ConfiguracionMowaMes,
     DatosSpeech,
     ExpresionSegmento,
-    FormatoSpeech,
     MotivoNoEliminable,
     NombreDeSpeechRepetido,
-    PartesSegmento,
     ProblemaSpeech,
     Segmento,
     SpeechInmutable,
@@ -67,21 +63,18 @@ from app.core.entities.mowa_mes_costo import VARIABLES_PLANTILLA, TarifaInvalida
 from app.core.entities.texto_enriquecido import CodigoTexto, ExpresionInvalida, MotivoSinCota
 from app.core.services.plataformas.mowa_mes import costos
 from app.core.services.plataformas.mowa_mes.configuracion import (
-    BorradorV2,
     ConfiguracionMowaMesService,
 )
 from app.core.services.plataformas.mowa_mes.speech import (
     VARIABLE_CONTACTO,
     VARIABLE_TITULAR,
     VARIABLE_VENCIMIENTO,
-    usa_whatsapp,
 )
 from app.core.services.texto_enriquecido.serializacion import expresion_a_dict, expresion_desde_dict
 from app.core.services.texto_enriquecido.uso import variables_usadas
 
 router = APIRouter(prefix="/mowa-mes", tags=["mowa-mes"])
 
-LARGO_MAXIMO_PARTE = 500
 LIMITE_MENSUAL_MAXIMO = 1_000_000_000
 _RANGO = {rango.segmento: rango for rango in RANGOS_SEGMENTO}
 
@@ -293,12 +286,6 @@ def previsualizar_plantilla_nombre(
 # --- Speech --------------------------------------------------------------
 
 
-class PartesEntrada(BaseModel):
-    segmento: Segmento
-    parte_1: str = Field(max_length=LARGO_MAXIMO_PARTE)
-    parte_2: str = Field(max_length=LARGO_MAXIMO_PARTE)
-
-
 class ExpresionSegmentoEntrada(BaseModel):
     """El contenido de un segmento de una v2: su expresion completa (el modelo del motor)."""
 
@@ -306,7 +293,7 @@ class ExpresionSegmentoEntrada(BaseModel):
     expresion: ExpresionEntrada
 
 
-_DESCRIPCION_CONTENIDO = "Las `partes` de una v1 o las `expresiones` de una v2: una de las dos"
+_DESCRIPCION_CONTENIDO = "Una expresion por segmento: los seis, cada uno una vez"
 
 
 class SpeechNuevoEntrada(BaseModel):
@@ -316,18 +303,12 @@ class SpeechNuevoEntrada(BaseModel):
         description="Sin nombre, se le asigna el siguiente 'Speech N'",
     )
     basada_en_id: int | None = None
-    partes: list[PartesEntrada] | None = Field(default=None, description=_DESCRIPCION_CONTENIDO)
-    expresiones: list[ExpresionSegmentoEntrada] | None = Field(
-        default=None, description=_DESCRIPCION_CONTENIDO
-    )
+    expresiones: list[ExpresionSegmentoEntrada] = Field(description=_DESCRIPCION_CONTENIDO)
 
 
 class SpeechEdicionEntrada(BaseModel):
     nombre: str = Field(min_length=1, max_length=LARGO_MAXIMO_NOMBRE_SPEECH)
-    partes: list[PartesEntrada] | None = Field(default=None, description=_DESCRIPCION_CONTENIDO)
-    expresiones: list[ExpresionSegmentoEntrada] | None = Field(
-        default=None, description=_DESCRIPCION_CONTENIDO
-    )
+    expresiones: list[ExpresionSegmentoEntrada] = Field(description=_DESCRIPCION_CONTENIDO)
 
 
 class SpeechParcialEntrada(BaseModel):
@@ -344,25 +325,12 @@ class SpeechParcialEntrada(BaseModel):
 
 
 class PrevisualizacionEntrada(BaseModel):
-    partes: list[PartesEntrada] | None = Field(default=None, description=_DESCRIPCION_CONTENIDO)
-    expresiones: list[ExpresionSegmentoEntrada] | None = Field(
-        default=None, description=_DESCRIPCION_CONTENIDO
-    )
+    expresiones: list[ExpresionSegmentoEntrada] = Field(description=_DESCRIPCION_CONTENIDO)
     whatsapp: str | None = Field(
         default=None,
         max_length=20,
         description="Sin numero, se usa el WhatsApp de contacto configurado",
     )
-
-
-class PartesRespuesta(ModeloRespuesta):
-    segmento: Segmento
-    etiqueta: str
-    dias_desde: int | None
-    dias_hasta: int
-    parte_1: str
-    parte_2: str
-    usa_whatsapp: bool
 
 
 class ExpresionSegmentoRespuesta(ModeloRespuesta):
@@ -380,11 +348,10 @@ class ExpresionSegmentoRespuesta(ModeloRespuesta):
 
 
 class VersionSpeechRespuesta(ModeloRespuesta):
-    """`partes` si es v1 y `expresiones` si es v2; la otra lista viene vacia."""
+    """Una version del speech: su contenido son las `expresiones`, una por segmento."""
 
     id: int
     nombre: str
-    formato: FormatoSpeech
     original: bool
     basada_en_id: int | None
     usada: bool
@@ -410,7 +377,6 @@ class VersionSpeechRespuesta(ModeloRespuesta):
             "(`eliminable` false), pero basta deshabilitarla"
         )
     )
-    partes: list[PartesRespuesta]
     expresiones: list[ExpresionSegmentoRespuesta]
 
 
@@ -444,15 +410,6 @@ _RESPUESTAS_400 = {
         "description": "La peticion no vale: `detail` es el motivo y `problemas` dice donde",
     }
 }
-
-
-class BorradorV2Respuesta(ModeloRespuesta):
-    """Una v1 convertida a v2, sin guardar: se edita y se guarda como version nueva."""
-
-    basada_en_id: int
-    nombre_sugerido: str
-    expresiones: list[ExpresionSegmentoRespuesta]
-    problemas: list[ProblemaSpeechRespuesta]
 
 
 class CaracterQuitadoRespuesta(ModeloRespuesta):
@@ -528,33 +485,15 @@ def _caracter_quitado(grafema: str) -> CaracterQuitadoRespuesta:
     )
 
 
-def _partes(entrada: list[PartesEntrada]) -> tuple[PartesSegmento, ...]:
-    return tuple(PartesSegmento(p.segmento, p.parte_1, p.parte_2) for p in entrada)
-
-
-def _contenido(
-    partes: list[PartesEntrada] | None, expresiones: list[ExpresionSegmentoEntrada] | None
-) -> tuple[tuple[PartesSegmento, ...], tuple[ExpresionSegmento, ...]]:
-    """Las partes de una v1 o las expresiones de una v2, leidas con el lector estricto del motor.
+def _contenido(expresiones: list[ExpresionSegmentoEntrada]) -> tuple[ExpresionSegmento, ...]:
+    """Las expresiones del pedido, leidas con el lector estricto del motor.
 
     Una forma imposible (un tipo de nodo que no existe) no es un 422 sin ubicacion: es un problema
     `expresion_invalida` con su segmento y su nodo.
     """
-    if (partes is None) == (expresiones is None):
-        raise SpeechInvalido(
-            (
-                ProblemaSpeech(
-                    None,
-                    "formato",
-                    "Se piden `partes` (v1) o `expresiones` (v2), no las dos ni ninguna",
-                ),
-            )
-        )
-    if partes is not None:
-        return _partes(partes), ()
     leidas: list[ExpresionSegmento] = []
     problemas: list[ProblemaSpeech] = []
-    for item in expresiones or ():
+    for item in expresiones:
         try:
             dato = item.expresion.model_dump(exclude_unset=True, exclude_none=True)
             leidas.append(ExpresionSegmento(item.segmento, expresion_desde_dict(dato)))
@@ -564,7 +503,7 @@ def _contenido(
             ]
     if problemas:
         raise SpeechInvalido(tuple(problemas))
-    return (), tuple(leidas)
+    return tuple(leidas)
 
 
 def _problema(p: ProblemaSpeech) -> ProblemaSpeechRespuesta:
@@ -625,7 +564,6 @@ def _version(version: VersionSpeech) -> VersionSpeechRespuesta:
     return VersionSpeechRespuesta(
         id=version.id,
         nombre=version.datos.nombre,
-        formato=version.datos.formato,
         original=version.original,
         basada_en_id=version.basada_en_id,
         usada=version.usada,
@@ -634,18 +572,6 @@ def _version(version: VersionSpeech) -> VersionSpeechRespuesta:
         deshabilitada_en=version.deshabilitada_en,
         eliminable=version.eliminable,
         motivo_no_eliminable=version.motivo_no_eliminable,
-        partes=[
-            PartesRespuesta(
-                segmento=p.segmento,
-                etiqueta=_RANGO[p.segmento].etiqueta,
-                dias_desde=_RANGO[p.segmento].desde,
-                dias_hasta=_RANGO[p.segmento].hasta,
-                parte_1=p.parte_1,
-                parte_2=p.parte_2,
-                usa_whatsapp=usa_whatsapp(p),
-            )
-            for p in version.datos.partes
-        ],
         expresiones=[_expresion_de_segmento(e) for e in version.datos.expresiones],
     )
 
@@ -696,23 +622,19 @@ def previsualizar_speech(
 ) -> Any:
     """Largo maximo de cada segmento, con titular de 8 y fecha de 10 (RF-MM-19).
 
-    Con `expresiones` (v2) devuelve por segmento el largo maximo (la cota de la expresion), el
-    nivel (`codigo`: 150 o 160 si lo cruza) y el ejemplo evaluado; sin maximo calculable,
-    `largo_maximo` es nulo y `sin_maximo` dice por que. El control de los 160 caracteres de la
-    campana es por fila, sobre el mensaje real.
+    Devuelve por segmento el largo maximo (la cota de la expresion), el nivel (`codigo`: 150 o 160
+    si lo cruza) y el ejemplo evaluado; sin maximo calculable, `largo_maximo` es nulo y
+    `sin_maximo` dice por que. El control de los 160 caracteres de la campana es por fila, sobre
+    el mensaje real.
 
     Un segmento que usa [whatsapp] sin numero se marca con `falta_whatsapp` y sin
     ejemplo: nunca se muestra un enlace roto.
     """
     try:
-        partes, expresiones = _contenido(entrada.partes, entrada.expresiones)
-        archivados: tuple[tuple[str, str], ...] = ()
-        if entrada.expresiones is not None:
-            whatsapp, problemas, largos, archivados = servicio.previsualizar_speech_v2(
-                expresiones, entrada.whatsapp
-            )
-        else:
-            whatsapp, problemas, largos = servicio.previsualizar_speech(partes, entrada.whatsapp)
+        expresiones = _contenido(entrada.expresiones)
+        whatsapp, problemas, largos, archivados = servicio.previsualizar_speech_v2(
+            expresiones, entrada.whatsapp
+        )
     except (ConfiguracionInvalida, SpeechInvalido) as exc:
         return _respuesta_de_error(exc)
     return PrevisualizacionRespuesta(
@@ -806,31 +728,6 @@ def eliminar_speech(
     return Response(status_code=204)
 
 
-@router.get(
-    "/speech/{speech_id}/como-v2",
-    response_model=BorradorV2Respuesta,
-    responses={**_RESPUESTAS_400, **respuestas_de_error(404)},
-)
-def convertir_a_v2(
-    speech_id: int,
-    servicio: ConfiguracionMowaMesService = Depends(obtener_servicio_mowa_mes),
-) -> Any:
-    """El borrador v2 de una v1: la misma estructura expresada con el motor, que da los mismos
-    mensajes y largos (con el titular y la fecha obligatorios). No guarda nada: se edita y se
-    guarda con `POST /speech` y `basada_en_id`, como una version nueva con huella propia. La v1
-    queda intacta. Una version que ya es v2 responde 400."""
-    try:
-        borrador: BorradorV2 = servicio.como_v2(speech_id)
-    except (SpeechNoEncontrado, SpeechInvalido) as exc:
-        return _respuesta_de_error(exc)
-    return BorradorV2Respuesta(
-        basada_en_id=borrador.basada_en_id,
-        nombre_sugerido=borrador.nombre_sugerido,
-        expresiones=[_expresion_de_segmento(e) for e in borrador.expresiones],
-        problemas=[_problema(p) for p in borrador.problemas],
-    )
-
-
 @router.post(
     "/speech",
     status_code=201,
@@ -841,15 +738,11 @@ def crear_speech(
     entrada: SpeechNuevoEntrada,
     servicio: ConfiguracionMowaMesService = Depends(obtener_servicio_mowa_mes),
 ) -> Any:
-    """Guarda una version v2 nueva (`expresiones`). Con `partes` (una v1) es 400 con el codigo
-    `version_v1_retirada`: ya no se crean versiones de dos partes (RF-MM-17). 404 si
-    `basada_en_id` no existe."""
+    """Guarda una version nueva (`expresiones`, una por segmento). 404 si `basada_en_id` no
+    existe."""
     try:
-        partes, expresiones = _contenido(entrada.partes, entrada.expresiones)
-        if entrada.expresiones is not None:
-            version = servicio.crear_speech_v2(entrada.nombre, expresiones, entrada.basada_en_id)
-        else:
-            version = servicio.crear_speech(entrada.nombre, partes, entrada.basada_en_id)
+        expresiones = _contenido(entrada.expresiones)
+        version = servicio.crear_speech_v2(entrada.nombre, expresiones, entrada.basada_en_id)
         return _version(version)
     except (SpeechInvalido, SpeechNoEncontrado, NombreDeSpeechRepetido) as exc:
         return _respuesta_de_error(exc)
@@ -865,15 +758,10 @@ def actualizar_speech(
     entrada: SpeechEdicionEntrada,
     servicio: ConfiguracionMowaMesService = Depends(obtener_servicio_mowa_mes),
 ) -> Any:
-    """Reemplaza una version v2 que nadie uso. Con `partes` es 400 `version_v1_retirada` (ni se
-    crean ni se editan versiones de dos partes, RF-MM-17); si ya se uso o es la original, 409; si
-    es una v1 y el contenido es v2, 400."""
+    """Reemplaza una version que nadie uso. Si ya se uso, es la original o esta deshabilitada,
+    409."""
     try:
-        partes, expresiones = _contenido(entrada.partes, entrada.expresiones)
-        formato = FormatoSpeech.V2 if entrada.expresiones is not None else FormatoSpeech.V1
-        datos = DatosSpeech(
-            nombre=entrada.nombre, partes=partes, expresiones=expresiones, formato=formato
-        )
+        datos = DatosSpeech(nombre=entrada.nombre, expresiones=_contenido(entrada.expresiones))
         return _version(servicio.actualizar_speech(speech_id, datos))
     except (SpeechInvalido, SpeechNoEncontrado, SpeechInmutable, NombreDeSpeechRepetido) as exc:
         return _respuesta_de_error(exc)
