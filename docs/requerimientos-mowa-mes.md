@@ -241,7 +241,9 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
   * Se filtra por mes de gestión, que es el mes de la fecha de envío (el mismo de RF-MM-01), escrito como «Octubre de 2026».
 * **RF-MM-33 — Campañas pendientes de reporte:** Señalar en el seguimiento las campañas activas que todavía no tienen reporte de enviados importado, con el paso siguiente («importar el reporte de enviados de MES»).
   * La campaña recién creada enlaza a su seguimiento.
-* **RF-MM-34 — Dónde está el id de MES:** Explicar, junto al campo del `id` de MES al importar el reporte, dónde se encuentra ese identificador en la web de MES (supuesto S-MM-10).
+* **RF-MM-34 — Dónde está el id de MES:** Nombrar el `id` de MES como lo llama MES, para que se reconozca: en la web de MES es el «ID campaña» y en el reporte de enviados es la columna `id` (decisión del usuario, 2026-11-01, que cierra S-MM-10).
+  * No se escribe a mano: sale del archivo del reporte. La pantalla lo nombra así donde hoy dice «id de MES» (la importación, la conciliación, el reemplazo y las advertencias).
+  * Los observados tienen 7 dígitos; no es una regla y no se valida el largo. Un ejemplo en pantalla, si lo hay, es sintético.
 
 ## 6. Decisiones tomadas sobre los puntos abiertos del pedido
 
@@ -274,6 +276,7 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Speech v1 y v2 | Solo v2 en todo el módulo: las v1 se convierten en su lugar con la conversión exacta y mensajes idénticos; su texto v1 se guarda para trazabilidad (RF-MM-17) | Usuario (2026-10-30), consultado por architec |
 | Campaña descartada y límite mensual | Sale de todos los cálculos, también del límite; si tiene reporte importado, la confirmación lo advierte (RF-MM-31) | Usuario (2026-10-30), consultado por architec |
 | Reporte de una campaña descartada | Se rechaza la importación con «restáurala primero»; no se guarda nada (RF-MM-31) | Usuario (2026-10-30), consultado por coordinador_modulo_mowa_mes |
+| Cómo aparece el id de MES (antes S-MM-10) | En la web de MES es el «ID campaña» (los vistos tienen 7 dígitos, sin ser regla) y en el reporte es la columna `id`, numérica; no se escribe a mano (RF-MM-34) | Usuario (2026-11-01) |
 | Cambiar los filtros desde la campaña | «Editar en Cartera» y volver, sin editor propio en la campaña (RF-MM-09) | Usuario (2026-10-30), consultado por architec |
 
 ## 7. Evidencia de los ejemplos
@@ -301,7 +304,6 @@ Los ejemplos están en `archivos_anexo_chat/`, con prefijo `MOWA_MES_Ejemplo_`: 
 | Supuesto | Qué se asumió | Dónde aplica |
 |---|---|---|
 | S-MM-1 | Sin integración por API: se generan archivos y se importa el reporte a mano | Todo el módulo |
-| S-MM-10 | Pendiente: cómo aparece el `id` de una campaña en la web de MES (pantalla, columna y forma), para el texto de ayuda | RF-MM-34 |
 
 Queda abierto S-MM-1: depende de información externa (qué ofrece MES), no de una preferencia del usuario. S-MM-3 se cerró el 2026-10-27: el usuario confirmó en el formulario de MES que la descripción admite 100 caracteres (sección 6). S-MM-2, S-MM-5 y S-MM-6 se confirmaron el 2026-09-21, y S-MM-7 y S-MM-8 el 2026-09-14; los cinco pasaron a la sección 6. S-MM-9 (los extendidos de GSM-7 se conservaban y contaban 2) se cerró el 2026-10-26 sin esperar a MES: el usuario decidió transliterarlos (RF-MM-27). S-MM-4 se confirmó el mismo día y pasó a la sección 6: architec contrastó la regla con los calendarios publicados para 2026 y 2027 (coinciden los 16 feriados y no hay ley nueva; siguen en trámite, sin aprobar, un feriado el 13 de octubre y el traslado de algunos feriados a lunes). Los descansos compensables por la visita del papa (D. S. 020-2026-TR, del 11 al 16 de noviembre de 2026) son regionales y no son feriados: el usuario no los marcó.
 ## 9. Registro de cambios
@@ -341,3 +343,6 @@ Queda abierto S-MM-1: depende de información externa (qué ofrece MES), no de u
 - **RF-MM-31 ampliado el mismo día:** importar un reporte a una campaña descartada se rechaza (U-1 del plan T-MM-C11).
 - **Supuesto nuevo:** S-MM-10, cómo aparece el id de MES (RF-MM-34).
 - **Nota de numeración:** sin renumerar, como el resto del módulo.
+
+**2026-11-01**
+- **RF existentes ampliados:** RF-MM-34 (dónde está el id de MES): el id se nombra como «ID campaña», como en MES, y es la columna `id` del reporte. Decisión del usuario; cierra el supuesto S-MM-10.
