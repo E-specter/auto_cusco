@@ -508,8 +508,8 @@ test.describe('F6-B: costos (RF-MM-24)', () => {
     await abrir(page, api);
 
     await expect(page.locator('[data-costo-mes]')).toHaveText('Costo del mes: S/ 1,234.50 · no incluye 2 campañas sin tarifa');
-    // Its own line right under the limit's figures, with nothing in between.
-    await expect(page.locator('[data-limite-cifras] + [data-costo-mes]')).toHaveCount(1);
+    // Its own line right under the limit's figures: only the usage bar (M-F7a) sits between them, and nothing else.
+    await expect(page.locator('[data-limite-cifras] + .mm-uso + [data-costo-mes]')).toHaveCount(1);
     // The amount in the numeral scale of the limit's figures; the note muted.
     const fuente = (selector: string) =>
       page.locator(selector).first().evaluate((el) => {

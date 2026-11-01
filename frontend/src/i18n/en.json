@@ -799,7 +799,7 @@
   "mowaMes.campana.nombreEstimado": "Estimated: the number of files depends on how the load is split, and [campana] is known once it is created.",
   "mowaMes.campana.costo.estimado": "Estimated cost",
   "mowaMes.campana.costo.hint": "{n} SMS × {tarifa}",
-  "mowaMes.costo.pendiente": "Pending the report",
+  "mowaMes.costo.pendiente": "Report pending",
   "mowaMes.costo.noDisponible": "Not available",
   "mowaMes.costo.noDisponible.ayuda": "Campaign created before the rate was stored",
   "mowaMes.costo.tarifa": "Rate {tarifa}",

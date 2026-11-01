@@ -242,11 +242,30 @@
   gap: var(--space-1);
 }
 
+/* The month and its two arrows are one piece: never split into three rows. `.row` also sets `flex-wrap` and is
+   loaded after this sheet, so the rule carries both classes to win by specificity, not by order. */
+.row.mm-mes {
+  flex-wrap: nowrap;
+}
+
+/* On a phone the title has its row, and «‹ Octubre de 2026 ›» goes under it, on one line. */
+@media (max-width: 47.99rem) {
+  .panel__head > .mm-mes {
+    flex-basis: 100%;
+    justify-content: center;
+  }
+
+  .mm-mes__valor {
+    min-inline-size: 0;
+    flex: 1 1 auto;
+  }
+}
+
 .mm-mes__valor {
   min-inline-size: 16ch;
   text-align: center;
   font-weight: 700;
-  text-transform: capitalize;
+  white-space: nowrap;
 }
 
 .mm-cifras {
@@ -430,8 +449,29 @@
 /* ---- Pending report (RF-MM-33) ---------------------------------------------------
    The tag sits after the description, on its own line when the cell is narrow; the notice in the detail
    carries its way to the import field at the end, and drops it under the text when there is no room. */
-.mm-pendiente__tag {
+/* The tag may break and never goes past its cell: a phone's column is narrow (the tag is nowrap otherwise). */
+/* `.tag` is `nowrap` and is loaded after this sheet: both classes, to win by specificity and not by order. */
+.tag.mm-pendiente__tag {
   margin-inline-start: var(--space-2);
+  max-inline-size: 100%;
+  white-space: normal;
+}
+
+/* The line above the active list (§4.3: one line): its hourglass sits before the text, in the text's colour. */
+.mm-pendientes {
+  padding-block-end: 0;
+}
+
+.mm-pendientes__linea {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.mm-pendientes__linea svg {
+  flex: none;
+  margin-block-start: 0.1em;
 }
 
 .mm-pendiente {
@@ -494,6 +534,8 @@
 .mm-deshab > details > summary {
   display: flex;
   align-items: center;
+  /* `.panel__head` spreads its children apart: here the arrow and the title go together, on the left. */
+  justify-content: flex-start;
   gap: var(--space-2);
   cursor: pointer;
   list-style: none;
@@ -594,9 +636,16 @@
   margin-block-start: 0.2em;
 }
 
+/* The icon and its label are one inline-flex piece (§2.3); the spaces after it stay real text, so the line still
+   reads «Costo del mes: S/ 19.64 · …». */
+.mm-costo-mes__rotulo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .mm-costo-mes__icono {
-  vertical-align: -0.2em;
-  margin-inline-end: var(--space-1);
+  flex: none;
   color: var(--color-text-muted);
 }
 
@@ -670,38 +719,47 @@
   font-size: var(--text-sm);
 }
 
+/* One grid for every datum, three columns (name | value | button): the copy buttons line up in a column of their own.
+   Each row is `display: contents`, so its three cells join the list's grid; the hairline under a row is under each cell. */
 .mm-subir__datos {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr) auto;
+  align-items: start;
   margin: 0;
 }
 
 .mm-subir__dato {
-  display: grid;
-  grid-template-columns: minmax(10rem, 14rem) 1fr;
-  align-items: start;
-  gap: var(--space-3);
+  display: contents;
+}
+
+.mm-subir__dato dt,
+.mm-subir__dato dd {
+  margin: 0;
   padding-block: var(--space-2);
   border-block-end: var(--color-border-hairline) solid var(--color-border);
 }
 
 .mm-subir__dato dt {
+  padding-inline-end: var(--space-3);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
 
-.mm-subir__dato dd {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0;
+.mm-subir__dato dd:not(.mm-subir__copiar) {
+  padding-inline-end: var(--space-3);
+  min-inline-size: 0;
 }
 
-/* On a phone the name goes above its value, so neither is squeezed beside the other. */
+/* On a phone the name goes above its value, and the value has its button beside it, so neither is squeezed. */
 @media (max-width: 47.99rem) {
-  .mm-subir__dato {
-    grid-template-columns: 1fr;
-    gap: var(--space-1);
+  .mm-subir__datos {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mm-subir__dato dt {
+    grid-column: 1 / -1;
+    padding-block-end: 0;
+    border-block-end: 0;
   }
 }
 

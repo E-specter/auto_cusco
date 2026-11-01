@@ -166,6 +166,28 @@ test.describe('el límite mensual', () => {
     await expect(barra(page)).toHaveAttribute('data-tono', 'excedido');
   });
 
+  test('el mes se ve «Octubre de 2026», con la mayúscula del texto y sin «De»: el CSS no capitaliza', async ({ page }) => {
+    await abrir(page, conUso(625_000));
+
+    // `innerText` is what is painted: it applies `text-transform`, `textContent` does not.
+    const visto = await page.locator('[data-mes]').evaluate((el) => (el as HTMLElement).innerText);
+    expect(visto).toMatch(/^[A-ZÁÉÍÓÚ][a-zñ]+ de \d{4}$/);
+    expect(await page.locator('[data-mes]').evaluate((el) => getComputedStyle(el).textTransform)).toBe('none');
+  });
+
+  test('«Costo del mes»: la moneda va en la misma línea, antes del texto', async ({ page }) => {
+    await abrir(page, conUso(625_000));
+
+    const icono = (await page.locator('[data-costo-mes] svg').boundingBox())!;
+    const rotulo = (await page.locator('[data-costo-mes] [data-i18n="mowaMes.seguimiento.costoMes"]').boundingBox())!;
+    const monto = (await page.locator('[data-costo-mes-valor]').boundingBox())!;
+    // Before the label, on its row; and the amount is on that row too, not under the icon.
+    expect(icono.x + icono.width).toBeLessThanOrEqual(rotulo.x + 1);
+    expect(icono.y).toBeLessThan(rotulo.y + rotulo.height);
+    expect(icono.y + icono.height).toBeGreaterThan(rotulo.y);
+    expect(monto.y).toBeLessThan(rotulo.y + rotulo.height + 4);
+  });
+
   test('«Costo del mes» lleva su moneda (coins) y el texto sigue igual', async ({ page }) => {
     await abrir(page, conUso(625_000));
 
@@ -313,6 +335,26 @@ test.describe('idioma y anchos', () => {
     await expect(page.locator('#mm-limite-title svg')).toHaveCount(1);
     await expect(page.locator('[data-limite-barra]')).toHaveAttribute('data-tono', 'excedido');
     await expect(page.locator('[data-detalle-cifras] .stat__label svg')).not.toHaveCount(0);
+  });
+
+  test('a 360 px el título del límite va en su renglón y «‹ mes ›» debajo, en uno solo', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 900 });
+    await abrir(page, conUso(625_000));
+
+    const titulo = (await page.locator('#mm-limite-title').boundingBox())!;
+    const anterior = (await page.getByRole('button', { name: 'Mes anterior' }).boundingBox())!;
+    const mes = (await page.locator('[data-mes]').boundingBox())!;
+    const siguiente = (await page.getByRole('button', { name: 'Mes siguiente' }).boundingBox())!;
+    // Under the title...
+    expect(Math.min(anterior.y, mes.y, siguiente.y)).toBeGreaterThanOrEqual(titulo.y + titulo.height - 1);
+    // ...and the three in one row, in order, with the month in one line.
+    expect(Math.abs(anterior.y - siguiente.y)).toBeLessThan(4);
+    expect(Math.abs(mes.y + mes.height / 2 - (anterior.y + anterior.height / 2))).toBeLessThan(6);
+    expect(anterior.x + anterior.width).toBeLessThanOrEqual(mes.x + 1);
+    expect(mes.x + mes.width).toBeLessThanOrEqual(siguiente.x + 1);
+    const lineas = await page.locator('[data-mes]').evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
+    expect(lineas).toBe(1);
+    expect(siguiente.x + siguiente.width).toBeLessThanOrEqual(361);
   });
 
   test('a 360 px la barra ocupa el ancho del panel y nada desborda', async ({ page }) => {

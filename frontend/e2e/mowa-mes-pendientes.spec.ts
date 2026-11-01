@@ -5,7 +5,7 @@
  * which the API computes: the screen never works it out. Every value is synthetic.
  */
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { apiMowaMes, campanaSintetica, montarApiMowaMes, type ApiFalsaMowaMes } from './api-falsa-mowa-mes';
 
@@ -57,7 +57,21 @@ test.describe('la fila y la línea de arriba', () => {
 
     await expect(linea(page)).toBeVisible();
     await expect(linea(page)).toHaveText('2 campañas pendientes del reporte');
-    await expect(linea(page).locator('.notice')).toHaveClass(/notice--warning/);
+    // One quiet line (§4.3), not a notice: a `.field__hint` with its hourglass inline, before the text.
+    const texto = linea(page).locator('p');
+    await expect(texto).toHaveClass(/field__hint/);
+    await expect(linea(page).locator('.notice')).toHaveCount(0);
+    await expect(texto.locator('svg')).toHaveCount(1);
+    await expect(texto.locator('svg')).toHaveAttribute('aria-hidden', 'true');
+    // The hourglass is the tag's: the same concept, the same icon.
+    const dibujo = (nodo: Locator) => nodo.evaluate((el) => el.innerHTML);
+    expect(await dibujo(texto.locator('svg'))).toBe(await dibujo(fila(page, 3).locator('.tag svg')));
+    // And it is in the line, on its left.
+    const caja = (await texto.locator('svg').boundingBox())!;
+    const palabras = (await texto.locator('[data-pendientes-texto]').boundingBox())!;
+    expect(caja.x + caja.width).toBeLessThanOrEqual(palabras.x + 1);
+    expect(caja.y).toBeLessThan(palabras.y + palabras.height);
+    expect(caja.y + caja.height).toBeGreaterThan(palabras.y);
   });
 
   test('con una sola, en singular', async ({ page }) => {
@@ -193,9 +207,25 @@ test.describe('idioma y anchos', () => {
     await expect(page.locator('.mm-campanas__tabla tbody tr').first()).toBeVisible();
 
     await expect(page.locator('.mm-campanas__tabla tbody tr').first().locator('.tag')).toHaveText('Report pending');
+    // The cost that is not an amount yet says the same as the tag: «Report pending», not «Pending the report».
+    await expect(page.locator('.mm-campanas__tabla tbody tr').first()).not.toContainText('Pending the report');
+    await expect(page.locator('.mm-campanas__tabla tbody tr').first().locator('td.muted', { hasText: 'Report pending' }).first()).toBeVisible();
     await expect(linea(page)).toHaveText('2 campaigns with the report pending');
     await expect(aviso(page)).toContainText('The MES sent report has not been imported yet.');
     await expect(aviso(page).getByRole('button', { name: 'Import the report' })).toBeVisible();
+  });
+
+  test('a 360 px el tag «Pendiente del reporte» se parte y no pasa del borde de su celda', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 900 });
+    await abrir(page, conCampanas([3]));
+
+    const medidas = await fila(page, 3).locator('.tag').evaluate((tag) => {
+      const celda = tag.closest('td')!.getBoundingClientRect();
+      const caja = tag.getBoundingClientRect();
+      return { derechaTag: caja.right, derechaCelda: celda.right, blanco: getComputedStyle(tag).whiteSpace };
+    });
+    expect(medidas.blanco).toBe('normal');
+    expect(medidas.derechaTag).toBeLessThanOrEqual(medidas.derechaCelda + 0.5);
   });
 
   test('a 360 px el aviso no desborda y su botón queda a la vista', async ({ page }) => {

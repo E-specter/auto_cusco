@@ -256,10 +256,13 @@ test.describe('anchos y accesibilidad', () => {
 
     const fila = panel(page).locator('dl > div').first();
     const nombre = (await fila.locator('dt').boundingBox())!;
-    const valor = (await fila.locator('dd').boundingBox())!;
+    const valor = (await fila.locator('dd').first().boundingBox())!;
     expect(nombre.y + nombre.height).toBeLessThanOrEqual(valor.y + 1);
     const boton = (await fila.getByRole('button').boundingBox())!;
     expect(boton.x + boton.width).toBeLessThanOrEqual(361);
+    // Under the name, the value has its button beside it: the same row.
+    expect(boton.x).toBeGreaterThanOrEqual(valor.x + valor.width - 1);
+    expect(Math.abs(boton.y - valor.y)).toBeLessThan(valor.height + 8);
     const desborde = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(desborde).toBeLessThanOrEqual(0);
   });
@@ -270,8 +273,41 @@ test.describe('anchos y accesibilidad', () => {
 
     const fila = panel(page).locator('dl > div').first();
     const nombre = (await fila.locator('dt').boundingBox())!;
-    const valor = (await fila.locator('dd').boundingBox())!;
+    const valor = (await fila.locator('dd').first().boundingBox())!;
     expect(valor.x).toBeGreaterThan(nombre.x + nombre.width - 1);
+  });
+
+  test('a 1280 px son tres columnas: los «Copiar» quedan en una columna alineada, a la derecha del valor', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await crearCampana(page);
+
+    const filas = panel(page).locator('dl > div');
+    const columnas = { nombre: new Set<number>(), valor: new Set<number>(), boton: new Set<number>() };
+    for (let i = 0; i < (await filas.count()); i++) {
+      const fila = filas.nth(i);
+      const nombre = (await fila.locator('dt').boundingBox())!;
+      const valor = (await fila.locator('dd').first().boundingBox())!;
+      const boton = (await fila.getByRole('button').boundingBox())!;
+      columnas.nombre.add(Math.round(nombre.x));
+      columnas.valor.add(Math.round(valor.x));
+      columnas.boton.add(Math.round(boton.x));
+      expect(boton.x).toBeGreaterThanOrEqual(valor.x + valor.width - 1);
+    }
+    // One x for each column, whatever the length of the values.
+    expect(columnas.nombre.size).toBe(1);
+    expect(columnas.valor.size).toBe(1);
+    expect(columnas.boton.size).toBe(1);
+  });
+
+  test('el botón de copiar es el pequeño de solo icono, con su nombre', async ({ page }) => {
+    await crearCampana(page);
+
+    const boton = panel(page).getByRole('button', { name: 'Copiar Salida', exact: true });
+    await expect(boton).toHaveClass(/btn--sm/);
+    await expect(boton).toHaveClass(/btn--icon/);
+    await expect(boton).toHaveAttribute('title', 'Copiar Salida');
+    const caja = (await boton.boundingBox())!;
+    expect(Math.round(caja.width)).toBe(Math.round(caja.height));
   });
 
   for (const tema of ['light', 'dark'] as const) {

@@ -77,8 +77,10 @@ import '../../styles/mowa-mes.css';
             <div class="mm-uso__relleno" data-limite-barra data-tono="normal"></div>
           </div>
           <p class="mm-costo-mes" data-costo-mes>
-            <Icon name="coins" size={16} class="mm-costo-mes__icono" />
-            <span data-i18n="mowaMes.seguimiento.costoMes">Costo del mes:</span>{' '}
+            <span class="mm-costo-mes__rotulo">
+              <Icon name="coins" size={16} class="mm-costo-mes__icono" />
+              <span data-i18n="mowaMes.seguimiento.costoMes">Costo del mes:</span>
+            </span>{' '}
             <strong class="mm-costo-mes__valor" data-costo-mes-valor></strong>{' '}
             <span class="muted" data-costo-mes-nota hidden></span>
           </p>
@@ -126,9 +128,9 @@ import '../../styles/mowa-mes.css';
           </div>
         </div>
         <!-- Above the list: how many of its campaigns still wait for the sent report (RF-MM-33). -->
-        <div class="panel__body" data-pendientes hidden>
-          <p class="notice notice--warning" role="status">
-            <Icon name="triangle-alert" size={20} />
+        <div class="panel__body mm-pendientes" data-pendientes hidden>
+          <p class="field__hint mm-pendientes__linea" role="status">
+            <Icon name="hourglass" size={16} />
             <span data-pendientes-texto></span>
           </p>
         </div>
@@ -807,12 +809,11 @@ import '../../styles/mowa-mes.css';
       window.history.pushState(null, '', `${window.location.pathname}${busquedaConVista(window.location.search, vista)}`);
     }
     pintarCampanas();
-    if (vista === 'descartadas') {
-      try {
-        await cargarDescartadas();
-      } catch (caido) {
-        mostrarError(caido);
-      }
+    try {
+      if (vista === 'descartadas') await cargarDescartadas();
+      await abrirLaDeLaVista(campanaDeLaUrl(window.location.search));
+    } catch (caido) {
+      mostrarError(caido);
     }
   }
 
@@ -824,7 +825,9 @@ import '../../styles/mowa-mes.css';
 
   $<HTMLSelectElement>('[data-descartadas-mes]').addEventListener('change', (evento) => {
     estado.mesDescartadas = (evento.currentTarget as HTMLSelectElement).value;
-    void cargarDescartadas().catch(mostrarError);
+    void cargarDescartadas()
+      .then(() => abrirLaDeLaVista(null))
+      .catch(mostrarError);
   });
 
   // ---- Discard, restore, delete (RF-MM-31, RF-MM-32) ------------------------------------------------
@@ -1452,15 +1455,35 @@ import '../../styles/mowa-mes.css';
   /** Opens the campaign the URL names, even if it is not on this page of the list. `false` if there is none. */
   async function abrirPedida(id: number | null): Promise<boolean> {
     if (id === null) return false;
-    if (!estado.campanas?.campanas.some((campana) => campana.id === id)) {
+    if (!campanasDeLaVista().some((campana) => campana.id === id)) {
+      // Not on the list in sight. Only an active one, from the active view, is fetched (an older one the list does not
+      // show): the detail is always of the view in sight, so a discarded one is never opened from the active view,
+      // and none is fetched into the discarded view, whose list is what the month filter says.
+      if (estado.vista !== 'activas') return false;
       try {
-        estado.campanaAparte = await obtenerCampana(id);
+        const pedida = await obtenerCampana(id);
+        if (pedida.descartada_en !== null) return false;
+        estado.campanaAparte = pedida;
       } catch {
         return false;
       }
     }
     await elegirCampana(id);
     return true;
+  }
+
+  /**
+   * The detail is always of the view in sight: what the active list does on loading, applied to the list of the view
+   * that is in sight. The campaign a link names (`?campana=`) wins if it is in the view; the one already open stays
+   * while it is in it; otherwise the first of the list; and a view with none shows the same empty detail.
+   */
+  async function abrirLaDeLaVista(pedida: number | null): Promise<void> {
+    if (await abrirPedida(pedida)) return;
+    const lista = campanasDeLaVista();
+    if (estado.campanaId !== null && lista.some((campana) => campana.id === estado.campanaId)) return;
+    const primera = lista[0];
+    if (primera) await elegirCampana(primera.id);
+    else cerrarDetalle();
   }
 
   async function arrancar(): Promise<void> {
@@ -1475,7 +1498,13 @@ import '../../styles/mowa-mes.css';
       estado.campanas = campanas;
       estado.descartadas = descartadas;
       estado.mesDescartadas = elegirMesDescartadas(descartadas.meses, estado.mesDescartadas);
-      // Opened on the discarded view (`?vista=descartadas`): the month it opens on is the newest.
+      // Opened on the discarded view (`?vista=descartadas`): the month it opens on is the newest, unless the link names
+      // a discarded campaign (`?campana=`): then it is that campaign's month, so the one it names is in the view.
+      const pedida = campanaDeLaUrl(window.location.search);
+      const mesDeLaPedida = descartadas.campanas.find((campana) => campana.id === pedida)?.mes_imputacion;
+      if (estado.vista === 'descartadas' && mesDeLaPedida && descartadas.meses.includes(mesDeLaPedida)) {
+        estado.mesDescartadas = mesDeLaPedida;
+      }
       if (estado.vista === 'descartadas' && estado.mesDescartadas) {
         estado.descartadas = await listarDescartadas(estado.mesDescartadas);
       }
@@ -1484,12 +1513,9 @@ import '../../styles/mowa-mes.css';
       pintarLimite();
       pintarCampanas();
       pintarDetalle();
-      // `?campana=<id>` opens that one (the link of «Para subir a MES»); otherwise the most recent, which is
-      // where a follow-up usually starts.
-      const primera = campanas.campanas[0];
-      if (estado.campanaId === null && !(await abrirPedida(campanaDeLaUrl(window.location.search)))) {
-        if (primera) await elegirCampana(primera.id);
-      }
+      // `?campana=<id>` opens that one (the link of «Para subir a MES») if it is in the view in sight; otherwise the
+      // first of its list (the most recent, which is where a follow-up usually starts).
+      if (estado.campanaId === null) await abrirLaDeLaVista(pedida);
     } catch (caido) {
       if (caido instanceof NetworkError) {
         sinConexion(true);

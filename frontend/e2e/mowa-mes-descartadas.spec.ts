@@ -249,6 +249,104 @@ test('el «cuenta en» del detalle lleva el mes en minúscula, a mitad de frase'
   await expect(page.locator('[data-detalle-meta]')).toContainText('cuenta en octubre de 2026');
 });
 
+test.describe('el detalle es siempre de la vista a la vista', () => {
+  test('al abrir con ?vista=descartadas el detalle es el de la primera descartada, no una activa', async ({ page }) => {
+    await abrir(page, conDescartadas(), '?vista=descartadas');
+
+    await expect(detalle(page)).toHaveText('Campaña 3');
+    // Not the active campaign 5 (pending, with its notice and the way to import): this one is discarded.
+    await expect(page.locator('[data-pendiente-aviso]')).toBeHidden();
+    await expect(page.locator('[data-reporte-descartada]')).toBeVisible();
+    await expect(fila(page, 3).getByRole('button', { name: 'Ver la campaña 3' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('al cambiar de vista el detalle cambia con ella, y vuelve a la primera de la otra', async ({ page }) => {
+    await abrir(page, conDescartadas());
+    await expect(detalle(page)).toHaveText('Campaña 5');
+
+    await vista(page, 'Descartadas').click();
+    await expect(detalle(page)).toHaveText('Campaña 3');
+    await expect(page.locator('[data-reporte-descartada]')).toBeVisible();
+
+    await vista(page, 'Activas').click();
+    await expect(detalle(page)).toHaveText('Campaña 5');
+    await expect(page.locator('[data-reporte-descartada]')).toBeHidden();
+  });
+
+  test('atrás y adelante también lo llevan: el detalle sigue a la vista que dice la URL', async ({ page }) => {
+    await abrir(page, conDescartadas());
+    await vista(page, 'Descartadas').click();
+    await expect(detalle(page)).toHaveText('Campaña 3');
+
+    await page.goBack();
+    await expect(detalle(page)).toHaveText('Campaña 5');
+    await page.goForward();
+    await expect(detalle(page)).toHaveText('Campaña 3');
+  });
+
+  test('al elegir otro mes el detalle es el de la primera de ese mes', async ({ page }) => {
+    await abrir(page, conDescartadas(), '?vista=descartadas');
+    await expect(detalle(page)).toHaveText('Campaña 3');
+
+    await mes(page).selectOption('2026-09');
+
+    await expect(detalle(page)).toHaveText('Campaña 2');
+    await mes(page).selectOption('2026-10');
+    await expect(detalle(page)).toHaveText('Campaña 3');
+  });
+
+  test('una vista vacía muestra el mismo detalle vacío que las activas', async ({ page }) => {
+    const sinDescartadas = conDescartadas();
+    sinDescartadas.campanas = sinDescartadas.campanas.filter((c) => c.descartada_en === null);
+    await abrir(page, sinDescartadas);
+    await expect(detalle(page)).toHaveText('Campaña 5');
+
+    await vista(page, 'Descartadas').click();
+
+    await expect(page.getByText('No hay campañas descartadas.')).toBeVisible();
+    await expect(page.getByText('Elige una campaña para ver su detalle.')).toBeVisible();
+    await expect(detalle(page)).toHaveCount(0);
+
+    // The same with the active list empty.
+    const sinActivas = conDescartadas();
+    sinActivas.campanas = sinActivas.campanas.filter((c) => c.descartada_en !== null);
+    const otra = await page.context().newPage();
+    await montarApiMowaMes(otra, sinActivas);
+    await otra.goto('/mowa-mes/seguimiento');
+    await expect(otra.getByText('Todavía no hay campañas generadas.')).toBeVisible();
+    await expect(otra.getByText('Elige una campaña para ver su detalle.')).toBeVisible();
+    await otra.close();
+  });
+
+  test('la campaña que nombra el enlace gana si está en la vista', async ({ page }) => {
+    await abrir(page, conDescartadas(), '?campana=4');
+
+    await expect(detalle(page)).toHaveText('Campaña 4');
+  });
+
+  test('una descartada que nombra el enlace abre su vista, en su mes, con ella en el detalle', async ({ page }) => {
+    await abrir(page, conDescartadas(), '?vista=descartadas&campana=1');
+
+    // Campaign 1 is of September: the month the view opens on is its own, not the newest.
+    await expect(mes(page)).toHaveValue('2026-09');
+    await expect(detalle(page)).toHaveText('Campaña 1');
+    await expect(fila(page, 1).getByRole('button', { name: 'Ver la campaña 1' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('la que nombra el enlace no gana si no está en la vista: una activa en las descartadas, o una descartada en las activas', async ({ page }) => {
+    await abrir(page, conDescartadas(), '?vista=descartadas&campana=5');
+    await expect(detalle(page)).toHaveText('Campaña 3');
+
+    const otra = await page.context().newPage();
+    await montarApiMowaMes(otra, conDescartadas());
+    await otra.goto('/mowa-mes/seguimiento?campana=3');
+    await expect(otra.getByRole('heading', { name: 'Seguimiento de MOWA MES', level: 1 })).toBeVisible();
+    await expect(otra.getByRole('heading', { name: /^Campaña \d+$/, level: 2 })).toHaveText('Campaña 5');
+    await expect(otra.locator('[data-reporte-descartada]')).toBeHidden();
+    await otra.close();
+  });
+});
+
 test.describe('descartar', () => {
   test('pide confirmación, con el foco en «Cancelar»; sin reporte importado no advierte', async ({ page }) => {
     await abrir(page, conDescartadas());

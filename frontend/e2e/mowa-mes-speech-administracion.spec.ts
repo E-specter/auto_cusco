@@ -234,6 +234,18 @@ test.describe('deshabilitar', () => {
 });
 
 test.describe('versiones deshabilitadas', () => {
+  test('en el resumen, el título va junto a la flecha, a la izquierda', async ({ page }) => {
+    await abrir(page, conVersiones());
+
+    const resumenCaja = (await resumen(page).boundingBox())!;
+    const flecha = (await resumen(page).locator('svg').boundingBox())!;
+    const titulo = (await resumen(page).locator('h2').boundingBox())!;
+    // The arrow first, the title right after it, both at the left edge of the summary (not the title pushed to the right).
+    expect(flecha.x + flecha.width).toBeLessThanOrEqual(titulo.x + 1);
+    expect(titulo.x - (flecha.x + flecha.width)).toBeLessThan(24);
+    expect(titulo.x - resumenCaja.x).toBeLessThan(resumenCaja.width / 3);
+  });
+
   test('el panel abre cerrado y no se muestra con cero', async ({ page }) => {
     await abrir(page, conVersiones());
 
@@ -546,6 +558,10 @@ test.describe('idioma y anchos', () => {
         await abrirPanel(page);
         await fila(page, 4).getByRole('button', { name: 'Ver' }).click();
         await expect(candado(page)).toBeVisible();
+        // The preview of the version just opened is being calculated, and its lengths are dimmed meanwhile: axe reads
+        // the contrast of what is painted, so it waits for the calculation to end (as accesibilidad.spec does).
+        await expect(page.locator('[data-speech-filas] tr[data-segmento] [data-largo]').first()).not.toHaveText('—');
+        await expect(page.locator('[data-form-speech]')).not.toHaveAttribute('data-calculando', 'true');
 
         const lista = await new AxeBuilder({ page }).withTags(REGLAS).analyze();
         expect(lista.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
