@@ -1,6 +1,6 @@
 # Plan de RF-MM-28 a RF-MM-36 (T-MM-C11)
 
-> **Estado: cerrado el 2026-10-31, salvo M-F8,** que espera S-MM-10. Los cortes están en `main`, de `154afee` a `1bcf2d8`. La revisión de cierre, con los hashes, las desviaciones, la verificación y los hallazgos, está en [revision-c11.md](revision-c11.md).
+> **Estado: cerrado el 2026-10-31; M-F8 cerrado el 2026-11-02** (`8873614` y `2583ee2`), con el dato del usuario que cerró S-MM-10. Los cortes están en `main`, de `154afee` a `1bcf2d8`, más los de M-F8. La revisión de cierre, con los hashes, las desviaciones, la verificación y los hallazgos, está en [revision-c11.md](revision-c11.md).
 >
 > **Escrito el 2026-10-30 sobre `1b0d9fe`.** Es solo el plan: no hay código hasta que lo apruebe `architec`.
 >

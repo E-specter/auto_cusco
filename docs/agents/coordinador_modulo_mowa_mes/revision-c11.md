@@ -1,6 +1,6 @@
 # Revisión de RF-MM-28 a RF-MM-36 (T-MM-C11)
 
-> **Cerrada el 2026-10-31, salvo M-F8.** Plan: [plan-c11.md](plan-c11.md), en `a4930dd`. Requerimientos en [requerimientos-mowa-mes.md](../../requerimientos-mowa-mes.md) (`1b0d9fe`): RF-MM-28 a RF-MM-36, RF-MM-17 modificado (solo v2) y RF-MM-01 y RF-MM-09 ampliados. Reglas de interfaz de `designer` en [mowa-mes-interfaz.md](../../mowa-mes-interfaz.md) (T-MM-D11). Los cortes están en `main`, de `154afee` (M-B1) a `1bcf2d8` (el arreglo de M-B4), sin subir con `git push`. M-F8 sigue bloqueado por S-MM-10.
+> **Cerrada el 2026-10-31; M-F8 cerrado el 2026-11-02** en `8873614` (backend) y `2583ee2` (frontend), con el dato del usuario que cerró S-MM-10 (el id es el «ID campaña» de MES, la columna `id` del reporte). Plan: [plan-c11.md](plan-c11.md), en `a4930dd`. Requerimientos en [requerimientos-mowa-mes.md](../../requerimientos-mowa-mes.md) (`1b0d9fe`): RF-MM-28 a RF-MM-36, RF-MM-17 modificado (solo v2) y RF-MM-01 y RF-MM-09 ampliados. Reglas de interfaz de `designer` en [mowa-mes-interfaz.md](../../mowa-mes-interfaz.md) (T-MM-D11). Los cortes están en `main`, de `154afee` (M-B1) a `1bcf2d8` (el arreglo de M-B4). El CI rojo de `5ebb9b3` (el reloj de las specs de MOWA) lo arregló `c3a6732`.
 
 Coordinador: `coordinador_modulo_mowa_mes`. Reporta a `architec`. Revisores:
 - `coordinador_motor_texto_enriquecido`: el §13 de todo corte que tocaba el motor, el selector, `/cartera` o el contrato compartido;
@@ -132,7 +132,8 @@ Coordinador: `coordinador_modulo_mowa_mes`. Reporta a `architec`. Revisores:
 
 ## 8. Pendiente
 
-- **M-F8** (RF-MM-34, el hint del id de MES): espera S-MM-10, el dato del usuario de cómo aparece el id en la web de MES.
+- ~~**M-F8**~~ (RF-MM-34): hecho el 2026-11-02 (`8873614` y `2583ee2`).
+- **T-MM-F13, pulido:** las dos tablas de la conciliación pasan a `.table--apilable`, porque a 360 px «Coinciden con la campaña» queda fuera de la vista (designer, 2026-11-02, de las capturas de M-F8).
 - **T-MM-B14:** `none_as_null`, y un CHECK de tipo donde aplique, en las 5 JSONB NOT NULL de MOWA, después de revisar quién escribe en cada una.
 - **T-JSON-1, del motor y sin urgencia:** las mismas 6 JSONB NOT NULL de otros módulos (§6).
 - **La fragilidad de `_motivo`, que viene de C10:** el lector del reporte reconoce los errores del lector general por el texto del mensaje. C11 no lo tocó.
