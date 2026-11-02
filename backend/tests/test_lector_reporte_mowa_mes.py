@@ -23,6 +23,9 @@ FILA = [
     "usuario_sintetico",
 ]
 
+# El texto de designer (M-F8, RF-MM-34): el id se llama «ID campaña» como en MES.
+MENSAJE_ID_NO_NUMERICO = r"^La fila 2 no tiene un ID campaña numérico en la columna «id»\.$"
+
 
 def _xlsx(cabeceras=COLUMNAS_REPORTE, *filas, hoja="Hoja1") -> bytes:
     libro = openpyxl.Workbook()
@@ -107,7 +110,7 @@ def test_sin_filas() -> None:
 
 
 def test_un_id_que_no_es_numero() -> None:
-    with pytest.raises(ReporteInvalido, match="fila 2"):
+    with pytest.raises(ReporteInvalido, match=MENSAJE_ID_NO_NUMERICO):
         LectorReporteMowaMes().leer(_xlsx(COLUMNAS_REPORTE, ["abc", *FILA[1:]]))
 
 
@@ -282,7 +285,7 @@ def test_un_csv_sin_una_columna_dice_cual_falta() -> None:
 def test_un_csv_con_un_id_que_no_es_numero_dice_la_fila() -> None:
     texto = chr(10).join([";".join(COLUMNAS_REPORTE), ";".join(["abc", *map(str, FILA[1:])])])
 
-    with pytest.raises(ReporteInvalido, match="fila 2"):
+    with pytest.raises(ReporteInvalido, match=MENSAJE_ID_NO_NUMERICO):
         LectorReporteMowaMes().leer(texto.encode("utf-8"), "reporte.csv")
 
 

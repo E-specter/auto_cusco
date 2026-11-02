@@ -5,6 +5,7 @@ supervision, WhatsApp, limite, huella del speech, division), no PostgreSQL.
 Titulares, documentos y telefonos sinteticos; supervisores del rango 900000xxx.
 """
 
+import re
 from dataclasses import replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -675,7 +676,10 @@ def test_importar_asocia_cada_id_y_un_id_repetido_exige_confirmar() -> None:
 
     assert [(r.mes_id, r.filas) for r in estado.reportes] == [(70001, 4), (70002, 3)]
     assert (estado.conciliacion.total.cargados, estado.conciliacion.total.enviados) == (7, 7)
-    with pytest.raises(ReporteYaImportado):
+    ya_importado = (
+        "Ya se importó el reporte de los ID campaña 70001, 70002; confirma para reemplazarlo."
+    )
+    with pytest.raises(ReporteYaImportado, match=f"^{re.escape(ya_importado)}$"):
         reportes.importar(creada.id, "reporte.xlsx", b"")
     reemplazado = reportes.importar(creada.id, "otro.xlsx", b"", reemplazar=True)
     assert {r.nombre_archivo for r in reemplazado.reportes} == {"otro.xlsx"}

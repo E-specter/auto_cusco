@@ -56,7 +56,7 @@ def _fecha(valor: Any) -> str:
 def _mes_id(valor: Any, fila: int) -> int:
     texto = _entero_como_texto(valor)
     if not texto.isdigit():
-        raise ReporteInvalido(f"La fila {fila} no tiene un id de MES numerico")
+        raise ReporteInvalido(f"La fila {fila} no tiene un ID campaña numérico en la columna «id».")
     return int(texto)
 
 

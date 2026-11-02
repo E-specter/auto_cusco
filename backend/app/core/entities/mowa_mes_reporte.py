@@ -89,6 +89,6 @@ class ReporteYaImportado(Exception):
     def __init__(self, mes_ids: tuple[int, ...]) -> None:
         ids = ", ".join(str(i) for i in mes_ids)
         super().__init__(
-            f"Ya se importo el reporte de los id de MES {ids}; confirma para reemplazarlo"
+            f"Ya se importó el reporte de los ID campaña {ids}; confirma para reemplazarlo."
         )
         self.mes_ids = mes_ids
