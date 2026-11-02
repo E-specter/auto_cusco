@@ -204,7 +204,7 @@ El speech por segmento es **una columna de texto compuesto con variantes por seg
 - el editor (sección 2) con límite 160;
 - los niveles de largo que MOWA MES ya usa (Cabe / Más de 150 / Más de 160 / Falta WhatsApp).
 
-La versión, el nombre de la versión y el guardado conservan su forma actual. Las versiones v1 se siguen mostrando en solo lectura con sus dos partes, hasta la fase M3.
+La versión, el nombre de la versión y el guardado conservan su forma actual. Las versiones v1 ya no existen: se convirtieron a v2 en su lugar (RF-MM-17, §10.2).
 
 ## 6. Sistema visual
 
@@ -399,17 +399,11 @@ El nombre es de la definición, no de una versión: renombrar **no crea una vers
 
 Pantalla de MOWA MES (`/mowa-mes/configuracion`): la revisa también `coordinador_modulo_mowa_mes`.
 
-- **Una versión v1** (incluido el Speech original) **se ve en solo lectura:**
-  - La tabla de segmentos queda con Parte 1, Parte 2, largo y estado como texto, sin campos.
-  - Arriba va el aviso de inmutable que ya existe (`.notice--info` con candado): «Versión de dos partes (v1): se usa en campañas tal como está y ya no se edita».
-  - El pie de guardar (nombre de la versión, Guardar, Descartar) no aparece hasta convertir.
-- **«Convertir a v2» es la única acción de una v1.**
-  - El hint pasa a «Para personalizarla, conviértela a v2: obtienes un borrador con los mismos mensajes, que no se guarda hasta que lo confirmes».
-  - El hint de bloqueo («Guarda o descarta los cambios de las partes…») desaparece, porque las partes ya no se editan.
+- **Solo v2 (RF-MM-17, decisión del usuario del 2026-10-30).** Las versiones de dos partes (v1), incluido el Speech original, se convirtieron a v2 en su lugar, con los mismos mensajes. Toda versión abre en el editor v2: ya no hay vista v1 ni «Convertir a v2» (T-MM-C11, M-F1). El Speech original lleva su propio aviso de candado; los avisos y la administración de versiones están en [mowa-mes-interfaz.md](mowa-mes-interfaz.md) §4.5.
 - **El aviso del segmento con producto real** pasa a «Con un producto real de muestra, el segmento sale de sus días de atraso ajustados a hoy, como si el mensaje se enviara hoy; en la campaña se ajustan a su fecha de envío». La última parte evita que alguien crea que la campaña también usa hoy: MOWA MES conserva su regla de fecha de envío (RF-MM-15). Usa la misma idea de «hoy» que la vista previa de `/columnas` (10.3).
-- **GSM-7 (RF-MM-27):** el largo y la vista previa vienen normalizados del backend; las partes de una v1 se muestran como se escribieron.
-  - **Hint fijo,** en v1 (incluido el Speech original, que también tiene tildes) y en v2: «Al generar, se quitan las tildes, los signos que el SMS no admite se cambian por uno simple y los que no tienen equivalente se borran. La versión se guarda como la escribes». En inglés: «When generating, accents are removed, signs the SMS does not accept are replaced by a simple one, and those with no equivalent are deleted. The version is saved as you write it».
-  - **Unidad del largo:** con la normalización, el largo se mide como lo cuenta el SMS. Se sigue diciendo «caracteres» en la columna, las etiquetas y los mensajes, y la nota de cálculo bajo la tabla suma una sola frase: «Se cuenta como lo cuenta el SMS: € [ ] { } \ ~ ^ y | ocupan 2 caracteres, y los signos que se cambian se cuentan ya cambiados («…» ocupa 3)». El largo y la cota del editor en el contexto `mowa_mes.speech` usan la misma unidad, para que la pantalla no muestre dos largos distintos; en `/columnas` no cambia nada (decisión de `coordinador_modulo_mowa_mes`, 2026-10-22, dentro de T-MM-B9).
+- **GSM-7 (RF-MM-27):** el largo y la vista previa vienen normalizados del backend.
+  - **Hint fijo,** bajo el editor: «Al generar, se quitan las tildes, los signos que el SMS no admite se cambian por uno simple y los que no tienen equivalente se borran. La versión se guarda como la escribes». En inglés: «When generating, accents are removed, signs the SMS does not accept are replaced by a simple one, and those with no equivalent are deleted. The version is saved as you write it».
+  - **Unidad del largo:** con la normalización, el largo se mide como lo cuenta el SMS: los signos que se cambian se cuentan ya cambiados («…» ocupa 3, como «...», y «€» también, como «EUR»). Desde el 2026-10-26, € [ ] { } \ ~ y | se transliteran y ^ se borra, así que ya no hay signos que ocupen 2. Se sigue diciendo «caracteres» en las etiquetas y los mensajes. El largo y la cota del editor en el contexto `mowa_mes.speech` usan la misma unidad, para que la pantalla no muestre dos largos distintos; en `/columnas` no cambia nada (decisión de `coordinador_modulo_mowa_mes`, 2026-10-22, dentro de T-MM-B9).
   - **Entra con la normalización, no antes:** la pantalla no promete lo que la generación todavía no hace. El hint y la línea de borrados los implementa T-MM-F7, sobre B16 y T-MM-B9, y no F8 (acuerdo de los dos coordinadores, 2026-10-20).
   - **Lo que se cambia por uno simple no se señala,** igual que las tildes. El usuario decidió transliterar (RF-MM-27, 2026-10-19): “ ” « » pasan a ", ‘ ’ a ', … a ..., – y — a -, ° y º a o, y ª a a. Se sigue leyendo igual.
   - **Lo que se borra sí se señala,** porque desaparece sin que se note en la vista previa: un emoji o un signo sin equivalente. El backend devuelve, por segmento, los caracteres que se borran, sin repetir, en el orden en que aparecen y con su punto de código (T-MM-B9).
@@ -420,8 +414,7 @@ Pantalla de MOWA MES (`/mowa-mes/configuracion`): la revisa también `coordinado
     - Cualquier otro sin parte visible (todos sus puntos de categoría Mn, Me, Cf, Cc o Zs, como «U+FE0F U+20E3» de un keycap) va como «carácter invisible U+XXXX» / «invisible character U+XXXX», con todos sus puntos.
     - No se marcan dentro del texto y la línea no bloquea guardar.
     - Lleva el icono `triangle-alert` y el color de advertencia, para no depender solo del color.
-    - **En v2:** `.notice--warning` de una línea, bajo el editor, para el segmento en pantalla.
-    - **En una v1:** la misma línea en la celda «Estado» de su fila.
+    - Es un `.notice--warning` de una línea, bajo el editor, para el segmento en pantalla.
 
 ### 10.3 Fecha de envío (F6, RF-55)
 
@@ -447,5 +440,5 @@ Pantalla de MOWA MES (`/mowa-mes/configuracion`): la revisa también `coordinado
 ### 10.4 Pruebas mínimas de C3
 
 - **F7:** abrir el diálogo, renombrar y ver el nombre nuevo en el campo y en la lista; el 409 bajo el campo, con el diálogo abierto; «Renombrar» inactivo sin cambios; el cuerpo enviado no crea una versión; renombrar desde una versión antigua; axe con el diálogo abierto, en claro y oscuro.
-- **F8:** una v1 en solo lectura, sin campos ni pie de guardar; «Convertir a v2» lleva al editor; el aviso nuevo del segmento; axe en la v1 de solo lectura. En T-MM-F7: el hint de GSM-7 en v1 y en v2, y la línea de caracteres borrados, que aparece solo con borrados, sin repetir, y no bloquea guardar.
+- **F8:** el aviso nuevo del segmento. (La v1 en solo lectura y «Convertir a v2» se probaron hasta que M-F1 los quitó.) En T-MM-F7: el hint de GSM-7 bajo el editor, y la línea de caracteres borrados, que aparece solo con borrados, sin repetir, y no bloquea guardar.
 - **F6:** la fecha por defecto, con el reloj fijado en la noche de Lima, cuando UTC ya es el día siguiente; `min` sigue a la fecha de corte; el 400 bajo el campo con las dos fechas; la fecha de envío en la vista previa y en la línea del botón; la nota de «hoy» en `/columnas`; axe en `/generar-carga` con el error de fecha.
