@@ -10,6 +10,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
+  MES_ACTUAL,
   apiMowaMes,
   campanaSintetica,
   conciliacionSintetica,
@@ -32,11 +33,14 @@ const REPORTE = {
   buffer: Buffer.from('reporte sintetico de prueba'),
 };
 
-const dos = (n: number) => String(n).padStart(2, '0');
+/**
+ * The month `delta` months from the fixed one (`MES_ACTUAL`), never from Node's clock. It is not `moverMes` of
+ * `src/lib/mowa-mes-seguimiento.ts`: that module reaches `i18n`, whose JSON the specs' loader cannot import.
+ */
 function mesRelativo(delta: number): string {
-  const hoy = new Date();
-  const fecha = new Date(hoy.getFullYear(), hoy.getMonth() + delta, 1);
-  return `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}`;
+  const [anio, mes] = MES_ACTUAL.split('-').map(Number);
+  const indice = anio * 12 + (mes - 1) + delta;
+  return `${Math.floor(indice / 12)}-${String((indice % 12) + 1).padStart(2, '0')}`;
 }
 
 /** Requests to exactly `ruta` (query ignored). */

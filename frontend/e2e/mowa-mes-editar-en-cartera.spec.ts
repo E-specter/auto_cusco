@@ -27,6 +27,8 @@ const PROPIA = /^\/api\/(cartera|selecciones|cargas)(\/|$)/;
 /** A `page` that gives its routes only to the requests that match, so two fakes that each 404 what they do not know can share one. */
 function soloRutas(page: Page, coincide: (ruta: string) => boolean): Page {
   return {
+    // The MOWA fake fixes the clock of the page it mounts on (`montarApiMowaMes`): it is the same page.
+    clock: page.clock,
     route: (_patron: unknown, manejador: Parameters<Page['route']>[1]) => page.route((url) => coincide(url.pathname), manejador),
   } as unknown as Page;
 }

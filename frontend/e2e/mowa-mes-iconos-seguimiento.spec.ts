@@ -9,6 +9,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import {
   DESCARTADA_EN,
+  MES_ACTUAL,
   apiMowaMes,
   campanaSintetica,
   consumoSintetico,
@@ -153,9 +154,7 @@ test.describe('el límite mensual', () => {
   test('cambiar de mes repinta la barra con el consumo de ese mes', async ({ page }) => {
     const api = apiMowaMes();
     api.consumo = (mes) => {
-      const hoy = new Date();
-      const actual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
-      const cargados = mes === actual ? 625_000 : 2_600_000;
+      const cargados = mes === MES_ACTUAL ? 625_000 : 2_600_000;
       return consumoSintetico(mes, { limite: LIMITE, cargados_mes: cargados, total: cargados, disponible: LIMITE - cargados, excedido: cargados > LIMITE });
     };
     await abrir(page, api);

@@ -15,7 +15,7 @@ import type { LargoSegmento, VersionSpeech } from '../src/lib/api-mowa-mes';
 import type { ExpresionSegmentoEntrada, ProblemaSpeech } from '../src/lib/mowa-mes-speech-v2';
 import type { components } from '../src/lib/contrato-api';
 import { caracteresQuitados, normalizarGsm7 } from './api-falsa-gsm7';
-import { montarApiMowaMes, type ApiFalsaMowaMes } from './api-falsa-mowa-mes';
+import { AHORA_MOWA, montarApiMowaMes, type ApiFalsaMowaMes } from './api-falsa-mowa-mes';
 import { apiTextoEnriquecidoVacia, manejarTextoEnriquecido, type ApiFalsaTextoEnriquecido } from './api-falsa-texto-enriquecido';
 import { json } from './apoyo';
 import { SEGMENTOS, expresionRespuesta } from './speech-original';
@@ -204,7 +204,7 @@ export async function montarApiSpeechV2(
         basada_en_id: (cuerpo.basada_en_id as number | null) ?? null,
         usada: false,
         editable: true,
-        creado_en: new Date().toISOString(),
+        creado_en: new Date(AHORA_MOWA).toISOString(),
         deshabilitada_en: null,
         eliminable: false,
         motivo_no_eliminable: null,

@@ -32,6 +32,14 @@ import type {
 import { json, siguiente } from './apoyo';
 import { expresionesDelOriginal } from './speech-original';
 
+/**
+ * The clock every MOWA MES spec runs on: mid-month at noon, so Lima (UTC-5) and UTC fall on the same day and the same
+ * month. The browser reads it through `page.clock`; the specs and the fakes read the month from `MES_ACTUAL`, never from
+ * Node's own clock, which on a runner in UTC says another month in the first hours of the 1st (Lima is still the 31st).
+ */
+export const AHORA_MOWA = '2026-10-15T12:00:00-05:00';
+export const MES_ACTUAL = AHORA_MOWA.slice(0, 7);
+
 type Respuesta = { estado: number; cuerpo?: unknown };
 
 /** The Speech original, as the database holds it since M-B3: a v2, with the migration's expressions. */
@@ -600,6 +608,8 @@ function contextoDe(estado: ApiFalsaMowaMes): ContextoCostos {
  * missing fake fails loudly instead of reaching a real server.
  */
 export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Promise<void> {
+  // `setFixedTime`, not `install`: the timers keep running, so the waits and the debounces are the real ones.
+  await page.clock.setFixedTime(new Date(AHORA_MOWA));
   const supervisionYCalendario = manejadorSupervisionCalendario(estado);
   await page.route('**/api/**', async (route) => {
     const pedido = route.request();
@@ -849,9 +859,7 @@ export async function montarApiMowaMes(page: Page, estado: ApiFalsaMowaMes): Pro
       if (mes !== null && !/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) {
         return json(route, 422, { detail: [{ loc: ['query', 'mes'], msg: 'String should match YYYY-MM', type: 'string_pattern_mismatch' }] });
       }
-      const hoy = new Date();
-      const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
-      return json(route, 200, consumoSintetico(mes ?? mesActual, estado.consumo(mes ?? mesActual)));
+      return json(route, 200, consumoSintetico(mes ?? MES_ACTUAL, estado.consumo(mes ?? MES_ACTUAL)));
     }
 
     const unaCampana = ruta.match(/^\/mowa-mes\/campanas\/(\d+)(\/.*)?$/);
