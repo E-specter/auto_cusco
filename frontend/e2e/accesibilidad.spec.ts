@@ -297,7 +297,7 @@ test('calendario: diálogo de excepción con error', async ({ page }) => {
 test('mowa-mes seguimiento: diálogo de reporte ya importado (409) con error', async ({ page }) => {
   const api = apiMowaMes();
   api.respuestas.importarReporte = [
-    { estado: 409, cuerpo: { detail: 'El id de MES 990000001 ya estaba importado' } },
+    { estado: 409, cuerpo: { detail: 'Ya se importó el reporte de los ID campaña 990000001; confirma para reemplazarlo.' } },
   ];
   await montarApiMowaMes(page, api);
   await page.goto('/mowa-mes/seguimiento');
@@ -308,7 +308,7 @@ test('mowa-mes seguimiento: diálogo de reporte ya importado (409) con error', a
   });
   await page.getByRole('button', { name: 'Importar reporte' }).click();
   const dialogo = page.getByRole('dialog', { name: 'Este reporte ya estaba importado' });
-  await expect(dialogo.getByText('El id de MES 990000001 ya estaba importado')).toBeVisible();
+  await expect(dialogo.getByText('Ya se importó el reporte de los ID campaña 990000001; confirma para reemplazarlo.')).toBeVisible();
   await sinViolaciones(page);
 });
 

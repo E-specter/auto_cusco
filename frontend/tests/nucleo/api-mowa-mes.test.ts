@@ -275,12 +275,12 @@ describe('campañas y seguimiento', () => {
   });
 
   it('un id ya importado llega como 409 con el motivo', async () => {
-    responderCon(409, { detail: 'El id de MES 990000001 ya estaba importado' });
+    responderCon(409, { detail: 'Ya se importó el reporte de los ID campaña 990000001; confirma para reemplazarlo.' });
 
     const fallo = await importarReporte(7, new File(['x'], 'r.xlsx')).catch((error: unknown) => error);
 
     expect((fallo as ApiError).status).toBe(409);
-    expect((fallo as ApiError).detail).toBe('El id de MES 990000001 ya estaba importado');
+    expect((fallo as ApiError).detail).toBe('Ya se importó el reporte de los ID campaña 990000001; confirma para reemplazarlo.');
   });
 
   it('pide la conciliación de su campaña', async () => {

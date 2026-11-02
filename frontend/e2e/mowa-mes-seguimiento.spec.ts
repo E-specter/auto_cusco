@@ -169,7 +169,7 @@ test.describe('S3: importar y conciliar', () => {
     await expect(page.getByText('Filas del reporte sin correspondencia en la campaña: 8')).toBeVisible();
     // importado_en 02:30 UTC on the 16th crosses midnight: in Lima it is the 15th.
     await expect(
-      page.getByText('Id 990000001 · REPORTE_SINTETICO.xlsx · 985 filas · 15.09 · 21:30'),
+      page.getByText('ID campaña 990000001 · REPORTE_SINTETICO.xlsx · 985 filas · 15.09 · 21:30'),
     ).toBeVisible();
 
     const [envio] = pedidosA(api, 'POST', '/mowa-mes/campanas/1/reportes');
@@ -192,7 +192,7 @@ test.describe('S4: reimportar un id ya importado', () => {
   test('pide confirmación con «No reemplazar» preseleccionado y reenvía con reemplazar=true', async ({ page }) => {
     const api = apiMowaMes();
     api.respuestas.importarReporte = [
-      { estado: 409, cuerpo: { detail: 'El id de MES 990000001 ya estaba importado' } },
+      { estado: 409, cuerpo: { detail: 'Ya se importó el reporte de los ID campaña 990000001; confirma para reemplazarlo.' } },
       { estado: 201, cuerpo: conciliacionSintetica(1) },
     ];
     await abrir(page, api);
@@ -201,7 +201,7 @@ test.describe('S4: reimportar un id ya importado', () => {
 
     const dialogo = page.getByRole('dialog', { name: 'Este reporte ya estaba importado' });
     await expect(dialogo).toBeVisible();
-    await expect(dialogo.getByText('El id de MES 990000001 ya estaba importado')).toBeVisible();
+    await expect(dialogo.getByText('Ya se importó el reporte de los ID campaña 990000001; confirma para reemplazarlo.')).toBeVisible();
     await expect(dialogo.getByRole('button', { name: 'No reemplazar' })).toBeFocused();
 
     await dialogo.getByRole('button', { name: 'Reemplazar', exact: true }).click();
@@ -214,7 +214,7 @@ test.describe('S4: reimportar un id ya importado', () => {
 
   test('«No reemplazar» cierra sin volver a enviar', async ({ page }) => {
     const api = apiMowaMes();
-    api.respuestas.importarReporte = [{ estado: 409, cuerpo: { detail: 'El id de MES 990000001 ya estaba importado' } }];
+    api.respuestas.importarReporte = [{ estado: 409, cuerpo: { detail: 'Ya se importó el reporte de los ID campaña 990000001; confirma para reemplazarlo.' } }];
     await abrir(page, api);
 
     await importarReporte(page);
@@ -227,7 +227,7 @@ test.describe('S4: reimportar un id ya importado', () => {
 });
 
 test.describe('S5: id sin correspondencia', () => {
-  test('advierte con el id de MES que no es de esta campaña', async ({ page }) => {
+  test('advierte con el ID campaña que no es de esta campaña', async ({ page }) => {
     const api = apiMowaMes();
     api.respuestas.importarReporte = [
       {
@@ -249,10 +249,79 @@ test.describe('S5: id sin correspondencia', () => {
 
     await expect(
       page.getByText(
-        'Un id de MES del reporte no coincide con ninguna fila cargada de esta campaña: probablemente es de otra. Id de MES: 990000777.',
+        'Un ID campaña del reporte no coincide con ninguna fila cargada de esta campaña: probablemente es de otra. ID campaña: 990000777.',
       ),
     ).toBeVisible();
   });
+});
+
+test.describe('RF-MM-34: el id de MES se llama «ID campaña», como en MES', () => {
+  const TEXTOS = {
+    es: {
+      intro: 'Sube el reporte de enviados que descargas de MES para esta campaña. Cada ID campaña del archivo (la columna «id») queda asociado a ella.',
+      reemplazo: 'Si reemplazas, las filas de ese ID campaña se sustituyen por las del archivo nuevo y la conciliación se recalcula.',
+      titulo: 'Por ID campaña',
+      columna: 'ID campaña',
+      reporte: 'ID campaña 990000001 · REPORTE_SINTETICO.xlsx · 985 filas ·',
+      nota: 'Dice si el ID campaña es de esta campaña, no cuánto se envió.',
+      advertencia: 'Un ID campaña del reporte no coincide con ninguna fila cargada de esta campaña: probablemente es de otra. ID campaña: 990000777.',
+    },
+    en: {
+      intro: 'Upload the sent report you download from MES for this campaign. Every MES campaign ID in the file (“ID campaña” in MES, the “id” column) is linked to it.',
+      reemplazo: 'If you replace it, the rows of that MES campaign ID are replaced by those of the new file and the reconciliation is recalculated.',
+      titulo: 'By MES campaign ID',
+      columna: 'Campaign ID',
+      reporte: 'Campaign ID 990000001 · REPORTE_SINTETICO.xlsx · 985 rows ·',
+      nota: 'It tells whether the campaign ID belongs to this campaign, not how much was sent.',
+      advertencia: 'A campaign ID in the report matches no loaded row of this campaign: it probably belongs to another one. Campaign ID: 990000777.',
+    },
+  } as const;
+
+  for (const idioma of ['es', 'en'] as const) {
+    test(`en ${idioma === 'es' ? 'español' : 'inglés'} la importación, el reemplazo, la conciliación y la advertencia lo nombran así`, async ({ page }) => {
+      await page.addInitScript((elegido) => {
+        localStorage.setItem('app:appearance', JSON.stringify({ language: elegido }));
+      }, idioma);
+      const t = TEXTOS[idioma];
+      const api = apiMowaMes();
+      api.respuestas.importarReporte = [
+        { estado: 409, cuerpo: { detail: 'Ya se importó el reporte de los ID campaña 990000001; confirma para reemplazarlo.' } },
+        {
+          estado: 201,
+          cuerpo: conciliacionSintetica(1, {
+            por_id: [
+              { mes_id: 990000001, filas: 985, con_correspondencia: 977 },
+              { mes_id: 990000777, filas: 12, con_correspondencia: 0 },
+            ],
+            advertencias: [{ codigo: 'id_sin_correspondencia', tipo: 'advertencia', mes_id: 990000777, detalle: 'detalle del servidor' }],
+          }),
+        },
+      ];
+      await montarApiMowaMes(page, api);
+      await page.goto(RUTA);
+
+      // The intro of the import (its text is in the markup too, as the fallback of the key).
+      const intro = page.locator('[data-i18n="mowaMes.seguimiento.reporte.intro"]');
+      await expect(intro).toBeVisible();
+      await expect(intro).toHaveText(t.intro);
+
+      await page.getByLabel(idioma === 'es' ? 'Archivo del reporte' : 'Report file').setInputFiles(REPORTE);
+      await page.getByRole('button', { name: idioma === 'es' ? 'Importar reporte' : 'Import report' }).click();
+
+      const dialogo = page.getByRole('dialog');
+      await expect(dialogo).toBeVisible();
+      const cuerpo = dialogo.locator('[data-i18n="mowaMes.seguimiento.reemplazar.body"]');
+      await expect(cuerpo).toBeVisible();
+      await expect(cuerpo).toHaveText(t.reemplazo);
+      await dialogo.getByRole('button', { name: idioma === 'es' ? 'Reemplazar' : 'Replace', exact: true }).click();
+
+      await expect(page.getByText(t.titulo, { exact: true })).toBeVisible();
+      await expect(page.locator('.mm-ids__tabla').getByRole('columnheader', { name: t.columna, exact: true })).toBeVisible();
+      await expect(page.getByText(t.nota, { exact: true })).toBeVisible();
+      await expect(page.getByText(t.reporte)).toBeVisible();
+      await expect(page.getByText(t.advertencia)).toBeVisible();
+    });
+  }
 });
 
 test.describe('RF-57: el reporte llega en cualquiera de los formatos de la sábana', () => {

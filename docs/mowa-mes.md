@@ -648,3 +648,19 @@ Con M-B3 (§24) no quedaba ninguna versión de dos partes en la base. M-B4 quita
 | `tests/test_mowa_mes_speech_sin_formato_postgres.py` | `@postgres` (`architec`, `-ConBase`): upgrade y downgrade de `e2c6b4a8d195` comparando el **esquema** (columnas con tipo, nulabilidad y valor por defecto, restricciones con su definición, índices) y **todas las filas** contra lo que dejó M-B3; la v2 nativa vuelve a `partes = '[]'` |
 | `tests/test_mowa_mes_speech_solo_v2_postgres.py` | `@postgres`: la ida y vuelta de M-B3, ahora con SQL crudo (el modelo ya no tiene `partes` ni `formato`) |
 | `tests/test_mowa_mes_speech_v2_postgres.py`, `tests/test_mowa_mes_configuracion_postgres.py` | `@postgres`: el original conserva su texto v1 en `texto_v1`; editar una versión convertida lo borra; la base no tiene `formato` ni sus CHECK ni `partes`; `expresiones` es NOT NULL |
+
+## 32. El id de MES se llama «ID campaña» (M-F8, RF-MM-34)
+
+El contrato no cambia (`mes_id` sigue siendo `mes_id`). El backend solo cambia dos mensajes que la pantalla muestra tal cual (M-F8b): «La fila {fila} no tiene un ID campaña numérico en la columna «id».» y «Ya se importó el reporte de los ID campaña {ids}; confirma para reemplazarlo.». La pantalla nombra el `id` de MES como lo nombra MES, para que se reconozca, y dice de dónde sale: de la columna `id` del reporte, que no se escribe a mano.
+
+- **Ocho textos**, con el texto de `designer` (es y en; las comillas del español son «», las del inglés “”):
+  - `mowaMes.seguimiento.reporte.intro` (la intro de la importación: dice que es el reporte de enviados, que el ID campaña es la columna `id` y que en MES se llama «ID campaña»);
+  - `mowaMes.seguimiento.reemplazar.body` (el diálogo de reemplazo);
+  - `mowaMes.seguimiento.conciliacion.ids` («Por ID campaña») y `…conciliacion.col.mesId` («ID campaña», «Campaign ID»);
+  - `mowaMes.seguimiento.conciliacion.advertenciaId` («{motivo} ID campaña: {id}.»);
+  - `mowaMes.seguimiento.conciliacion.reporte` («ID campaña {id} · {archivo} · {filas} filas · {fecha}») y `…conciliacion.idsNota` («Dice si el ID campaña es de esta campaña…»): así el nombre es uno solo en toda la conciliación;
+  - `mowaMes.codigo.id_sin_correspondencia`.
+- **El marcado repite el texto es** de la intro y del diálogo (`seguimiento.astro`), como respaldo de `data-i18n`, igual que el resto de la página: las dos copias cambian con la clave.
+- **Los ids de las pruebas siguen sintéticos** (99xxxxxxx), sin ejemplos en pantalla. El `detail` falso de la 409 de reemplazo imita la frase nueva del backend («Ya se importó el reporte de los ID campaña 990000001; confirma para reemplazarlo.»), que el backend cambia en un corte aparte.
+- **Lo que no cambia:** los comentarios de código y el contrato.
+- **Pruebas.** Playwright: `e2e/mowa-mes-seguimiento.spec.ts`, bloque «RF-MM-34» (los siete textos visibles en es y en, a través de una importación con 409 y reemplazo) y los textos nuevos de S5. Vitest: los espejos de i18n y el `detail` de `api-mowa-mes.test.ts`. Las de backend son `test_lector_reporte_mowa_mes.py` y `test_mowa_mes_campana.py`, que verifican la frase completa de cada mensaje.
