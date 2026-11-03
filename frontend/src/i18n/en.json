@@ -832,6 +832,7 @@
   "textoEnriquecido.codigo.texto_guardado_usado": "This text was already used in a version and cannot be deleted. You can disable it so it is no longer offered.",
   "textoEnriquecido.codigo.texto_guardado_deshabilitado": "This text is disabled and does not accept new versions.",
   "textoEnriquecido.codigo.contexto_guardado_desconocido": "That kind of saved text is not available.",
+  "textoEnriquecido.codigo.regla_del_contexto": "A rule for this kind of text is not met.",
   "textoEnriquecido.familia.texto": "Text",
   "textoEnriquecido.familia.numero": "Number",
   "textoEnriquecido.familia.conversion": "Conversion",

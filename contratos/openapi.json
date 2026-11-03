@@ -6891,7 +6891,8 @@
           "texto_guardado_no_encontrado",
           "texto_guardado_usado",
           "texto_guardado_deshabilitado",
-          "contexto_guardado_desconocido"
+          "contexto_guardado_desconocido",
+          "regla_del_contexto"
         ],
         "title": "CodigoTexto",
         "description": "Catalogo de codigos que el frontend traducira como `textoEnriquecido.codigo.<codigo>`.\n\nUn codigo por linea, con la forma `NOMBRE = \"codigo\"`: la prueba espejo del\nfrontend lee esta clase. Los primeros se detectan al compilar (una expresion\ninvalida no procesa ninguna fila); los siguientes, al evaluar una fila concreta; al final,\nlos que solo informa la API del motor (B4a): lo que no se puede leer, el contexto o el\nproducto que no existen, y por que una expresion no tiene largo maximo."
@@ -12070,6 +12071,38 @@
               }
             ],
             "title": "Campo"
+          },
+          "codigo_contexto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Contexto"
+          },
+          "parametros": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parametros"
           }
         },
         "type": "object",
@@ -12448,6 +12481,10 @@
               }
             ],
             "title": "Deshabilitado En"
+          },
+          "eliminable": {
+            "type": "boolean",
+            "title": "Eliminable"
           }
         },
         "type": "object",
@@ -12459,7 +12496,8 @@
           "cantidad_versiones",
           "actualizado_en",
           "vigente_usada",
-          "deshabilitado_en"
+          "deshabilitado_en",
+          "eliminable"
         ],
         "title": "ResumenTextoRespuesta"
       },

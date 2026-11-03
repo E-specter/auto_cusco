@@ -29,6 +29,7 @@ from app.core.entities.texto_enriquecido import (
     ExpresionNoEscribible,
     LimitesExpresion,
     NodoVariable,
+    Problema,
     TipoValor,
 )
 from app.core.services.contextos_texto import contexto_cartera
@@ -171,6 +172,24 @@ def _emitidos_por_los_textos_guardados() -> set[CodigoTexto]:
             )
         ]
     )
+    registro.registrar(
+        ContextoGuardado(
+            "prueba.reglas",
+            "Con reglas",
+            TipoContenido.TEXTO_PLANO,
+            validador_de_texto_plano(
+                None,
+                lambda texto: [
+                    Problema(
+                        CodigoTexto.REGLA_DEL_CONTEXTO,
+                        "Una regla del modulo",
+                        codigo_contexto="regla_de_prueba",
+                        parametros={"valor": 1},
+                    )
+                ],
+            ),
+        )
+    )
     servicio = TextosGuardadosService(RepositorioTextosEnMemoria(), registro)
     app.dependency_overrides[obtener_servicio_textos_guardados] = lambda: servicio
     emitidos: set[CodigoTexto] = set()
@@ -184,6 +203,10 @@ def _emitidos_por_los_textos_guardados() -> set[CodigoTexto]:
             "/textos-guardados",
             json={"contexto": "prueba", "nombre": "b", "contenido": {"texto": "x"}},
         ).json()["id"]
+        regla = http.post(
+            "/textos-guardados",
+            json={"contexto": "prueba.reglas", "nombre": "r", "contenido": {"texto": "x"}},
+        ).json()
         servicio.marcar_usada(usado, 1)
         http.post(f"/textos-guardados/{deshabilitado}/deshabilitar")
         respuestas = [
@@ -202,6 +225,7 @@ def _emitidos_por_los_textos_guardados() -> set[CodigoTexto]:
     finally:
         app.dependency_overrides.pop(obtener_servicio_textos_guardados, None)
     emitidos.update(CodigoTexto(r.json()["codigo"]) for r in respuestas)
+    emitidos.update(CodigoTexto(p["codigo"]) for p in regla["problemas"])
     return emitidos
 
 

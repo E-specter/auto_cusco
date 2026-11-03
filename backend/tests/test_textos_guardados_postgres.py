@@ -246,6 +246,24 @@ def test_el_listado_es_del_contexto_ordenado_y_marca_si_la_vigente_se_uso(reposi
     assert [r.vigente_usada for r in repo.listar(CONTEXTO)] == [False, True]
 
 
+def test_eliminable_es_falso_si_se_uso_cualquier_version_aunque_no_sea_la_vigente(
+    repositorio,
+) -> None:
+    repo, _ = repositorio
+    vieja = repo.crear(CONTEXTO, "Vieja usada", CONTENIDO)
+    repo.agregar_version(vieja.id, CONTENIDO)
+    repo.marcar_version_usada(vieja.id, 1)
+    repo.crear(CONTEXTO, "Sin usar", CONTENIDO)
+
+    listado = {r.nombre: r for r in repo.listar(CONTEXTO)}
+
+    assert (listado["Vieja usada"].vigente_usada, listado["Vieja usada"].eliminable) == (
+        False,
+        False,
+    )
+    assert listado["Sin usar"].eliminable is True
+
+
 def test_usada_en_se_marca_la_primera_vez_y_no_cambia_despues(repositorio) -> None:
     repo, _ = repositorio
     creado = repo.crear(CONTEXTO, "usada", CONTENIDO)

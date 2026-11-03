@@ -51,6 +51,7 @@ class RepositorioTextosEnMemoria:
                 actualizado_en=t.actualizado_en,
                 vigente_usada=t.vigente.usada,
                 deshabilitado_en=t.deshabilitado_en,
+                eliminable=not t.alguna_usada,
             )
             for t in self.textos.values()
             if t.contexto == contexto and (incluir_deshabilitados or not t.deshabilitado)

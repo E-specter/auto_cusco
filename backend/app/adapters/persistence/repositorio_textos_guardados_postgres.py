@@ -68,6 +68,7 @@ class RepositorioTextosGuardadosPostgres(RepositorioTextosGuardadosPort):
                 _VERSION.c.texto_id,
                 func.max(_VERSION.c.numero).label("vigente"),
                 func.count().label("cantidad"),
+                func.bool_and(_VERSION.c.usada_en.is_(None)).label("eliminable"),
             )
             .group_by(_VERSION.c.texto_id)
             .subquery()
@@ -81,6 +82,7 @@ class RepositorioTextosGuardadosPostgres(RepositorioTextosGuardadosPort):
                 _TEXTO.c.deshabilitado_en,
                 por_texto.c.vigente,
                 por_texto.c.cantidad,
+                por_texto.c.eliminable,
                 _VERSION.c.usada_en.is_not(None).label("vigente_usada"),
             )
             .join(por_texto, por_texto.c.texto_id == _TEXTO.c.id)
@@ -107,6 +109,7 @@ class RepositorioTextosGuardadosPostgres(RepositorioTextosGuardadosPort):
                     actualizado_en=fila.actualizado_en,
                     vigente_usada=fila.vigente_usada,
                     deshabilitado_en=fila.deshabilitado_en,
+                    eliminable=fila.eliminable,
                 )
                 for fila in cx.execute(consulta).all()
             ]

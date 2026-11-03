@@ -6,8 +6,10 @@ Hay dos formas de declararlo:
 
 - `validador_de_expresion`: `{"expresion": {...}}`, una expresion del motor de texto enriquecido
   (RF-42) validada contra un `ContextoTexto` (RF-46);
-- `validador_de_texto_plano`: `{"texto": "..."}`, un texto con un largo maximo y, si el modulo las
-  tiene, reglas propias (por ejemplo, las macros `[$MACROn$]` del mensaje de WhatsMKT).
+- `validador_de_texto_plano`: `{"texto": "..."}`, un texto con un largo maximo (fijo, leido de la
+  configuracion en cada validacion, o sin medir) y, si el modulo las tiene, reglas propias (por
+  ejemplo, las macros `[$MACROn$]` del mensaje de WhatsMKT). Una regla devuelve un `Problema` con
+  `REGLA_DEL_CONTEXTO`, su `codigo_contexto` y sus `parametros`.
 
 El nucleo no conoce ningun contexto: cada modulo registra el suyo en el `RegistroContextosGuardados`
 desde la capa de composicion de la API, como las plataformas de las definiciones (RF-72).
@@ -99,16 +101,26 @@ def validador_de_expresion(contexto: ContextoTexto) -> Validador:
 
 
 def validador_de_texto_plano(
-    maximo: int, reglas: Callable[[str], Sequence[Problema]] | None = None
+    maximo: int | Callable[[], int] | None,
+    reglas: Callable[[str], Sequence[Problema]] | None = None,
 ) -> Validador:
-    """Valida `{"texto": ...}`: un texto de 1 a `maximo` caracteres y, si hay, las `reglas`."""
+    """Valida `{"texto": ...}`: un texto no vacio de hasta `maximo` caracteres y, si hay, las
+    `reglas` del modulo (que devuelven `Problema`s, con `REGLA_DEL_CONTEXTO` si son propias).
+
+    `maximo` puede ser un entero fijo; una funcion sin argumentos, que se lee en CADA validacion
+    (para un tope que viene de la configuracion y puede cambiar sin reiniciar); o None, que no
+    mide el largo y solo exige que el texto no este vacio.
+    """
 
     def validar(contenido: Mapping[str, Any]) -> tuple[Problema, ...]:
         if set(contenido) != {"texto"} or not isinstance(contenido["texto"], str):
             return _invalido("El contenido es un objeto con una unica clave `texto`, de texto")
         texto = contenido["texto"]
-        if not texto.strip() or len(texto) > maximo:
-            return _invalido(f"El texto debe tener entre 1 y {maximo} caracteres")
+        limite = maximo() if callable(maximo) else maximo
+        if not texto.strip():
+            return _invalido("El texto no puede estar vacio")
+        if limite is not None and len(texto) > limite:
+            return _invalido(f"El texto debe tener entre 1 y {limite} caracteres")
         return tuple(reglas(texto)) if reglas else ()
 
     return validar

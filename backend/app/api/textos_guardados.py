@@ -181,6 +181,7 @@ class ResumenTextoRespuesta(ModeloRespuesta):
     actualizado_en: datetime
     vigente_usada: bool
     deshabilitado_en: datetime | None
+    eliminable: bool  # ninguna version se uso (no solo la vigente): si no, solo se deshabilita
 
 
 def _contexto(contexto: ContextoGuardado) -> ContextoGuardadoRespuesta:
@@ -228,6 +229,7 @@ def _resumen(resumen: ResumenTexto) -> ResumenTextoRespuesta:
         actualizado_en=resumen.actualizado_en,
         vigente_usada=resumen.vigente_usada,
         deshabilitado_en=resumen.deshabilitado_en,
+        eliminable=resumen.eliminable,
     )
 
 

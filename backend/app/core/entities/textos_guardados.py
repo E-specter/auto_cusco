@@ -80,6 +80,8 @@ class ResumenTexto:
     actualizado_en: datetime
     vigente_usada: bool
     deshabilitado_en: datetime | None
+    # Verdadero si ninguna version se uso (no solo la vigente): solo entonces se puede eliminar.
+    eliminable: bool
 
 
 class TextoNoEncontrado(Exception):

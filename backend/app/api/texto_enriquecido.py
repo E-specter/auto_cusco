@@ -313,6 +313,15 @@ class ProblemaTextoRespuesta(ModeloRespuesta):
     columna: int | None
     segmento: str | None
     campo: str | None
+    # Solo con `regla_del_contexto` (RF-69): la regla que nombra el modulo y los valores de su
+    # mensaje; la interfaz usa la clave `<modulo>.codigo.<codigo_contexto>`. Opcionales de verdad:
+    # sin valor no viajan, y el JSON de todo problema anterior sale exactamente igual que antes.
+    codigo_contexto: str | None = Field(default=None, exclude_if=lambda valor: valor is None)
+    parametros: dict[str, str | int] | None = Field(
+        default=None, exclude_if=lambda valor: valor is None
+    )
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=False)
 
 
 class SinCotaRespuesta(ModeloRespuesta):
@@ -529,6 +538,8 @@ def problema_respuesta(
         columna=de_definicion.columna if de_definicion else None,
         segmento=de_definicion.segmento if de_definicion else None,
         campo=de_definicion.campo if de_definicion else None,
+        codigo_contexto=problema.codigo_contexto,
+        parametros=dict(problema.parametros) if problema.parametros is not None else None,
     )
 
 

@@ -832,6 +832,7 @@
   "textoEnriquecido.codigo.texto_guardado_usado": "Este texto ya se usó en una versión y no se puede eliminar. Puedes deshabilitarlo para que deje de ofrecerse.",
   "textoEnriquecido.codigo.texto_guardado_deshabilitado": "Este texto está deshabilitado y no admite versiones nuevas.",
   "textoEnriquecido.codigo.contexto_guardado_desconocido": "Ese tipo de texto guardado no está disponible.",
+  "textoEnriquecido.codigo.regla_del_contexto": "No se cumple una regla de este tipo de texto.",
   "textoEnriquecido.familia.texto": "Texto",
   "textoEnriquecido.familia.numero": "Número",
   "textoEnriquecido.familia.conversion": "Conversión",

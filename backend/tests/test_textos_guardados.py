@@ -424,6 +424,24 @@ def test_usada_en_se_marca_la_primera_vez_y_no_cambia_despues() -> None:
         servicio.marcar_usada(texto.id, 9)
 
 
+def test_eliminable_es_falso_si_se_uso_cualquier_version_aunque_no_sea_la_vigente() -> None:
+    servicio, _ = _servicio()
+    vieja = servicio.crear(PLANO, "Vieja usada", _plano()).texto
+    servicio.agregar_version(vieja.id, _plano("dos"))
+    servicio.marcar_usada(vieja.id, 1)  # la vigente es la 2 y no se uso
+    servicio.crear(PLANO, "Sin usar", _plano())
+
+    listado = {r.nombre: r for r in servicio.listar(PLANO)}
+
+    assert (listado["Vieja usada"].vigente_usada, listado["Vieja usada"].eliminable) == (
+        False,
+        False,
+    )
+    assert (listado["Sin usar"].vigente_usada, listado["Sin usar"].eliminable) == (False, True)
+    with pytest.raises(TextoConVersionesUsadas):  # y es lo que el 409 confirmaria
+        servicio.eliminar(vieja.id)
+
+
 def test_el_listado_trae_lo_necesario_ordenado_por_nombre_y_solo_del_contexto() -> None:
     servicio, _ = _servicio()
     servicio.crear(PLANO, "b segundo", _plano())
@@ -462,6 +480,25 @@ def _crear(http, nombre="Cobranza", contexto=PLANO, contenido=None):
         "/textos-guardados",
         json={"contexto": contexto, "nombre": nombre, "contenido": contenido or _plano()},
     )
+
+
+def test_el_listado_por_http_dice_si_se_puede_eliminar_con_una_version_vieja_usada(cliente) -> None:
+    http, servicio = cliente
+    vieja = _crear(http, "Vieja usada").json()["id"]
+    http.post(f"/textos-guardados/{vieja}/versiones", json={"contenido": _plano("dos")})
+    servicio.marcar_usada(vieja, 1)
+    _crear(http, "Sin usar")
+
+    listado = {
+        t["nombre"]: t for t in http.get("/textos-guardados", params={"contexto": PLANO}).json()
+    }
+
+    assert (listado["Vieja usada"]["vigente_usada"], listado["Vieja usada"]["eliminable"]) == (
+        False,
+        False,
+    )
+    assert listado["Sin usar"]["eliminable"] is True
+    assert http.delete(f"/textos-guardados/{vieja}").status_code == 409
 
 
 def test_get_contextos_trae_lo_que_los_modulos_registraron(cliente) -> None:
@@ -635,6 +672,164 @@ def test_eliminar_con_una_version_usada_es_409_y_no_borra(cliente) -> None:
 
     assert respuesta.status_code == 409 and respuesta.json()["codigo"] == "texto_guardado_usado"
     assert http.get(f"/textos-guardados/{id_}").json()["version"]["usada"] is True
+
+
+# --- Reglas propias del contexto (T-HI-B6) ------------------------------------------------------
+
+
+def _macro_desconocida(texto: str) -> list[Problema]:
+    """Una regla del modulo: solo existen las macros 1 a 3. Lo hace como lo hara WhatsMKT."""
+    return [
+        Problema(
+            CodigoTexto.REGLA_DEL_CONTEXTO,
+            f"La macro {macro} no existe",
+            codigo_contexto="macro_desconocida",
+            parametros={"macro": macro, "maximo": 3},
+        )
+        for macro in re.findall(r"\[\$MACRO(?:[4-9]|\d\d+)\$\]", texto)
+    ]
+
+
+def test_el_maximo_de_un_texto_plano_puede_ser_una_funcion_que_se_lee_en_cada_validacion() -> None:
+    tope = {"valor": 5}
+    validar = validador_de_texto_plano(lambda: tope["valor"])
+
+    assert validar(_plano("x" * 5)) == ()
+    assert validar(_plano("x" * 6))
+    tope["valor"] = 8  # la configuracion cambio: sin reiniciar nada
+    assert validar(_plano("x" * 6)) == ()
+    assert validar(_plano("x" * 9))
+
+
+def test_sin_maximo_no_se_mide_el_largo_pero_el_texto_no_puede_estar_vacio() -> None:
+    validar = validador_de_texto_plano(None)
+
+    assert validar(_plano("x" * 10_000)) == ()
+    assert validar(_plano(""))
+    assert validar(_plano("   "))
+    assert validar({"texto": 3})
+
+
+def test_un_maximo_entero_se_comporta_como_siempre() -> None:
+    validar = validador_de_texto_plano(20)
+
+    assert validar(_plano("x" * 20)) == ()
+    assert [p.codigo for p in validar(_plano("x" * 21))] == [CodigoTexto.TEXTO_GUARDADO_INVALIDO]
+    assert [p.codigo for p in validar(_plano(""))] == [CodigoTexto.TEXTO_GUARDADO_INVALIDO]
+
+
+@pytest.fixture
+def cliente_con_reglas():
+    registro = RegistroContextosGuardados(
+        [
+            ContextoGuardado(
+                "prueba.reglas",
+                "Con reglas",
+                TipoContenido.TEXTO_PLANO,
+                validador_de_texto_plano(None, _macro_desconocida),
+            )
+        ]
+    )
+    servicio = TextosGuardadosService(RepositorioTextosEnMemoria(), registro)
+    app.dependency_overrides[obtener_servicio_textos_guardados] = lambda: servicio
+    app.dependency_overrides[obtener_registro_contextos_guardados] = lambda: registro
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_una_regla_del_contexto_llega_a_la_api_con_su_codigo_y_sus_parametros(
+    cliente_con_reglas,
+) -> None:
+    respuesta = cliente_con_reglas.post(
+        "/textos-guardados",
+        json={
+            "contexto": "prueba.reglas",
+            "nombre": "Mensaje",
+            "contenido": _plano("Hola [$MACRO9$]"),
+        },
+    )
+
+    assert respuesta.status_code == 400
+    cuerpo = respuesta.json()
+    assert cuerpo["codigo"] == "texto_guardado_invalido"
+    [problema] = cuerpo["problemas"]
+    assert problema == {
+        "codigo": "regla_del_contexto",
+        "detalle": "La macro [$MACRO9$] no existe",
+        "ubicacion": None,
+        "nombre": None,
+        "columna": None,
+        "segmento": None,
+        "campo": "contenido",
+        "codigo_contexto": "macro_desconocida",
+        "parametros": {"macro": "[$MACRO9$]", "maximo": 3},
+    }
+
+
+def test_un_texto_que_cumple_las_reglas_del_contexto_se_guarda(cliente_con_reglas) -> None:
+    respuesta = cliente_con_reglas.post(
+        "/textos-guardados",
+        json={
+            "contexto": "prueba.reglas",
+            "nombre": "Mensaje",
+            "contenido": _plano("Hola [$MACRO1$]"),
+        },
+    )
+
+    assert respuesta.status_code == 201
+
+
+def test_los_problemas_de_hoy_se_serializan_exactamente_igual_sin_los_campos_nuevos(
+    cliente,
+) -> None:
+    http, _ = cliente
+
+    nombre = http.post(
+        "/textos-guardados", json={"contexto": PLANO, "nombre": " ", "contenido": _plano()}
+    ).json()["problemas"]
+    motor = http.post(
+        "/textos-guardados",
+        json={
+            "contexto": EXPRESION,
+            "nombre": "x",
+            "contenido": _expresion({"tipo": "variable", "nombre": "no_existe", "funciones": []}),
+        },
+    ).json()["problemas"]
+
+    assert nombre == [
+        {
+            "codigo": "texto_guardado_invalido",
+            "detalle": "El nombre debe tener entre 1 y 120 caracteres",
+            "ubicacion": None,
+            "nombre": None,
+            "columna": None,
+            "segmento": None,
+            "campo": "nombre",
+        }
+    ]
+    [problema] = motor
+    assert set(problema) == {
+        "codigo",
+        "detalle",
+        "ubicacion",
+        "nombre",
+        "columna",
+        "segmento",
+        "campo",
+    }  # ni `codigo_contexto` ni `parametros`, ni siquiera en null
+
+
+def test_los_campos_del_contexto_son_opcionales_en_el_contrato() -> None:
+    esquemas = app.openapi()["components"]["schemas"]
+    problemas = {n: e for n, e in esquemas.items() if n.startswith("ProblemaTextoRespuesta")}
+
+    assert problemas
+    for esquema in problemas.values():
+        assert {"codigo_contexto", "parametros"} <= set(esquema["properties"])
+        assert not {"codigo_contexto", "parametros"} & set(esquema["required"])
+        assert {"codigo", "detalle", "ubicacion", "campo"} <= set(esquema["required"])
 
 
 # --- La migracion y los nombres (<= 63 caracteres) ----------------------------------------------

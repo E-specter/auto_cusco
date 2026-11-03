@@ -8,6 +8,7 @@ registro cerrado; nada del usuario se ejecuta (RF-48).
 El diseno completo esta en docs/motor-texto-enriquecido.md.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -85,6 +86,9 @@ class CodigoTexto(StrEnum):
     TEXTO_GUARDADO_USADO = "texto_guardado_usado"  # alguna version se uso: solo se deshabilita
     TEXTO_GUARDADO_DESHABILITADO = "texto_guardado_deshabilitado"  # no admite versiones nuevas
     CONTEXTO_GUARDADO_DESCONOCIDO = "contexto_guardado_desconocido"  # el modulo no lo registro
+    # Una regla propia del contexto de un texto guardado (RF-69). El texto de respaldo es generico;
+    # el real lo pone el modulo en su clave `<modulo>.codigo.<codigo_contexto>`.
+    REGLA_DEL_CONTEXTO = "regla_del_contexto"
 
 
 @dataclass(frozen=True)
@@ -96,6 +100,11 @@ class Problema:
     frontend. Con `nodo` en None el problema es de toda la expresion y no tiene
     ubicacion. `nombre` es la variable o la funcion involucrada, para que el
     mensaje pueda nombrarla.
+
+    `codigo_contexto` y `parametros` los usa solo `REGLA_DEL_CONTEXTO`: el modulo dueno de un
+    contexto de textos guardados (RF-69) nombra su regla (`macro_desconocida`) y los valores que su
+    mensaje necesita (`{"macro": "[$MACRO9$]"}`), y su interfaz lo traduce con la clave
+    `<modulo>.codigo.<codigo_contexto>`. En los demas problemas son None.
     """
 
     codigo: CodigoTexto
@@ -104,6 +113,8 @@ class Problema:
     funcion: int | None = None
     parametro: str | None = None
     nombre: str | None = None
+    codigo_contexto: str | None = None
+    parametros: Mapping[str, str | int] | None = None
 
 
 @dataclass(frozen=True)

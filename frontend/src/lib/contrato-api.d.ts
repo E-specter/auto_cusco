@@ -2113,7 +2113,7 @@ export interface components {
          *     producto que no existen, y por que una expresion no tiene largo maximo.
          * @enum {string}
          */
-        CodigoTexto: "expresion_invalida" | "definicion_invalida" | "sintaxis_invalida" | "referencia_vacia" | "variable_desconocida" | "funcion_desconocida" | "parametro_invalido" | "tipo_incompatible" | "limite_excedido" | "no_se_puede_escribir_como_texto" | "sin_segmento" | "variable_obligatoria_vacia" | "argumento_vacio" | "division_por_cero" | "no_es_numero" | "no_es_fecha" | "telefono_invalido" | "resultado_fuera_de_rango" | "valor_no_convertible" | "sin_cota_variable" | "sin_cota_funcion" | "contexto_desconocido" | "producto_no_encontrado" | "sin_version_vigente" | "definicion_no_encontrada" | "version_no_encontrada" | "nombre_repetido" | "seleccion_no_encontrada" | "fecha_envio_anterior" | "plataforma_desconocida" | "plataforma_columna_fija_ausente" | "plataforma_columna_fija_movida" | "plataforma_tipo_de_columna_fija" | "plataforma_tipo_del_resto" | "plataforma_columnas_de_mas" | "texto_guardado_invalido" | "texto_guardado_no_encontrado" | "texto_guardado_usado" | "texto_guardado_deshabilitado" | "contexto_guardado_desconocido";
+        CodigoTexto: "expresion_invalida" | "definicion_invalida" | "sintaxis_invalida" | "referencia_vacia" | "variable_desconocida" | "funcion_desconocida" | "parametro_invalido" | "tipo_incompatible" | "limite_excedido" | "no_se_puede_escribir_como_texto" | "sin_segmento" | "variable_obligatoria_vacia" | "argumento_vacio" | "division_por_cero" | "no_es_numero" | "no_es_fecha" | "telefono_invalido" | "resultado_fuera_de_rango" | "valor_no_convertible" | "sin_cota_variable" | "sin_cota_funcion" | "contexto_desconocido" | "producto_no_encontrado" | "sin_version_vigente" | "definicion_no_encontrada" | "version_no_encontrada" | "nombre_repetido" | "seleccion_no_encontrada" | "fecha_envio_anterior" | "plataforma_desconocida" | "plataforma_columna_fija_ausente" | "plataforma_columna_fija_movida" | "plataforma_tipo_de_columna_fija" | "plataforma_tipo_del_resto" | "plataforma_columnas_de_mas" | "texto_guardado_invalido" | "texto_guardado_no_encontrado" | "texto_guardado_usado" | "texto_guardado_deshabilitado" | "contexto_guardado_desconocido" | "regla_del_contexto";
         /**
          * CodigoWhatsmkt
          * @description Codigos de error del modulo; el frontend los traduce como `whatsmkt.codigo.<codigo>`.
@@ -4144,6 +4144,12 @@ export interface components {
             segmento: string | null;
             /** Campo */
             campo: string | null;
+            /** Codigo Contexto */
+            codigo_contexto?: string | null;
+            /** Parametros */
+            parametros?: {
+                [key: string]: string | number;
+            } | null;
         };
         /** ProblemaWhatsmktRespuesta */
         ProblemaWhatsmktRespuesta: {
@@ -4281,6 +4287,8 @@ export interface components {
             vigente_usada: boolean;
             /** Deshabilitado En */
             deshabilitado_en: string | null;
+            /** Eliminable */
+            eliminable: boolean;
         };
         /** RevisionRespuesta */
         RevisionRespuesta: {

@@ -156,6 +156,14 @@ def _esquemas_de_respuesta() -> set[str]:
     return vistos
 
 
+# Lo unico que puede ser opcional: un campo que de verdad "a veces no viene". Estos solo viajan
+# con `regla_del_contexto` (RF-69), para que el JSON de todo problema previo salga igual.
+OPCIONALES_PORQUE_A_VECES_NO_VIENEN = {
+    "ProblemaTextoRespuesta.codigo_contexto",
+    "ProblemaTextoRespuesta.parametros",
+}
+
+
 def test_todo_campo_de_una_respuesta_es_obligatorio() -> None:
     # Opcional en el contrato significa "a veces no viene". Un campo que el backend
     # siempre envia va obligatorio, con null en su tipo si puede venir vacio; si no,
@@ -168,5 +176,7 @@ def test_todo_campo_de_una_respuesta_es_obligatorio() -> None:
         for campo in esquemas[nombre].get("properties", {})
         if campo not in esquemas[nombre].get("required", [])
     )
+
+    opcionales = [campo for campo in opcionales if campo not in OPCIONALES_PORQUE_A_VECES_NO_VIENEN]
 
     assert opcionales == [], f"Campos de respuesta opcionales en el contrato: {opcionales}"
