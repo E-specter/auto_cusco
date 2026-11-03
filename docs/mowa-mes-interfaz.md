@@ -183,7 +183,7 @@ Las tres usan `dialog.dialog`, con el foco inicial en «Cancelar» y Escape para
 - **En la campaña,** junto al `select` «Selección guardada», va un botón `.btn--sm` «Editar en Cartera» (`square-pen`). Abre `/cartera` con esa selección y `?volver=`.
   - Sin una selección elegida, queda inactivo, con el `title` «Elige una selección guardada para editarla».
 - **En `/cartera`, cuando llega con `?volver=`,** un `.notice--info` bajo el encabezado de la página y antes de todo lo demás, con una línea y un enlace:
-  - el texto: «Estás editando la selección de una campaña de MOWA MES. Al guardarla, vuelves a la campaña»;
+  - el texto: «Estás editando la selección de una campaña de {canal}. Al guardarla, vuelves a la campaña», con `{canal}` sacado del prefijo de `volver` (`nav.mowaMes` o `nav.whatsmkt`; [motor-texto-enriquecido-interfaz.md](motor-texto-enriquecido-interfaz.md) §12.1). Desde MOWA MES se lee igual que antes;
   - el enlace «Volver a la campaña sin guardar», con el icono `chevron-left`. Si hay cambios sin guardar, pasa por la misma confirmación que ya tiene Cartera («Hay cambios sin guardar»), y no se pierde nada sin aviso.
 - **Si al volver la selección ya no existe** (se borró en Cartera), la campaña muestra un `.notice--warning` bajo el `select`: «La selección que editaste en Cartera ya no existe. Elige otra selección guardada». El `select` queda sin elegir. El aviso se va al elegir otra.
 - **Si `/cartera` llega con un `seleccion` que no existe,** queda vacía y usable, con un `.notice--warning` (`role="status"`): «La selección que abriste ya no existe. Arma una nueva o elige otra de la lista». Nunca un error.
@@ -259,7 +259,7 @@ Prefijo `mowaMes.*` (es y en). No usan el prefijo `mowaMes.codigo.*`, que vigila
 | `mowaMes.campana.subir.irSeguimiento` | Ir al seguimiento de la campaña | Go to the campaign's tracking |
 | `mowaMes.campana.editarEnCartera.inactivo` | Elige una selección guardada para editarla. | Choose a saved selection to edit it. |
 | `mowaMes.campana.seleccionBorrada` | La selección que editaste en Cartera ya no existe. Elige otra selección guardada. | The selection you edited in Portfolio no longer exists. Choose another saved selection. |
-| `cartera.volver.aviso` | Estás editando la selección de una campaña de MOWA MES. Al guardarla, vuelves a la campaña. | You are editing the selection of a MOWA MES campaign. When you save it, you go back to the campaign. |
+| `cartera.volver.aviso` | Estás editando la selección de una campaña de {canal}. Al guardarla, vuelves a la campaña. | You are editing the selection of a {canal} campaign. When you save it, you go back to the campaign. |
 | `cartera.volver.sinGuardar` | Volver a la campaña sin guardar | Back to the campaign without saving |
 | `cartera.volver.noExiste` | La selección que abriste ya no existe. Arma una nueva o elige otra de la lista. | The selection you opened no longer exists. Build a new one or choose another from the list. |
 | `selector.descartar.cuerpo` (cambia el texto) | Los cambios que no guardaste se pierden. | The changes you did not save will be lost. |

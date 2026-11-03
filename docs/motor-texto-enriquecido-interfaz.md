@@ -675,7 +675,7 @@ Un `.notice--info` bajo el encabezado de la página y antes de todo lo demás, c
 | `columnas.plataforma.fijadaPor` | La fija {canal}: se abrió desde allí. | Set by {canal}: it was opened from there. |
 
 - `{nombre}` va citado con `camposAdicionales.nombreCitado`.
-- `cartera.volver.*` no cambia: Cartera sigue con sus textos, porque solo la abre MOWA MES. Si otro canal la abre, pasa a estas claves.
+- **`/cartera` también recibe `volver` de los dos canales** (WhatsMKT la usa desde su campaña, T-WM-F2a1). Su aviso conserva sus claves, `cartera.volver.*`, pero el texto lleva `{canal}`, que sale del prefijo con las mismas claves de la barra que §12.1. Los textos están en [mowa-mes-interfaz.md](mowa-mes-interfaz.md) §5. El enlace sigue diciendo «Volver a la campaña sin guardar»: en los dos canales vuelve a una campaña.
 
 ### 12.7 Pruebas mínimas
 
