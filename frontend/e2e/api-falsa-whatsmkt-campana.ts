@@ -9,8 +9,11 @@ import type { Page } from '@playwright/test';
 
 import type { ResumenTexto } from '../src/lib/api-textos-guardados';
 import type {
+  CampanaCreada,
   CampanaPrevista,
+  CodigoWhatsmkt,
   ExclusionCampana,
+  PeticionCreacion,
   PeticionPrevisualizacion,
   PrevisualizacionCampanas,
   ProblemaCampana,
@@ -39,6 +42,24 @@ export interface CampanaFalsa {
   programacion: { sugerida: string; minima: string; proximas: string[] };
   /** The send dates the preview answers `fecha_no_gestionable` to; the suggestion that comes with it is the next working day after (Monday to Saturday). */
   fechasNoGestionables: string[];
+  /** The requests that create the lot, in order. */
+  creaciones: PeticionCreacion[];
+  /** Scripted answers to creating, taken in order (the last repeats); empty means the fake creates the lot from the preview. */
+  respuestasCrear: Guion[];
+  /** What the card of each campaign warns about (`sin_whatsapp`). */
+  avisosFicha: CodigoWhatsmkt[];
+  /** The ids of the campaigns whose file was downloaded. */
+  descargas: number[];
+}
+
+const ENLACE_FALSO = 'https://wa.me/+51900000123';
+
+/**
+ * The text of a version of a message. The block under the select, «Así lo verá el cliente» and the card of the campaign created all come from
+ * it, so each says what the message chosen says; a version after the first carries its number, which tells it from the latest.
+ */
+export function textoDeMensaje(resumen: Pick<ResumenTexto, 'nombre' | 'version_vigente'>, version = resumen.version_vigente): string {
+  return `Hola [$MACRO1$], ${resumen.nombre}: tu saldo es [$MACRO2$]. INFO por [whatsapp]${version > 1 ? ` (v${version})` : ''}`;
 }
 
 export function texto(id: number, nombre: string, parcial: Partial<ResumenTexto> = {}): ResumenTexto {
@@ -68,6 +89,10 @@ export function campanaFalsa(parcial: Partial<CampanaFalsa> = {}): CampanaFalsa 
     // The clock of `montarApiWhatsmkt` is Thursday 15 Oct 2026: tomorrow is the first working day.
     programacion: { sugerida: '2026-10-16', minima: '2026-10-16', proximas: ['2026-10-16', '2026-10-17', '2026-10-19'] },
     fechasNoGestionables: ['2026-10-18'],
+    creaciones: [],
+    respuestasCrear: [],
+    avisosFicha: [],
+    descargas: [],
     ...parcial,
   };
 }
@@ -82,6 +107,13 @@ const exclusion = (fila: number, codigo: ExclusionCampana['codigo'], detalle: st
   macro: null,
   etiqueta: null,
 });
+
+/** What the customer would read: the message with the first row's values and the contact link. */
+function ejemploDe(mensaje: CampanaPrevista['mensaje'], estado: CampanaFalsa): string | null {
+  const resumen = mensaje === null ? undefined : estado.textos.find((t) => t.id === mensaje.texto_guardado_id);
+  if (!mensaje || !resumen) return null;
+  return textoDeMensaje(resumen, mensaje.version).replace('[whatsapp]', ENLACE_FALSO).replace('[$MACRO1$]', 'Maria').replace('[$MACRO2$]', '1500.50');
+}
 
 function campanaPrevista(clave: string | null, cantidad: number, estado: CampanaFalsa, mensaje: CampanaPrevista['mensaje']): CampanaPrevista {
   const exclusiones = Array.from({ length: estado.exclusiones }, (_, i) =>
@@ -107,7 +139,7 @@ function campanaPrevista(clave: string | null, cantidad: number, estado: Campana
       { supervision: false, celdas: ['51900000002', 'Jose', '410.75'] },
     ],
     mensaje,
-    mensaje_ejemplo: mensaje === null ? null : `Hola Maria, tu cuenta tiene un saldo pendiente.  Escríbenos a https://wa.me/+51900000123`,
+    mensaje_ejemplo: ejemploDe(mensaje, estado),
   };
 }
 
@@ -147,6 +179,47 @@ function previsualizacion(entrada: PeticionPrevisualizacion, estado: CampanaFals
       exclusion(100 + i, 'sin_dias_atraso', 'No tiene días de atraso, así que no cae en ningún segmento. En el modo «Global» sí entraría.'),
     ),
   };
+}
+
+/** The text of the card: the version of the message the request names (the one the preview showed), with the macros as they are and `[whatsapp]` as the link. */
+function mensajeDeLaFicha(entrada: PeticionCreacion, segmento: string | null, estado: CampanaFalsa): string {
+  const pedido = segmento === null ? entrada.mensaje : entrada.mensajes?.[segmento];
+  const resumen = estado.textos.find((t) => t.id === pedido?.texto_guardado_id);
+  if (!pedido || !resumen) return '';
+  return textoDeMensaje(resumen, pedido.version ?? resumen.version_vigente).replace('[whatsapp]', ENLACE_FALSO);
+}
+
+/** The lot the backend answers (201): one campaign per campaign of the preview, with the card of its form written as the request says. */
+function loteCreado(entrada: PeticionCreacion, estado: CampanaFalsa): CampanaCreada[] {
+  const previa = previsualizacion(entrada, estado);
+  return previa.campanas.map((campana, i) => {
+    const nombre =
+      campana.segmento === null
+        ? (entrada.nombre ?? 'CUZCO_Vencida whatsapp')
+        : (entrada.nombres?.[campana.segmento] ?? `CUZCO_Vencida (${campana.etiqueta_segmento}) whatsapp`);
+    const franja = (h: string) => (h === 'horario_1' ? { inicio: '08:00', fin: '14:00' } : { inicio: '14:00', fin: '20:00' });
+    return {
+      id: 37 + i,
+      lote_id: 12,
+      nombre,
+      segmento: campana.segmento,
+      archivo: { nombre: `${nombre}.xlsx`, tamano: 18_000, filas: campana.cantidad },
+      ficha: {
+        nombre,
+        fecha_envio: entrada.fecha_envio ?? estado.programacion.sugerida,
+        horarios: entrada.horarios.map((h) => ({ nombre: h, ...franja(h) })),
+        lo_antes_posible: entrada.lo_antes_posible ?? false,
+        pais: 'Perú',
+        foto_id: entrada.foto_id ?? null,
+        cantidad: campana.cantidad,
+        tipo_envio: entrada.tipo_envio ?? 'solo_texto',
+        adjunto_id: entrada.adjunto_id ?? null,
+        etiqueta_vcard: entrada.etiqueta_vcard ?? null,
+        mensaje: mensajeDeLaFicha(entrada, campana.segmento, estado),
+        avisos: estado.avisosFicha,
+      },
+    };
+  });
 }
 
 /** The next working day after `fecha` (AAAA-MM-DD): the next one that is not a Sunday. The fake has no holidays. */
@@ -212,6 +285,24 @@ export async function montarCampanaWhatsmkt(page: Page, estado: CampanaFalsa): P
       const guion = siguiente(estado.respuestasPrevia);
       return guion ? json(route, guion.estado, guion.cuerpo ?? {}) : json(route, 200, previsualizacion(entrada, estado));
     }
+    if (ruta === '/whatsmkt/campanas' && metodo === 'POST') {
+      const entrada = JSON.parse(peticion.postData() ?? '{}') as PeticionCreacion;
+      estado.creaciones.push(entrada);
+      const guion = siguiente(estado.respuestasCrear);
+      return guion ? json(route, guion.estado, guion.cuerpo ?? {}) : json(route, 201, loteCreado(entrada, estado));
+    }
+    const archivo = /^\/whatsmkt\/campanas\/(\d+)\/archivo$/.exec(ruta);
+    if (archivo && metodo === 'GET') {
+      estado.descargas.push(Number(archivo[1]));
+      return route.fulfill({
+        status: 200,
+        headers: {
+          'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'content-disposition': `attachment; filename="campana-${archivo[1]}.xlsx"`,
+        },
+        body: 'contenido sintetico de la campana',
+      });
+    }
     if (ruta === '/whatsmkt/programacion' && metodo === 'GET') return json(route, 200, estado.programacion);
     if (ruta === '/texto-enriquecido/catalogo' && metodo === 'GET' && url.searchParams.get('contexto') === 'cartera') {
       return json(route, 200, catalogoSintetico('cartera'));
@@ -219,6 +310,29 @@ export async function montarCampanaWhatsmkt(page: Page, estado: CampanaFalsa): P
     if (ruta === '/textos-guardados' && metodo === 'GET') {
       const deshabilitados = url.searchParams.get('deshabilitados') === 'true';
       return json(route, 200, estado.textos.filter((t) => (t.deshabilitado_en !== null) === deshabilitados));
+    }
+    const delTexto = /^\/textos-guardados\/(\d+)$/.exec(ruta);
+    if (delTexto && metodo === 'GET') {
+      const resumen = estado.textos.find((t) => t.id === Number(delTexto[1]));
+      if (!resumen) return json(route, 404, { detail: 'No existe el texto', codigo: 'texto_guardado_no_encontrado' });
+      const version = {
+        numero: resumen.version_vigente,
+        creado_en: resumen.actualizado_en,
+        usada_en: null,
+        usada: false,
+        contenido: { texto: textoDeMensaje(resumen) },
+      };
+      return json(route, 200, {
+        id: resumen.id,
+        contexto: resumen.contexto,
+        nombre: resumen.nombre,
+        creado_en: resumen.actualizado_en,
+        actualizado_en: resumen.actualizado_en,
+        deshabilitado_en: resumen.deshabilitado_en,
+        version_vigente: resumen.version_vigente,
+        versiones: [{ numero: version.numero, creado_en: version.creado_en, usada_en: null, usada: false }],
+        version,
+      });
     }
     const definicion = /^\/definiciones-columnas\/(\d+)$/.exec(ruta);
     if (definicion && metodo === 'GET') return json(route, 200, definicionConColumnas(Number(definicion[1])));

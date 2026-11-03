@@ -7,12 +7,13 @@
  * rest of the screen down; only an API that cannot be reached at all stands the page down.
  */
 
-import { NetworkError, mensajeDeError } from '../lib/api';
+import { ApiError, NetworkError, mensajeDeError } from '../lib/api';
 import { listarDefiniciones, obtenerDefinicion, type ResumenDefinicion } from '../lib/api-definiciones';
 import { obtenerCatalogo } from '../lib/api-texto-enriquecido';
-import { listarTextos, type ResumenTexto } from '../lib/api-textos-guardados';
+import { listarTextos, obtenerTexto, type ResumenTexto } from '../lib/api-textos-guardados';
 import { etiquetaVariable } from '../lib/campos';
 import {
+  crearCampanas,
   listarAdjuntos,
   listarSegmentos,
   obtenerConfiguracion,
@@ -21,7 +22,9 @@ import {
   type AdjuntoWhatsmkt,
   type CampanaPrevista,
   type ConfiguracionWhatsmkt,
+  type ErrorFechaNoGestionable,
   type PrevisualizacionCampanas,
+  type ProblemaCampana,
   type ProgramacionWhatsmkt,
   type SegmentoWhatsmkt,
 } from '../lib/api-whatsmkt';
@@ -33,11 +36,15 @@ import { pintarBotonesDeVariables } from '../lib/mowa-mes-plantilla';
 import { FILAS_POR_PAGINA, paginar, pintarPaginador } from '../lib/paginacion';
 import { celda, celdaDeFila, cifra, tabla, vacio } from '../lib/tabla-dom';
 import { enlaceEditarEnCartera, seleccionDeLaUrl } from '../lib/volver';
+import { largoDelMensaje } from '../lib/whatsmkt-mensaje';
+import { montarFicha } from './whatsmkt-ficha';
+import { montarSubida } from './whatsmkt-subida';
 import {
   MACROS_PUBLICADAS,
   borradorInicial,
   cantidadDeMacros,
   diasDeSegmento,
+  entradaDeCreacion,
   entradaDePrevisualizacion,
   etiquetaDeAdjunto,
   filasDeColumnas,
@@ -52,7 +59,7 @@ import {
   type SeccionDeProblema,
   type SeleccionBase,
 } from '../lib/whatsmkt-campana';
-import { FECHA_DE_EJEMPLO, LARGO_MAXIMO_NOMBRE, definicionesDeWhatsmkt } from '../lib/whatsmkt';
+import { FECHA_DE_EJEMPLO, LARGO_MAXIMO_NOMBRE, definicionesDeWhatsmkt, errorDeModulo, textoDeCodigo } from '../lib/whatsmkt';
 import { EVENTO_SELECCION, montarSelector, type ControladorSelector, type EstadoSeleccion } from './selector-seleccion';
 
 /** Long enough that a typed template or a click on a box does not ask the API for each change. */
@@ -85,6 +92,8 @@ const estado = {
   errorMensajes: '',
   errorAdjuntos: '',
   errorProgramacion: '',
+  /** The lot is being created: «Crear» waits. */
+  creando: false,
 };
 
 const raiz = $<HTMLElement>('[data-selector]');
@@ -180,6 +189,11 @@ function pintarColumnas(): void {
   const aviso = $<HTMLElement>('[data-cinco-macros]');
   aviso.hidden = macros <= MACROS_PUBLICADAS;
   aviso.textContent = macros > MACROS_PUBLICADAS ? t('whatsmkt.archivo.cincoMacros', { n: macros }) : '';
+  // The macros marked in the message blocks carry the label of their column: they are drawn again once the columns are known.
+  document.querySelectorAll<HTMLElement>('[data-texto-mensaje]').forEach((bloque) => {
+    const id = Number(bloque.dataset.id);
+    if (id > 0) void pintarTextoDeMensaje(bloque, id);
+  });
 }
 
 /** The columns of the definition chosen, at its latest version (the one the preview and the creation use). */
@@ -203,7 +217,7 @@ async function cargarColumnas(): Promise<void> {
     if (borrador().definicionId !== id) return;
     const etiquetas = new Map((catalogo?.contexto.variables ?? []).map((v) => [v.nombre, etiquetaVariable(v)]));
     estado.columnas = filasDeColumnas(
-      definicion.version.contenido.columnas.map((c) => ({ nombre: c.nombre, etiqueta: c.etiqueta, expresion: c.expresion, variantes: c.variantes.length })),
+      definicion.version.contenido.columnas.map((c) => ({ nombre: c.nombre, etiqueta: c.etiqueta, expresion: c.expresion, variantes: c.variantes })),
       (nombre) => etiquetas.get(nombre) ?? etiquetaVariable({ nombre, clave_nombre: null }),
     );
   } catch (caido) {
@@ -247,6 +261,56 @@ function pintarSelectGlobal(): void {
   if (deSegmentos.length > 0) selectGlobal.append(grupo('whatsmkt.mensaje.porSegmento', deSegmentos));
   const elegido = borrador().mensajeGlobal;
   elegir(selectGlobal, elegido === null ? '' : String(elegido));
+  void pintarTextoDeMensaje($<HTMLElement>('[data-texto-mensaje="global"]'), elegido);
+}
+
+/** The latest version of each text read once: the block under a select shows what the message says, which a longer name cannot. */
+const textosLeidos = new Map<number, Promise<string>>();
+const textoDe = (id: number): Promise<string> => {
+  const leido = textosLeidos.get(id) ?? obtenerTexto(id).then((texto) => String(texto.version.contenido.texto ?? ''));
+  textosLeidos.set(id, leido);
+  // A failed read is forgotten so the next paint asks again.
+  leido.catch(() => textosLeidos.delete(id));
+  return leido;
+};
+
+/**
+ * The text of the message chosen, under its select (§3.4): read only, as written, with its macros marked (their label in the `title`) and its
+ * length against the limit («312 / 4096»). Without a message, or if the text cannot be read, there is no block: the select says the rest.
+ */
+async function pintarTextoDeMensaje(destino: HTMLElement, id: number | null): Promise<void> {
+  destino.dataset.id = String(id);
+  if (id === null) {
+    destino.hidden = true;
+    destino.replaceChildren();
+    return;
+  }
+  let texto: string;
+  try {
+    texto = await textoDe(id);
+  } catch {
+    if (destino.dataset.id === String(id)) destino.hidden = true;
+    return;
+  }
+  // Another message was chosen while this one was being read.
+  if (destino.dataset.id !== String(id)) return;
+  const cuerpo = document.createElement('p');
+  cuerpo.className = 'mono wm-mensaje-texto__cuerpo';
+  texto.split(/(\[\$MACRO\d+\$\])/).forEach((trozo) => {
+    const macro = /^\[\$MACRO(\d+)\$\]$/.exec(trozo);
+    if (!macro) return void cuerpo.append(trozo);
+    const marca = document.createElement('mark');
+    marca.className = 'wm-macro';
+    marca.textContent = trozo;
+    const etiqueta = estado.columnas.find((c) => c.macro === Number(macro[1]))?.etiqueta;
+    if (etiqueta) marca.title = t('whatsmkt.mensaje.macro', { n: macro[1], etiqueta });
+    cuerpo.append(marca);
+  });
+  const largo = document.createElement('p');
+  largo.className = 'wm-contador';
+  largo.textContent = t('whatsmkt.mensaje.largo', { largo: largoDelMensaje(texto), maximo: estado.configuracion?.tope_mensaje ?? 0 });
+  destino.replaceChildren(cuerpo, largo);
+  destino.hidden = false;
 }
 
 /** One row per segment of the platform: its days, and the select of its message with its problems under it. */
@@ -276,8 +340,14 @@ function pintarMensajesPorSegmento(): void {
     estado.textos.forEach((texto) => select.append(opcion(String(texto.id), texto.nombre)));
     const elegido = borrador().mensajesPorSegmento[segmento.clave] ?? null;
     elegir(select, elegido === null ? '' : String(elegido));
+    const textoElegido = document.createElement('div');
+    textoElegido.className = 'wm-mensaje-texto';
+    textoElegido.dataset.textoMensaje = segmento.clave;
+    textoElegido.hidden = true;
+    void pintarTextoDeMensaje(textoElegido, elegido);
     select.addEventListener('change', () => {
       borrador().mensajesPorSegmento[segmento.clave] = aNumero(select.value);
+      void pintarTextoDeMensaje(textoElegido, borrador().mensajesPorSegmento[segmento.clave]);
       cambioDelFormulario();
     });
     const problemas = document.createElement('div');
@@ -293,7 +363,7 @@ function pintarMensajesPorSegmento(): void {
     sinProductos.hidden = true;
     sinProductos.textContent = t('whatsmkt.mensaje.sinProductos');
     select.setAttribute('aria-describedby', `${identificador}-problemas ${identificador}-sin-productos`);
-    celdaMensaje.append(select, problemas, sinProductos);
+    celdaMensaje.append(select, problemas, sinProductos, textoElegido);
 
     fila.append(celdaDeFila(segmento.etiqueta, '', t('whatsmkt.configuracion.col.segmento')), celda('td', diasDeSegmento(segmento), 'mono', t('whatsmkt.campana.col.dias')), celdaMensaje);
     cuerpo.append(fila);
@@ -327,6 +397,7 @@ document.querySelectorAll<HTMLButtonElement>('button[data-modo]').forEach((boton
 
 selectGlobal.addEventListener('change', () => {
   borrador().mensajeGlobal = aNumero(selectGlobal.value);
+  void pintarTextoDeMensaje($<HTMLElement>('[data-texto-mensaje="global"]'), borrador().mensajeGlobal);
   cambioDelFormulario();
 });
 
@@ -420,6 +491,7 @@ function pintarFecha(): void {
 }
 
 campoFecha.addEventListener('change', () => {
+  avisoFechaVencida.hidden = true;
   borrador().fechaEnvio = campoFecha.value;
   cambioDelFormulario();
 });
@@ -445,7 +517,7 @@ const errorEnvio = $<HTMLElement>('[data-envio-error]');
 function pintarEnvio(): void {
   selectAdjunto.replaceChildren(opcion('', t('whatsmkt.envio.elegirArchivo')), ...estado.adjuntos.map((a) => opcion(String(a.id), etiquetaDeAdjunto(a))));
   elegir(selectAdjunto, borrador().adjuntoId === null ? '' : String(borrador().adjuntoId));
-  // With an empty library there is nothing to choose: the link beside it says where to upload (shortcut: until F2a2 uploads from here).
+  // With an empty library there is nothing to choose: the select waits, and «Subir un archivo» beside it fills it.
   selectAdjunto.disabled = estado.adjuntos.length === 0;
   const fotos = estado.adjuntos.filter((a) => a.tipo === 'imagen_jpeg');
   selectFoto.replaceChildren(opcion('', t('whatsmkt.envio.sinFoto')), ...fotos.map((a) => opcion(String(a.id), etiquetaDeAdjunto(a))));
@@ -485,6 +557,18 @@ campoVcard.addEventListener('input', () => {
   pintarErroresLocales();
   cambioDelFormulario();
 });
+
+/** What an upload leaves in the library is listed and chosen in its select, as if it had been picked there (§3.6). */
+function usarAdjunto(adjunto: AdjuntoWhatsmkt, comoFoto: boolean): void {
+  if (!estado.adjuntos.some((a) => a.id === adjunto.id)) estado.adjuntos = [...estado.adjuntos, adjunto];
+  if (comoFoto) borrador().fotoId = adjunto.id;
+  else borrador().adjuntoId = adjunto.id;
+  pintarEnvio();
+  pintarErroresLocales();
+  cambioDelFormulario();
+}
+montarSubida({ proposito: 'adjunto', select: selectAdjunto, alUsar: (adjunto) => usarAdjunto(adjunto, false) });
+montarSubida({ proposito: 'foto', select: selectFoto, alUsar: (adjunto) => usarAdjunto(adjunto, true) });
 
 // ---- 6. Campaign name -------------------------------------------------------------------------------------------------
 
@@ -644,12 +728,111 @@ function itemDeProblema(texto: string, seccion: SeccionDeProblema | null, codigo
   return item;
 }
 
-function pintarCrear(problemas: number): void {
+const botonCrear = $<HTMLButtonElement>('[data-crear]');
+const alertaCrear = $<HTMLElement>('[data-crear-error]');
+const avisoFechaVencida = $<HTMLElement>('[data-fecha-vencida]');
+const ficha = montarFicha();
+let problemasActuales = 0;
+
+/**
+ * «Crear» is on when nothing stops it and the preview on screen is the one of the form as it is now: not while a new one is being asked for
+ * and not while the lot is being created. After creating, the form is inert and «Armar otra campaña» starts again.
+ */
+function pintarCrear(problemas = problemasActuales): void {
+  problemasActuales = problemas;
   const cantidad = estado.previa?.campanas.length ?? 0;
   $<HTMLElement>('[data-crear-texto]').textContent = cantidad > 1 ? t('whatsmkt.crear.varias', { n: cantidad }) : t('whatsmkt.crear.una');
-  // shortcut: «Crear» stays off here; T-WM-F2a2 turns it on (when there are no problems) and sends the exact version of each message.
-  $<HTMLElement>('[data-crear-motivo]').textContent = problemas > 0 ? motivoDeCrear(problemas) : t('whatsmkt.configuracion.pronto');
+  const calculando = panelPrevia.dataset.calculando === 'true';
+  botonCrear.disabled = problemas > 0 || cantidad === 0 || calculando || estado.creando;
+  $<HTMLElement>('[data-crear-motivo]').textContent = problemas > 0 ? motivoDeCrear(problemas) : '';
 }
+
+function limpiarFalloDeCrear(): void {
+  alertaCrear.hidden = true;
+  $<HTMLElement>('[data-crear-error-lista]').replaceChildren();
+  avisoFechaVencida.hidden = true;
+}
+
+/** The send date stopped being a working day between the preview and creating: the next one is offered, and what was written stays. */
+function mostrarFechaVencida({ fecha, sugerida }: Pick<ErrorFechaNoGestionable, 'fecha' | 'sugerida'>): void {
+  $<HTMLElement>('[data-fecha-vencida-texto]').textContent = t('whatsmkt.crear.fechaVencida', { fecha: formatDate(fecha), sugerida: formatDate(sugerida) });
+  const usar = $<HTMLButtonElement>('[data-fecha-vencida-usar]');
+  usar.dataset.fecha = sugerida;
+  usar.textContent = t('whatsmkt.programacion.usar', { fecha: formatDate(sugerida) });
+  avisoFechaVencida.hidden = false;
+  avisoFechaVencida.scrollIntoView({ block: 'center' });
+}
+
+$<HTMLButtonElement>('[data-fecha-vencida-usar]').addEventListener('click', (evento) => {
+  const sugerida = (evento.currentTarget as HTMLElement).dataset.fecha;
+  if (!sugerida) return;
+  borrador().fechaEnvio = sugerida;
+  campoFecha.value = sugerida;
+  avisoFechaVencida.hidden = true;
+  campoFecha.focus();
+  cambioDelFormulario();
+});
+
+/** The reason a lot was not created, at the top and in an alert: the problems of a 422 each on its line, or the one sentence of the rest. */
+function decirFalloDeCrear(caido: unknown): void {
+  if (caido instanceof ApiError && caido.status === 409 && caido.cuerpo?.codigo === 'fecha_no_gestionable') {
+    mostrarFechaVencida(caido.cuerpo as unknown as ErrorFechaNoGestionable);
+    return;
+  }
+  const etiquetas = Object.fromEntries(estado.segmentos.map((s) => [s.clave, s.etiqueta]));
+  const problemas = caido instanceof ApiError && Array.isArray(caido.cuerpo?.problemas) ? (caido.cuerpo.problemas as ProblemaCampana[]) : [];
+  const delModulo = errorDeModulo(caido);
+  const lineas =
+    problemas.length > 0
+      ? problemas.map((p) => textoDeProblemaConSegmento(p, etiquetas))
+      : [delModulo ? textoDeCodigo(delModulo, delModulo as unknown as Record<string, string | number | null>) : mensajeDeError(caido)];
+  $<HTMLElement>('[data-crear-error-lista]').replaceChildren(
+    ...lineas.map((texto) => {
+      const linea = document.createElement('p');
+      linea.textContent = texto;
+      return linea;
+    }),
+  );
+  alertaCrear.hidden = false;
+  alertaCrear.focus();
+  alertaCrear.scrollIntoView({ block: 'start' });
+}
+
+/** Creates the whole lot with what the preview on screen showed, and shows the card to upload it; if it fails nothing was created. */
+async function crear(): Promise<void> {
+  const base = baseDeSeleccion();
+  const entrada = base ? entradaDePrevisualizacion(base, borrador()) : null;
+  const previa = estado.previa;
+  if (!entrada || !previa || previa.campanas.length === 0) return;
+  limpiarFalloDeCrear();
+  estado.creando = true;
+  ocupado(botonCrear, true);
+  pintarCrear();
+  try {
+    const creadas = await crearCampanas(entradaDeCreacion(entrada, previa, borrador(), nombresActuales()));
+    cerrarFormulario();
+    const nombreDeSegmento = (clave: string | null): string | undefined => estado.segmentos.find((s) => s.clave === clave)?.etiqueta;
+    ficha.mostrar(creadas, estado.adjuntos, (campana) => nombreDeSegmento(campana.segmento) ?? campana.nombre);
+  } catch (caido) {
+    decirFalloDeCrear(caido);
+  } finally {
+    estado.creando = false;
+    ocupado(botonCrear, false);
+    pintarCrear();
+  }
+}
+botonCrear.addEventListener('click', () => void crear());
+
+/**
+ * The lot exists: the card takes the place of the preview and the form stops answering, so the same lot is not created twice by accident.
+ * Another campaign starts from a clean page (what MOWA MES does).
+ */
+function cerrarFormulario(): void {
+  panelPrevia.hidden = true;
+  document.querySelectorAll<HTMLElement>('[data-formulario] > section.panel:not(#wm-sec-ficha)').forEach((seccion) => (seccion.inert = true));
+  raiz.inert = true;
+}
+$<HTMLButtonElement>('[data-creada-otra]').addEventListener('click', () => window.location.reload());
 
 // ---- 7. Preview ----------------------------------------------------------------------------------------------------------
 
@@ -661,6 +844,7 @@ const pagerFuera = $<HTMLElement>('[data-fuera-pager]');
 function marcarCalculando(si: boolean): void {
   panelPrevia.dataset.calculando = String(si);
   panelPrevia.setAttribute('aria-busy', String(si));
+  pintarCrear();
 }
 
 function tablaDeExclusiones(filas: ReadonlyArray<{ pagare: string | null; codigo: string; detalle: string }>): HTMLElement {
@@ -986,6 +1170,7 @@ function repintarTodo(): void {
   pintarNombre();
   pintarEditarEnCartera();
   pintarPrevia();
+  ficha.repintar();
 }
 
 async function arrancar(): Promise<void> {

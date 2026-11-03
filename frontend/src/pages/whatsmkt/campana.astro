@@ -54,6 +54,12 @@ import '../../styles/whatsmkt.css';
       </p>
 
       <div class="wm__contenido" data-formulario hidden>
+        <!-- A lot is created whole or not at all: when it fails nothing was created, and the reason goes here, at the top. -->
+        <div class="notice notice--danger" data-crear-error role="alert" tabindex="-1" hidden>
+          <Icon name="circle-alert" size={20} />
+          <div data-crear-error-lista></div>
+        </div>
+
         <!-- ---- 2. Load file: the definition of the WhatsMKT platform (RF-WM-09 to RF-WM-12) ---------------- -->
         <section class="panel" id="wm-sec-archivo" tabindex="-1" aria-labelledby="wm-archivo-title">
           <div class="panel__head">
@@ -106,6 +112,7 @@ import '../../styles/whatsmkt.css';
               <label class="field__label" for="wm-mensaje-global" data-i18n="whatsmkt.mensaje.global">Mensaje</label>
               <select class="input" id="wm-mensaje-global" aria-describedby="wm-mensaje-global-error"></select>
               <div class="wm-problemas" id="wm-mensaje-global-error" data-problemas-mensaje="global" role="alert"></div>
+              <div class="wm-mensaje-texto" data-texto-mensaje="global" hidden></div>
             </div>
 
             <p class="field__error" data-mensajes-error role="alert"></p>
@@ -138,6 +145,11 @@ import '../../styles/whatsmkt.css';
               <p class="field__error" id="wm-fecha-error" data-fecha-error role="alert"></p>
               <button type="button" class="btn btn--sm" data-fecha-usar hidden></button>
             </div>
+            <p class="notice notice--warning" data-fecha-vencida role="alert" hidden>
+              <Icon name="triangle-alert" size={20} />
+              <span data-fecha-vencida-texto></span>
+              <button type="button" class="btn btn--sm" data-fecha-vencida-usar></button>
+            </p>
 
             <fieldset class="wm-grupo" aria-describedby="wm-horarios-hint wm-horarios-error">
               <legend class="field__label" data-i18n="whatsmkt.programacion.horarios">Horarios de envío</legend>
@@ -179,11 +191,17 @@ import '../../styles/whatsmkt.css';
               <div class="field wm-condicional" data-condicional="archivo" hidden>
                 <label class="field__label" for="wm-adjunto" data-i18n="whatsmkt.envio.adjunto">Archivo</label>
                 <select class="input" id="wm-adjunto" aria-describedby="wm-envio-error"></select>
-                <!-- shortcut: la subida desde la campaña entra en F2a2 (decisión del usuario, 2026-11-03); hasta entonces se sube en la configuración. -->
-                <a class="btn btn--sm btn--quiet" href="/whatsmkt/configuracion#wm-biblioteca-title">
-                  <Icon name="upload" size={16} />
-                  <span data-i18n="whatsmkt.envio.subirEnConfiguracion">Subir en la configuración</span>
-                </a>
+                <div class="wm-subir">
+                  <button type="button" class="btn btn--sm" data-subir="adjunto">
+                    <span class="btn__spinner" aria-hidden="true"></span>
+                    <Icon name="upload" size={16} />
+                    <span class="btn__label" data-i18n="whatsmkt.envio.subir">Subir un archivo</span>
+                  </button>
+                  <input type="file" hidden tabindex="-1" accept="image/jpeg,image/png,video/*,audio/*,application/pdf" data-subir-entrada="adjunto" />
+                </div>
+                <p class="field__error" data-subir-error="adjunto" role="alert"></p>
+                <p class="field__hint" data-subir-estado="adjunto" role="status"></p>
+                <button type="button" class="btn btn--sm wm-subir__restaurar" data-subir-restaurar="adjunto" data-i18n="whatsmkt.envio.restaurarYUsar" hidden>Restaurar y usar</button>
               </div>
               <label class="wm-check">
                 <input type="radio" name="wm-tipo-envio" value="vcard" />
@@ -199,6 +217,17 @@ import '../../styles/whatsmkt.css';
             <div class="field">
               <label class="field__label" for="wm-foto" data-i18n="whatsmkt.envio.foto">Foto de perfil</label>
               <select class="input" id="wm-foto" aria-describedby="wm-foto-hint"></select>
+              <div class="wm-subir">
+                <button type="button" class="btn btn--sm" data-subir="foto">
+                  <span class="btn__spinner" aria-hidden="true"></span>
+                  <Icon name="upload" size={16} />
+                  <span class="btn__label" data-i18n="whatsmkt.envio.subirFoto">Subir una foto</span>
+                </button>
+                <input type="file" hidden tabindex="-1" accept="image/jpeg" data-subir-entrada="foto" />
+              </div>
+              <p class="field__error" data-subir-error="foto" role="alert"></p>
+              <p class="field__hint" data-subir-estado="foto" role="status"></p>
+              <button type="button" class="btn btn--sm wm-subir__restaurar" data-subir-restaurar="foto" data-i18n="whatsmkt.envio.restaurarYUsar" hidden>Restaurar y usar</button>
               <p class="field__hint" id="wm-foto-hint" data-i18n="whatsmkt.envio.fotoHint">JPEG de 200 × 200 píxeles, hasta 1 MB.</p>
             </div>
           </div>
@@ -312,13 +341,46 @@ import '../../styles/whatsmkt.css';
               </div>
             </div>
 
-            <!-- shortcut: «Crear» is visible and off; T-WM-F2a2 turns it on and sends the exact version of each message. -->
             <div class="wm-form__foot">
               <button type="button" class="btn btn--primary" data-crear disabled aria-describedby="wm-crear-motivo">
                 <span class="btn__spinner" aria-hidden="true"></span>
                 <span class="btn__label" data-crear-texto>Crear campaña</span>
               </button>
               <p class="field__hint" id="wm-crear-motivo" data-crear-motivo></p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---- Para subir a WhatsMKT: what the analyst needs once the lot exists (RF-WM-36) ---------------------------- -->
+        <section class="panel" id="wm-sec-ficha" tabindex="-1" aria-labelledby="wm-ficha-title" data-ficha hidden>
+          <div class="panel__head">
+            <h2 class="panel__title" id="wm-ficha-title" data-i18n="whatsmkt.subir.titulo">Para subir a WhatsMKT</h2>
+          </div>
+          <div class="panel__body wm-form">
+            <p class="notice notice--success" role="status">
+              <Icon name="circle-check" size={20} />
+              <span data-ficha-aviso></span>
+            </p>
+            <div class="segmented" role="group" data-i18n-attr="aria-label:whatsmkt.previa.campanas" aria-label="Campañas del lote" data-ficha-campanas hidden></div>
+            <ol class="wm-pasos">
+              <li class="wm-pasos__paso">
+                <h3 class="wm-subtitulo" data-i18n="whatsmkt.subir.paso1">Descarga los archivos</h3>
+                <ul class="wm-ficha__archivos" data-ficha-archivos></ul>
+                <p class="field__error" data-ficha-descarga-error role="alert"></p>
+              </li>
+              <li class="wm-pasos__paso">
+                <h3 class="wm-subtitulo" data-i18n="whatsmkt.subir.paso2">Completa el formulario de WhatsMKT</h3>
+                <p class="notice notice--warning" data-ficha-avisos hidden></p>
+                <dl class="wm-ficha__datos" data-ficha-datos></dl>
+                <p class="field__hint" data-ficha-copia-estado role="status"></p>
+              </li>
+              <li class="wm-pasos__paso">
+                <h3 class="wm-subtitulo" data-i18n="whatsmkt.subir.paso3">Después del envío, importa el informe</h3>
+                <a class="btn" href="/whatsmkt/seguimiento" data-ficha-seguimiento data-i18n="whatsmkt.subir.irSeguimiento">Ir al seguimiento de la campaña</a>
+              </li>
+            </ol>
+            <div class="wm-form__foot">
+              <button type="button" class="btn" data-creada-otra data-i18n="whatsmkt.creada.otra">Armar otra campaña</button>
             </div>
           </div>
         </section>
@@ -331,6 +393,8 @@ import '../../styles/whatsmkt.css';
   <template data-icono-supervision><Icon name="user-check" size={16} /></template>
   <template data-icono-excluidos><Icon name="ban" size={16} /></template>
   <template data-icono-editar-cartera><Icon name="square-pen" size={16} /></template>
+  <template data-icono-copiar><Icon name="copy" size={16} /></template>
+  <template data-icono-descargar><Icon name="download" size={16} /></template>
 
   <!-- ---- Generic failure ---------------------------------------------- -->
   <dialog class="dialog" data-dialog="error" aria-labelledby="wm-error-title">

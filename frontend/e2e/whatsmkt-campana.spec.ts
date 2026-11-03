@@ -64,6 +64,8 @@ test.describe('la base', () => {
       'Envío',
       'Nombre de la campaña',
       'Previsualización',
+      // The card of the lot, hidden until one is created.
+      'Para subir a WhatsMKT',
     ]);
     await expect.poll(() => campana.previas.length).toBeGreaterThan(0);
     expect(ultimaPrevia(campana)).toMatchObject({ fecha_corte: '2026-09-13', cantidad: 1000, seleccion_id: 1, modo: 'por_segmento', definicion: { id: 11 } });
@@ -174,6 +176,25 @@ test.describe('mensaje', () => {
     await expect(page.locator('[data-sin-productos="mayores_2"]')).toBeVisible();
     await expect(page.locator('[data-sin-productos="preventivo"]')).toBeHidden();
     await expect(page.locator('[data-sin-productos="tramo_2"]')).toBeHidden();
+  });
+
+  test('bajo cada select va el texto del mensaje elegido, de solo lectura, con su largo contra el tope y sus macros marcadas', async ({ page }) => {
+    await conSeleccion(page);
+    const bloque = page.locator('[data-texto-mensaje="preventivo"]');
+
+    await expect(bloque.locator('.wm-mensaje-texto__cuerpo')).toHaveText('Hola [$MACRO1$], Preventivo: tu saldo es [$MACRO2$]. INFO por [whatsapp]');
+    // «[whatsapp]» counts as the link it becomes (26): 72 characters of text plus the 16 the link adds.
+    await expect(bloque.locator('.wm-contador')).toHaveText('88 / 4096 caracteres');
+    // The macros are marked, and the one whose column has a label says it in its title.
+    await expect(bloque.locator('mark.wm-macro')).toHaveText(['[$MACRO1$]', '[$MACRO2$]']);
+    await expect(bloque.locator('mark.wm-macro').first()).toHaveAttribute('title', 'MACRO1 · Nombres del titular');
+    // The segment with no message has no block.
+    await expect(page.locator('[data-texto-mensaje="mayores_2"]')).toBeHidden();
+
+    await mensajeDe(page, 'tramo_2').selectOption({ label: 'Oferta de octubre' });
+    await expect(page.locator('[data-texto-mensaje="tramo_2"] .wm-mensaje-texto__cuerpo')).toContainText('Oferta de octubre');
+    await mensajeDe(page, 'tramo_2').selectOption({ label: 'Elige un mensaje' });
+    await expect(page.locator('[data-texto-mensaje="tramo_2"]')).toBeHidden();
   });
 
   test('elegir otro mensaje de un segmento lo manda en la previsualización', async ({ page }) => {
@@ -388,14 +409,14 @@ test.describe('envío', () => {
     await expect(problemas(page)).toHaveCount(0);
   });
 
-  test('con la biblioteca vacía el select de archivos queda inactivo y el enlace dice dónde subir', async ({ page }) => {
+  test('con la biblioteca vacía el select de archivos queda inactivo y «Subir un archivo» sigue al lado', async ({ page }) => {
     const api = apiConfigurada();
     api.adjuntos = [];
     await conSeleccion(page, api);
     await page.getByLabel('Texto + archivo').check();
 
     await expect(page.locator('#wm-adjunto')).toBeDisabled();
-    await expect(page.getByRole('link', { name: 'Subir en la configuración' })).toHaveAttribute('href', '/whatsmkt/configuracion#wm-biblioteca-title');
+    await expect(page.getByRole('button', { name: 'Subir un archivo' })).toBeVisible();
   });
 
   test('el archivo se elige de la biblioteca (sin los archivados) y la foto solo entre las JPEG, con «Sin foto»', async ({ page }) => {
@@ -408,7 +429,7 @@ test.describe('envío', () => {
       /tarifario\.pdf · PDF · 1[.,]5 MB/,
     ]);
     await expect(page.locator('#wm-foto option')).toHaveText(['Sin foto', 'afiche-octubre.jpg · Imagen JPEG · 240 KB']);
-    await expect(page.getByRole('link', { name: 'Subir en la configuración' })).toHaveAttribute('href', /\/whatsmkt\/configuracion/);
+    await expect(page.getByRole('button', { name: 'Subir una foto' })).toBeVisible();
   });
 });
 
@@ -594,13 +615,13 @@ test.describe('los problemas y «Crear»', () => {
     expect(api.pedidos.filter((p) => p.metodo === 'POST' && p.ruta === '/whatsmkt/campanas')).toHaveLength(0);
   });
 
-  test('sin problemas «Crear» sigue apagado: lo activa la entrega siguiente', async ({ page }) => {
+  test('sin problemas «Crear» está activo y, sin pedirlo, no crea nada', async ({ page }) => {
     const { api } = await conSeleccion(page);
     await page.locator('[data-franja="horario_1"]').check();
 
     await expect(problemas(page)).toHaveCount(0);
-    await expect(crear(page)).toBeDisabled();
-    await expect(page.locator('[data-crear-motivo]')).toHaveText('Disponible pronto.');
+    await expect(crear(page)).toBeEnabled();
+    await expect(page.locator('[data-crear-motivo]')).toBeEmpty();
     expect(api.pedidos.filter((p) => p.metodo === 'POST' && p.ruta === '/whatsmkt/campanas')).toHaveLength(0);
   });
 

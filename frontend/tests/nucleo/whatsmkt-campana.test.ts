@@ -9,17 +9,22 @@ import type { ConfiguracionWhatsmkt, SegmentoWhatsmkt } from '../../src/lib/api-
 import {
   borradorInicial,
   cantidadDeMacros,
+  datosDeFicha,
   diasDeSegmento,
+  entradaDeCreacion,
   entradaDePrevisualizacion,
   etiquetaDeAdjunto,
+  fechaDeFormulario,
   filasDeColumnas,
   horariosElegidos,
   motivoDeCrear,
   nombresDeLote,
   problemasLocales,
+  quedoArchivado,
   seccionDeProblema,
   textoDeProblema,
   textoDeProblemaConSegmento,
+  textoDeSubida,
   variablesDesconocidasDeNombre,
   type BorradorCampana,
   type SeleccionBase,
@@ -299,5 +304,154 @@ describe('cómo se leen las cosas', () => {
     expect(cantidadDeMacros([])).toBe(0);
     expect(cantidadDeMacros([1])).toBe(0);
     expect(cantidadDeMacros([1, 2, 3, 4, 5, 6, 7])).toBe(6);
+  });
+});
+
+describe('el pedido de crear', () => {
+  const mensaje = (id: number, version: number) => ({ texto_guardado_id: id, nombre: `Mensaje ${id}`, version, deshabilitado: false });
+  const previaPorSegmento = {
+    campanas: [
+      { segmento: 'preventivo', mensaje: mensaje(7, 3) },
+      { segmento: 'tramo_2', mensaje: mensaje(8, 1) },
+    ],
+  } as Parameters<typeof entradaDeCreacion>[1];
+  const previaGlobal = { campanas: [{ segmento: null, mensaje: mensaje(9, 2) }] } as Parameters<typeof entradaDeCreacion>[1];
+  const pedido = (borrador: BorradorCampana) => entradaDePrevisualizacion(BASE, borrador)!;
+
+  it('cada mensaje va con la versión EXACTA que devolvió la previsualización, no con «la vigente», y cada campaña con su nombre', () => {
+    const borrador = conHorario({ modo: 'por_segmento', mensajesPorSegmento: { preventivo: 7, tramo_2: 8, mayores_2: null } });
+
+    const creacion = entradaDeCreacion(pedido(borrador), previaPorSegmento, borrador, ['CUZCO (Preventivo)', 'CUZCO (Tramo 2)']);
+
+    expect(creacion.mensajes).toEqual({ preventivo: { texto_guardado_id: 7, version: 3 }, tramo_2: { texto_guardado_id: 8, version: 1 } });
+    expect(creacion.nombres).toEqual({ preventivo: 'CUZCO (Preventivo)', tramo_2: 'CUZCO (Tramo 2)' });
+    expect(creacion.nombre).toBeUndefined();
+    expect(creacion.mensaje).toBeUndefined();
+  });
+
+  it('en modo global manda un solo mensaje con su versión y un solo nombre', () => {
+    const borrador = conHorario({ modo: 'global', mensajeGlobal: 9 });
+
+    const creacion = entradaDeCreacion(pedido(borrador), previaGlobal, borrador, ['CUZCO especial']);
+
+    expect(creacion.mensaje).toEqual({ texto_guardado_id: 9, version: 2 });
+    expect(creacion.nombre).toBe('CUZCO especial');
+    expect(creacion.mensajes).toBeUndefined();
+    expect(creacion.nombres).toBeUndefined();
+  });
+
+  it('trae lo de la previsualización y suma los horarios, lo antes posible y el tipo de envío', () => {
+    const borrador = conHorario({ horarios: { horario_1: true, horario_2: true }, antes: true, fechaEnvio: '2026-10-19' });
+
+    const creacion = entradaDeCreacion(pedido(borrador), previaPorSegmento, borrador, ['a', 'b']);
+
+    expect(creacion).toMatchObject({
+      fecha_corte: '2026-09-13',
+      cantidad: 1000,
+      seleccion_id: 5,
+      modo: 'por_segmento',
+      fecha_envio: '2026-10-19',
+      horarios: ['horario_1', 'horario_2'],
+      lo_antes_posible: true,
+      tipo_envio: 'solo_texto',
+    });
+  });
+
+  it('solo manda lo del tipo de envío elegido: el archivo con «Texto + archivo» y la etiqueta con «Texto + vCard»; la foto, con cualquiera', () => {
+    const lleno = { adjuntoId: 4, fotoId: 5, etiquetaVcard: '  Caja Cusco  ' };
+    const de = (tipoEnvio: BorradorCampana['tipoEnvio']) => {
+      const borrador = conHorario({ ...lleno, tipoEnvio });
+      return entradaDeCreacion(pedido(borrador), previaPorSegmento, borrador, ['a', 'b']);
+    };
+
+    expect(de('solo_texto')).toMatchObject({ foto_id: 5 });
+    expect(de('solo_texto').adjunto_id).toBeUndefined();
+    expect(de('solo_texto').etiqueta_vcard).toBeUndefined();
+    expect(de('archivo')).toMatchObject({ foto_id: 5, adjunto_id: 4 });
+    expect(de('archivo').etiqueta_vcard).toBeUndefined();
+    expect(de('vcard')).toMatchObject({ foto_id: 5, etiqueta_vcard: 'Caja Cusco' });
+    expect(de('vcard').adjunto_id).toBeUndefined();
+  });
+
+  it('sin foto no manda foto_id', () => {
+    const borrador = conHorario({ fotoId: null });
+
+    expect(entradaDeCreacion(pedido(borrador), previaPorSegmento, borrador, ['a', 'b']).foto_id).toBeUndefined();
+  });
+});
+
+describe('la ficha de una campaña creada', () => {
+  const ficha = {
+    nombre: 'CUZCO_Vencida (Preventivo) whatsapp 2026.10.29',
+    fecha_envio: '2026-10-29',
+    horarios: [{ nombre: 'horario_1', inicio: '08:00', fin: '14:00' }],
+    lo_antes_posible: false,
+    pais: 'Perú',
+    foto_id: null,
+    cantidad: 1520,
+    tipo_envio: 'archivo',
+    adjunto_id: 4,
+    etiqueta_vcard: null,
+    mensaje: 'Hola [$MACRO1$]\nINFO por https://wa.me/+51900000123',
+    avisos: [],
+  } as Parameters<typeof datosDeFicha>[0];
+
+  it('trae cada dato del formulario en su orden, con los valores que se escriben en él', () => {
+    const datos = datosDeFicha(ficha, [{ id: 4, tipo: 'imagen_jpeg' }]);
+
+    expect(datos.map((d) => d.clave)).toEqual(['nombre', 'fecha', 'antes', 'pais', 'cantidad', 'tipo', 'mensaje']);
+    expect(datos.map((d) => d.valor)).toEqual([
+      'CUZCO_Vencida (Preventivo) whatsapp 2026.10.29',
+      '29/10/2026 · Horario 1 (08:00 – 14:00)',
+      'No',
+      'Perú',
+      // No thousands separator: it is typed in the field.
+      '1520',
+      'Texto + imagen',
+      'Hola [$MACRO1$]\nINFO por https://wa.me/+51900000123',
+    ]);
+    expect(datos.map((d) => d.multilinea)).toEqual([false, false, false, false, false, false, true]);
+    expect(datos[0].etiqueta).toBe('Nombre de campaña');
+  });
+
+  it('dos horarios van juntos y lo antes posible dice Sí', () => {
+    const datos = datosDeFicha(
+      { ...ficha, lo_antes_posible: true, horarios: [...ficha.horarios, { nombre: 'horario_2', inicio: '14:00', fin: '20:00' }] },
+      [],
+    );
+
+    expect(datos[1].valor).toBe('29/10/2026 · Horario 1 (08:00 – 14:00) · Horario 2 (14:00 – 20:00)');
+    expect(datos[2].valor).toBe('Sí');
+  });
+
+  it('el tipo de envío dice el tipo del archivo, o la etiqueta del vCard, o solo texto', () => {
+    expect(datosDeFicha(ficha, [{ id: 4, tipo: 'pdf' }])[5].valor).toBe('Texto + PDF');
+    expect(datosDeFicha(ficha, [{ id: 4, tipo: 'video' }])[5].valor).toBe('Texto + video');
+    expect(datosDeFicha({ ...ficha, tipo_envio: 'vcard', adjunto_id: null, etiqueta_vcard: 'Caja Cusco' }, [])[5].valor).toBe('Texto + vCard · Caja Cusco');
+    expect(datosDeFicha({ ...ficha, tipo_envio: 'solo_texto', adjunto_id: null }, [])[5].valor).toBe('Solo texto');
+  });
+
+  it('la fecha se escribe como la pide el formulario de WhatsMKT', () => {
+    expect(fechaDeFormulario('2026-10-29')).toBe('29/10/2026');
+    expect(fechaDeFormulario('2026-01-05')).toBe('05/01/2026');
+  });
+});
+
+describe('lo que dice una subida desde la campaña', () => {
+  it('un archivo nuevo dice que se subió y se eligió; una imagen suma que se guardó sin metadatos', () => {
+    expect(textoDeSubida({ nombre: 'tarifario.pdf', tipo: 'pdf', ya_existia: false })).toBe('Subido y elegido: tarifario.pdf.');
+    expect(textoDeSubida({ nombre: 'afiche.jpg', tipo: 'imagen_jpeg', ya_existia: false })).toBe(
+      'Subido y elegido: afiche.jpg. Se guardó sin metadatos (EXIF, ubicación).',
+    );
+  });
+
+  it('uno que ya estaba dice que se usa el mismo, sin hablar de metadatos', () => {
+    expect(textoDeSubida({ nombre: 'afiche.jpg', tipo: 'imagen_jpeg', ya_existia: true })).toBe('Ya estaba en la biblioteca: se usa el mismo archivo.');
+  });
+
+  it('solo se ofrece restaurar lo que ya estaba Y está archivado', () => {
+    expect(quedoArchivado({ ya_existia: true, archivado_en: '2026-10-12T15:00:00-05:00' })).toBe(true);
+    expect(quedoArchivado({ ya_existia: true, archivado_en: null })).toBe(false);
+    expect(quedoArchivado({ ya_existia: false, archivado_en: null })).toBe(false);
   });
 });

@@ -43,6 +43,147 @@
   align-self: flex-start;
 }
 
+/* The upload beside a select of the sending section: the button is as wide as its text, and its status and its «Restaurar y usar» go under. */
+.wm-subir {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.wm-subir__restaurar {
+  align-self: flex-start;
+}
+
+/* The card of the lot created: three numbered steps; the data of the form in one grid (name | value | button) so the copy buttons line up
+   in a column of their own, and on a phone the name goes above its value, which keeps its button beside it. */
+.wm-pasos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding-inline-start: var(--space-5);
+}
+
+.wm-pasos__paso > * + * {
+  margin-block-start: var(--space-2);
+}
+
+.wm-ficha__archivos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wm-ficha__archivo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+
+.wm-ficha__valor {
+  overflow-wrap: anywhere;
+}
+
+/* The message is a block of several lines kept as written. */
+.wm-ficha__valor--bloque {
+  display: block;
+  white-space: pre-wrap;
+}
+
+.wm-ficha__datos {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr) auto;
+  align-items: stretch;
+  margin: 0;
+}
+
+.wm-ficha__dato {
+  display: contents;
+}
+
+.wm-ficha__dato dt,
+.wm-ficha__dato dd {
+  margin: 0;
+  padding-block: var(--space-2);
+  border-block-end: var(--color-border-hairline) solid var(--color-border);
+}
+
+.wm-ficha__dato dt {
+  padding-inline-end: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.wm-ficha__dato dd:not(.wm-ficha__copiar) {
+  padding-inline-end: var(--space-3);
+  min-inline-size: 0;
+}
+
+/* On a phone each datum is its own two-row grid: the name and its copy button on the first row, the value under them across the whole width. */
+@media (max-width: 47.99rem) {
+  .wm-ficha__datos {
+    display: block;
+  }
+
+  .wm-ficha__dato {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    border-block-end: var(--color-border-hairline) solid var(--color-border);
+  }
+
+  .wm-ficha__dato dt,
+  .wm-ficha__dato dd {
+    border-block-end: 0;
+  }
+
+  .wm-ficha__dato dt {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .wm-ficha__dato .wm-ficha__copiar {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .wm-ficha__dato dd:not(.wm-ficha__copiar) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    padding-block-start: 0;
+  }
+}
+
+/* The text of the message chosen, read only and as written, with its length against the limit and its macros marked. */
+.wm-mensaje-texto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.wm-mensaje-texto__cuerpo {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.wm-macro {
+  background-color: var(--color-accent-wash);
+  color: inherit;
+}
+
+.wm-ficha__rotulo {
+  font-size: var(--text-sm);
+}
+
 .wm-form {
   display: flex;
   flex-direction: column;

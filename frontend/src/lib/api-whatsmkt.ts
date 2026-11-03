@@ -65,10 +65,11 @@ export function listarAdjuntos(archivados = false): Promise<AdjuntoWhatsmkt[]> {
  * Validates, cleans and stores a file (201). A file with the same fingerprint answers the one that was there,
  * with `ya_existia`: an archived one that is uploaded again stays archived. The module's refusals are 422.
  */
-export function subirAdjunto(archivo: File): Promise<AdjuntoSubido> {
+export function subirAdjunto(archivo: File, proposito: 'adjunto' | 'foto' = 'adjunto'): Promise<AdjuntoSubido> {
   const cuerpo = new FormData();
   cuerpo.set('archivo', archivo);
-  cuerpo.set('proposito', 'adjunto');
+  // `foto` also checks that it serves as a profile photo: JPEG, 200 x 200, up to 1 MB.
+  cuerpo.set('proposito', proposito);
   return request<AdjuntoSubido>(ADJUNTOS, { method: 'POST', body: cuerpo });
 }
 
@@ -96,6 +97,12 @@ export type ExclusionCampana = Esquemas['ExclusionWhatsmktRespuesta'];
 export type MensajeEntrada = Esquemas['MensajeWhatsmktEntrada'];
 export type ModoCampana = Esquemas['ModoCampana'];
 export type TipoEnvio = Esquemas['TipoEnvio'];
+export type PeticionCreacion = Esquemas['CreacionCampanasWhatsmktEntrada'];
+/** A campaign of the lot just created, with the data of its form already written (RF-WM-36). */
+export type CampanaCreada = Esquemas['CampanaCreadaWhatsmktRespuesta'];
+export type FichaCampana = Esquemas['FichaWhatsmktRespuesta'];
+/** The 409 of creating: the send date stopped being a working day; `sugerida` is the next one. */
+export type ErrorFechaNoGestionable = Esquemas['ErrorFechaNoGestionableWhatsmktRespuesta'];
 
 /**
  * What the lot would be, without creating anything: the campaigns, their sample and exclusions, the message of each and
@@ -106,4 +113,17 @@ export function previsualizarCampanas(
   signal?: AbortSignal,
 ): Promise<PrevisualizacionCampanas> {
   return request<PrevisualizacionCampanas>('/whatsmkt/campanas/previsualizacion', conJson('POST', entrada, signal));
+}
+
+/**
+ * Creates the whole lot or none (201 with the campaigns of the lot). A date that stopped being a working day is a 409 with the next one
+ * (`ErrorFechaNoGestionable`); what keeps it from being created is a 422 with every problem; the rest are 400 and 404.
+ */
+export function crearCampanas(entrada: PeticionCreacion): Promise<CampanaCreada[]> {
+  return request<CampanaCreada[]>('/whatsmkt/campanas', conJson('POST', entrada));
+}
+
+/** The `.xlsx` of a campaign, with the name the server gives it. */
+export function descargarArchivoCampana(id: number): Promise<ArchivoDescargado> {
+  return descargarArchivo(`/whatsmkt/campanas/${id}/archivo`);
 }

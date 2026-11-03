@@ -9,22 +9,30 @@
  */
 
 import type {
+  AdjuntoSubido,
   AdjuntoWhatsmkt,
+  CampanaPrevista,
   ConfiguracionWhatsmkt,
+  FichaCampana,
+  MensajeEntrada,
   ModoCampana,
+  PeticionCreacion,
   PeticionPrevisualizacion,
+  PrevisualizacionCampanas,
   ProblemaCampana,
   SegmentoWhatsmkt,
   TipoEnvio,
 } from './api-whatsmkt';
 import type { Expresion } from './expresion';
-import { resumenDeContenido } from './constructor-pantalla';
+import { textoDeContenido } from './constructor-pantalla';
 import { formatDate } from './format';
 import { t } from './i18n';
 import type { Consulta } from './seleccion';
 import {
   LARGO_MAXIMO_NOMBRE,
+  esImagen,
   nombreDeCampana,
+  nombreDeFranja,
   nombreDeTipo,
   tamanoLegible,
   textoDeCodigo,
@@ -233,6 +241,49 @@ export function problemasLocales(
   return problemas;
 }
 
+/**
+ * The request that creates what the preview showed (RF-WM-23): the same form plus what only creating needs. Each message goes with the
+ * EXACT version the preview answered, not «the latest»: what was shown is what is created, even if another version was saved meanwhile.
+ * `nombres` are the ones on screen, one per campaign in the order of the preview. Only what the chosen type of sending uses travels
+ * (the file of «Texto + archivo», the label of «Texto + vCard»); the photo is optional for every type.
+ */
+export function entradaDeCreacion(
+  entrada: PeticionPrevisualizacion,
+  previa: Pick<PrevisualizacionCampanas, 'campanas'>,
+  borrador: BorradorCampana,
+  nombres: readonly string[],
+): PeticionCreacion {
+  const exacta = (mensaje: NonNullable<CampanaPrevista['mensaje']>): MensajeEntrada => ({
+    texto_guardado_id: mensaje.texto_guardado_id,
+    version: mensaje.version,
+  });
+  const creacion: PeticionCreacion = {
+    ...entrada,
+    horarios: horariosElegidos(borrador),
+    lo_antes_posible: borrador.antes,
+    tipo_envio: borrador.tipoEnvio,
+  };
+  if (borrador.modo === 'global') {
+    const mensaje = previa.campanas[0]?.mensaje;
+    if (mensaje) creacion.mensaje = exacta(mensaje);
+    if (nombres[0] !== undefined) creacion.nombre = nombres[0];
+  } else {
+    const mensajes: Record<string, MensajeEntrada> = {};
+    const nombresPorSegmento: Record<string, string> = {};
+    previa.campanas.forEach((campana, i) => {
+      if (campana.segmento === null) return;
+      if (campana.mensaje) mensajes[campana.segmento] = exacta(campana.mensaje);
+      if (nombres[i] !== undefined) nombresPorSegmento[campana.segmento] = nombres[i];
+    });
+    creacion.mensajes = mensajes;
+    creacion.nombres = nombresPorSegmento;
+  }
+  if (borrador.fotoId !== null) creacion.foto_id = borrador.fotoId;
+  if (borrador.tipoEnvio === 'archivo' && borrador.adjuntoId !== null) creacion.adjunto_id = borrador.adjuntoId;
+  if (borrador.tipoEnvio === 'vcard') creacion.etiqueta_vcard = borrador.etiquetaVcard.trim();
+  return creacion;
+}
+
 /** The sentence beside «Crear» while there are problems: «Corrige 2 problemas para crear.» */
 export function motivoDeCrear(cantidad: number): string {
   return cantidad === 1 ? t('whatsmkt.crear.problemasUno') : t('whatsmkt.crear.problemas', { n: cantidad });
@@ -258,8 +309,8 @@ export interface ColumnaDeDefinicion {
   nombre: string;
   etiqueta: string | null;
   expresion: Expresion;
-  /** How many segment variants the column has; the list of the builder says so after the content. */
-  variantes?: number;
+  /** Its segment variants: the list of the builder says how many after the content. */
+  variantes?: readonly unknown[];
 }
 
 export interface FilaDeColumna {
@@ -272,32 +323,16 @@ export interface FilaDeColumna {
 
 /**
  * The columns of a definition at a glance: the first is the number (no macro); each of the others is macro 1, 2, 3 by its
- * position. The content reads like the list of the builder (`resumenDeContenido` is its function; the words are its keys
- * `columnas.contenido.*`): a variable by its visible name, or the start of a composed text.
- *
- * shortcut: the assembly of those words (10 lines) is `textoDeContenido` of `pages/columnas.astro`, which is not exported; this
- * repeats it until it is a function of a module (then import it and delete this).
+ * position. The content reads exactly like the list of the builder (`textoDeContenido`, its own function): a variable by its visible
+ * name, or the start of a composed text.
  */
-const MAXIMO_RESUMEN = 60;
 
 export function filasDeColumnas(
   columnas: readonly ColumnaDeDefinicion[],
   etiquetaDeVariable: (nombre: string) => string = (nombre) => nombre,
 ): FilaDeColumna[] {
   return columnas.map((columna, indice) => {
-    const resumen = resumenDeContenido(columna.expresion, etiquetaDeVariable, MAXIMO_RESUMEN);
-    let contenido: string;
-    if (resumen.modo === 'vacio') contenido = t('columnas.contenido.vacio');
-    else if (resumen.modo === 'variable') {
-      contenido = resumen.funciones
-        ? t('columnas.contenido.variableConFunciones', { variable: resumen.variable, n: resumen.funciones })
-        : t('columnas.contenido.variable', { variable: resumen.variable });
-    } else {
-      contenido = t(resumen.recortado ? 'columnas.contenido.textoRecortado' : 'columnas.contenido.texto', { fragmento: resumen.fragmento });
-    }
-    if (columna.variantes) {
-      contenido += ` · ${t(columna.variantes === 1 ? 'columnas.variantes.uno' : 'columnas.variantes.otras', { n: columna.variantes })}`;
-    }
+    const { texto: contenido } = textoDeContenido({ expresion: columna.expresion, variantes: columna.variantes ?? [] }, etiquetaDeVariable);
     return { macro: indice === 0 ? null : indice, encabezado: columna.nombre, etiqueta: columna.etiqueta, contenido };
   });
 }
@@ -307,3 +342,65 @@ export const cantidadDeMacros = (columnas: readonly unknown[]): number => Math.m
 
 /** WhatsMKT publishes up to this many variables per message (DU-WM-1, provisional). */
 export const MACROS_PUBLICADAS = 5;
+
+// ---- Uploading from the campaign (§3.6) -------------------------------------------------------------------
+
+/** The upload found the same file in the library, archived: it is not brought back by itself, the analyst decides. */
+export const quedoArchivado = (subido: Pick<AdjuntoSubido, 'ya_existia' | 'archivado_en'>): boolean =>
+  subido.ya_existia && subido.archivado_en !== null;
+
+/** What the status says once an upload is chosen: the file is new (images say they lost their metadata) or it was already there. */
+export function textoDeSubida(subido: Pick<AdjuntoSubido, 'nombre' | 'tipo' | 'ya_existia'>): string {
+  if (subido.ya_existia) return t('whatsmkt.envio.repetido');
+  const base = t('whatsmkt.envio.subido', { nombre: subido.nombre });
+  return esImagen(subido.tipo) ? `${base} ${t('whatsmkt.biblioteca.sinMetadatos')}` : base;
+}
+
+// ---- The card of a campaign created (§3.10) ------------------------------------------------------------------
+
+/** A piece of the WhatsMKT form, ready to copy: what it asks, what to write, and whether it is a block of several lines. */
+export interface DatoDeFicha {
+  clave: 'nombre' | 'fecha' | 'antes' | 'pais' | 'cantidad' | 'tipo' | 'mensaje';
+  etiqueta: string;
+  valor: string;
+  multilinea: boolean;
+}
+
+/** `2026-10-29` as the form of WhatsMKT writes it: `29/10/2026`. */
+export const fechaDeFormulario = (iso: string): string => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+
+/**
+ * The name of an attachment type as the form of WhatsMKT offers it. The form is in Spanish whatever the screen's language is, and what
+ * is written here is what its analyst picks, so these are its own words and are not translated.
+ */
+const TIPO_EN_FORMULARIO: Readonly<Record<string, string>> = { imagen_jpeg: 'imagen', imagen_png: 'imagen', video: 'video', audio: 'audio', pdf: 'PDF' };
+
+/**
+ * The data of the form in its order: name, date and time slots, as soon as possible, country, how many phones the list has (no thousands
+ * separator, because that is how it is typed), the type of sending and the text of the message. The values are the form's own (Spanish).
+ */
+export function datosDeFicha(ficha: FichaCampana, adjuntos: ReadonlyArray<Pick<AdjuntoWhatsmkt, 'id' | 'tipo'>>): DatoDeFicha[] {
+  const franjas = ficha.horarios.map((h) => `${nombreDeFranja(h.nombre as Franja)} (${h.inicio} – ${h.fin})`);
+  const adjunto = ficha.adjunto_id === null ? undefined : adjuntos.find((a) => a.id === ficha.adjunto_id);
+  const tipo =
+    ficha.tipo_envio === 'vcard'
+      ? `Texto + vCard · ${ficha.etiqueta_vcard ?? ''}`
+      : ficha.tipo_envio === 'archivo'
+        ? `Texto + ${adjunto ? (TIPO_EN_FORMULARIO[adjunto.tipo] ?? 'archivo') : 'archivo'}`
+        : 'Solo texto';
+  const dato = (clave: DatoDeFicha['clave'], valor: string, multilinea = false): DatoDeFicha => ({
+    clave,
+    etiqueta: t(`whatsmkt.subir.dato.${clave}`),
+    valor,
+    multilinea,
+  });
+  return [
+    dato('nombre', ficha.nombre),
+    dato('fecha', [fechaDeFormulario(ficha.fecha_envio), ...franjas].join(' · ')),
+    dato('antes', ficha.lo_antes_posible ? 'Sí' : 'No'),
+    dato('pais', ficha.pais),
+    dato('cantidad', String(ficha.cantidad)),
+    dato('tipo', tipo),
+    dato('mensaje', ficha.mensaje, true),
+  ];
+}

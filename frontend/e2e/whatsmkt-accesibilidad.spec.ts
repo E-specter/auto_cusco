@@ -74,6 +74,29 @@ for (const tema of ['light', 'dark'] as const) {
         await sinViolaciones(page);
       });
 
+      test('campaña, con la ficha del lote creado, con su aviso y la subida de un archivo archivado', async ({ page }) => {
+        await montarCampanaWhatsmkt(page, campanaFalsa({ avisosFicha: ['sin_whatsapp'] }));
+        await montarSeleccion(page);
+        await page.goto('/whatsmkt/campana');
+        await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 1000' });
+        await page.locator('#wm-definicion').selectOption({ label: 'Contactos WhatsMKT' });
+        await page.locator('[data-franja="horario_1"]').check();
+        // The fixture's segments own no message: each one that will make a campaign needs its own, or nothing can be created.
+        await page.locator('#wm-mensaje-preventivo').selectOption({ label: 'Preventivo' });
+        await page.locator('#wm-mensaje-tramo_2').selectOption({ label: 'Tramo 2' });
+        // An archived file found again: its status and «Restaurar y usar» are on screen next to the select.
+        await page.getByLabel('Texto + archivo').check();
+        await page.locator('[data-subir-entrada="adjunto"]').setInputFiles({ name: 'spot-anterior.mp4', mimeType: 'video/mp4', buffer: Buffer.from('sintetico') });
+        await expect(page.getByRole('button', { name: 'Restaurar y usar' }).first()).toBeVisible();
+        await sinViolaciones(page);
+        await page.getByLabel('Solo texto').check();
+        await expect(page.locator('[data-crear]')).toBeEnabled();
+        await page.locator('[data-crear]').click();
+        await expect(page.locator('#wm-sec-ficha')).toBeVisible();
+        await expect(page.locator('[data-ficha-avisos]')).toBeVisible();
+        await sinViolaciones(page);
+      });
+
       test('seguimiento, con su aviso de construcción', async ({ page }) => {
         await page.goto('/whatsmkt/seguimiento');
         await expect(page.getByRole('heading', { name: 'Seguimiento de WhatsMKT', level: 1 })).toBeVisible();
