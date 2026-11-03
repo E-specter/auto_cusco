@@ -17,9 +17,12 @@ def test_cada_codigo_tiene_su_traduccion() -> None:
     )
 
 
-def test_son_29_codigos_y_los_de_la_previsualizacion_estan_entre_ellos() -> None:
-    assert len(CodigoWhatsmkt) == 29
-    assert {"sin_dias_atraso", "sin_supervisores"} <= {c.value for c in CodigoWhatsmkt}
+def test_son_31_codigos_y_los_nuevos_de_la_previsualizacion_y_el_whatsapp_estan_entre_ellos() -> (
+    None
+):
+    assert len(CodigoWhatsmkt) == 31
+    nuevos = {"sin_dias_atraso", "sin_supervisores", "whatsapp_invalido", "sin_whatsapp"}
+    assert nuevos <= {c.value for c in CodigoWhatsmkt}
 
 
 def test_el_detalle_de_sin_dias_atraso_y_el_enlace_a_supervisores_estan_en_los_dos_idiomas() -> (
@@ -27,5 +30,10 @@ def test_el_detalle_de_sin_dias_atraso_y_el_enlace_a_supervisores_estan_en_los_d
 ):
     for idioma in ("es", "en"):
         diccionario_ = diccionario(idioma)
-        for clave in ("whatsmkt.exclusiones.sin_dias_atraso", "whatsmkt.previa.irSupervisores"):
+        claves = (
+            "whatsmkt.exclusiones.sin_dias_atraso",
+            "whatsmkt.previa.irSupervisores",
+            "whatsmkt.previa.irWhatsapp",
+        )
+        for clave in claves:
             assert diccionario_.get(clave), f"Falta {clave} en {idioma}.json"

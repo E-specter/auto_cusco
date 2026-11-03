@@ -19,11 +19,15 @@ from datetime import datetime, time
 from typing import Annotated, Self
 
 from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi.exceptions import RequestValidationError
 from pydantic import AfterValidator, BaseModel, Field, StringConstraints, model_validator
 
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_definiciones_postgres import (
     RepositorioDefinicionesPostgres,
+)
+from app.adapters.persistence.repositorio_textos_guardados_postgres import (
+    RepositorioTextosGuardadosPostgres,
 )
 from app.adapters.persistence.repositorio_whatsmkt_postgres import RepositorioWhatsmktPostgres
 from app.api.errores import DetalleError, ErrorConCodigo, respuestas_de_error
@@ -37,6 +41,7 @@ from app.core.entities.whatsmkt import (
     ErrorWhatsmkt,
     Horario,
     SegmentoWhatsmkt,
+    TextoDeSegmentoInvalido,
 )
 from app.core.services.plataformas.whatsmkt.administracion import ConfiguracionWhatsmktService
 
@@ -57,7 +62,9 @@ PARAMETROS = ("horarios", "variable", "segmento", "fila", "desde", "hasta") + (
 def obtener_servicio_whatsmkt() -> ConfiguracionWhatsmktService:
     """Dependencia de FastAPI; los tests la sustituyen por un doble de prueba."""
     return ConfiguracionWhatsmktService(
-        RepositorioWhatsmktPostgres(get_engine()), RepositorioDefinicionesPostgres(get_engine())
+        RepositorioWhatsmktPostgres(get_engine()),
+        RepositorioDefinicionesPostgres(get_engine()),
+        RepositorioTextosGuardadosPostgres(get_engine()),
     )
 
 
@@ -150,6 +157,15 @@ class ConfiguracionWhatsmktEntrada(BaseModel):
     tope_pdf: int = Field(
         default=None, gt=0, le=_MAXIMO_TOPE, description="Bytes, mayor que 0 (RF-WM-31)"
     )
+    whatsapp_contacto: str | None = Field(
+        default=None,
+        max_length=20,
+        description=(
+            "WhatsApp de contacto que reemplaza a [whatsapp] en el mensaje (DU-WM-11): 9 digitos "
+            "que empiezan con 9; mal escrito responde `whatsapp_invalido`. Sin el campo se "
+            "conserva el actual; null (o vacio) lo borra"
+        ),
+    )
 
     def sobre(self, actual: ConfiguracionWhatsmkt) -> ConfiguracionWhatsmkt:
         """La configuracion guardada con los campos que vinieron."""
@@ -171,6 +187,7 @@ class ConfiguracionWhatsmktRespuesta(ModeloRespuesta):
     tope_audio: int
     tope_pdf: int
     actualizado_en: datetime | None
+    whatsapp_contacto: str | None
     variables_plantilla: list[str] = Field(description="Las variables validas de la plantilla")
 
 
@@ -193,6 +210,7 @@ def _configuracion(c: ConfiguracionWhatsmkt) -> ConfiguracionWhatsmktRespuesta:
         tope_audio=c.tope_audio,
         tope_pdf=c.tope_pdf,
         actualizado_en=c.actualizado_en,
+        whatsapp_contacto=c.whatsapp_contacto,
         variables_plantilla=list(VARIABLES_PLANTILLA),
     )
 
@@ -240,6 +258,14 @@ class SegmentoWhatsmktEntrada(BaseModel):
     etiqueta: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
     desde: int | None = Field(ge=-_MAXIMO_DIAS, le=_MAXIMO_DIAS, description="null: sin piso")
     hasta: int | None = Field(ge=-_MAXIMO_DIAS, le=_MAXIMO_DIAS, description="null: sin tope")
+    texto_guardado_id: int | None = Field(
+        default=None,
+        description=(
+            "El mensaje del segmento: un texto del contexto `whatsmkt.mensaje` (RF-WM-19). Sin el "
+            "campo se conserva el actual; null lo quita; uno que no existe o es de otro contexto "
+            "responde el 422 de validacion"
+        ),
+    )
 
     @model_validator(mode="after")
     def _rango(self) -> Self:
@@ -261,12 +287,18 @@ class SegmentoWhatsmktRespuesta(ModeloRespuesta):
     desde: int | None
     hasta: int | None
     orden: int
+    texto_guardado_id: int | None = Field(description="Su mensaje; null si no tiene")
 
 
 def _segmentos(segmentos: list[SegmentoWhatsmkt]) -> list[SegmentoWhatsmktRespuesta]:
     return [
         SegmentoWhatsmktRespuesta(
-            clave=s.clave, etiqueta=s.etiqueta, desde=s.desde, hasta=s.hasta, orden=s.orden
+            clave=s.clave,
+            etiqueta=s.etiqueta,
+            desde=s.desde,
+            hasta=s.hasta,
+            orden=s.orden,
+            texto_guardado_id=s.texto_guardado_id,
         )
         for s in segmentos
     ]
@@ -295,8 +327,33 @@ def reemplazar_segmentos(
     Otras claves, una repetida o una que falta responden el 422 de validacion, sin codigo.
     Segmentos que se superponen o dejan huecos responden 422 con su `codigo` y sus parametros, y
     la tabla anterior queda como estaba."""
-    nuevos = [SegmentoWhatsmkt(s.clave, s.etiqueta, s.desde, s.hasta, 0) for s in entrada]
+    actuales = {s.clave: s.texto_guardado_id for s in servicio.listar_segmentos()}
+    nuevos = [
+        SegmentoWhatsmkt(
+            s.clave,
+            s.etiqueta,
+            s.desde,
+            s.hasta,
+            0,
+            s.texto_guardado_id
+            if "texto_guardado_id" in s.model_fields_set
+            else actuales.get(s.clave),
+        )
+        for s in entrada
+    ]
     try:
         return _segmentos(servicio.reemplazar_segmentos(nuevos))
     except ErrorWhatsmkt as exc:
         raise error_whatsmkt(exc) from exc
+    except TextoDeSegmentoInvalido as exc:
+        indice = next(i for i, s in enumerate(entrada) if s.clave == exc.clave)
+        raise RequestValidationError(
+            [
+                {
+                    "type": "value_error",
+                    "loc": ("body", indice, "texto_guardado_id"),
+                    "msg": str(exc),
+                    "input": exc.texto_id,
+                }
+            ]
+        ) from exc

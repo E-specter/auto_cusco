@@ -79,7 +79,9 @@ def test_la_migracion_va_y_vuelve_y_siembra_lo_de_s_wm_1() -> None:
         sembrado = RepositorioWhatsmktPostgres(engine)
         configuracion = sembrado.obtener_configuracion()
         assert replace(configuracion, actualizado_en=None) == ConfiguracionWhatsmkt()
-        assert sembrado.listar_segmentos() == list(SEGMENTOS_POR_DEFECTO)
+        # Desde B3 cada segmento apunta a su mensaje sembrado: aqui solo se miran los limites.
+        segmentos = [replace(s, texto_guardado_id=None) for s in sembrado.listar_segmentos()]
+        assert segmentos == list(SEGMENTOS_POR_DEFECTO)
     finally:
         command.upgrade(_alembic(), "head")
 

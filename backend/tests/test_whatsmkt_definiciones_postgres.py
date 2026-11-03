@@ -17,6 +17,9 @@ from app.adapters.persistence.modelos import DefinicionCargaGuardada
 from app.adapters.persistence.repositorio_definiciones_postgres import (
     RepositorioDefinicionesPostgres,
 )
+from app.adapters.persistence.repositorio_textos_guardados_postgres import (
+    RepositorioTextosGuardadosPostgres,
+)
 from app.adapters.persistence.repositorio_whatsmkt_postgres import RepositorioWhatsmktPostgres
 from app.core.entities.nombres import normalizar_nombre
 from app.core.entities.whatsmkt import CodigoWhatsmkt, DefinicionDefectoNoExiste, ErrorWhatsmkt
@@ -54,7 +57,10 @@ def entorno():
     definiciones = RepositorioDefinicionesPostgres(engine)
     original = repo.obtener_configuracion()
     try:
-        yield ConfiguracionWhatsmktService(repo, definiciones), repo, definiciones
+        servicio = ConfiguracionWhatsmktService(
+            repo, definiciones, RepositorioTextosGuardadosPostgres(engine)
+        )
+        yield servicio, repo, definiciones
     finally:
         repo.guardar_configuracion(original)
         with engine.begin() as cx:

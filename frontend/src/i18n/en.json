@@ -1456,5 +1456,8 @@
   "whatsmkt.codigo.sin_dias_atraso": "No days overdue",
   "whatsmkt.codigo.sin_supervisores": "There are no supervisors set up: the campaign cannot be created without them.",
   "whatsmkt.exclusiones.sin_dias_atraso": "It has no days overdue, so it falls in no segment. In “Global” mode it would be included.",
-  "whatsmkt.previa.irSupervisores": "Set up supervisors"
+  "whatsmkt.previa.irSupervisores": "Set up supervisors",
+  "whatsmkt.codigo.whatsapp_invalido": "WhatsApp must have 9 digits and start with 9.",
+  "whatsmkt.codigo.sin_whatsapp": "The message uses [whatsapp] and no contact WhatsApp is set up.",
+  "whatsmkt.previa.irWhatsapp": "Set up the contact WhatsApp"
 }

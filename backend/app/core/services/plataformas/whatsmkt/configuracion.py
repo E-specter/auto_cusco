@@ -6,6 +6,7 @@ Los topes (RF-WM-26 y 31) son enteros mayores que cero en bytes: los valida el m
 import re
 from dataclasses import replace
 
+from app.core.entities.telefono import numero_valido
 from app.core.entities.whatsmkt import (
     PLANTILLA_NOMBRE_POR_DEFECTO,
     VARIABLES_PLANTILLA,
@@ -50,8 +51,22 @@ def plantilla_valida(plantilla: str | None) -> str:
     return limpia
 
 
+def whatsapp_valido(numero: str | None) -> str | None:
+    """DU-WM-11 (a): el WhatsApp de contacto es de 9 digitos y empieza con 9 (RF-02). Sin texto
+    queda sin numero (None); uno mal escrito es `whatsapp_invalido`."""
+    limpio = (numero or "").strip()
+    if not limpio:
+        return None
+    if not numero_valido(limpio):
+        raise ErrorWhatsmkt(
+            CodigoWhatsmkt.WHATSAPP_INVALIDO, "El WhatsApp debe tener 9 digitos y empezar con 9"
+        )
+    return limpio
+
+
 def configuracion_valida(configuracion: ConfiguracionWhatsmkt) -> ConfiguracionWhatsmkt:
-    """La configuracion con sus reglas aplicadas: horarios y plantilla (que queda limpia).
+    """La configuracion con sus reglas aplicadas: horarios, plantilla (que queda limpia) y el
+    WhatsApp de contacto.
 
     Un horario malo se rechaza nombrando la franja (`horarios`); si fallan las dos, las dos.
     """
@@ -69,4 +84,8 @@ def configuracion_valida(configuracion: ConfiguracionWhatsmkt) -> ConfiguracionW
             f"{', '.join(malos)}: la hora de inicio tiene que ser anterior a la de fin",
             horarios=malos,
         )
-    return replace(configuracion, plantilla_nombre=plantilla_valida(configuracion.plantilla_nombre))
+    return replace(
+        configuracion,
+        plantilla_nombre=plantilla_valida(configuracion.plantilla_nombre),
+        whatsapp_contacto=whatsapp_valido(configuracion.whatsapp_contacto),
+    )

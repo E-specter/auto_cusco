@@ -48,6 +48,7 @@ from app.core.entities.textos_guardados import (
     VersionDeTextoNoEncontrada,
     VersionTexto,
 )
+from app.core.services.plataformas.whatsmkt.contexto import CONTEXTO_MENSAJE
 from app.core.services.textos_guardados.contextos import (
     ContextoGuardado,
     ContextoGuardadoDesconocido,
@@ -61,9 +62,9 @@ from app.core.services.textos_guardados.servicio import (
 
 router = APIRouter(prefix="/textos-guardados", tags=["textos guardados"])
 
-# Los contextos que la aplicacion conoce: cada modulo agrega aqui el suyo (RF-69). B4 no registra
-# ninguno; `whatsmkt.mensaje` lo registra WhatsMKT. Los tests sustituyen la dependencia.
-_REGISTRO_CONTEXTOS = RegistroContextosGuardados()
+# Los contextos que la aplicacion conoce: cada modulo agrega aqui el suyo (RF-69). El nucleo no
+# importa ninguno; los tests sustituyen la dependencia.
+_REGISTRO_CONTEXTOS = RegistroContextosGuardados([CONTEXTO_MENSAJE])
 
 
 def obtener_registro_contextos_guardados() -> RegistroContextosGuardados:

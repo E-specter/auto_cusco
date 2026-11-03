@@ -8,19 +8,26 @@ from app.core.entities.whatsmkt import (
     DefinicionDefectoNoExiste,
     ErrorWhatsmkt,
     SegmentoWhatsmkt,
+    TextoDeSegmentoInvalido,
 )
 from app.core.ports.repositorio_definiciones_port import RepositorioDefinicionesPort
+from app.core.ports.repositorio_textos_guardados_port import RepositorioTextosGuardadosPort
 from app.core.ports.repositorio_whatsmkt_port import RepositorioWhatsmktPort
 from app.core.services.plataformas.whatsmkt import configuracion, segmentos
+from app.core.services.plataformas.whatsmkt.contexto import CLAVE_CONTEXTO_MENSAJE
 from app.core.services.plataformas.whatsmkt.plataforma import CLAVE
 
 
 class ConfiguracionWhatsmktService:
     def __init__(
-        self, repositorio: RepositorioWhatsmktPort, definiciones: RepositorioDefinicionesPort
+        self,
+        repositorio: RepositorioWhatsmktPort,
+        definiciones: RepositorioDefinicionesPort,
+        textos: RepositorioTextosGuardadosPort,
     ) -> None:
         self._repositorio = repositorio
         self._definiciones = definiciones
+        self._textos = textos
 
     def obtener_configuracion(self) -> ConfiguracionWhatsmkt:
         return self._repositorio.obtener_configuracion()
@@ -47,4 +54,21 @@ class ConfiguracionWhatsmktService:
         return self._repositorio.listar_segmentos()
 
     def reemplazar_segmentos(self, nuevos: Sequence[SegmentoWhatsmkt]) -> list[SegmentoWhatsmkt]:
-        return self._repositorio.reemplazar_segmentos(list(segmentos.segmentos_validos(nuevos)))
+        validos = segmentos.segmentos_validos(nuevos)
+        for segmento in validos:
+            self._revisar_texto_del_segmento(segmento)
+        return self._repositorio.reemplazar_segmentos(list(validos))
+
+    def _revisar_texto_del_segmento(self, segmento: SegmentoWhatsmkt) -> None:
+        """RF-WM-19: el mensaje del segmento es un texto del contexto `whatsmkt.mensaje`."""
+        if segmento.texto_guardado_id is None:
+            return
+        texto = self._textos.obtener(segmento.texto_guardado_id)
+        if texto is None:
+            raise TextoDeSegmentoInvalido(segmento.clave, segmento.texto_guardado_id, "no existe")
+        if texto.contexto != CLAVE_CONTEXTO_MENSAJE:
+            raise TextoDeSegmentoInvalido(
+                segmento.clave,
+                segmento.texto_guardado_id,
+                f"no es un mensaje de WhatsMKT (es del contexto {texto.contexto!r})",
+            )

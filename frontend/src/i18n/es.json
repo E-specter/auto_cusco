@@ -1456,5 +1456,8 @@
   "whatsmkt.codigo.sin_dias_atraso": "Sin días de atraso",
   "whatsmkt.codigo.sin_supervisores": "No hay supervisores configurados: sin ellos no se crea la campaña.",
   "whatsmkt.exclusiones.sin_dias_atraso": "No tiene días de atraso, así que no cae en ningún segmento. En el modo «Global» sí entraría.",
-  "whatsmkt.previa.irSupervisores": "Configurar supervisores"
+  "whatsmkt.previa.irSupervisores": "Configurar supervisores",
+  "whatsmkt.codigo.whatsapp_invalido": "El WhatsApp debe tener 9 dígitos y empezar con 9.",
+  "whatsmkt.codigo.sin_whatsapp": "El mensaje usa [whatsapp] y no hay WhatsApp de contacto configurado.",
+  "whatsmkt.previa.irWhatsapp": "Configurar el WhatsApp de contacto"
 }

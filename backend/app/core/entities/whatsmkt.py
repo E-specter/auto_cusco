@@ -56,6 +56,8 @@ class CodigoWhatsmkt(StrEnum):
     HORARIO_INVALIDO = "horario_invalido"
     SIN_DIAS_ATRASO = "sin_dias_atraso"
     SIN_SUPERVISORES = "sin_supervisores"
+    WHATSAPP_INVALIDO = "whatsapp_invalido"
+    SIN_WHATSAPP = "sin_whatsapp"
 
 
 class ModoCampana(StrEnum):
@@ -85,6 +87,16 @@ class DefinicionDefectoNoExiste(Exception):
     def __init__(self, definicion_id: int) -> None:
         super().__init__(f"No existe la definicion {definicion_id}")
         self.definicion_id = definicion_id
+
+
+class TextoDeSegmentoInvalido(Exception):
+    """El texto elegido como mensaje de un segmento no existe o no es del contexto
+    `whatsmkt.mensaje` (RF-WM-19)."""
+
+    def __init__(self, clave: str, texto_id: int, motivo: str) -> None:
+        super().__init__(f"El mensaje del segmento {clave!r}: {motivo}")
+        self.clave = clave
+        self.texto_id = texto_id
 
 
 class AdjuntoNoEncontrado(Exception):
@@ -118,6 +130,9 @@ class ConfiguracionWhatsmkt:
     tope_audio: int = TOPE_ADJUNTO_POR_DEFECTO
     tope_pdf: int = TOPE_ADJUNTO_POR_DEFECTO
     actualizado_en: datetime | None = None
+    # DU-WM-11 (a): el numero de contacto que reemplaza a `[whatsapp]` en el mensaje; sin numero,
+    # `[whatsapp]` queda tal cual. 9 digitos que empiezan con 9 (RF-02).
+    whatsapp_contacto: str | None = None
 
 
 @dataclass(frozen=True)
@@ -129,6 +144,9 @@ class SegmentoWhatsmkt:
     desde: int | None
     hasta: int | None
     orden: int
+    # El texto guardado (contexto `whatsmkt.mensaje`) que es el mensaje de este segmento. Es el
+    # texto, no la version: la campana congela la version al crearse.
+    texto_guardado_id: int | None = None
 
 
 # S-WM-1, el valor sembrado por la migracion. Los segmentos son fijos: se editan su etiqueta y sus

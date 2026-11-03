@@ -2126,7 +2126,7 @@ export interface components {
          *     y `segmentos_con_hueco`; los demas los emiten B2 a B6.
          * @enum {string}
          */
-        CodigoWhatsmkt: "sin_telefono" | "telefono_invalido" | "macro_vacia" | "mensaje_con_emoji" | "macro_inexistente" | "mensaje_largo" | "mensaje_deshabilitado" | "nombre_largo" | "variable_inexistente" | "fecha_no_gestionable" | "sin_horario" | "sin_productos" | "definicion_no_whatsmkt" | "foto_formato" | "foto_medidas" | "foto_peso" | "adjunto_tipo" | "adjunto_peso" | "adjunto_danado" | "segmentos_superpuestos" | "segmentos_con_hueco" | "informe_sin_encabezados" | "informe_sin_filas" | "informe_ya_importado" | "campana_descartada" | "campana_no_descartada" | "horario_invalido" | "sin_dias_atraso" | "sin_supervisores";
+        CodigoWhatsmkt: "sin_telefono" | "telefono_invalido" | "macro_vacia" | "mensaje_con_emoji" | "macro_inexistente" | "mensaje_largo" | "mensaje_deshabilitado" | "nombre_largo" | "variable_inexistente" | "fecha_no_gestionable" | "sin_horario" | "sin_productos" | "definicion_no_whatsmkt" | "foto_formato" | "foto_medidas" | "foto_peso" | "adjunto_tipo" | "adjunto_peso" | "adjunto_danado" | "segmentos_superpuestos" | "segmentos_con_hueco" | "informe_sin_encabezados" | "informe_sin_filas" | "informe_ya_importado" | "campana_descartada" | "campana_no_descartada" | "horario_invalido" | "sin_dias_atraso" | "sin_supervisores" | "whatsapp_invalido" | "sin_whatsapp";
         /**
          * ColumnaAnalizadaRespuesta
          * @description Una columna del archivo. `indice` va en base 0 y es su posicion en el archivo (los
@@ -2380,6 +2380,11 @@ export interface components {
              * @description Bytes, mayor que 0 (RF-WM-31)
              */
             tope_pdf?: number;
+            /**
+             * Whatsapp Contacto
+             * @description WhatsApp de contacto que reemplaza a [whatsapp] en el mensaje (DU-WM-11): 9 digitos que empiezan con 9; mal escrito responde `whatsapp_invalido`. Sin el campo se conserva el actual; null (o vacio) lo borra
+             */
+            whatsapp_contacto?: string | null;
         };
         /** ConfiguracionWhatsmktRespuesta */
         ConfiguracionWhatsmktRespuesta: {
@@ -2399,6 +2404,8 @@ export interface components {
             tope_pdf: number;
             /** Actualizado En */
             actualizado_en: string | null;
+            /** Whatsapp Contacto */
+            whatsapp_contacto: string | null;
             /**
              * Variables Plantilla
              * @description Las variables validas de la plantilla
@@ -4344,6 +4351,11 @@ export interface components {
              * @description null: sin tope
              */
             hasta: number | null;
+            /**
+             * Texto Guardado Id
+             * @description El mensaje del segmento: un texto del contexto `whatsmkt.mensaje` (RF-WM-19). Sin el campo se conserva el actual; null lo quita; uno que no existe o es de otro contexto responde el 422 de validacion
+             */
+            texto_guardado_id?: number | null;
         };
         /** SegmentoWhatsmktRespuesta */
         SegmentoWhatsmktRespuesta: {
@@ -4357,6 +4369,11 @@ export interface components {
             hasta: number | null;
             /** Orden */
             orden: number;
+            /**
+             * Texto Guardado Id
+             * @description Su mensaje; null si no tiene
+             */
+            texto_guardado_id: number | null;
         };
         /** SeleccionEntrada */
         SeleccionEntrada: {

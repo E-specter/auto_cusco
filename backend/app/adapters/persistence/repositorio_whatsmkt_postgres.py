@@ -44,11 +44,14 @@ def _configuracion(fila: Row) -> ConfiguracionWhatsmkt:
         tope_audio=fila.tope_audio,
         tope_pdf=fila.tope_pdf,
         actualizado_en=fila.actualizado_en,
+        whatsapp_contacto=fila.whatsapp_contacto,
     )
 
 
 def _segmento(fila: Row) -> SegmentoWhatsmkt:
-    return SegmentoWhatsmkt(fila.clave, fila.etiqueta, fila.desde, fila.hasta, fila.orden)
+    return SegmentoWhatsmkt(
+        fila.clave, fila.etiqueta, fila.desde, fila.hasta, fila.orden, fila.texto_guardado_id
+    )
 
 
 def _adjunto(fila: Row) -> AdjuntoWhatsmkt:
@@ -93,6 +96,7 @@ class RepositorioWhatsmktPostgres(RepositorioWhatsmktPort):
                 tope_video=configuracion.tope_video,
                 tope_audio=configuracion.tope_audio,
                 tope_pdf=configuracion.tope_pdf,
+                whatsapp_contacto=configuracion.whatsapp_contacto,
                 actualizado_en=func.clock_timestamp(),
             )
             .returning(*_CONFIGURACION.c)
@@ -123,7 +127,13 @@ class RepositorioWhatsmktPostgres(RepositorioWhatsmktPort):
                 cx.execute(
                     update(_SEGMENTO)
                     .where(_SEGMENTO.c.clave == s.clave)
-                    .values(etiqueta=s.etiqueta, desde=s.desde, hasta=s.hasta, orden=s.orden)
+                    .values(
+                        etiqueta=s.etiqueta,
+                        desde=s.desde,
+                        hasta=s.hasta,
+                        orden=s.orden,
+                        texto_guardado_id=s.texto_guardado_id,
+                    )
                 )
             filas = cx.execute(select(_SEGMENTO).order_by(_SEGMENTO.c.orden)).all()
         return [_segmento(f) for f in filas]

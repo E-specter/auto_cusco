@@ -6927,7 +6927,9 @@
           "campana_no_descartada",
           "horario_invalido",
           "sin_dias_atraso",
-          "sin_supervisores"
+          "sin_supervisores",
+          "whatsapp_invalido",
+          "sin_whatsapp"
         ],
         "title": "CodigoWhatsmkt",
         "description": "Codigos de error del modulo; el frontend los traduce como `whatsmkt.codigo.<codigo>`.\n\nLos de docs/whatsmkt-interfaz.md §7 (con `horario_invalido`, `sin_dias_atraso` y\n`sin_supervisores`), todos desde B1 para que la\nprueba espejo de i18n no cambie en cada corte. Un codigo por linea, con la forma\n`NOMBRE = \"codigo\"`: la prueba espejo lee esta clase. Un codigo nuevo se acuerda antes con\ndesigner. B1 emite solo `horario_invalido`, `variable_inexistente`, `segmentos_superpuestos`\ny `segmentos_con_hueco`; los demas los emiten B2 a B6."
@@ -7624,6 +7626,19 @@
             "exclusiveMinimum": 0.0,
             "title": "Tope Pdf",
             "description": "Bytes, mayor que 0 (RF-WM-31)"
+          },
+          "whatsapp_contacto": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Contacto",
+            "description": "WhatsApp de contacto que reemplaza a [whatsapp] en el mensaje (DU-WM-11): 9 digitos que empiezan con 9; mal escrito responde `whatsapp_invalido`. Sin el campo se conserva el actual; null (o vacio) lo borra"
           }
         },
         "type": "object",
@@ -7681,6 +7696,17 @@
             ],
             "title": "Actualizado En"
           },
+          "whatsapp_contacto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Contacto"
+          },
           "variables_plantilla": {
             "items": {
               "type": "string"
@@ -7701,6 +7727,7 @@
           "tope_audio",
           "tope_pdf",
           "actualizado_en",
+          "whatsapp_contacto",
           "variables_plantilla"
         ],
         "title": "ConfiguracionWhatsmktRespuesta"
@@ -12625,6 +12652,18 @@
             ],
             "title": "Hasta",
             "description": "null: sin tope"
+          },
+          "texto_guardado_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Texto Guardado Id",
+            "description": "El mensaje del segmento: un texto del contexto `whatsmkt.mensaje` (RF-WM-19). Sin el campo se conserva el actual; null lo quita; uno que no existe o es de otro contexto responde el 422 de validacion"
           }
         },
         "type": "object",
@@ -12671,6 +12710,18 @@
           "orden": {
             "type": "integer",
             "title": "Orden"
+          },
+          "texto_guardado_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Texto Guardado Id",
+            "description": "Su mensaje; null si no tiene"
           }
         },
         "type": "object",
@@ -12679,7 +12730,8 @@
           "etiqueta",
           "desde",
           "hasta",
-          "orden"
+          "orden",
+          "texto_guardado_id"
         ],
         "title": "SegmentoWhatsmktRespuesta"
       },

@@ -783,9 +783,15 @@ class WhatsmktConfiguracion(Base):
     actualizado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # DU-WM-11 (a): el numero de contacto que reemplaza a `[whatsapp]` en el mensaje.
+    whatsapp_contacto: Mapped[str | None] = mapped_column(String(9))
 
     __table_args__ = (
         CheckConstraint("id = 1", name="fila_unica"),
+        CheckConstraint(
+            f"whatsapp_contacto IS NULL OR whatsapp_contacto ~ {_TELEFONO_RF02}",
+            name="whatsapp_valido",
+        ),
         CheckConstraint("horario_1_inicio < horario_1_fin", name="horario_1_valido"),
         CheckConstraint("horario_2_inicio < horario_2_fin", name="horario_2_valido"),
         CheckConstraint("length(btrim(plantilla_nombre)) > 0", name="plantilla_no_vacia"),
@@ -810,6 +816,11 @@ class WhatsmktSegmento(Base):
     desde: Mapped[int | None] = mapped_column(Integer)
     hasta: Mapped[int | None] = mapped_column(Integer)
     orden: Mapped[int] = mapped_column(Integer)
+    # El mensaje del segmento: un texto guardado del contexto `whatsmkt.mensaje` (RF-WM-19).
+    texto_guardado_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("texto_guardado.id", ondelete="SET NULL", name="fk_whatsmkt_segmento_texto"),
+    )
 
     __table_args__ = (
         CheckConstraint("length(btrim(clave)) > 0", name="clave_no_vacia"),

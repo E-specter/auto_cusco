@@ -65,11 +65,23 @@ class DefinicionesFalsas:
         )
 
 
+class TextosFalsos:
+    """Los textos guardados: el 10 es un mensaje de WhatsMKT y el 11, de otro contexto."""
+
+    def __init__(self) -> None:
+        self.contextos = {10: "whatsmkt.mensaje", 11: "otro.contexto", 12: "whatsmkt.mensaje"}
+
+    def obtener(self, texto_id):
+        if texto_id not in self.contextos:
+            return None
+        return SimpleNamespace(id=texto_id, contexto=self.contextos[texto_id])
+
+
 @pytest.fixture
 def cliente():
     repositorio = RepositorioWhatsmktFalso()
     app.dependency_overrides[obtener_servicio_whatsmkt] = lambda: ConfiguracionWhatsmktService(
-        repositorio, DefinicionesFalsas()
+        repositorio, DefinicionesFalsas(), TextosFalsos()
     )
     try:
         yield TestClient(app), repositorio
@@ -100,6 +112,7 @@ def test_la_configuracion_se_lee_con_sus_valores_por_defecto(cliente) -> None:
         "tope_audio": 16_000_000,
         "tope_pdf": 16_000_000,
         "actualizado_en": "2026-11-02T12:00:00Z",
+        "whatsapp_contacto": None,
         "variables_plantilla": ["fecha_corte", "segmento"],
     }
 
@@ -306,14 +319,29 @@ def test_los_segmentos_se_leen_de_menor_a_mayor(cliente) -> None:
 
     assert respuesta.status_code == 200
     assert respuesta.json() == [
-        {"clave": "preventivo", "etiqueta": "Preventivo", "desde": None, "hasta": 0, "orden": 0},
-        {"clave": "tramo_2", "etiqueta": "Tramo 2", "desde": 1, "hasta": 8, "orden": 1},
+        {
+            "clave": "preventivo",
+            "etiqueta": "Preventivo",
+            "desde": None,
+            "hasta": 0,
+            "orden": 0,
+            "texto_guardado_id": None,
+        },
+        {
+            "clave": "tramo_2",
+            "etiqueta": "Tramo 2",
+            "desde": 1,
+            "hasta": 8,
+            "orden": 1,
+            "texto_guardado_id": None,
+        },
         {
             "clave": "mayores_2",
             "etiqueta": "Tramos mayores al 2",
             "desde": 9,
             "hasta": None,
             "orden": 2,
+            "texto_guardado_id": None,
         },
     ]
 
@@ -415,3 +443,76 @@ def test_el_contrato_declara_el_422_con_codigo_en_los_dos_put() -> None:
         assert ref["schema"]["$ref"].endswith("/ErrorWhatsmktRespuesta")
     error = esquemas["components"]["schemas"]["ErrorWhatsmktRespuesta"]
     assert set(error["required"]) == {"detail", "codigo", *PARAMETROS_NULOS}
+
+
+# --- whatsapp_contacto (DU-WM-11) -------------------------------------------------------------
+
+
+def test_el_whatsapp_de_contacto_se_guarda_se_conserva_y_se_borra_con_null(cliente) -> None:
+    client, _ = cliente
+
+    guardado = client.put("/whatsmkt/configuracion", json={"whatsapp_contacto": "900000123"})
+    conservado = client.put("/whatsmkt/configuracion", json={"tope_mensaje": 100})
+    borrado = client.put("/whatsmkt/configuracion", json={"whatsapp_contacto": None})
+
+    assert guardado.json()["whatsapp_contacto"] == "900000123"
+    assert conservado.json()["whatsapp_contacto"] == "900000123"
+    assert borrado.json()["whatsapp_contacto"] is None
+
+
+def test_un_whatsapp_en_blanco_queda_sin_numero_y_se_recorta(cliente) -> None:
+    client, _ = cliente
+
+    en_blanco = client.put("/whatsmkt/configuracion", json={"whatsapp_contacto": "   "})
+    recortado = client.put("/whatsmkt/configuracion", json={"whatsapp_contacto": " 900000123 "})
+
+    assert en_blanco.json()["whatsapp_contacto"] is None
+    assert recortado.json()["whatsapp_contacto"] == "900000123"
+
+
+@pytest.mark.parametrize("numero", ["812345678", "90000012", "9000001234", "abc", "9000 00123"])
+def test_un_whatsapp_mal_escrito_responde_422_con_su_codigo_sin_guardar(cliente, numero) -> None:
+    client, repositorio = cliente
+
+    respuesta = client.put("/whatsmkt/configuracion", json={"whatsapp_contacto": numero})
+
+    assert respuesta.status_code == 422
+    assert respuesta.json()["codigo"] == "whatsapp_invalido"
+    assert repositorio.escrituras == 0
+
+
+# --- texto_guardado_id de los segmentos (RF-WM-19) --------------------------------------------
+
+
+def test_el_texto_de_cada_segmento_se_elige_se_conserva_y_se_quita(cliente) -> None:
+    client, _ = cliente
+    con_texto = _tres(preventivo={"texto_guardado_id": 10}, tramo_2={"texto_guardado_id": 12})
+
+    elegidos = client.put("/whatsmkt/segmentos", json=con_texto)
+    sin_decir = client.put("/whatsmkt/segmentos", json=_tres())  # no trae el campo: se conserva
+    quitado = client.put("/whatsmkt/segmentos", json=_tres(preventivo={"texto_guardado_id": None}))
+
+    assert [s["texto_guardado_id"] for s in elegidos.json()] == [10, 12, None]
+    assert [s["texto_guardado_id"] for s in sin_decir.json()] == [10, 12, None]
+    assert [s["texto_guardado_id"] for s in quitado.json()] == [None, 12, None]
+    assert [s["texto_guardado_id"] for s in client.get("/whatsmkt/segmentos").json()] == [
+        None,
+        12,
+        None,
+    ]
+
+
+@pytest.mark.parametrize("texto_id", [11, 99])
+def test_un_texto_que_no_existe_o_es_de_otro_contexto_responde_el_422_de_validacion(
+    cliente, texto_id
+) -> None:
+    client, repositorio = cliente
+
+    respuesta = client.put(
+        "/whatsmkt/segmentos", json=_tres(tramo_2={"texto_guardado_id": texto_id})
+    )
+
+    assert respuesta.status_code == 422
+    [error] = respuesta.json()["detail"]
+    assert error["loc"][-1] == "texto_guardado_id"
+    assert repositorio.segmentos == list(SEGMENTOS_POR_DEFECTO)
