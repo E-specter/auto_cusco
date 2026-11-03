@@ -479,6 +479,7 @@ Lo propio de cada plataforma (qué columnas fija y cómo se llaman) lo declara s
   - Junto al nombre, «Restaurar» (`.btn--sm .btn--quiet`) le devuelve el encabezado de su posición. Solo aparece si el nombre es distinto del de su posición.
 - **Tipo del resto** (`tipo_resto`): el `select` de tipo queda inactivo con ese tipo, y el hint de la fila dice «En WhatsMKT las macros son siempre texto: el valor sale ya formateado».
 - **Problemas de la plataforma:** la validación los devuelve con su columna y su regla (B2), y se muestran bajo la columna como cualquier otro problema (§4), con el texto de su código. Con un problema de plataforma no se guarda.
+- **Cambiar de plataforma antes de guardar** (solo en una definición nueva): si ya hay algo escrito, un diálogo lo confirma, porque se borran **todas** las columnas, también las no fijas. Quedan las que fija la plataforma elegida o, al pasar a «Ninguna (archivo libre)», una columna vacía. El nombre, la protección de fórmulas y la segmentación se conservan. Sin nada escrito, cambia sin preguntar. El botón de confirmar es `.btn--danger`.
 - **Plataforma que ya no existe:** si la definición guardada declara una plataforma que no está registrada, el tag dice «Plataforma desconocida: {clave}», en `tag--advertencia`, y el problema de la validación va arriba, en el resumen (§9.4). La definición se lee y se genera como está.
 - **A 360 px** la tabla se apila (`.table--apilable-ancha`), y el candado de una columna fija ocupa el lugar de las acciones, con su texto visible: «Columna fija».
 
@@ -529,6 +530,11 @@ textos.destruir();
 | `columnas.plataforma.reglas.sinMas` | y no se agregan más columnas | and no more columns can be added |
 | `columnas.plataforma.porPosicion` | {plataforma} toma las columnas por su orden, no por su nombre: esta es la macro {n}. | {plataforma} takes the columns by order, not by name: this is macro {n}. |
 | `columnas.plataforma.restaurar` | Restaurar | Restore |
+| `columnas.plataforma.restaurarPara` | Restaurar el encabezado de la columna {n} | Restore the header of column {n} |
+| `columnas.plataforma.cambiar.titulo` | Cambiar la plataforma | Change the platform |
+| `columnas.plataforma.cambiar.cuerpo` | Se borran las columnas que escribiste y quedan solo las que fija {plataforma}. El nombre y las opciones de la definición no cambian. | The columns you wrote are deleted, and only the ones {plataforma} fixes remain. The definition's name and options do not change. |
+| `columnas.plataforma.cambiar.cuerpoLibre` | Se borran las columnas que escribiste y queda una columna vacía. El nombre y las opciones de la definición no cambian. | The columns you wrote are deleted and one empty column remains. The definition's name and options do not change. |
+| `columnas.plataforma.cambiar.confirmar` | Cambiar plataforma | Change platform |
 | `columnas.plataforma.tipoFijo` | En {plataforma} las macros son siempre texto: el valor sale ya formateado. | In {plataforma} macros are always text: the value goes out already formatted. |
 | `columnas.formato.celdaTexto` | Texto de Excel | Excel text |
 | `textosGuardados.texto` | Texto | Text |
