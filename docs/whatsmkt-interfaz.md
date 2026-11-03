@@ -215,7 +215,9 @@ Cada bloque se guarda por separado, como en MOWA. Los paneles van en este orden:
 
 1. **Segmentos y mensajes** (RF-WM-20 y RF-WM-21):
    - La tabla de segmentos, apilable, con Segmento, «Desde (días)» y «Hasta (días)» (días de atraso ajustados), editables. Un límite vacío se lee como par: el «Desde» del preventivo dice «sin mínimo», y el «Hasta» de «Tramos mayores al 2» dice «sin máximo». Una tabla que deja huecos o se superpone se rechaza con su código, bajo la fila.
-   - Debajo, el mensaje de cada segmento con `TextosGuardados` (§11.3 del motor), un `.segmented` por segmento para elegir cuál se edita.
+   - Debajo, el mensaje de cada segmento con `TextosGuardados` (§11.3 del motor), un `.segmented` por segmento para elegir cuál se edita. El bloque tiene su título, «Mensaje de cada segmento», así que el componente no muestra el suyo.
+   - Bajo el `.segmented`, la línea «Mensaje de {segmento}: {nombre}», o «{segmento} no tiene un mensaje elegido». Si el texto elegido en el componente no es el de ese segmento, al lado va «Usar como mensaje de {segmento}», que lo vincula. Si ya es el suyo, el botón no aparece. No hay desvincular: se cambia por otro.
+   - La vista previa del editor usa las 3 filas de ejemplo del motor, no una por segmento de WhatsMKT. Si el usuario pide una por segmento, se suma después.
 2. **Mensajes globales** (RF-WM-19): `TextosGuardados`, con el título «Mensajes globales» y el hint «Para las campañas especiales, con un solo mensaje para toda la selección».
 3. **WhatsApp de contacto** (DU-WM-11, regla provisional a): un panel propio, después de los mensajes, porque es lo que usa `[whatsapp]`. Es el campo de MOWA MES (RF-MM-16) con los textos de WhatsMKT:
    - un `input` «WhatsApp de contacto», `inputmode="numeric"`, `maxlength="9"`, `autocomplete="off"`, con el hint «Número de 9 dígitos que empieza con 9. Donde un mensaje dice [whatsapp], se escribe https://wa.me/+51 y el número». Puede quedar vacío;
@@ -407,6 +409,14 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.previa.irWhatsapp` | Configurar el WhatsApp de contacto | Set up the contact WhatsApp |
 | `whatsmkt.mensaje.insertarWhatsapp` | Enlace de WhatsApp | WhatsApp link |
 | `whatsmkt.mensaje.sinWhatsapp` | (sin WhatsApp configurado) | (no WhatsApp set up) |
+| `whatsmkt.mensaje.sinMacros` | No hay una definición por defecto. Elige una más abajo, en Definición por defecto, para insertar macros. | There is no default definition. Choose one below, under Default definition, to insert macros. |
+| `whatsmkt.mensaje.sinFilasEjemplo` | No hay filas de ejemplo para la vista previa. | There are no sample rows for the preview. |
+| `whatsmkt.mensaje.pasoElTope` | El mensaje pasó el tope: {largo} / {maximo} caracteres. | The message went over the limit: {largo} / {maximo} characters. |
+| `whatsmkt.configuracion.segmentoDelMensaje` | Segmento del mensaje | Segment of the message |
+| `whatsmkt.configuracion.mensajeDelSegmento` | Mensaje de {segmento}: {nombreCitado} | Message for {segmento}: {nombreCitado} |
+| `whatsmkt.configuracion.sinMensajeDelSegmento` | {segmento} no tiene un mensaje elegido. | {segmento} has no message chosen. |
+| `whatsmkt.configuracion.usarComoMensaje` | Usar como mensaje de {segmento} | Use as the message for {segmento} |
+| `whatsmkt.configuracion.mensajeVinculado` | {nombreCitado} es ahora el mensaje de {segmento}. | {nombreCitado} is now the message for {segmento}. |
 | `whatsmkt.previa.sinExclusiones` | Ninguno de esta campaña queda fuera. | None from this campaign is left out. |
 | `whatsmkt.previa.calculando` | Calculando la previsualización… | Calculating the preview… |
 | `whatsmkt.previa.campanas` | Campañas del lote | Campaigns in the batch |
