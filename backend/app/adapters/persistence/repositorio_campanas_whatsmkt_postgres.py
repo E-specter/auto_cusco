@@ -6,7 +6,7 @@ la de la definicion que se usaron quedan marcadas como usadas (ya no se modifica
 """
 
 from collections.abc import Iterable, Sequence
-from datetime import time
+from datetime import date, time, timedelta
 from typing import Any
 
 from sqlalchemy import Connection, Engine, func, insert, select, update
@@ -21,7 +21,7 @@ from app.adapters.persistence.modelos import (
     WhatsmktFilaCargada,
     WhatsmktLote,
 )
-from app.core.entities.whatsmkt import ModoCampana, TipoEnvio
+from app.core.entities.whatsmkt import CodigoWhatsmkt, ModoCampana, TipoEnvio
 from app.core.entities.whatsmkt_campana import (
     ArchivoGuardado,
     CampanaNueva,
@@ -29,6 +29,8 @@ from app.core.entities.whatsmkt_campana import (
     HorarioElegido,
     LoteCreado,
     LoteNuevo,
+    PaginaCampanas,
+    PaginaExclusiones,
 )
 from app.core.ports.repositorio_campanas_whatsmkt_port import RepositorioCampanasWhatsmktPort
 from app.core.services.plataformas.whatsmkt.archivo_contactos import ExclusionContacto
@@ -149,6 +151,10 @@ def _campana(fila: Row) -> CampanaWhatsmkt:
     )
 
 
+def _mes_siguiente(primero: date) -> date:
+    return (primero.replace(day=28) + timedelta(days=4)).replace(day=1)
+
+
 def consulta_de_campanas():
     """Las campanas con el nombre y el tamano de su archivo (sin sus bytes)."""
     return select(
@@ -240,3 +246,80 @@ class RepositorioCampanasWhatsmktPostgres(RepositorioCampanasWhatsmktPort):
                 )
             ).one_or_none()
         return None if fila is None else ArchivoGuardado(fila.nombre, bytes(fila.contenido))
+
+    def listar(
+        self,
+        limite: int,
+        desplazamiento: int,
+        lote_id: int | None = None,
+        mes: date | None = None,
+    ) -> PaginaCampanas:
+        filtros = []
+        if lote_id is not None:
+            filtros.append(_CAMPANA.c.lote_id == lote_id)
+        if mes is not None:
+            primero = mes.replace(day=1)
+            filtros += [
+                _CAMPANA.c.fecha_envio >= primero,
+                _CAMPANA.c.fecha_envio < _mes_siguiente(primero),
+            ]
+        with self._engine.connect() as cx:
+            total = cx.execute(
+                select(func.count()).select_from(_CAMPANA).where(*filtros)
+            ).scalar_one()
+            filas = cx.execute(
+                consulta_de_campanas()
+                .where(*filtros)
+                .order_by(_CAMPANA.c.creado_en.desc(), _CAMPANA.c.id.desc())
+                .limit(limite)
+                .offset(desplazamiento)
+            ).all()
+        return PaginaCampanas(total, tuple(_campana(f) for f in filas))
+
+    def obtener(self, campana_id: int) -> CampanaWhatsmkt | None:
+        with self._engine.connect() as cx:
+            fila = cx.execute(
+                consulta_de_campanas().where(_CAMPANA.c.id == campana_id)
+            ).one_or_none()
+        return None if fila is None else _campana(fila)
+
+    def modo_del_lote(self, lote_id: int) -> ModoCampana:
+        with self._engine.connect() as cx:
+            return ModoCampana(
+                cx.execute(select(_LOTE.c.modo).where(_LOTE.c.id == lote_id)).scalar_one()
+            )
+
+    def listar_exclusiones(
+        self, lote_id: int, campana_id: int | None, limite: int, desplazamiento: int
+    ) -> PaginaExclusiones:
+        donde = (
+            _EXCLUSION.c.lote_id == lote_id,
+            _EXCLUSION.c.campana_id.is_(None)
+            if campana_id is None
+            else _EXCLUSION.c.campana_id == campana_id,
+        )
+        with self._engine.connect() as cx:
+            total = cx.execute(
+                select(func.count()).select_from(_EXCLUSION).where(*donde)
+            ).scalar_one()
+            filas = cx.execute(
+                select(*_EXCLUSION.c)
+                .where(*donde)
+                .order_by(_EXCLUSION.c.fila, _EXCLUSION.c.id)
+                .limit(limite)
+                .offset(desplazamiento)
+            ).all()
+        return PaginaExclusiones(
+            total,
+            tuple(
+                ExclusionContacto(
+                    fila=f.fila,
+                    pagare=f.pagare,
+                    codigo=CodigoWhatsmkt(f.codigo),
+                    detalle=f.detalle,
+                    macro=f.macro,
+                    etiqueta=f.etiqueta,
+                )
+                for f in filas
+            ),
+        )

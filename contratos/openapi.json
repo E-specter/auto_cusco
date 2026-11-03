@@ -5390,14 +5390,14 @@
         "description": "Crea el LOTE completo o nada, en una sola transaccion (RF-WM-23): una campana en modo\n`global`, o una por segmento con productos. Cada una congela la version exacta del mensaje y de\nla definicion (la pedida o, sin ella, la vigente), el archivo, los horarios y los supervisores.\n\nResponde 201 con cada campana (id, nombre, archivo y la ficha de RF-WM-36). Si algo impide\ncrear (sin horario, sin supervisores, sin mensaje, un problema del mensaje, la foto, un nombre\nde mas de 75 caracteres...) responde 422 con todos los problemas y no guarda nada.",
         "operationId": "crear_campanas_whatsmkt_campanas_post",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreacionCampanasWhatsmktEntrada"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -5405,10 +5405,10 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/CampanaCreadaWhatsmktRespuesta"
                   },
-                  "type": "array",
                   "title": "Response Crear Campanas Whatsmkt Campanas Post"
                 }
               }
@@ -5440,6 +5440,99 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorCreacionWhatsmktRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Lista de campanas",
+        "description": "Las campanas, las mas recientes primero (las de un mismo lote quedan juntas), paginadas.",
+        "operationId": "listar_campanas_whatsmkt_campanas_get",
+        "parameters": [
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limite"
+            }
+          },
+          {
+            "name": "desplazamiento",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Desplazamiento"
+            }
+          },
+          {
+            "name": "lote_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Solo las de este lote",
+              "title": "Lote Id"
+            },
+            "description": "Solo las de este lote"
+          },
+          {
+            "name": "mes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM: el mes de la fecha de envio",
+              "title": "Mes"
+            },
+            "description": "YYYY-MM: el mes de la fecha de envio"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaCampanasWhatsmktRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -5491,6 +5584,105 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/whatsmkt/campanas/{campana_id}": {
+      "get": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Detalle de la campana",
+        "description": "La campana con su ficha (RF-WM-36), su lote y sus exclusiones, las suyas y las que quedaron\nfuera de todas las campanas del lote, cada lista con su propia paginacion.\n\nLa ficha sale de lo congelado al crear, salvo [whatsapp]: se reemplaza con el WhatsApp de\ncontacto VIGENTE, porque el texto se copia ahora en WhatsMKT. Sin numero queda el marcador y\nla ficha trae el aviso `sin_whatsapp`.",
+        "operationId": "obtener_campana_whatsmkt_campanas__campana_id__get",
+        "parameters": [
+          {
+            "name": "campana_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campana Id"
+            }
+          },
+          {
+            "name": "exclusiones_limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 100,
+              "title": "Exclusiones Limite"
+            }
+          },
+          {
+            "name": "exclusiones_desplazamiento",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Exclusiones Desplazamiento"
+            }
+          },
+          {
+            "name": "fuera_del_lote_limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 100,
+              "title": "Fuera Del Lote Limite"
+            }
+          },
+          {
+            "name": "fuera_del_lote_desplazamiento",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Fuera Del Lote Desplazamiento"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleCampanaWhatsmktRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorConCodigo"
                 }
               }
             }
@@ -8865,6 +9057,149 @@
         "title": "DefinicionWhatsmktEntrada",
         "description": "Una definicion de `/definiciones-columnas`: la version pedida o, sin ella, la vigente."
       },
+      "DetalleCampanaWhatsmktRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "lote_id": {
+            "type": "integer",
+            "title": "Lote Id"
+          },
+          "segmento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segmento",
+            "description": "La clave del segmento; nula en el modo global"
+          },
+          "segmento_etiqueta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segmento Etiqueta"
+          },
+          "fecha_envio": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Envio"
+          },
+          "horarios": {
+            "items": {
+              "$ref": "#/components/schemas/HorarioCampanaWhatsmktRespuesta"
+            },
+            "type": "array",
+            "title": "Horarios"
+          },
+          "cantidad": {
+            "type": "integer",
+            "title": "Cantidad",
+            "description": "Filas del archivo, supervisores incluidos"
+          },
+          "creada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creada En"
+          },
+          "descartada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descartada En",
+            "description": "Nula hasta que se pueda descartar (B6)"
+          },
+          "lote": {
+            "$ref": "#/components/schemas/LoteWhatsmktRespuesta"
+          },
+          "fecha_corte": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Corte"
+          },
+          "productos": {
+            "type": "integer",
+            "title": "Productos",
+            "description": "Productos cargados, sin la supervision"
+          },
+          "supervisores": {
+            "type": "integer",
+            "title": "Supervisores",
+            "description": "Cuantos supervisores van en el archivo"
+          },
+          "definicion_nombre": {
+            "type": "string",
+            "title": "Definicion Nombre"
+          },
+          "definicion_version": {
+            "type": "integer",
+            "title": "Definicion Version"
+          },
+          "texto_version": {
+            "type": "integer",
+            "title": "Texto Version"
+          },
+          "archivo": {
+            "$ref": "#/components/schemas/ArchivoCampanaWhatsmktRespuesta"
+          },
+          "ficha": {
+            "$ref": "#/components/schemas/FichaWhatsmktRespuesta"
+          },
+          "exclusiones": {
+            "$ref": "#/components/schemas/PaginaExclusionesWhatsmktRespuesta",
+            "description": "Las exclusiones de ESTA campana, paginadas"
+          },
+          "exclusiones_fuera_del_lote": {
+            "$ref": "#/components/schemas/PaginaExclusionesWhatsmktRespuesta",
+            "description": "Los productos del lote que no cayeron en ninguna campana: se ven desde cualquiera del lote. Su `total` es el total de exclusiones fuera del lote; en un lote global es cero y la lista, vacia"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "lote_id",
+          "segmento",
+          "segmento_etiqueta",
+          "fecha_envio",
+          "horarios",
+          "cantidad",
+          "creada_en",
+          "descartada_en",
+          "lote",
+          "fecha_corte",
+          "productos",
+          "supervisores",
+          "definicion_nombre",
+          "definicion_version",
+          "texto_version",
+          "archivo",
+          "ficha",
+          "exclusiones",
+          "exclusiones_fuera_del_lote"
+        ],
+        "title": "DetalleCampanaWhatsmktRespuesta"
+      },
       "DetalleError": {
         "properties": {
           "detail": {
@@ -10094,7 +10429,15 @@
           "mensaje": {
             "type": "string",
             "title": "Mensaje",
-            "description": "Texto para copiar: [whatsapp] ya es el enlace y las [$MACROn$] quedan tal cual"
+            "description": "Texto para copiar: [whatsapp] ya es el enlace (con el numero VIGENTE al leer) y las [$MACROn$] quedan tal cual"
+          },
+          "avisos": {
+            "items": {
+              "$ref": "#/components/schemas/CodigoWhatsmkt"
+            },
+            "type": "array",
+            "title": "Avisos",
+            "description": "`sin_whatsapp`: el mensaje usa [whatsapp] y no hay WhatsApp de contacto configurado; el marcador queda sin reemplazar"
           }
         },
         "type": "object",
@@ -10109,7 +10452,8 @@
           "tipo_envio",
           "adjunto_id",
           "etiqueta_vcard",
-          "mensaje"
+          "mensaje",
+          "avisos"
         ],
         "title": "FichaWhatsmktRespuesta",
         "description": "Cada dato del formulario de WhatsMKT, listo para copiar (RF-WM-36)."
@@ -10945,6 +11289,38 @@
         ],
         "title": "ListaCampanasRespuesta"
       },
+      "ListaCampanasWhatsmktRespuesta": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "De todas las que cumplen los filtros, no solo de esta pagina"
+          },
+          "limite": {
+            "type": "integer",
+            "title": "Limite"
+          },
+          "desplazamiento": {
+            "type": "integer",
+            "title": "Desplazamiento"
+          },
+          "campanas": {
+            "items": {
+              "$ref": "#/components/schemas/ResumenCampanaWhatsmktRespuesta"
+            },
+            "type": "array",
+            "title": "Campanas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "limite",
+          "desplazamiento",
+          "campanas"
+        ],
+        "title": "ListaCampanasWhatsmktRespuesta"
+      },
       "ListaDescartadasRespuesta": {
         "properties": {
           "campanas": {
@@ -11010,6 +11386,24 @@
           "args"
         ],
         "title": "LlamadaGuardadaRespuesta"
+      },
+      "LoteWhatsmktRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "El numero del lote"
+          },
+          "modo": {
+            "$ref": "#/components/schemas/ModoCampana"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "modo"
+        ],
+        "title": "LoteWhatsmktRespuesta"
       },
       "MarcaFechaRespuesta": {
         "properties": {
@@ -11673,6 +12067,37 @@
           "exclusiones"
         ],
         "title": "PaginaExclusionesRespuesta"
+      },
+      "PaginaExclusionesWhatsmktRespuesta": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limite": {
+            "type": "integer",
+            "title": "Limite"
+          },
+          "desplazamiento": {
+            "type": "integer",
+            "title": "Desplazamiento"
+          },
+          "exclusiones": {
+            "items": {
+              "$ref": "#/components/schemas/ExclusionWhatsmktRespuesta"
+            },
+            "type": "array",
+            "title": "Exclusiones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "limite",
+          "desplazamiento",
+          "exclusiones"
+        ],
+        "title": "PaginaExclusionesWhatsmktRespuesta"
       },
       "PaginaRespuesta": {
         "properties": {
@@ -13151,6 +13576,94 @@
           "importado_en"
         ],
         "title": "ReporteImportadoRespuesta"
+      },
+      "ResumenCampanaWhatsmktRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "lote_id": {
+            "type": "integer",
+            "title": "Lote Id"
+          },
+          "segmento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segmento",
+            "description": "La clave del segmento; nula en el modo global"
+          },
+          "segmento_etiqueta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segmento Etiqueta"
+          },
+          "fecha_envio": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Envio"
+          },
+          "horarios": {
+            "items": {
+              "$ref": "#/components/schemas/HorarioCampanaWhatsmktRespuesta"
+            },
+            "type": "array",
+            "title": "Horarios"
+          },
+          "cantidad": {
+            "type": "integer",
+            "title": "Cantidad",
+            "description": "Filas del archivo, supervisores incluidos"
+          },
+          "creada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creada En"
+          },
+          "descartada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descartada En",
+            "description": "Nula hasta que se pueda descartar (B6)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "lote_id",
+          "segmento",
+          "segmento_etiqueta",
+          "fecha_envio",
+          "horarios",
+          "cantidad",
+          "creada_en",
+          "descartada_en"
+        ],
+        "title": "ResumenCampanaWhatsmktRespuesta"
       },
       "ResumenDefinicionRespuesta": {
         "properties": {

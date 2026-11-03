@@ -13,10 +13,10 @@ Con el mensaje (B4b1, parte 1): el pedido elige el mensaje y cada campana trae s
 los problemas del mensaje. Todavia sin la validacion de la fecha de envio ni las tablas.
 """
 
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Literal, Self
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.adapters.output.exportadores.comunes import disposicion_de_descarga
@@ -33,7 +33,11 @@ from app.api.archivos_carga import RESPUESTAS_ERROR, obtener_servicio_generacion
 from app.api.cartera import obtener_catalogo_cartera
 from app.api.consultas import parsear_filtro, parsear_orden
 from app.api.definiciones_columnas import obtener_servicio_definiciones
-from app.api.errores import ErrorConCodigo, respuestas_de_error
+from app.api.errores import (
+    ErrorConCodigo,
+    respuestas_de_error,
+    respuestas_de_error_con_codigo,
+)
 from app.api.fecha_envio import error_de_fecha_envio
 from app.api.respuestas import ModeloRespuesta
 from app.api.supervisores import obtener_servicio_supervision
@@ -51,7 +55,11 @@ from app.core.entities.whatsmkt import (
     ModoCampana,
     TipoEnvio,
 )
-from app.core.entities.whatsmkt_campana import CampanaNoEncontrada, CampanaWhatsmkt
+from app.core.entities.whatsmkt_campana import (
+    CampanaNoEncontrada,
+    CampanaWhatsmkt,
+    PaginaExclusiones,
+)
 from app.core.services.definiciones_columnas.servicio import DefinicionesColumnasService
 from app.core.services.fecha_envio import FechaEnvioAnterior
 from app.core.services.generacion_cargas.servicio import (
@@ -65,12 +73,17 @@ from app.core.services.plataformas.whatsmkt.archivo_contactos import (
     SeleccionCampana,
 )
 from app.core.services.plataformas.whatsmkt.biblioteca import BibliotecaWhatsmktService
+from app.core.services.plataformas.whatsmkt.consulta import (
+    ConsultaCampanasWhatsmktService,
+    DetalleCampana,
+    Paginacion,
+)
 from app.core.services.plataformas.whatsmkt.crear import (
     CreacionCampanasWhatsmktService,
     CreacionInvalida,
     PeticionCreacion,
 )
-from app.core.services.plataformas.whatsmkt.ficha import ficha_de
+from app.core.services.plataformas.whatsmkt.ficha import FichaCampana, ficha_de
 from app.core.services.plataformas.whatsmkt.previa import (
     CampanaPrevista,
     MensajePedido,
@@ -475,7 +488,16 @@ class FichaWhatsmktRespuesta(ModeloRespuesta):
     adjunto_id: int | None
     etiqueta_vcard: str | None
     mensaje: str = Field(
-        description="Texto para copiar: [whatsapp] ya es el enlace y las [$MACROn$] quedan tal cual"
+        description=(
+            "Texto para copiar: [whatsapp] ya es el enlace (con el numero VIGENTE al leer) y las "
+            "[$MACROn$] quedan tal cual"
+        )
+    )
+    avisos: list[CodigoWhatsmkt] = Field(
+        description=(
+            "`sin_whatsapp`: el mensaje usa [whatsapp] y no hay WhatsApp de contacto configurado; "
+            "el marcador queda sin reemplazar"
+        )
     )
 
 
@@ -495,17 +517,24 @@ class ErrorCreacionWhatsmktRespuesta(ErrorWhatsmktRespuesta):
     problemas: list[ProblemaWhatsmktRespuesta]
 
 
-def _ficha(c: CampanaWhatsmkt) -> FichaWhatsmktRespuesta:
-    f = ficha_de(c)
+def _horarios(horarios) -> list[HorarioCampanaWhatsmktRespuesta]:
+    return [
+        HorarioCampanaWhatsmktRespuesta(
+            nombre=h.nombre, inicio=h.inicio.strftime("%H:%M"), fin=h.fin.strftime("%H:%M")
+        )
+        for h in horarios
+    ]
+
+
+def _ficha(c: CampanaWhatsmkt, whatsapp_vigente: str | None) -> FichaWhatsmktRespuesta:
+    return _respuesta_de_ficha(ficha_de(c, whatsapp_vigente))
+
+
+def _respuesta_de_ficha(f: FichaCampana) -> FichaWhatsmktRespuesta:
     return FichaWhatsmktRespuesta(
         nombre=f.nombre,
         fecha_envio=f.fecha_envio,
-        horarios=[
-            HorarioCampanaWhatsmktRespuesta(
-                nombre=h.nombre, inicio=h.inicio.strftime("%H:%M"), fin=h.fin.strftime("%H:%M")
-            )
-            for h in f.horarios
-        ],
+        horarios=_horarios(f.horarios),
         lo_antes_posible=f.lo_antes_posible,
         pais=f.pais,
         foto_id=f.foto_id,
@@ -514,6 +543,7 @@ def _ficha(c: CampanaWhatsmkt) -> FichaWhatsmktRespuesta:
         adjunto_id=f.adjunto_id,
         etiqueta_vcard=f.etiqueta_vcard,
         mensaje=f.mensaje,
+        avisos=list(f.avisos),
     )
 
 
@@ -526,7 +556,7 @@ def _campana_creada(c: CampanaWhatsmkt) -> CampanaCreadaWhatsmktRespuesta:
         archivo=ArchivoCampanaWhatsmktRespuesta(
             nombre=c.archivo_nombre, tamano=c.archivo_tamano, filas=c.cantidad
         ),
-        ficha=_ficha(c),
+        ficha=_ficha(c, c.whatsapp_contacto),  # al crear, el vigente es el que se congelo
     )
 
 
@@ -656,4 +686,175 @@ def descargar_archivo_de_la_campana(
         content=archivo.contenido,
         media_type=TIPOS_MIME[FormatoArchivo.XLSX],
         headers={"Content-Disposition": disposicion_de_descarga(archivo.nombre)},
+    )
+
+
+# --- Leer: la lista y el detalle (T-WM-B4b1, parte 3; RF-WM-36 y RF-WM-40) --------------------
+
+EXCLUSIONES_POR_PAGINA = 100  # como la previsualizacion
+_MES = r"^\d{4}-(0[1-9]|1[0-2])$"
+
+
+class ResumenCampanaWhatsmktRespuesta(ModeloRespuesta):
+    id: int
+    nombre: str
+    lote_id: int
+    segmento: str | None = Field(description="La clave del segmento; nula en el modo global")
+    segmento_etiqueta: str | None
+    fecha_envio: date
+    horarios: list[HorarioCampanaWhatsmktRespuesta]
+    cantidad: int = Field(description="Filas del archivo, supervisores incluidos")
+    creada_en: datetime
+    descartada_en: datetime | None = Field(description="Nula hasta que se pueda descartar (B6)")
+
+
+class ListaCampanasWhatsmktRespuesta(ModeloRespuesta):
+    total: int = Field(description="De todas las que cumplen los filtros, no solo de esta pagina")
+    limite: int
+    desplazamiento: int
+    campanas: list[ResumenCampanaWhatsmktRespuesta]
+
+
+class LoteWhatsmktRespuesta(ModeloRespuesta):
+    id: int = Field(description="El numero del lote")
+    modo: ModoCampana
+
+
+class PaginaExclusionesWhatsmktRespuesta(ModeloRespuesta):
+    total: int
+    limite: int
+    desplazamiento: int
+    exclusiones: list[ExclusionWhatsmktRespuesta]
+
+
+class DetalleCampanaWhatsmktRespuesta(ResumenCampanaWhatsmktRespuesta):
+    lote: LoteWhatsmktRespuesta
+    fecha_corte: date
+    productos: int = Field(description="Productos cargados, sin la supervision")
+    supervisores: int = Field(description="Cuantos supervisores van en el archivo")
+    definicion_nombre: str
+    definicion_version: int
+    texto_version: int
+    archivo: ArchivoCampanaWhatsmktRespuesta
+    ficha: FichaWhatsmktRespuesta
+    exclusiones: PaginaExclusionesWhatsmktRespuesta = Field(
+        description="Las exclusiones de ESTA campana, paginadas"
+    )
+    exclusiones_fuera_del_lote: PaginaExclusionesWhatsmktRespuesta = Field(
+        description=(
+            "Los productos del lote que no cayeron en ninguna campana: se ven desde cualquiera "
+            "del lote. Su `total` es el total de exclusiones fuera del lote; en un lote global "
+            "es cero y la lista, vacia"
+        )
+    )
+
+
+def obtener_servicio_consulta_whatsmkt() -> ConsultaCampanasWhatsmktService:
+    """Dependencia de FastAPI; los tests la sustituyen por un doble de prueba."""
+    return ConsultaCampanasWhatsmktService(
+        RepositorioCampanasWhatsmktPostgres(get_engine()),
+        RepositorioWhatsmktPostgres(get_engine()),
+    )
+
+
+def _resumen(c: CampanaWhatsmkt) -> dict[str, Any]:
+    return {
+        "id": c.id,
+        "nombre": c.nombre,
+        "lote_id": c.lote_id,
+        "segmento": c.segmento,
+        "segmento_etiqueta": c.segmento_etiqueta,
+        "fecha_envio": c.fecha_envio,
+        "horarios": _horarios(c.horarios),
+        "cantidad": c.cantidad,
+        "creada_en": c.creado_en,
+        "descartada_en": c.descartada_en,
+    }
+
+
+def _pagina_de_exclusiones(
+    pagina: PaginaExclusiones, paginacion: Paginacion
+) -> PaginaExclusionesWhatsmktRespuesta:
+    return PaginaExclusionesWhatsmktRespuesta(
+        total=pagina.total,
+        limite=paginacion.limite,
+        desplazamiento=paginacion.desplazamiento,
+        exclusiones=[
+            ExclusionWhatsmktRespuesta(
+                codigo=e.codigo,
+                fila=e.fila,
+                pagare=e.pagare,
+                detalle=e.detalle,
+                macro=e.macro,
+                etiqueta=e.etiqueta,
+            )
+            for e in pagina.exclusiones
+        ],
+    )
+
+
+@router.get("", summary="Lista de campanas", response_model=ListaCampanasWhatsmktRespuesta)
+def listar_campanas(
+    limite: int = Query(default=50, ge=1, le=500),
+    desplazamiento: int = Query(default=0, ge=0),
+    lote_id: int | None = Query(default=None, ge=1, description="Solo las de este lote"),
+    mes: str | None = Query(
+        default=None, pattern=_MES, description="YYYY-MM: el mes de la fecha de envio"
+    ),
+    servicio: ConsultaCampanasWhatsmktService = Depends(obtener_servicio_consulta_whatsmkt),
+) -> ListaCampanasWhatsmktRespuesta:
+    """Las campanas, las mas recientes primero (las de un mismo lote quedan juntas), paginadas."""
+    primero = None if mes is None else date(int(mes[:4]), int(mes[5:]), 1)
+    pagina = servicio.listar(Paginacion(limite, desplazamiento), lote_id, primero)
+    return ListaCampanasWhatsmktRespuesta(
+        total=pagina.total,
+        limite=limite,
+        desplazamiento=desplazamiento,
+        campanas=[ResumenCampanaWhatsmktRespuesta(**_resumen(c)) for c in pagina.campanas],
+    )
+
+
+@router.get(
+    "/{campana_id}",
+    summary="Detalle de la campana",
+    response_model=DetalleCampanaWhatsmktRespuesta,
+    responses=respuestas_de_error_con_codigo(404),
+)
+def obtener_campana(
+    campana_id: int,
+    exclusiones_limite: int = Query(default=EXCLUSIONES_POR_PAGINA, ge=1, le=1000),
+    exclusiones_desplazamiento: int = Query(default=0, ge=0),
+    fuera_del_lote_limite: int = Query(default=EXCLUSIONES_POR_PAGINA, ge=1, le=1000),
+    fuera_del_lote_desplazamiento: int = Query(default=0, ge=0),
+    servicio: ConsultaCampanasWhatsmktService = Depends(obtener_servicio_consulta_whatsmkt),
+) -> DetalleCampanaWhatsmktRespuesta:
+    """La campana con su ficha (RF-WM-36), su lote y sus exclusiones, las suyas y las que quedaron
+    fuera de todas las campanas del lote, cada lista con su propia paginacion.
+
+    La ficha sale de lo congelado al crear, salvo [whatsapp]: se reemplaza con el WhatsApp de
+    contacto VIGENTE, porque el texto se copia ahora en WhatsMKT. Sin numero queda el marcador y
+    la ficha trae el aviso `sin_whatsapp`.
+    """
+    propias = Paginacion(exclusiones_limite, exclusiones_desplazamiento)
+    fuera = Paginacion(fuera_del_lote_limite, fuera_del_lote_desplazamiento)
+    try:
+        d: DetalleCampana = servicio.detalle(campana_id, propias, fuera)
+    except CampanaNoEncontrada as exc:
+        raise ErrorConCodigo(404, str(exc), None) from exc
+    c = d.campana
+    return DetalleCampanaWhatsmktRespuesta(
+        **_resumen(c),
+        lote=LoteWhatsmktRespuesta(id=c.lote_id, modo=d.modo),
+        fecha_corte=c.fecha_corte,
+        productos=c.productos,
+        supervisores=len(c.supervisores),
+        definicion_nombre=c.definicion_nombre,
+        definicion_version=c.definicion_version,
+        texto_version=c.texto_version,
+        archivo=ArchivoCampanaWhatsmktRespuesta(
+            nombre=c.archivo_nombre, tamano=c.archivo_tamano, filas=c.cantidad
+        ),
+        ficha=_respuesta_de_ficha(d.ficha),
+        exclusiones=_pagina_de_exclusiones(d.exclusiones, propias),
+        exclusiones_fuera_del_lote=_pagina_de_exclusiones(d.exclusiones_fuera_del_lote, fuera),
     )

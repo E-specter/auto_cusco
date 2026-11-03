@@ -115,6 +115,18 @@ class LoteCreado:
 
 
 @dataclass(frozen=True)
+class PaginaCampanas:
+    total: int  # de todas las que cumplen los filtros, no solo de esta pagina
+    campanas: tuple[CampanaWhatsmkt, ...]
+
+
+@dataclass(frozen=True)
+class PaginaExclusiones:
+    total: int
+    exclusiones: tuple[ExclusionContacto, ...]
+
+
+@dataclass(frozen=True)
 class ArchivoGuardado:
     nombre: str
     contenido: bytes

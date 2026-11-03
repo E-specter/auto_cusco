@@ -1489,7 +1489,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Lista de campanas
+         * @description Las campanas, las mas recientes primero (las de un mismo lote quedan juntas), paginadas.
+         */
+        get: operations["listar_campanas_whatsmkt_campanas_get"];
         put?: never;
         /**
          * Crear el lote de campanas
@@ -1517,6 +1521,31 @@ export interface paths {
         };
         /** Descargar el archivo de contactos de la campana */
         get: operations["descargar_archivo_de_la_campana_whatsmkt_campanas__campana_id__archivo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsmkt/campanas/{campana_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Detalle de la campana
+         * @description La campana con su ficha (RF-WM-36), su lote y sus exclusiones, las suyas y las que quedaron
+         *     fuera de todas las campanas del lote, cada lista con su propia paginacion.
+         *
+         *     La ficha sale de lo congelado al crear, salvo [whatsapp]: se reemplaza con el WhatsApp de
+         *     contacto VIGENTE, porque el texto se copia ahora en WhatsMKT. Sin numero queda el marcador y
+         *     la ficha trae el aviso `sin_whatsapp`.
+         */
+        get: operations["obtener_campana_whatsmkt_campanas__campana_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2879,6 +2908,72 @@ export interface components {
             /** Version */
             version?: number | null;
         };
+        /** DetalleCampanaWhatsmktRespuesta */
+        DetalleCampanaWhatsmktRespuesta: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Lote Id */
+            lote_id: number;
+            /**
+             * Segmento
+             * @description La clave del segmento; nula en el modo global
+             */
+            segmento: string | null;
+            /** Segmento Etiqueta */
+            segmento_etiqueta: string | null;
+            /**
+             * Fecha Envio
+             * Format: date
+             */
+            fecha_envio: string;
+            /** Horarios */
+            horarios: components["schemas"]["HorarioCampanaWhatsmktRespuesta"][];
+            /**
+             * Cantidad
+             * @description Filas del archivo, supervisores incluidos
+             */
+            cantidad: number;
+            /**
+             * Creada En
+             * Format: date-time
+             */
+            creada_en: string;
+            /**
+             * Descartada En
+             * @description Nula hasta que se pueda descartar (B6)
+             */
+            descartada_en: string | null;
+            lote: components["schemas"]["LoteWhatsmktRespuesta"];
+            /**
+             * Fecha Corte
+             * Format: date
+             */
+            fecha_corte: string;
+            /**
+             * Productos
+             * @description Productos cargados, sin la supervision
+             */
+            productos: number;
+            /**
+             * Supervisores
+             * @description Cuantos supervisores van en el archivo
+             */
+            supervisores: number;
+            /** Definicion Nombre */
+            definicion_nombre: string;
+            /** Definicion Version */
+            definicion_version: number;
+            /** Texto Version */
+            texto_version: number;
+            archivo: components["schemas"]["ArchivoCampanaWhatsmktRespuesta"];
+            ficha: components["schemas"]["FichaWhatsmktRespuesta"];
+            /** @description Las exclusiones de ESTA campana, paginadas */
+            exclusiones: components["schemas"]["PaginaExclusionesWhatsmktRespuesta"];
+            /** @description Los productos del lote que no cayeron en ninguna campana: se ven desde cualquiera del lote. Su `total` es el total de exclusiones fuera del lote; en un lote global es cero y la lista, vacia */
+            exclusiones_fuera_del_lote: components["schemas"]["PaginaExclusionesWhatsmktRespuesta"];
+        };
         /**
          * DetalleError
          * @description Motivo legible por el que la API rechazo la peticion.
@@ -3387,9 +3482,14 @@ export interface components {
             etiqueta_vcard: string | null;
             /**
              * Mensaje
-             * @description Texto para copiar: [whatsapp] ya es el enlace y las [$MACROn$] quedan tal cual
+             * @description Texto para copiar: [whatsapp] ya es el enlace (con el numero VIGENTE al leer) y las [$MACROn$] quedan tal cual
              */
             mensaje: string;
+            /**
+             * Avisos
+             * @description `sin_whatsapp`: el mensaje usa [whatsapp] y no hay WhatsApp de contacto configurado; el marcador queda sin reemplazar
+             */
+            avisos: components["schemas"]["CodigoWhatsmkt"][];
         };
         /** FilaMuestraRespuesta */
         FilaMuestraRespuesta: {
@@ -3714,6 +3814,20 @@ export interface components {
             /** Campanas */
             campanas: components["schemas"]["CampanaRespuesta"][];
         };
+        /** ListaCampanasWhatsmktRespuesta */
+        ListaCampanasWhatsmktRespuesta: {
+            /**
+             * Total
+             * @description De todas las que cumplen los filtros, no solo de esta pagina
+             */
+            total: number;
+            /** Limite */
+            limite: number;
+            /** Desplazamiento */
+            desplazamiento: number;
+            /** Campanas */
+            campanas: components["schemas"]["ResumenCampanaWhatsmktRespuesta"][];
+        };
         /** ListaDescartadasRespuesta */
         ListaDescartadasRespuesta: {
             /**
@@ -3738,6 +3852,15 @@ export interface components {
             nombre: string;
             /** Args */
             args: (string | number | components["schemas"]["ArgumentoVariableGuardadoRespuesta"])[];
+        };
+        /** LoteWhatsmktRespuesta */
+        LoteWhatsmktRespuesta: {
+            /**
+             * Id
+             * @description El numero del lote
+             */
+            id: number;
+            modo: components["schemas"]["ModoCampana"];
         };
         /** MarcaFechaRespuesta */
         MarcaFechaRespuesta: {
@@ -4009,6 +4132,17 @@ export interface components {
             desplazamiento: number;
             /** Exclusiones */
             exclusiones: components["schemas"]["ExclusionRespuesta"][];
+        };
+        /** PaginaExclusionesWhatsmktRespuesta */
+        PaginaExclusionesWhatsmktRespuesta: {
+            /** Total */
+            total: number;
+            /** Limite */
+            limite: number;
+            /** Desplazamiento */
+            desplazamiento: number;
+            /** Exclusiones */
+            exclusiones: components["schemas"]["ExclusionWhatsmktRespuesta"][];
         };
         /** PaginaRespuesta */
         PaginaRespuesta: {
@@ -4570,6 +4704,44 @@ export interface components {
              * Format: date-time
              */
             importado_en: string;
+        };
+        /** ResumenCampanaWhatsmktRespuesta */
+        ResumenCampanaWhatsmktRespuesta: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Lote Id */
+            lote_id: number;
+            /**
+             * Segmento
+             * @description La clave del segmento; nula en el modo global
+             */
+            segmento: string | null;
+            /** Segmento Etiqueta */
+            segmento_etiqueta: string | null;
+            /**
+             * Fecha Envio
+             * Format: date
+             */
+            fecha_envio: string;
+            /** Horarios */
+            horarios: components["schemas"]["HorarioCampanaWhatsmktRespuesta"][];
+            /**
+             * Cantidad
+             * @description Filas del archivo, supervisores incluidos
+             */
+            cantidad: number;
+            /**
+             * Creada En
+             * Format: date-time
+             */
+            creada_en: string;
+            /**
+             * Descartada En
+             * @description Nula hasta que se pueda descartar (B6)
+             */
+            descartada_en: string | null;
         };
         /** ResumenDefinicionRespuesta */
         ResumenDefinicionRespuesta: {
@@ -9140,6 +9312,42 @@ export interface operations {
             };
         };
     };
+    listar_campanas_whatsmkt_campanas_get: {
+        parameters: {
+            query?: {
+                limite?: number;
+                desplazamiento?: number;
+                /** @description Solo las de este lote */
+                lote_id?: number | null;
+                /** @description YYYY-MM: el mes de la fecha de envio */
+                mes?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaCampanasWhatsmktRespuesta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     crear_campanas_whatsmkt_campanas_post: {
         parameters: {
             query?: never;
@@ -9220,6 +9428,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtener_campana_whatsmkt_campanas__campana_id__get: {
+        parameters: {
+            query?: {
+                exclusiones_limite?: number;
+                exclusiones_desplazamiento?: number;
+                fuera_del_lote_limite?: number;
+                fuera_del_lote_desplazamiento?: number;
+            };
+            header?: never;
+            path: {
+                campana_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleCampanaWhatsmktRespuesta"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorConCodigo"];
                 };
             };
             /** @description Validation Error */
