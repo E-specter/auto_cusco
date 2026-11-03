@@ -158,22 +158,23 @@ Fuente: «El campo de mensaje es un solo bloque, WhatsMKT ya hace el reemplazo d
   * Preventivo:
 
     ```
-    Hola [$MACRO1$] Caja Cusco te informa que tu cuota vence  el [$MACRO2$] , pague puntualmente en nuestras agencias, agentes  KASNET o a través de Wayki app. Si ya pagaste, omite este mensaje. INFO por https://wa.me/+51920990206
+    Hola [$MACRO1$] Caja Cusco te informa que tu cuota vence  el [$MACRO2$] , pague puntualmente en nuestras agencias, agentes  KASNET o a través de Wayki app. Si ya pagaste, omite este mensaje. INFO por [whatsapp]
     ```
 
   * Tramo 2:
 
     ```
-    Hola [$MACRO1$] Caja Cusco te informa que tu cuota venció el [$MACRO2$] , ponte al día, te invitamos a pagar en nuestras agencias, agentes KASNET o a través de Wayki app. Si ya pagaste, omite este mensaje. INFO por https://wa.me/+51920990206
+    Hola [$MACRO1$] Caja Cusco te informa que tu cuota venció el [$MACRO2$] , ponte al día, te invitamos a pagar en nuestras agencias, agentes KASNET o a través de Wayki app. Si ya pagaste, omite este mensaje. INFO por [whatsapp]
     ```
 
   * Tramos mayores al 2, el que usó la campaña del 29.10 (P-5):
 
     ```
-    Hola [$MACRO1$] Caja Cusco te informa que tu cuota venció el [$MACRO2$] , evita estar mal calificado en el sistema financiero, el monto de tu cuota es [$MACRO3$] , acércate a pagar a nuestras agencias , agentes KASNET y/o canales alternativos. INFO por https://wa.me/+51920990206
+    Hola [$MACRO1$] Caja Cusco te informa que tu cuota venció el [$MACRO2$] , evita estar mal calificado en el sistema financiero, el monto de tu cuota es [$MACRO3$] , acércate a pagar a nuestras agencias , agentes KASNET y/o canales alternativos. INFO por [whatsapp]
     ```
 
   * Los espacios dobles («vence  el», «agentes  KASNET») y los espacios antes de una coma se conservan tal como vienen, hasta que el usuario decida (duda DU-WM-2).
+  * `[whatsapp]` reemplaza aquí el enlace `https://wa.me/+51…` con el número de WhatsApp de contacto que trae el speech original. El número real no se escribe en el repositorio (regla de datos sintéticos, `AGENTS.md`), ni en este documento ni en la siembra. Cómo entra a los mensajes es la duda DU-WM-11.
 * **RF-WM-22 — Mensaje de la campaña:** Elegir al crear la campaña el mensaje guardado que usa: en modo global, un mensaje global o el de un segmento; en modo por segmento, el de cada segmento, que por defecto es su mensaje de la configuración.
   * Una versión deshabilitada no se ofrece, y crear o previsualizar una campaña con ella se rechaza con el motivo.
 * **RF-WM-23 — Lote de campañas por segmento:** Si el modo es por segmento, entonces crear una campaña de WhatsMKT por cada segmento que tenga productos, porque cada campaña de WhatsMKT lleva un solo mensaje.
@@ -360,7 +361,7 @@ No están en el plan v2 ni en las decisiones del 2026-11-02. Mientras no se resp
 | DU-WM-8 | ¿Se confirma el formato de las macros en el mensaje: fecha `15/10/2026` y monto `1,234.50`, sin `S/`? En el archivo del 29.10 eran una celda de fecha y una de número. (Ese formato, editable en la definición.) | RF-WM-09 |
 | DU-WM-9 | ¿Se registra una tarifa por mensaje y un costo por campaña, o un límite mensual, como en MOWA MES (RF-MM-01, RF-MM-23, RF-MM-24)? (No, en esta entrega.) | Sección 6 |
 | DU-WM-10 | ¿Cómo se nombra el archivo de contactos que se descarga? El del 29.10 se llamaba `CUSCO_Vencida WhatsMKT Whatsapp 2026.10.29.xlsx`. (El nombre de la campaña más `.xlsx`, con los caracteres no válidos en Windows cambiados por `_`.) | RF-WM-16 |
-| DU-WM-11 | El enlace `https://wa.me/+51920990206` va fijo dentro de los speeches. ¿Se deja como texto del mensaje o se configura aparte, como la variable de WhatsApp de MOWA (RF-MM-16)? (Texto del mensaje.) | RF-WM-21 |
+| DU-WM-11 | El speech original trae el enlace de WhatsApp de contacto de la Caja dentro del texto, pero el número real no puede guardarse en el repositorio, ni en la siembra de B3. ¿Cómo entra? (a) Como en MOWA (RF-MM-16): un número de contacto en la configuración de WhatsMKT, que el sistema pone en lugar de `[whatsapp]` al mostrar y copiar el mensaje; sin número configurado, no se crea una campaña cuyo mensaje lo use. (b) La v1 se siembra con `[whatsapp]` literal, y el usuario lo cambia por el enlace al editar el mensaje en la configuración. (Provisional: (a), el patrón ya probado en MOWA; se decide antes de B3.) | RF-WM-21 |
 
 ## 12. Registro de cambios
 
@@ -369,3 +370,4 @@ No están en el plan v2 ni en las decisiones del 2026-11-02. Mientras no se resp
 - **RF existentes ampliados o modificados:** ninguno en este documento. Cita los RF globales RF-44 y RF-49 (ampliados) y RF-69 a RF-74 (nuevos), que escribe T-HI-0, y el cambio de RF-MM-08 a lunes a sábado (T-MM-0), que escriben sus dueños.
 - **Supuestos nuevos:** S-WM-1 a S-WM-9 (los S-1 a S-9 del plan). **Dudas nuevas:** DU-WM-1 a DU-WM-11.
 - **Nota de numeración:** secuencia propia del módulo, continua y sin huecos. Los RF que se agreguen después continúan la secuencia sin renumerar los existentes, como en MOWA MES.
+- **RF existentes ampliados:** RF-WM-21: el enlace de WhatsApp de contacto de los speeches pasa a `[whatsapp]`, porque el número real no puede estar en el repositorio (la prueba `test_datos_sinteticos` lo detectó en `main`). DU-WM-11 se reescribe con las dos opciones.
