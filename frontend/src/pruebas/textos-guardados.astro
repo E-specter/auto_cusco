@@ -10,6 +10,8 @@
  *   ?contexto=<clave>   the context of the texts (`sintetico.texto` by default)
  *   &usos=1             tell the component how many times a used version was used (3), as a module that counts would
  *   &etiqueta=1         the option of each text carries «· versión N», as a module that adds its own data would
+ *   &filtrar=1          a module's filter: the texts named in `window.ocultosPrueba` (a Set, from `&ocultos=a,b`) are not offered;
+ *                       a test changes the Set and calls `controladorPrueba.repintar()`
  *
  * The mounted controller is left on `window.controladorPrueba`, so a test can call what a screen would
  * (`hayCambios`, `confirmarSalida`, `recargar`, `destruir`); the last event, on `[data-ultimo-evento]`.
@@ -84,12 +86,17 @@ import TextosGuardados from '../components/TextosGuardados.astro';
     document.body.dataset.eventos = String(Number(document.body.dataset.eventos ?? 0) + 1);
   });
 
+  // The filter of the test: a text named in the Set is not offered. The Set is the page's and the test's to change.
+  const ocultos = new Set((parametros.get('ocultos') ?? '').split(',').filter((nombre) => nombre !== ''));
+  (window as unknown as { ocultosPrueba: Set<string> }).ocultosPrueba = ocultos;
+
   void montarTextosGuardados(raiz, {
     contexto: parametros.get('contexto') ?? 'sintetico.texto',
     editor,
     titulo: 'Mensajes de prueba',
     etiquetaDe: parametros.get('etiqueta') === '1' ? (texto) => `${texto.nombre} · versión ${texto.version_vigente}` : undefined,
     usos: parametros.get('usos') === '1' ? () => 3 : undefined,
+    filtrar: parametros.get('filtrar') === '1' ? (texto) => !ocultos.has(texto.nombre) : undefined,
   }).then((controlador) => {
     expuesta.controladorPrueba = controlador;
     document.body.dataset.montado = 'true';

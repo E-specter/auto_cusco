@@ -81,6 +81,15 @@ export function repartir(lista: readonly ResumenTexto[]): { habilitados: Resumen
   };
 }
 
+/**
+ * The texts the panel offers: all of them with no filter (the same list), or the ones that pass `filtrar`. The filter is
+ * the module's (e.g. «only the texts not linked to a segment») and is asked every time the panel is drawn, so a link that
+ * changed since it was mounted is reflected. Nothing is mutated.
+ */
+export function visibles(lista: readonly ResumenTexto[], filtrar?: (texto: ResumenTexto) => boolean): readonly ResumenTexto[] {
+  return filtrar ? lista.filter((texto) => filtrar(texto)) : lista;
+}
+
 /** The list with one text renamed; the others are the same objects. */
 export function listaConNombre(lista: readonly ResumenTexto[], id: number, nombre: string): ResumenTexto[] {
   return lista.map((t) => (t.id === id ? { ...t, nombre } : t));

@@ -449,6 +449,96 @@ test('un nombre que el backend rechaza dice su límite en la frase', async ({ pa
   await expect(dialogo.getByText('Escribe un nombre de 1 a 120 caracteres.')).toBeVisible();
 });
 
+test.describe('la opción filtrar del módulo', () => {
+  const ocultar = (page: Page, ...nombres: string[]) =>
+    page.evaluate((cuales) => {
+      const conjunto = (window as unknown as { ocultosPrueba: Set<string> }).ocultosPrueba;
+      conjunto.clear();
+      cuales.forEach((n) => conjunto.add(n));
+    }, nombres);
+  const repintar = (page: Page) =>
+    page.evaluate(() => (window as unknown as { controladorPrueba: { repintar(): void } }).controladorPrueba.repintar());
+
+  test('sin la opción no cambia nada: se ofrecen todos', async ({ page }) => {
+    await abrir(page, conDosTextos(), '?ocultos=Cobranza');
+    await expect(selectorDeTexto(page).locator('option')).toHaveText(['Cobranza', 'Preventivo']);
+  });
+
+  test('con la opción, los que no la pasan no se ofrecen en el select ni en los deshabilitados, y el primero es el primero ofrecido', async ({ page }) => {
+    const api = conDosTextos();
+    api.textos.push(
+      textoFalso({ id: 3, nombre: 'Viejo', deshabilitado_en: '2026-10-05T10:00:00-05:00' }),
+      textoFalso({ id: 4, nombre: 'Otro', deshabilitado_en: '2026-10-06T10:00:00-05:00' }),
+    );
+    await abrir(page, api, '?filtrar=1&ocultos=Cobranza,Viejo');
+
+    await expect(selectorDeTexto(page).locator('option')).toHaveText(['Preventivo']);
+    // El primero que se abre es el primero que se ofrece, no el primero del API.
+    await expect(contenido(page)).toHaveValue('Hola Preventivo, v2');
+    const panel = raiz(page).locator('[data-textos-deshab]');
+    await expect(panel.locator('summary')).toHaveText('Deshabilitados (1)');
+    await panel.locator('summary').click();
+    await expect(panel.locator('li')).toHaveCount(1);
+    await expect(panel.locator('li[data-texto="4"]')).toContainText('Otro');
+  });
+
+  test('si todos los deshabilitados quedan fuera, el panel plegado no se muestra', async ({ page }) => {
+    const api = conDosTextos();
+    api.textos.push(textoFalso({ id: 3, nombre: 'Viejo', deshabilitado_en: '2026-10-05T10:00:00-05:00' }));
+    await abrir(page, api, '?filtrar=1&ocultos=Viejo');
+    await expect(raiz(page).locator('[data-textos-deshab]')).toBeHidden();
+  });
+
+  test('se pregunta en cada repintado: un vínculo que cambió se refleja sin volver a montar', async ({ page }) => {
+    await abrir(page, conDosTextos(), '?filtrar=1');
+    await expect(selectorDeTexto(page).locator('option')).toHaveText(['Cobranza', 'Preventivo']);
+
+    await ocultar(page, 'Preventivo');
+    await repintar(page);
+    await expect(selectorDeTexto(page).locator('option')).toHaveText(['Cobranza']);
+
+    await ocultar(page);
+    await repintar(page);
+    await expect(selectorDeTexto(page).locator('option')).toHaveText(['Cobranza', 'Preventivo']);
+  });
+
+  test('un texto abierto que deja de pasar el filtro sigue abierto, sale del select y se cambia eligiendo otro', async ({ page }) => {
+    await abrir(page, conDosTextos(), '?filtrar=1');
+    await elegir(page, 'Preventivo', 'Hola Preventivo, v2');
+    await contenido(page).fill('Lo que escribí');
+
+    await ocultar(page, 'Preventivo');
+    await repintar(page);
+
+    await expect(selectorDeTexto(page).locator('option')).toHaveText(['Cobranza']);
+    // Sigue abierto: su contenido, lo escrito y sus gestos no se tocan.
+    await expect(contenido(page)).toHaveValue('Lo que escribí');
+    await expect(page.getByRole('button', { name: 'Renombrar «Preventivo»' })).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    // Hasta que se elige otro, y lo escrito pide confirmar como siempre.
+    await selectorDeTexto(page).selectOption({ label: 'Cobranza' });
+    await expect(page.getByRole('dialog', { name: 'Hay cambios sin guardar' })).toBeVisible();
+    await page.getByRole('dialog').getByRole('button', { name: 'Descartar cambios' }).click();
+    await expect(contenido(page)).toHaveValue('Hola Cobranza, v1');
+  });
+
+  test('deshabilitar con el filtro puesto abre el siguiente que se ofrece, no uno oculto', async ({ page }) => {
+    const api = apiTextosGuardados();
+    api.textos.push(
+      textoFalso({ id: 1, nombre: 'Alfa' }),
+      textoFalso({ id: 2, nombre: 'Beta' }),
+      textoFalso({ id: 3, nombre: 'Gamma' }),
+    );
+    await abrir(page, api, '?filtrar=1&ocultos=Beta');
+    await expect(selectorDeTexto(page).locator('option')).toHaveText(['Alfa', 'Gamma']);
+    await page.getByRole('button', { name: 'Deshabilitar «Alfa»' }).click();
+    await expect(anuncio(page)).toContainText('Se deshabilitó «Alfa»');
+    await expect(selectorDeTexto(page).locator('option')).toHaveText(['Gamma']);
+    await expect(contenido(page)).toHaveValue('Hola Gamma, v1');
+  });
+});
+
 test('en inglés dice lo mismo con sus palabras', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' })));
   await abrir(page, conDosTextos());

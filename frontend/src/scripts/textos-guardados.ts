@@ -30,6 +30,7 @@ import {
   type TextoRespuesta,
 } from '../lib/api-textos-guardados';
 import { openWhenFree } from '../lib/dialogs';
+import { confirmarDescartar } from './confirmar-descartar';
 import { t, traducirPorPrefijo } from '../lib/i18n';
 import {
   clasificarError,
@@ -46,6 +47,7 @@ import {
   usarComoBase,
   vecinoDe,
   versionAlGuardar,
+  visibles,
   type ModoTexto,
 } from '../lib/textos-guardados';
 
@@ -101,6 +103,12 @@ export interface OpcionesTextos {
   eliminar?: { titulo: (nombre: string) => string; cuerpo: string };
   /** The module's own sentence for a problem of the content, or `null` for the default one. */
   textoDeProblema?: (problema: ProblemaTexto) => string | null;
+  /**
+   * Which texts the panel offers, in the list of the enabled ones and in the folded list of the disabled ones. It is asked every
+   * time the panel is drawn (see `repintar`), so a link that changed without mounting again is reflected. A text that is open and
+   * stops passing it stays open until another one is chosen; it only leaves the `select`. Without it, every text is offered.
+   */
+  filtrar?: (texto: ResumenTexto) => boolean;
 }
 
 export interface ControladorTextos {
@@ -111,6 +119,8 @@ export interface ControladorTextos {
   confirmarSalida(): Promise<boolean>;
   /** Reads the lists again, and the text on screen if it still exists. */
   recargar(): Promise<void>;
+  /** Draws the panel again without asking the API: the module's `filtrar` is evaluated again. */
+  repintar(): void;
   destruir(): void;
 }
 
@@ -246,40 +256,14 @@ export async function montarTextosGuardados(raiz: HTMLElement, opciones: Opcione
     raiz.dispatchEvent(new CustomEvent<EstadoTextos>(EVENTO_TEXTOS, { detail: estado(), bubbles: true }));
   }
 
-  /** The dialog answers a yes/no; Escape and the backdrop are "no". */
-  function confirmarCambios(): Promise<boolean> {
-    return new Promise((resolver) => {
-      const si = q<HTMLButtonElement>('[data-textos-cambios-si]');
-      const no = q<HTMLButtonElement>('[data-textos-cambios-no]');
-      let respuesta = false;
-      const alSi = () => {
-        respuesta = true;
-        dialogos.cambios.close();
-      };
-      const alNo = () => dialogos.cambios.close();
-      si.addEventListener('click', alSi, { once: true });
-      no.addEventListener('click', alNo, { once: true });
-      // The dialog may wait its turn behind another one: until it is shown, and while it is open, a `close` is the previous answer's.
-      let listo = false;
-      const alCerrar = () => {
-        if (!listo || dialogos.cambios.open) return;
-        si.removeEventListener('click', alSi);
-        no.removeEventListener('click', alNo);
-        dialogos.cambios.removeEventListener('close', alCerrar);
-        resolver(respuesta);
-      };
-      dialogos.cambios.addEventListener('close', alCerrar);
-      void openWhenFree(dialogos.cambios).then(() => {
-        listo = true;
-        no.focus();
-      });
-    });
+  /** Ask before leaving what has changed; `true` means go ahead. The question is the shared one (`confirmar-descartar.ts`). */
+  async function puedoSoltar(): Promise<boolean> {
+    return hayCambios() ? confirmarDescartar(dialogos.cambios) : true;
   }
 
-  /** Ask before leaving what has changed; `true` means go ahead. */
-  async function puedoSoltar(): Promise<boolean> {
-    return hayCambios() ? confirmarCambios() : true;
-  }
+  /** What the panel offers, asked every time it is drawn: the lists are the API's, the filter is the module's. */
+  const ofrecidos = () => visibles(s.lista, opciones.filtrar);
+  const ofrecidosDeshabilitados = () => visibles(s.deshabilitados, opciones.filtrar);
 
   const textoDelProblema = (problema: ProblemaTexto): string =>
     opciones.textoDeProblema?.(problema) ?? traducirPorPrefijo('textoEnriquecido.codigo', problema.codigo, problema.detalle);
@@ -291,13 +275,14 @@ export async function montarTextosGuardados(raiz: HTMLElement, opciones: Opcione
   function pintarSelect(): void {
     el.select.replaceChildren();
     const guardado = s.texto !== null;
-    if (!guardado || s.lista.length === 0) {
+    const lista = ofrecidos();
+    if (!guardado || lista.length === 0) {
       const sinGuardar = document.createElement('option');
       sinGuardar.value = '';
       sinGuardar.textContent = t('textosGuardados.sinGuardar');
       el.select.append(sinGuardar);
     }
-    for (const texto of s.lista) {
+    for (const texto of lista) {
       const opcion = document.createElement('option');
       opcion.value = String(texto.id);
       opcion.textContent = etiquetaDeOpcion(texto);
@@ -461,9 +446,10 @@ export async function montarTextosGuardados(raiz: HTMLElement, opciones: Opcione
   }
 
   function pintarDeshabilitados(): void {
-    el.deshab.hidden = s.deshabilitados.length === 0;
-    el.deshabTitulo.textContent = t('textosGuardados.deshabilitados', { n: s.deshabilitados.length });
-    el.deshabLista.replaceChildren(...s.deshabilitados.map(filaDeshabilitada));
+    const lista = ofrecidosDeshabilitados();
+    el.deshab.hidden = lista.length === 0;
+    el.deshabTitulo.textContent = t('textosGuardados.deshabilitados', { n: lista.length });
+    el.deshabLista.replaceChildren(...lista.map(filaDeshabilitada));
   }
 
   function pintar(): void {
@@ -519,7 +505,8 @@ export async function montarTextosGuardados(raiz: HTMLElement, opciones: Opcione
 
   /** The first text, or an empty new one when there is none. */
   async function mostrarPrimero(): Promise<void> {
-    if (s.lista.length > 0) await abrirTexto(s.lista[0].id);
+    const primeros = ofrecidos();
+    if (primeros.length > 0) await abrirTexto(primeros[0].id);
     else poner(null);
   }
 
@@ -665,12 +652,13 @@ export async function montarTextosGuardados(raiz: HTMLElement, opciones: Opcione
     if (!texto || s.modo === 'deshabilitado') return;
     if (!(await puedoSoltar())) return;
     mostrarError('');
-    const vecino = vecinoDe(s.lista, texto.id);
+    const vecino = vecinoDe(ofrecidos(), texto.id);
     try {
       await deshabilitarTexto(texto.id);
       await recargarListas();
       // The text leaves the list of the enabled: what is shown is the one next to it, or a new one.
-      const siguiente = vecino !== null && s.lista.some((x) => x.id === vecino.id) ? vecino : (s.lista[0] ?? null);
+      const ofrecidosAhora = ofrecidos();
+      const siguiente = vecino !== null && ofrecidosAhora.some((x) => x.id === vecino.id) ? vecino : (ofrecidosAhora[0] ?? null);
       if (siguiente) await abrirTexto(siguiente.id);
       else poner(null);
       anunciar(t('textosGuardados.deshabilitadoAviso', { nombre: texto.nombre }));
@@ -813,12 +801,13 @@ export async function montarTextosGuardados(raiz: HTMLElement, opciones: Opcione
       pintarAceptarEliminar();
       try {
         const eraElMostrado = s.texto?.id === objetivo.id;
-        const vecino = vecinoDe(s.lista, objetivo.id);
+        const vecino = vecinoDe(ofrecidos(), objetivo.id);
         await eliminarTexto(objetivo.id);
         dialogos.eliminar.close();
         await recargarListas();
         if (eraElMostrado) {
-          const siguiente = vecino !== null && s.lista.some((x) => x.id === vecino.id) ? vecino : (s.lista[0] ?? null);
+          const ofrecidosAhora = ofrecidos();
+          const siguiente = vecino !== null && ofrecidosAhora.some((x) => x.id === vecino.id) ? vecino : (ofrecidosAhora[0] ?? null);
           if (siguiente) await abrirTexto(siguiente.id);
           else poner(null);
         } else {
@@ -913,6 +902,7 @@ export async function montarTextosGuardados(raiz: HTMLElement, opciones: Opcione
       if (id !== null) await abrirTexto(id, s.texto?.version.numero === s.texto?.version_vigente ? undefined : s.texto?.version.numero);
       else pintar();
     },
+    repintar: pintar,
     destruir() {
       alta.abort();
       editor?.destruir();

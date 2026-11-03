@@ -21,6 +21,7 @@ import {
   usarComoBase,
   vecinoDe,
   versionAlGuardar,
+  visibles,
 } from '../../src/lib/textos-guardados';
 
 function texto(mostrada: number, vigente: number, parcial: Partial<TextoRespuesta> = {}, usadas: number[] = []): TextoRespuesta {
@@ -185,5 +186,51 @@ describe('leer un rechazo por su código', () => {
     const { nombre, contenido } = problemasPorCampo(error);
     expect(nombre.map((p) => p.codigo)).toEqual(['texto_guardado_invalido']);
     expect(contenido.map((p) => p.codigo)).toEqual(['expresion_invalida', 'limite_excedido']);
+  });
+});
+
+describe('lo que el panel ofrece (la opción filtrar del módulo)', () => {
+  const lista = [resumen(1, 'Preventivo'), resumen(2, 'Cobranza'), resumen(3, 'Mora')];
+
+  it('sin filtro ofrece la misma lista, sin copiarla: todo queda como antes', () => {
+    expect(visibles(lista)).toBe(lista);
+    expect(visibles(lista, undefined)).toBe(lista);
+    expect(visibles([])).toEqual([]);
+  });
+
+  it('con filtro ofrece solo los que lo pasan, en su orden, y no toca la lista', () => {
+    const copia = [...lista];
+    expect(visibles(lista, (t) => t.nombre !== 'Cobranza').map((t) => t.id)).toEqual([1, 3]);
+    expect(visibles(lista, () => false)).toEqual([]);
+    expect(visibles(lista, () => true).map((t) => t.id)).toEqual([1, 2, 3]);
+    expect(lista).toEqual(copia);
+  });
+
+  it('el filtro recibe el resumen del texto y se pregunta cada vez: un vínculo que cambió se refleja sin volver a montar', () => {
+    const vinculados = new Set<number>();
+    const filtro = (t: ResumenTexto) => !vinculados.has(t.id);
+    expect(visibles(lista, filtro).map((t) => t.id)).toEqual([1, 2, 3]);
+    vinculados.add(2);
+    expect(visibles(lista, filtro).map((t) => t.id)).toEqual([1, 3]);
+    vinculados.delete(2);
+    vinculados.add(1);
+    expect(visibles(lista, filtro).map((t) => t.id)).toEqual([2, 3]);
+    const vistos: number[] = [];
+    visibles(lista, (t) => (vistos.push(t.id), true));
+    expect(vistos).toEqual([1, 2, 3]);
+  });
+
+  it('vale igual para la lista de los deshabilitados', () => {
+    const deshabilitados = [resumen(4, 'Viejo', true), resumen(5, 'Otro', true)];
+    expect(visibles(deshabilitados, (t) => t.id !== 4).map((t) => t.id)).toEqual([5]);
+    expect(visibles(deshabilitados)).toBe(deshabilitados);
+  });
+
+  it('el vecino al irse un texto se busca entre los que se ofrecen, no entre todos', () => {
+    const ofrecidos = visibles(lista, (t) => t.id !== 2);
+    // «Preventivo» se va: el que le toca es «Mora», no «Cobranza», que el módulo no ofrece.
+    expect(vecinoDe(ofrecidos, 1)?.id).toBe(3);
+    // Uno que ya no se ofrece (está abierto pero fuera del filtro) se resuelve como cualquiera que no está.
+    expect(vecinoDe(ofrecidos, 2)?.id).toBe(1);
   });
 });
