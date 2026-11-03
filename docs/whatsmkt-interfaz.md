@@ -82,7 +82,8 @@ Al crear, la página reemplaza la previsualización por las fichas «Para subir 
 - **Global:** un solo `select`, con los mensajes globales y luego los de los segmentos, en dos `optgroup` («Mensajes globales» y «Mensajes por segmento»), y el mismo bloque de solo lectura debajo.
 - **Los mensajes se escriben en la configuración,** no en la campaña: la campaña elige. Junto al `select`, «Editar en la configuración» (`square-pen`, `.btn--sm .btn--quiet`), con ir y volver.
 - **Mensajes deshabilitados:** no se ofrecen (RF-WM-22). Si la campaña venía con uno que se deshabilitó mientras tanto, el `select` queda sin elegir y un `.field__error` lo dice con su código (§7).
-- **Problemas del mensaje** (emoji, macro que no existe en la definición, largo): van bajo su `select`, por su código, y también en el resumen de la previsualización (§3.8).
+- **Lo que trae la previsualización por campaña:** `mensaje` (`texto_guardado_id`, `nombre`, `version` y `deshabilitado`, o `null`) y `mensaje_ejemplo`. El `select` de cada segmento muestra el `mensaje` que llega; con `null`, queda en «Elige un mensaje», sin opción elegida.
+- **Problemas del mensaje:** van bajo el `select` de su segmento (el campo `segmento` del problema; `null` es el `select` global), por su código y con sus `parametros`, y también en el resumen de la previsualización (§3.8). Si un mensaje tiene varios, van todos, en el orden en que llegan: `sin_mensaje`, `mensaje_deshabilitado`, `macro_inexistente`, `mensaje_con_emoji`, `mensaje_largo` y `sin_whatsapp`.
 
 ### 3.5 Programación (RF-WM-06 a RF-WM-08)
 
@@ -114,12 +115,12 @@ Se recalcula sola, con la misma espera y cancelación que la campaña de MOWA, c
 - **Resumen,** arriba:
   - «Se crearán 3 campañas · 1,205 filas en total», o «Se creará 1 campaña · 400 filas». Las cifras van con `formatNumber`.
   - Si hay productos fuera de las campañas, se suma a la línea: «· 87 productos fuera de las campañas», como enlace a su tabla (ver abajo).
-  - Si hay problemas, un `.notice--danger` con la lista, cada uno con el texto de su código y un enlace «Ir al campo» que lleva el foco a su sección.
+  - Si hay problemas, un `.notice--danger` con la lista, cada uno con el texto de su código y un enlace «Ir al campo» que lleva el foco a su sección. Un problema con `segmento` lleva delante su nombre: «Tramo 2 · El mensaje usa [whatsapp] y…». La lista conserva el orden en que llegan.
 - **Un `.segmented` por campaña del lote:** «Preventivo (520) · Tramo 2 (480) · Mayores al 2 (205)», con el número de filas. En modo global no hay `.segmented`: hay una sola campaña.
 - **Por campaña:**
   - **Cifras** (`.stat`), con los iconos del catálogo de MOWA: filas del archivo (`file-up`), supervisión (`user-check`) y excluidos (`ban`).
   - **Nombre:** el resultante (§3.7), en mono.
-  - **Mensaje de ejemplo:** el texto con las macros reemplazadas con la primera fila de productos, en un bloque de lectura, con el título «Así lo verá el cliente». Es lo que hará WhatsMKT (RF-WM-27).
+  - **Mensaje de ejemplo:** el texto con las macros reemplazadas con la primera fila de productos (`mensaje_ejemplo`; nunca una de supervisión), en un bloque de lectura, con el título «Así lo verá el cliente». Es lo que hará WhatsMKT (RF-WM-27).
   - **Muestra:** las primeras filas del archivo, en una tabla apilable. Los encabezados salen de `cabeceras` de la campaña: el `nombre` tal como va en el archivo, y la `etiqueta` en una segunda línea, en texto apagado: «[$MARCRO1$]», y debajo «Nombres del titular». Sin etiqueta, solo el nombre. Las `celdas` de cada fila van alineadas con `cabeceras`; las filas marcadas de supervisión llevan el tag «Supervisión».
   - **Exclusiones:** una tabla apilable con Pagaré, Motivo (tag con su texto corto) y Detalle, paginada con el paginador compartido. Si el backend recorta la lista, un `.field__hint` bajo la tabla: «Se muestran las primeras 100 de 240. La lista completa estará en el seguimiento de la campaña después de crearla». Sin exclusiones: «Ninguno de esta campaña queda fuera».
 - **Productos fuera de las campañas** (`exclusiones_sin_campana`): los excluidos que no pertenecen a ninguna campaña del lote, porque no tienen días de atraso (modo por segmento) o porque su segmento se quedó sin productos y no genera campaña.
@@ -287,6 +288,7 @@ Los códigos los define el backend en su enum (`whatsmkt.codigo.*`, RF-WM-43) y 
 | `campana_descartada` | Bajo el informe | La campaña está descartada. Restáurala primero. | The campaign is discarded. Restore it first. |
 | `campana_no_descartada` | (respaldo) | Solo se puede eliminar una campaña descartada. Descártala primero. | Only a discarded campaign can be deleted. Discard it first. |
 | `whatsapp_invalido` | Configuración, bajo el WhatsApp de contacto | El WhatsApp debe tener 9 dígitos y empezar con 9. | WhatsApp must have 9 digits and start with 9. |
+| `sin_mensaje` | Bajo el `select` del mensaje de su segmento, y en el resumen | No tiene mensaje: elige uno, o configura el del segmento. | It has no message: choose one, or set up the segment's message. |
 | `sin_whatsapp` | Resumen de la previsualización y «Crear» | El mensaje usa [whatsapp] y no hay WhatsApp de contacto configurado. | The message uses [whatsapp] and no contact WhatsApp is set up. |
 
 Las cuatro primeras son motivos de exclusión: además del texto corto, llevan un detalle para la columna Detalle, con su clave `whatsmkt.exclusiones.*`, como en MOWA:
@@ -294,6 +296,8 @@ Las cuatro primeras son motivos de exclusión: además del texto corto, llevan u
 - `sin_dias_atraso`: es «No tiene días de atraso, así que no cae en ningún segmento. En el modo «Global» sí entraría.» / en «It has no days overdue, so it falls in no segment. In “Global” mode it would be included.» Es el caso de `sin_speech` de MOWA. En el modo global no se excluye.
 
 `sin_supervisores` se detecta en la previsualización, no recién al crear: va en el resumen de problemas, deja «Crear» inactivo, y en lugar de «Ir al campo» lleva «Configurar supervisores» (`whatsmkt.previa.irSupervisores`), que abre Supervisores con ir y volver (§2). Si aun así llega al crear (alguien los borró entretanto), va arriba en `role="alert"` con el mismo enlace.
+
+`sin_mensaje` también deja «Crear» inactivo, pero lleva «Ir al campo», al `select` del mensaje de su segmento: ahí se resuelve, en la propia campaña. Con `segmento` en `null` (modo global), el texto es otro, `whatsmkt.problema.sin_mensaje.global`: «Elige el mensaje de la campaña.» / "Choose the campaign's message." Al crear, el mismo código arriba, en `role="alert"`.
 
 `sin_whatsapp` sigue el mismo patrón: en el resumen de la previsualización, con «Crear» inactivo, y en lugar de «Ir al campo», «Configurar el WhatsApp de contacto» (`whatsmkt.previa.irWhatsapp`), que abre la configuración en ese campo, con ir y volver. Al crear, el mismo código arriba, en `role="alert"`.
 
@@ -364,6 +368,8 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.previa.resumenUna` | Se creará 1 campaña · {filas} filas | 1 campaign will be created · {filas} rows |
 | `whatsmkt.previa.irAlCampo` | Ir al campo | Go to the field |
 | `whatsmkt.previa.irSupervisores` | Configurar supervisores | Set up supervisors |
+| `whatsmkt.problema.sin_mensaje.global` | Elige el mensaje de la campaña. | Choose the campaign's message. |
+| `whatsmkt.mensaje.elegir` | Elige un mensaje | Choose a message |
 | `whatsmkt.previa.irWhatsapp` | Configurar el WhatsApp de contacto | Set up the contact WhatsApp |
 | `whatsmkt.mensaje.insertarWhatsapp` | Enlace de WhatsApp | WhatsApp link |
 | `whatsmkt.mensaje.sinWhatsapp` | (sin WhatsApp configurado) | (no WhatsApp set up) |
