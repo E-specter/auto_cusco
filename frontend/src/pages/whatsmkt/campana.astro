@@ -1,16 +1,20 @@
 ---
 /**
- * WhatsMKT campaign (T-WM-F2). Until that cut lands this is the screen's place in the menu: its title and a
- * notice that says what it will do, so the module reads as one from its first release.
+ * WhatsMKT campaign (T-WM-F2a1, docs/whatsmkt-interfaz.md §3): the form that builds the request (the base selection, the
+ * definition, the message, the programming, the sending and the name) and the preview of the lot it would give. «Crear»
+ * is there but off until T-WM-F2a2, which creates the lot and shows the sheet of each campaign.
+ *
+ * The behaviour lives in `scripts/whatsmkt-campana.ts`; this is the markup, one `.panel` per section in the order of §3.1.
  */
 import Shell from '../../layouts/Shell.astro';
 import Icon from '../../components/Icon.astro';
+import SelectorSeleccion from '../../components/SelectorSeleccion.astro';
 import '../../styles/whatsmkt.css';
 ---
 
 <Shell
   title="Campaña de WhatsMKT — auto_cusco"
-  description="Arma la lista de contactos sobre una selección de cartera y crea la campaña de WhatsMKT."
+  description="Arma la lista de contactos sobre una selección de cartera y previsualiza el lote de campañas de WhatsMKT."
 >
   <div class="page">
     <header class="page__head">
@@ -21,11 +25,330 @@ import '../../styles/whatsmkt.css';
       </p>
     </header>
 
-    <p class="notice notice--info">
-      <Icon name="info" size={20} />
-      <span data-i18n="whatsmkt.campana.enConstruccion">
-        Esta pantalla está en construcción. Aquí armarás la lista de contactos sobre una selección de cartera, elegirás el mensaje, la fecha y los horarios de envío, y crearás la campaña.
-      </span>
-    </p>
+    <section class="standIn" data-offline hidden aria-labelledby="wm-offline-title">
+      <h2 class="standIn__title" id="wm-offline-title" data-i18n="console.offline.title">Sin conexión con la API</h2>
+      <p class="standIn__body" data-i18n="console.offline.body">
+        No se pudo contactar con el backend. Comprueba que esté en marcha y vuelve a intentarlo.
+      </p>
+      <button type="button" class="btn btn--primary" data-reintentar>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span class="btn__label" data-i18n="console.offline.retry">Reintentar</span>
+      </button>
+    </section>
+
+    <div class="wm__contenido" data-contenido hidden>
+      <!-- ---- 1. Base: the cut-off date and the saved selection (RF-WM-05) ---------------------------------- -->
+      <SelectorSeleccion modo="compacto" id="seleccion" />
+
+      <!-- Back from Cartera, the selection that was being edited is gone (deleted there): none is chosen, and this says why. -->
+      <p class="notice notice--warning" data-seleccion-borrada hidden role="status">
+        <Icon name="triangle-alert" size={20} />
+        <span data-i18n="whatsmkt.campana.seleccionBorrada">
+          La selección que editaste en Cartera ya no existe. Elige otra selección guardada.
+        </span>
+      </p>
+
+      <p class="notice notice--warning" data-guardia hidden role="status">
+        <Icon name="triangle-alert" size={20} />
+        <span data-guardia-texto></span>
+      </p>
+
+      <div class="wm__contenido" data-formulario hidden>
+        <!-- ---- 2. Load file: the definition of the WhatsMKT platform (RF-WM-09 to RF-WM-12) ---------------- -->
+        <section class="panel" id="wm-sec-archivo" tabindex="-1" aria-labelledby="wm-archivo-title">
+          <div class="panel__head">
+            <h2 class="panel__title" id="wm-archivo-title" data-i18n="whatsmkt.seccion.archivo">Archivo de carga</h2>
+          </div>
+          <div class="panel__body wm-form">
+            <div class="field">
+              <label class="field__label" for="wm-definicion" data-i18n="whatsmkt.archivo.definicion">Definición de columnas</label>
+              <select class="input" id="wm-definicion" aria-describedby="wm-definicion-version wm-definicion-error"></select>
+              <p class="field__hint mono" id="wm-definicion-version" data-version-linea></p>
+              <p class="field__error" id="wm-definicion-error" data-definicion-error role="alert"></p>
+            </div>
+
+            <p class="notice notice--warning" data-sin-definiciones hidden>
+              <Icon name="triangle-alert" size={20} />
+              <span data-i18n="whatsmkt.archivo.crearAviso">Crea una definición de WhatsMKT en Columnas de carga para armar el archivo.</span>
+            </p>
+
+            <div data-columnas-tabla></div>
+            <p class="field__hint" data-cinco-macros hidden></p>
+
+            <!-- shortcut: a plain link until T-WM-F2b brings the go-and-back to the constructor (T-HI-F3 already gives Columnas its side). -->
+            <div class="wm-form__foot">
+              <a class="btn btn--sm" href="/columnas" data-columnas>
+                <Icon name="square-pen" size={16} />
+                <span data-columnas-texto data-i18n="whatsmkt.archivo.editar">Editar en Columnas de carga</span>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---- 3. Message: global or by segment, chosen from the saved texts (RF-WM-17 to RF-WM-27) ---------- -->
+        <section class="panel" id="wm-sec-mensaje" tabindex="-1" aria-labelledby="wm-mensaje-title">
+          <div class="panel__head">
+            <h2 class="panel__title" id="wm-mensaje-title" data-i18n="whatsmkt.seccion.mensaje">Mensaje</h2>
+          </div>
+          <div class="panel__body wm-form">
+            <div class="field">
+              <span class="field__label" id="wm-modo-etiqueta" data-i18n="whatsmkt.mensaje.modo">Modo del mensaje</span>
+              <div class="segmented" role="group" aria-labelledby="wm-modo-etiqueta" data-modo-grupo>
+                <button type="button" class="segmented__item" data-modo="por_segmento" aria-pressed="true" data-i18n="whatsmkt.mensaje.modo.segmento">Por segmento</button>
+                <button type="button" class="segmented__item" data-modo="global" aria-pressed="false" data-i18n="whatsmkt.mensaje.modo.global">Global</button>
+              </div>
+              <p class="field__hint" data-modo-hint></p>
+            </div>
+
+            <div data-mensaje-segmentos></div>
+
+            <div class="field" data-mensaje-global hidden>
+              <label class="field__label" for="wm-mensaje-global" data-i18n="whatsmkt.mensaje.global">Mensaje</label>
+              <select class="input" id="wm-mensaje-global" aria-describedby="wm-mensaje-global-error"></select>
+              <div class="wm-problemas" id="wm-mensaje-global-error" data-problemas-mensaje="global" role="alert"></div>
+            </div>
+
+            <p class="field__error" data-mensajes-error role="alert"></p>
+            <p class="field__hint" data-sin-mensajes hidden data-i18n="whatsmkt.mensaje.sinMensajes">
+              No hay mensajes guardados. Se escriben en la configuración.
+            </p>
+
+            <!-- shortcut: a plain link until the settings can send the analyst back. -->
+            <div class="wm-form__foot">
+              <a class="btn btn--sm btn--quiet" href="/whatsmkt/configuracion">
+                <Icon name="square-pen" size={16} />
+                <span data-i18n="whatsmkt.mensaje.editarEnConfiguracion">Editar en la configuración</span>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---- 4. Programming: date, time slots and «as soon as possible» (RF-WM-06 to RF-WM-08) ------------- -->
+        <section class="panel" id="wm-sec-programacion" tabindex="-1" aria-labelledby="wm-programacion-title">
+          <div class="panel__head">
+            <h2 class="panel__title" id="wm-programacion-title" data-i18n="whatsmkt.seccion.programacion">Programación</h2>
+          </div>
+          <div class="panel__body wm-form">
+            <div class="field">
+              <label class="field__label" for="wm-fecha" data-i18n="whatsmkt.programacion.fecha">Fecha de envío</label>
+              <input class="input" id="wm-fecha" type="date" aria-describedby="wm-fecha-hint wm-fecha-error" />
+              <p class="field__hint" id="wm-fecha-hint" data-i18n="whatsmkt.programacion.fechaHint">
+                Se sugiere el siguiente día gestionable: de lunes a sábado, sin feriados.
+              </p>
+              <p class="field__error" id="wm-fecha-error" data-fecha-error role="alert"></p>
+              <button type="button" class="btn btn--sm" data-fecha-usar hidden></button>
+            </div>
+
+            <fieldset class="wm-grupo" aria-describedby="wm-horarios-hint wm-horarios-error">
+              <legend class="field__label" data-i18n="whatsmkt.programacion.horarios">Horarios de envío</legend>
+              <div class="wm-checks" data-horarios></div>
+              <p class="field__hint" id="wm-horarios-hint" data-i18n="whatsmkt.programacion.horariosHint">Marca al menos uno.</p>
+              <p class="field__error" id="wm-horarios-error" data-horarios-error role="alert"></p>
+            </fieldset>
+
+            <div class="field">
+              <label class="wm-check">
+                <input type="checkbox" id="wm-antes" aria-describedby="wm-antes-hint" />
+                <span class="wm-check__cuerpo">
+                  <span class="wm-check__titulo" data-i18n="whatsmkt.programacion.antes">Deseo que salga mi envío lo antes posible</span>
+                </span>
+              </label>
+              <p class="field__hint" id="wm-antes-hint" data-i18n="whatsmkt.programacion.antesHint">
+                Se copia en la ficha; no cambia la fecha ni los horarios.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---- 5. Sending: type, file, photo and vCard label (RF-WM-28 to RF-WM-31) -------------------------- -->
+        <section class="panel" id="wm-sec-envio" tabindex="-1" aria-labelledby="wm-envio-title">
+          <div class="panel__head">
+            <h2 class="panel__title" id="wm-envio-title" data-i18n="whatsmkt.seccion.envio">Envío</h2>
+          </div>
+          <div class="panel__body wm-form">
+            <fieldset class="wm-grupo">
+              <legend class="field__label" data-i18n="whatsmkt.envio.tipo">Tipo de envío</legend>
+              <label class="wm-check">
+                <input type="radio" name="wm-tipo-envio" value="solo_texto" checked />
+                <span class="wm-check__cuerpo"><span class="wm-check__titulo" data-i18n="whatsmkt.envio.texto">Solo texto</span></span>
+              </label>
+              <label class="wm-check">
+                <input type="radio" name="wm-tipo-envio" value="archivo" />
+                <span class="wm-check__cuerpo"><span class="wm-check__titulo" data-i18n="whatsmkt.envio.archivo">Texto + archivo</span></span>
+              </label>
+              <div class="field wm-condicional" data-condicional="archivo" hidden>
+                <label class="field__label" for="wm-adjunto" data-i18n="whatsmkt.envio.adjunto">Archivo</label>
+                <select class="input" id="wm-adjunto" aria-describedby="wm-envio-error"></select>
+                <!-- shortcut: la subida desde la campaña entra en F2a2 (decisión del usuario, 2026-11-03); hasta entonces se sube en la configuración. -->
+                <a class="btn btn--sm btn--quiet" href="/whatsmkt/configuracion#wm-biblioteca-title">
+                  <Icon name="upload" size={16} />
+                  <span data-i18n="whatsmkt.envio.subirEnConfiguracion">Subir en la configuración</span>
+                </a>
+              </div>
+              <label class="wm-check">
+                <input type="radio" name="wm-tipo-envio" value="vcard" />
+                <span class="wm-check__cuerpo"><span class="wm-check__titulo" data-i18n="whatsmkt.envio.vcard">Texto + vCard</span></span>
+              </label>
+              <div class="field wm-condicional" data-condicional="vcard" hidden>
+                <label class="field__label" for="wm-vcard" data-i18n="whatsmkt.envio.etiquetaContacto">Etiqueta del contacto</label>
+                <input class="input" id="wm-vcard" type="text" autocomplete="off" maxlength="80" aria-describedby="wm-envio-error" />
+              </div>
+              <p class="field__error" id="wm-envio-error" data-envio-error role="alert"></p>
+            </fieldset>
+
+            <div class="field">
+              <label class="field__label" for="wm-foto" data-i18n="whatsmkt.envio.foto">Foto de perfil</label>
+              <select class="input" id="wm-foto" aria-describedby="wm-foto-hint"></select>
+              <p class="field__hint" id="wm-foto-hint" data-i18n="whatsmkt.envio.fotoHint">JPEG de 200 × 200 píxeles, hasta 1 MB.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---- 6. Campaign name: the template, editable for this campaign (RF-WM-33) --------------------------- -->
+        <section class="panel" id="wm-sec-nombre" tabindex="-1" aria-labelledby="wm-nombre-title">
+          <div class="panel__head">
+            <h2 class="panel__title" id="wm-nombre-title" data-i18n="whatsmkt.seccion.nombre">Nombre de la campaña</h2>
+          </div>
+          <div class="panel__body wm-form">
+            <div class="field">
+              <label class="field__label" for="wm-plantilla" data-i18n="whatsmkt.configuracion.nombre.plantilla">Plantilla del nombre</label>
+              <input
+                class="input mono"
+                id="wm-plantilla"
+                type="text"
+                maxlength="75"
+                autocomplete="off"
+                spellcheck="false"
+                aria-describedby="wm-plantilla-hint wm-plantilla-contador wm-plantilla-error"
+              />
+              <div
+                class="wm-variables"
+                role="group"
+                data-i18n-attr="aria-label:whatsmkt.configuracion.nombre.variables"
+                aria-label="Variables de la plantilla"
+                aria-describedby="wm-variables-hint"
+                data-variables
+              ></div>
+              <p class="field__hint" id="wm-variables-hint" data-i18n="whatsmkt.configuracion.nombre.variablesHint" set:text="{fecha_corte}: la fecha de corte, como AAAA.MM.DD. {segmento}: el nombre del segmento; queda vacío en una campaña global."></p>
+              <p class="field__hint" id="wm-plantilla-hint" data-segmento-al-final hidden data-i18n="whatsmkt.nombre.segmentoAlFinal">
+                Se agrega el segmento al final para que los nombres no se repitan.
+              </p>
+              <p class="wm-contador" id="wm-plantilla-contador" data-contador></p>
+              <p class="field__error" id="wm-plantilla-error" data-plantilla-error role="alert"></p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---- 7. Preview of the lot (RF-WM-35), with «Crear» at the foot -------------------------------------- -->
+        <section class="panel" id="wm-sec-previa" tabindex="-1" aria-labelledby="wm-previa-title" data-previa data-calculando="false" aria-busy="false">
+          <div class="panel__head">
+            <h2 class="panel__title" id="wm-previa-title" data-i18n="whatsmkt.seccion.previsualizacion">Previsualización</h2>
+          </div>
+          <div class="panel__body wm-form">
+            <p class="wm-resumen" data-resumen role="status"></p>
+            <p class="field__error" data-previa-error role="alert"></p>
+            <div class="notice notice--danger" data-problemas hidden>
+              <Icon name="circle-alert" size={20} />
+              <div>
+                <strong data-i18n="whatsmkt.previa.problemasTitulo">Corrige esto para poder crear:</strong>
+                <ul class="wm-lista-problemas" data-problemas-lista></ul>
+              </div>
+            </div>
+            <p class="notice notice--warning" data-sin-campanas hidden>
+              <Icon name="triangle-alert" size={20} />
+              <span data-sin-campanas-texto></span>
+            </p>
+
+            <div class="segmented" role="group" data-i18n-attr="aria-label:whatsmkt.previa.campanas" aria-label="Campañas del lote" data-campanas hidden></div>
+
+            <div class="wm-campana" data-campana hidden>
+              <dl class="wm-cifras" data-cifras></dl>
+              <div class="wm-previa__nombre">
+                <p class="field__label" data-nombre-rotulo></p>
+                <p class="mono wm-previa__valor" data-nombre-resultante></p>
+              </div>
+              <div class="wm-previa__ejemplo" data-ejemplo-bloque hidden>
+                <h3 class="wm-subtitulo" data-i18n="whatsmkt.mensaje.vistaPrevia">Así lo verá el cliente</h3>
+                <p class="wm-ejemplo mono" data-ejemplo></p>
+              </div>
+
+              <h3 class="wm-subtitulo" data-i18n="whatsmkt.previa.muestra">Muestra</h3>
+              <div data-muestra></div>
+
+              <h3 class="wm-subtitulo" data-i18n="whatsmkt.previa.exclusiones">Exclusiones</h3>
+              <p class="field__hint" data-exclusiones-truncadas hidden></p>
+              <div data-exclusiones></div>
+              <div class="pager" data-pager role="group" data-i18n-attr="aria-label:whatsmkt.previa.exclusiones" aria-label="Exclusiones" data-exclusiones-pager hidden>
+                <button type="button" class="btn btn--sm" data-page-prev>
+                  <Icon name="chevron-left" size={16} />
+                  <span data-i18n="console.incidencias.prev">Anteriores</span>
+                </button>
+                <p class="mono muted pager__rango" data-page-range aria-live="polite"></p>
+                <button type="button" class="btn btn--sm" data-page-next>
+                  <span data-i18n="console.incidencias.next">Siguientes</span>
+                  <Icon name="chevron-right" size={16} />
+                </button>
+              </div>
+            </div>
+
+            <!-- The products that belong to no campaign of the lot: not part of any, so not part of the `.segmented`. -->
+            <div class="wm-fuera" data-fuera hidden>
+              <h3 class="wm-subtitulo" id="wm-fuera-titulo" data-fuera-titulo></h3>
+              <p class="field__hint" data-i18n="whatsmkt.previa.fuera.hint">
+                No entran en ninguna campaña del lote: no tienen días de atraso, o su segmento se quedó sin productos.
+              </p>
+              <p class="field__hint" data-fuera-truncadas hidden></p>
+              <div data-fuera-tabla></div>
+              <div class="pager" data-pager role="group" data-i18n-attr="aria-label:whatsmkt.previa.fuera.titulo" aria-label="Productos fuera de las campañas" data-fuera-pager hidden>
+                <button type="button" class="btn btn--sm" data-page-prev>
+                  <Icon name="chevron-left" size={16} />
+                  <span data-i18n="console.incidencias.prev">Anteriores</span>
+                </button>
+                <p class="mono muted pager__rango" data-page-range aria-live="polite"></p>
+                <button type="button" class="btn btn--sm" data-page-next>
+                  <span data-i18n="console.incidencias.next">Siguientes</span>
+                  <Icon name="chevron-right" size={16} />
+                </button>
+              </div>
+            </div>
+
+            <!-- shortcut: «Crear» is visible and off; T-WM-F2a2 turns it on and sends the exact version of each message. -->
+            <div class="wm-form__foot">
+              <button type="button" class="btn btn--primary" data-crear disabled aria-describedby="wm-crear-motivo">
+                <span class="btn__spinner" aria-hidden="true"></span>
+                <span class="btn__label" data-crear-texto>Crear campaña</span>
+              </button>
+              <p class="field__hint" id="wm-crear-motivo" data-crear-motivo></p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
   </div>
+
+  <!-- Icons for what the script draws: rendered once here, cloned each time. -->
+  <template data-icono-filas><Icon name="file-up" size={16} /></template>
+  <template data-icono-supervision><Icon name="user-check" size={16} /></template>
+  <template data-icono-excluidos><Icon name="ban" size={16} /></template>
+  <template data-icono-editar-cartera><Icon name="square-pen" size={16} /></template>
+
+  <!-- ---- Generic failure ---------------------------------------------- -->
+  <dialog class="dialog" data-dialog="error" aria-labelledby="wm-error-title">
+    <div class="dialog__head">
+      <h2 id="wm-error-title" data-i18n="common.error">Algo salió mal</h2>
+    </div>
+    <div class="dialog__body">
+      <p class="notice notice--danger">
+        <Icon name="circle-alert" size={20} />
+        <span data-error-body></span>
+      </p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn btn--primary" data-close data-i18n="common.close">Cerrar</button>
+    </div>
+  </dialog>
 </Shell>
+
+<script>
+  import '../../scripts/whatsmkt-campana';
+</script>

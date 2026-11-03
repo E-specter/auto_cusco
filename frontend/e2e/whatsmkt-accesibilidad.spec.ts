@@ -7,6 +7,8 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 import { apiWhatsmkt, montarApiWhatsmkt } from './api-falsa-whatsmkt';
+import { campanaFalsa, montarCampanaWhatsmkt } from './api-falsa-whatsmkt-campana';
+import { montarSeleccion } from './apoyo-seleccion';
 
 const REGLAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
@@ -17,7 +19,7 @@ test.use({ reducedMotion: 'reduce' });
 async function sinViolaciones(page: Page): Promise<void> {
   const resultado = await new AxeBuilder({ page }).withTags(REGLAS).analyze();
   const resumen = resultado.violations.map(
-    (v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`,
+    (v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => `${n.target.join(' ')} ${n.html.slice(0, 160)} → ${(n.failureSummary ?? '').replace(/\s+/g, ' ')}`).join(' | ')}`,
   );
   expect(resumen).toEqual([]);
 }
@@ -38,9 +40,34 @@ for (const tema of ['light', 'dark'] as const) {
         await montarApiWhatsmkt(page, apiWhatsmkt());
       });
 
-      test('campaña, con su aviso de construcción', async ({ page }) => {
+      test('campaña, sin selección elegida', async ({ page }) => {
+        await montarCampanaWhatsmkt(page, campanaFalsa());
+        await montarSeleccion(page);
         await page.goto('/whatsmkt/campana');
         await expect(page.getByRole('heading', { name: 'Campaña de WhatsMKT', level: 1 })).toBeVisible();
+        await expect(page.locator('[data-guardia]')).toBeVisible();
+        await sinViolaciones(page);
+      });
+
+      test('campaña, con la previsualización del lote, sus problemas y los productos fuera de las campañas', async ({ page }) => {
+        await montarCampanaWhatsmkt(
+          page,
+          campanaFalsa({
+            problemasExtra: [
+              { codigo: 'sin_supervisores', detalle: 'Sin supervisores', segmento: null, parametros: {} },
+              { codigo: 'sin_whatsapp', detalle: 'Sin WhatsApp', segmento: 'tramo_2', parametros: {} },
+            ],
+          }),
+        );
+        await montarSeleccion(page);
+        await page.goto('/whatsmkt/campana');
+        await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 1000' });
+        // The fixture has no default definition: choosing one is what lets the preview be asked for.
+        await page.locator('#wm-definicion').selectOption({ label: 'Contactos WhatsMKT' });
+        await page.locator('[data-franja="horario_1"]').check();
+        await expect(page.locator('[data-campana]')).toBeVisible();
+        await expect(page.locator('[data-fuera]')).toBeVisible();
+        await expect(page.locator('[data-previa]')).toHaveAttribute('data-calculando', 'false');
         await sinViolaciones(page);
       });
 
@@ -104,6 +131,9 @@ for (const tema of ['light', 'dark'] as const) {
       localStorage.setItem('app:appearance', JSON.stringify({ theme: elegido, language: 'es' }));
     }, tema);
     await montarApiWhatsmkt(page, apiWhatsmkt());
+    // The campaign screen reads the selection, the saved texts and a definition: without them it opens its error dialog.
+    await montarCampanaWhatsmkt(page, campanaFalsa());
+    await montarSeleccion(page);
     await page.goto('/whatsmkt/campana');
 
     await page.getByRole('button', { name: 'WhatsMKT' }).click();

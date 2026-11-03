@@ -5,12 +5,17 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { apiWhatsmkt, montarApiWhatsmkt } from './api-falsa-whatsmkt';
+import { campanaFalsa, montarCampanaWhatsmkt } from './api-falsa-whatsmkt-campana';
+import { montarSeleccion } from './apoyo-seleccion';
 
 const nav = (page: Page) => page.getByRole('navigation', { name: /Secciones|Sections/ });
 const disparador = (page: Page) => page.getByRole('button', { name: 'WhatsMKT' });
 
 async function abrir(page: Page, ruta: string): Promise<void> {
   await montarApiWhatsmkt(page, apiWhatsmkt());
+  // The campaign screen also reads the selection, the saved texts and a definition: registered after, they fall back to the rest.
+  await montarCampanaWhatsmkt(page, campanaFalsa());
+  await montarSeleccion(page);
   await page.goto(ruta);
 }
 
@@ -88,15 +93,13 @@ test.describe('menú de WhatsMKT', () => {
 });
 
 test.describe('pantallas que esperan su corte', () => {
-  test('Campaña tiene su título y dice lo que traerá', async ({ page }) => {
+  test('Campaña tiene su título y empieza por elegir la selección', async ({ page }) => {
     await abrir(page, '/whatsmkt/campana');
 
     // `.page__head`, not the whole page: the header's «API en línea» is an `.eyebrow` too.
     await expect(page.locator('.page__head .eyebrow')).toHaveText('Canales · WhatsMKT');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Campaña de WhatsMKT');
-    const aviso = page.locator('.notice--info');
-    await expect(aviso).toContainText('en construcción');
-    await expect(aviso).toContainText('crearás la campaña');
+    await expect(page.locator('[data-guardia]')).toContainText('Elige una selección guardada para armar la campaña.');
   });
 
   test('Seguimiento tiene su título y dice lo que traerá', async ({ page }) => {

@@ -10,6 +10,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { apiSupervisionCalendario, apiVacia, montarApi, montarApiSupervisionCalendario } from './api-falsa';
 import { apiMowaMes, montarApiMowaMes } from './api-falsa-mowa-mes';
 import { apiWhatsmkt, montarApiWhatsmkt } from './api-falsa-whatsmkt';
+import { campanaFalsa, montarCampanaWhatsmkt } from './api-falsa-whatsmkt-campana';
+import { montarSeleccion } from './apoyo-seleccion';
 import { montarConfiguracion } from './api-falsa-speech-v2';
 
 test.use({ reducedMotion: 'reduce', timezoneId: 'America/Lima' });
@@ -26,7 +28,12 @@ const sinDatos = (page: Page) => montarApi(page, apiVacia());
 const conMowaMes = (page: Page) => montarApiMowaMes(page, apiMowaMes());
 const conConfiguracionMowaMes = async (page: Page) => void (await montarConfiguracion(page, apiMowaMes()));
 const conSupervision = (page: Page) => montarApiSupervisionCalendario(page, apiSupervisionCalendario());
-const conWhatsmkt = (page: Page) => montarApiWhatsmkt(page, apiWhatsmkt());
+const conWhatsmkt = async (page: Page) => {
+  await montarApiWhatsmkt(page, apiWhatsmkt());
+  // The campaign screen also reads the selection, the saved texts and a definition; the rest falls back to the fake above.
+  await montarCampanaWhatsmkt(page, campanaFalsa());
+  await montarSeleccion(page);
+};
 
 const PANTALLAS: Pantalla[] = [
   { nombre: 'Cargas', ruta: '/cargas', conCabecera: false, montar: sinDatos },

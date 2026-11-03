@@ -18,9 +18,29 @@
 
 /* The links of the tools notice: the notice's own colour, underlined. The default link colour does not
    hold its contrast on the info wash. */
-[data-herramientas] a {
+[data-herramientas] a,
+.wm-problemas a,
+[data-problemas] a,
+[data-sin-campanas] a {
   color: inherit;
   text-decoration: underline;
+}
+
+/* A button that reads as the links around it (the «Ir al campo» of a problem): the colour of its notice, underlined. */
+.wm-enlace {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+/* «Usar el …» under the date takes its text's width, not the whole column of the form. */
+[data-fecha-usar] {
+  align-self: flex-start;
 }
 
 .wm-form {
@@ -242,4 +262,125 @@
 .wm-pronto__titulo {
   font-size: var(--text-sm);
   font-weight: 600;
+}
+
+/* ---- Campaign screen (T-WM-F2a1, docs/whatsmkt-interfaz.md §3) --------------------------------------------------
+   Sections are `.panel`s; what the preview draws (figures, name, example, sample, exclusions) is built by the script. */
+
+.wm-editar-cartera {
+  align-self: flex-start;
+  margin-block-start: var(--space-2);
+}
+
+.wm-checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wm-condicional {
+  margin-inline-start: var(--space-5);
+}
+
+/* The problems of a message, under its select, one per line in the order they arrive. */
+.wm-problemas:empty {
+  display: none;
+}
+
+.wm-problemas > p + p {
+  margin-block-start: var(--space-1);
+}
+
+.wm-lista-problemas {
+  margin: var(--space-2) 0 0;
+  padding-inline-start: var(--space-4);
+}
+
+.wm-resumen {
+  font-size: var(--text-sm);
+}
+
+.wm-resumen:empty {
+  display: none;
+}
+
+.wm-campana {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+.wm-cifras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.wm-cifras .stat__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.wm-previa__valor {
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.wm-subtitulo {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin-block-start: var(--space-2);
+}
+
+/* «Así lo verá el cliente»: the text as WhatsMKT will send it, kept as written (line breaks and double spaces). */
+.wm-ejemplo {
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: var(--space-3);
+  border: var(--color-border-hairline) solid var(--color-border);
+  border-radius: var(--radius-structural);
+  background-color: var(--color-surface);
+}
+
+/* A header of the sample: the name as it goes in the file and, under it, the label of the column (muted). */
+.wm-cabecera__etiqueta {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.wm-fuera {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+.wm-mensajes select {
+  min-inline-size: 12rem;
+}
+
+/* A box or a radio with its text: the sheet that defines `.choice` (console.css) only loads on /cargas. */
+.wm-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.wm-check input {
+  margin-block-start: 0.25em;
+}
+
+.wm-check__cuerpo {
+  display: flex;
+  flex-direction: column;
+}
+
+.wm-check:has(input:focus-visible) {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }

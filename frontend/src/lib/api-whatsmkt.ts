@@ -19,8 +19,15 @@ export type HorarioWhatsmkt = Esquemas['HorarioWhatsmktRespuesta'];
 export type SegmentoWhatsmkt = Esquemas['SegmentoWhatsmktRespuesta'];
 export type SegmentoWhatsmktEntrada = Esquemas['SegmentoWhatsmktEntrada'];
 export type CodigoWhatsmkt = Esquemas['CodigoWhatsmkt'];
+/** The next working day and the first date that can be picked (RF-70 and RF-71). */
+export type ProgramacionWhatsmkt = Esquemas['ProgramacionWhatsmktRespuesta'];
 /** The 422 of a module rule: the code the screen translates and the data its text names. */
 export type ErrorWhatsmkt = Esquemas['ErrorWhatsmktRespuesta'];
+
+/** The suggested send date (`sugerida`) and the earliest one allowed (`minima`), both in the Lima calendar. */
+export function obtenerProgramacion(): Promise<ProgramacionWhatsmkt> {
+  return request<ProgramacionWhatsmkt>('/whatsmkt/programacion');
+}
 
 export function obtenerConfiguracion(): Promise<ConfiguracionWhatsmkt> {
   return request<ConfiguracionWhatsmkt>('/whatsmkt/configuracion');
@@ -77,4 +84,26 @@ export function desarchivarAdjunto(id: number): Promise<AdjuntoWhatsmkt> {
 /** The file as it was stored (images without metadata), with the name the server gives it. */
 export function descargarAdjunto(id: number): Promise<ArchivoDescargado> {
   return descargarArchivo(`${ADJUNTOS}/${id}/contenido`);
+}
+
+// ---- Campaigns (RF-WM-23, RF-WM-35) ----------------------------------------------------------------
+
+export type PeticionPrevisualizacion = Esquemas['PrevisualizacionCampanasWhatsmktEntrada'];
+export type PrevisualizacionCampanas = Esquemas['PrevisualizacionCampanasWhatsmktRespuesta'];
+export type CampanaPrevista = Esquemas['CampanaPrevistaWhatsmktRespuesta'];
+export type ProblemaCampana = Esquemas['ProblemaWhatsmktRespuesta'];
+export type ExclusionCampana = Esquemas['ExclusionWhatsmktRespuesta'];
+export type MensajeEntrada = Esquemas['MensajeWhatsmktEntrada'];
+export type ModoCampana = Esquemas['ModoCampana'];
+export type TipoEnvio = Esquemas['TipoEnvio'];
+
+/**
+ * What the lot would be, without creating anything: the campaigns, their sample and exclusions, the message of each and
+ * the problems that stop creating. It recalculates on every change of the form, so a newer call cancels the older.
+ */
+export function previsualizarCampanas(
+  entrada: PeticionPrevisualizacion,
+  signal?: AbortSignal,
+): Promise<PrevisualizacionCampanas> {
+  return request<PrevisualizacionCampanas>('/whatsmkt/campanas/previsualizacion', conJson('POST', entrada, signal));
 }
