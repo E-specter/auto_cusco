@@ -9,7 +9,7 @@ normalizador (app/core/services/ingesta_sabana); tests/test_modelos_persistencia
 lo verifica contra el catalogo.
 """
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 
@@ -29,6 +29,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    Time,
     UniqueConstraint,
     func,
     text,
@@ -42,6 +43,7 @@ from app.core.entities.carga import EstadoCarga, EventoAuditoria
 from app.core.entities.mowa_mes import Programacion
 from app.core.entities.mowa_mes_campana import Salida, TipoCarga
 from app.core.entities.sabana import Severidad, TipoDocumento
+from app.core.entities.whatsmkt import TipoAdjunto
 
 # Nombres de restricciones estables: Alembic los necesita para migraciones reproducibles.
 CONVENCION_NOMBRES = {
@@ -694,3 +696,87 @@ class MowaMesReporteFila(Base):
     estado: Mapped[str] = mapped_column(Text)
     salida: Mapped[str] = mapped_column(Text)
     usuario: Mapped[str] = mapped_column(Text)
+
+
+class WhatsmktConfiguracion(Base):
+    """Configuracion de WhatsMKT: una sola fila (RF-WM-04). Sin dias de envio: son fijos (RF-70)."""
+
+    __tablename__ = "whatsmkt_configuracion"
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
+    horario_1_inicio: Mapped[time] = mapped_column(Time)
+    horario_1_fin: Mapped[time] = mapped_column(Time)
+    horario_2_inicio: Mapped[time] = mapped_column(Time)
+    horario_2_fin: Mapped[time] = mapped_column(Time)
+    plantilla_nombre: Mapped[str] = mapped_column(Text)
+    # Nula hasta que se elija; que sea de plataforma whatsmkt se chequea desde B2 (RF-72).
+    definicion_defecto_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "definicion_carga.id",
+            ondelete="SET NULL",
+            name="fk_whatsmkt_configuracion_definicion_defecto",
+        ),
+    )
+    tope_mensaje: Mapped[int] = mapped_column(Integer)
+    tope_video: Mapped[int] = mapped_column(BigInteger)
+    tope_audio: Mapped[int] = mapped_column(BigInteger)
+    tope_pdf: Mapped[int] = mapped_column(BigInteger)
+    actualizado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint("id = 1", name="fila_unica"),
+        CheckConstraint("horario_1_inicio < horario_1_fin", name="horario_1_valido"),
+        CheckConstraint("horario_2_inicio < horario_2_fin", name="horario_2_valido"),
+        CheckConstraint("length(btrim(plantilla_nombre)) > 0", name="plantilla_no_vacia"),
+        CheckConstraint("tope_mensaje > 0", name="tope_mensaje_positivo"),
+        CheckConstraint("tope_video > 0", name="tope_video_positivo"),
+        CheckConstraint("tope_audio > 0", name="tope_audio_positivo"),
+        CheckConstraint("tope_pdf > 0", name="tope_pdf_positivo"),
+    )
+
+
+class WhatsmktSegmento(Base):
+    """Segmento de WhatsMKT por dias de atraso ajustados (RF-WM-20); NULL es sin piso o tope.
+
+    Son 3 fijos (S-WM-1): solo se editan. `orden` es derivado y no es unico: se actualiza fila a
+    fila y un UNIQUE chocaria a mitad de camino.
+    """
+
+    __tablename__ = "whatsmkt_segmento"
+
+    clave: Mapped[str] = mapped_column(Text, primary_key=True)
+    etiqueta: Mapped[str] = mapped_column(Text)
+    desde: Mapped[int | None] = mapped_column(Integer)
+    hasta: Mapped[int | None] = mapped_column(Integer)
+    orden: Mapped[int] = mapped_column(Integer)
+
+    __table_args__ = (
+        CheckConstraint("length(btrim(clave)) > 0", name="clave_no_vacia"),
+        CheckConstraint("length(btrim(etiqueta)) > 0", name="etiqueta_no_vacia"),
+        CheckConstraint("desde IS NULL OR hasta IS NULL OR desde <= hasta", name="rango_valido"),
+    )
+
+
+class WhatsmktAdjunto(Base):
+    """Archivo de la biblioteca de adjuntos (RF-WM-30), unico por huella SHA-256."""
+
+    __tablename__ = "whatsmkt_adjunto"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    tipo: Mapped[str] = mapped_column(String(16))
+    nombre: Mapped[str] = mapped_column(Text)
+    tamano: Mapped[int] = mapped_column(BigInteger)
+    huella: Mapped[str] = mapped_column(String(64))
+    contenido: Mapped[bytes] = mapped_column(LargeBinary)
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    archivado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        UniqueConstraint("huella"),
+        CheckConstraint(f"tipo IN ({_en(TipoAdjunto)})", name="tipo_valido"),
+        CheckConstraint("tamano >= 0", name="tamano_no_negativo"),
+        CheckConstraint("huella ~ '^[0-9a-f]{64}$'", name="huella_valida"),
+    )

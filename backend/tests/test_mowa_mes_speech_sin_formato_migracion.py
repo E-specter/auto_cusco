@@ -48,11 +48,11 @@ def _orden(sql: str, *sentencias: str) -> list[int]:
     return [sql.index(sentencia) for sentencia in sentencias]
 
 
-def test_la_migracion_cuelga_de_la_de_solo_v2_y_es_la_cabeza() -> None:
+def test_la_migracion_cuelga_de_la_de_solo_v2_y_el_arbol_tiene_una_sola_cabeza() -> None:
     directorio = ScriptDirectory.from_config(_configuracion())
 
     assert directorio.get_revision(REVISION).down_revision == REVISION_ANTERIOR
-    assert directorio.get_heads() == [REVISION]
+    assert len(directorio.get_heads()) == 1  # la cabeza cambia con cada migracion nueva
 
 
 def test_los_nombres_y_textos_de_los_check_son_los_que_dejo_m_b3() -> None:

@@ -4292,6 +4292,150 @@
           }
         }
       }
+    },
+    "/whatsmkt/configuracion": {
+      "get": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Obtener Configuracion",
+        "operationId": "obtener_configuracion_whatsmkt_configuracion_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionWhatsmktRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Actualizar la configuracion de WhatsMKT (parcial)",
+        "description": "Actualizacion parcial sobre PUT: un campo omitido conserva el guardado.\n\n- `null` en un campo que no admite vacio responde 422 de validacion.\n- `definicion_defecto_id: null` quita la definicion por defecto; una que no existe es 404.\n- Un tope menor o igual a cero responde el 422 de validacion, sin codigo.\n- Un horario con inicio igual o posterior al fin (`horarios` dice cuales franjas) o una\n  variable desconocida en la plantilla (`variable`) responden 422 con su `codigo`.",
+        "operationId": "guardar_configuracion_whatsmkt_configuracion_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfiguracionWhatsmktEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionWhatsmktRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Una regla del modulo no se cumple; `codigo` dice cual y `detail` el motivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorWhatsmktRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/whatsmkt/segmentos": {
+      "get": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Listar Segmentos",
+        "operationId": "listar_segmentos_whatsmkt_segmentos_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SegmentoWhatsmktRespuesta"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Segmentos Whatsmkt Segmentos Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Editar los 3 segmentos (etiqueta y limites)",
+        "description": "Edita la etiqueta y los limites de los 3 segmentos fijos, en una transaccion (RF-WM-20).\nEl `orden` lo fija la API, de menor a mayor.\n\nOtras claves, una repetida o una que falta responden el 422 de validacion, sin codigo.\nSegmentos que se superponen o dejan huecos responden 422 con su `codigo` y sus parametros, y\nla tabla anterior queda como estaba.",
+        "operationId": "reemplazar_segmentos_whatsmkt_segmentos_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/SegmentoWhatsmktEntrada"
+                },
+                "type": "array",
+                "title": "Entrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SegmentoWhatsmktRespuesta"
+                  },
+                  "type": "array",
+                  "title": "Response Reemplazar Segmentos Whatsmkt Segmentos Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Una regla del modulo no se cumple; `codigo` dice cual y `detail` el motivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorWhatsmktRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5558,6 +5702,40 @@
         "title": "CodigoTexto",
         "description": "Catalogo de codigos que el frontend traducira como `textoEnriquecido.codigo.<codigo>`.\n\nUn codigo por linea, con la forma `NOMBRE = \"codigo\"`: la prueba espejo del\nfrontend lee esta clase. Los primeros se detectan al compilar (una expresion\ninvalida no procesa ninguna fila); los siguientes, al evaluar una fila concreta; al final,\nlos que solo informa la API del motor (B4a): lo que no se puede leer, el contexto o el\nproducto que no existen, y por que una expresion no tiene largo maximo."
       },
+      "CodigoWhatsmkt": {
+        "type": "string",
+        "enum": [
+          "sin_telefono",
+          "telefono_invalido",
+          "macro_vacia",
+          "mensaje_con_emoji",
+          "macro_inexistente",
+          "mensaje_largo",
+          "mensaje_deshabilitado",
+          "nombre_largo",
+          "variable_inexistente",
+          "fecha_no_gestionable",
+          "sin_horario",
+          "sin_productos",
+          "definicion_no_whatsmkt",
+          "foto_formato",
+          "foto_medidas",
+          "foto_peso",
+          "adjunto_tipo",
+          "adjunto_peso",
+          "adjunto_danado",
+          "segmentos_superpuestos",
+          "segmentos_con_hueco",
+          "informe_sin_encabezados",
+          "informe_sin_filas",
+          "informe_ya_importado",
+          "campana_descartada",
+          "campana_no_descartada",
+          "horario_invalido"
+        ],
+        "title": "CodigoWhatsmkt",
+        "description": "Codigos de error del modulo; el frontend los traduce como `whatsmkt.codigo.<codigo>`.\n\nLos 27 de docs/whatsmkt-interfaz.md §7 mas `horario_invalido`, todos desde B1 para que la\nprueba espejo de i18n no cambie en cada corte. Un codigo por linea, con la forma\n`NOMBRE = \"codigo\"`: la prueba espejo lee esta clase. Un codigo nuevo se acuerda antes con\ndesigner. B1 emite solo `horario_invalido`, `variable_inexistente`, `segmentos_superpuestos`\ny `segmentos_con_hueco`; los demas los emiten B2 a B6."
+      },
       "ColumnaAnalizadaRespuesta": {
         "properties": {
           "indice": {
@@ -6103,6 +6281,142 @@
           "supervisores"
         ],
         "title": "ConfiguracionSupervisionRespuesta"
+      },
+      "ConfiguracionWhatsmktEntrada": {
+        "properties": {
+          "horario_1": {
+            "$ref": "#/components/schemas/HorarioWhatsmktEntrada",
+            "description": "Franja 1 (RF-WM-07)"
+          },
+          "horario_2": {
+            "$ref": "#/components/schemas/HorarioWhatsmktEntrada",
+            "description": "Franja 2 (RF-WM-07)"
+          },
+          "plantilla_nombre": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Plantilla Nombre",
+            "description": "Plantilla del nombre de campana (RF-WM-33): texto fijo con {fecha_corte} y {segmento}. Vacia, vuelve la de por defecto"
+          },
+          "definicion_defecto_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definicion Defecto Id",
+            "description": "Definicion de carga por defecto (RF-WM-04); null la quita"
+          },
+          "tope_mensaje": {
+            "type": "integer",
+            "maximum": 2000000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Tope Mensaje",
+            "description": "Caracteres, mayor que 0 (RF-WM-26)"
+          },
+          "tope_video": {
+            "type": "integer",
+            "maximum": 2000000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Tope Video",
+            "description": "Bytes, mayor que 0 (RF-WM-31)"
+          },
+          "tope_audio": {
+            "type": "integer",
+            "maximum": 2000000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Tope Audio",
+            "description": "Bytes, mayor que 0 (RF-WM-31)"
+          },
+          "tope_pdf": {
+            "type": "integer",
+            "maximum": 2000000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Tope Pdf",
+            "description": "Bytes, mayor que 0 (RF-WM-31)"
+          }
+        },
+        "type": "object",
+        "title": "ConfiguracionWhatsmktEntrada",
+        "description": "Todos los campos son opcionales: uno omitido conserva el guardado y un `null` en uno que\nno admite vacio responde 422 (como la configuracion de MOWA MES). Solo la definicion por\ndefecto admite `null`: quita la elegida."
+      },
+      "ConfiguracionWhatsmktRespuesta": {
+        "properties": {
+          "horario_1": {
+            "$ref": "#/components/schemas/HorarioWhatsmktRespuesta"
+          },
+          "horario_2": {
+            "$ref": "#/components/schemas/HorarioWhatsmktRespuesta"
+          },
+          "plantilla_nombre": {
+            "type": "string",
+            "title": "Plantilla Nombre"
+          },
+          "definicion_defecto_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definicion Defecto Id"
+          },
+          "tope_mensaje": {
+            "type": "integer",
+            "title": "Tope Mensaje"
+          },
+          "tope_video": {
+            "type": "integer",
+            "title": "Tope Video"
+          },
+          "tope_audio": {
+            "type": "integer",
+            "title": "Tope Audio"
+          },
+          "tope_pdf": {
+            "type": "integer",
+            "title": "Tope Pdf"
+          },
+          "actualizado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualizado En"
+          },
+          "variables_plantilla": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Variables Plantilla",
+            "description": "Las variables validas de la plantilla"
+          }
+        },
+        "type": "object",
+        "required": [
+          "horario_1",
+          "horario_2",
+          "plantilla_nombre",
+          "definicion_defecto_id",
+          "tope_mensaje",
+          "tope_video",
+          "tope_audio",
+          "tope_pdf",
+          "actualizado_en",
+          "variables_plantilla"
+        ],
+        "title": "ConfiguracionWhatsmktRespuesta"
       },
       "ConfirmacionEntrada": {
         "properties": {
@@ -7132,6 +7446,105 @@
         "title": "ErrorPeticionCampanaRespuesta",
         "description": "400 de la previsualizacion y de la creacion de campanas.\n\n`campo` dice a que campo de la pantalla pertenece el error cuando el frontend lo puede\nubicar (hoy solo `plantilla_nombre_archivo`); es null si el error no es de un campo.\nExtiende `detail` como pide la regla de docs/contrato-api.md, seccion 3."
       },
+      "ErrorWhatsmktRespuesta": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoWhatsmkt"
+          },
+          "horarios": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horarios",
+            "description": "horario_invalido: las franjas que fallan"
+          },
+          "variable": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variable",
+            "description": "variable_inexistente: la que no existe"
+          },
+          "segmento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segmento",
+            "description": "segmentos_superpuestos: el segmento con el que se pisa"
+          },
+          "fila": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fila",
+            "description": "segmentos_superpuestos: la fila bajo la que se muestra"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde",
+            "description": "segmentos_con_hueco: primer dia sin segmento (null: -inf)"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta",
+            "description": "segmentos_con_hueco: ultimo dia sin segmento (null: +inf)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "codigo",
+          "horarios",
+          "variable",
+          "segmento",
+          "fila",
+          "desde",
+          "hasta"
+        ],
+        "title": "ErrorWhatsmktRespuesta",
+        "description": "422 de una regla de negocio: el motivo, el codigo que la interfaz traduce y los datos que\nsu texto nombra. Los parametros siempre viajan; los que el codigo no usa van nulos."
+      },
       "EstadoCarga": {
         "type": "string",
         "enum": [
@@ -7959,6 +8372,46 @@
           "speech_optimizado"
         ],
         "title": "HerramientasRespuesta"
+      },
+      "HorarioWhatsmktEntrada": {
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+            "title": "Inicio",
+            "description": "HH:MM, 24 horas"
+          },
+          "fin": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+            "title": "Fin",
+            "description": "HH:MM, 24 horas; posterior al inicio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inicio",
+          "fin"
+        ],
+        "title": "HorarioWhatsmktEntrada"
+      },
+      "HorarioWhatsmktRespuesta": {
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "title": "Inicio"
+          },
+          "fin": {
+            "type": "string",
+            "title": "Fin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inicio",
+          "fin"
+        ],
+        "title": "HorarioWhatsmktRespuesta"
       },
       "IncidenciaRespuesta": {
         "properties": {
@@ -10273,6 +10726,104 @@
           "cantidad"
         ],
         "title": "SegmentoConteoRespuesta"
+      },
+      "SegmentoWhatsmktEntrada": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave",
+            "description": "Una de las 3 fijas: preventivo, tramo_2 o mayores_2"
+          },
+          "etiqueta": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Etiqueta"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": -100000.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde",
+            "description": "null: sin piso"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": -100000.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta",
+            "description": "null: sin tope"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "etiqueta",
+          "desde",
+          "hasta"
+        ],
+        "title": "SegmentoWhatsmktEntrada"
+      },
+      "SegmentoWhatsmktRespuesta": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          },
+          "orden": {
+            "type": "integer",
+            "title": "Orden"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "etiqueta",
+          "desde",
+          "hasta",
+          "orden"
+        ],
+        "title": "SegmentoWhatsmktRespuesta"
       },
       "SeleccionEntrada": {
         "properties": {
