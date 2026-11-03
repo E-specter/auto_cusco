@@ -62,10 +62,10 @@ Los requerimientos de este documento se numeran `RF-MM-XX` dentro del módulo, p
   * `Enviar ahora`.
   * `Enviar en hora determinada` (**por defecto**): una fecha y hora; la fecha sugerida es el siguiente día gestionable (RF-MM-08).
   * `Enviar en diferentes horas` (uso ocasional): varias fechas y horas.
-* **RF-MM-08 — Día gestionable:** Calcular el siguiente día gestionable a partir de la fecha de generación: de lunes a viernes, excluyendo los feriados nacionales de Perú.
-  * Los feriados nacionales se calculan para cualquier año: los de fecha fija por su día y mes, y Jueves y Viernes Santo a partir de la fecha de Pascua. Así el cálculo no depende de cargar las fechas de cada año.
-  * La configuración permite agregar días no laborables decretados y retirar un feriado cuando cambie la ley (RF-32, RF-33).
-  * La regla trae solo los 16 feriados nacionales de ley vigentes al 2026; cualquier otro día no laborable (decretos, descansos regionales o compensables) lo registra el usuario a mano, y queda guardado y visible para todos los usuarios (decisión del usuario, 2026-10-26, que cierra el supuesto S-MM-4).
+* **RF-MM-08 — Día gestionable:** Sugerir como fecha de envío el siguiente día gestionable posterior a la fecha de generación, según RF-70.
+  * Los sábados se envía y los domingos no (decisión del usuario, 2026-11-02, que reemplaza el «de lunes a viernes» anterior). Los días de envío son los mismos para todos los canales (RF-70).
+  * El cálculo de los feriados de ley y las excepciones registradas a mano pasaron a RF-70 sin cambios.
+  * Antecedente de MOWA MES: la regla trae solo los 16 feriados nacionales de ley vigentes al 2026; cualquier otro día no laborable (decretos, descansos regionales o compensables) lo registra el usuario a mano, y queda guardado y visible para todos los usuarios (decisión del usuario, 2026-10-26, que cierra el supuesto S-MM-4).
 * **RF-MM-09 — Base de datos de la campaña:** Tomar como base de la campaña una selección de cartera de una fecha de corte (filtros, orden y cantidad, o una selección guardada), con el mismo orden y desempate que la lista de `/cartera` y que el resumen del top n (RF-08).
   * Si se quieren cambiar los filtros de la base, entonces la campaña ofrece «Editar en Cartera»: abre `/cartera` con la selección cargada y, al guardarla, vuelve a la campaña con la selección actualizada. La campaña no tiene un editor de filtros propio (decisión del usuario, 2026-10-30).
 
@@ -83,6 +83,12 @@ Formato confirmado con el ejemplo de carga (sección 7).
 
   * Si el documento del producto no es DNI ni RUC (por ejemplo, carné de extranjería o pasaporte), entonces se carga igual en `dni`, con su número normalizado, y la previsualización de la campaña advierte cuántos registros lo llevan. No se sabe si MES acepta esos documentos: la advertencia deja decidir antes de subir el archivo.
 
+* **RF-MM-37 — Archivo de carga desde el constructor de columnas:** Generar el archivo de RF-MM-10 con el generador de cargas y el constructor de columnas compartidos, a partir de una definición de plataforma `mowa_mes` (RF-72).
+  * La definición `mowa_mes` tiene fijas las tres columnas de RF-MM-10: nombre, orden y tipo de celda. No se agregan, quitan ni reordenan columnas.
+  * Con la misma entrada, el archivo es el mismo byte a byte que antes de este cambio. Lo comprueba la prueba de oro del módulo.
+  * El archivo de MES no usa la celda con formato «Texto» de RF-73: `dni` se escribe como hasta ahora, y por eso el archivo no cambia.
+  * Siguen en MOWA MES el armado del `mensaje` (sección 4), las exclusiones (RF-MM-13) y la división en archivos (RF-MM-11).
+  * Decisión del usuario, 2026-11-02: «ambos usarán el mismo generador de archivos de carga robusto con constructor de columnas» (MOWA MES y WhatsMKT).
 * **RF-MM-11 — Límites por archivo y división:** Limitar cada archivo de carga a **50 000 registros y 2 MB**; si la carga supera cualquiera de los dos límites, entonces dividirla en dos o más archivos que respeten ambos.
   * Los registros de supervisión van en el primer archivo (RF-41).
   * Cada archivo conserva el orden de la selección.
@@ -278,6 +284,8 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Reporte de una campaña descartada | Se rechaza la importación con «restáurala primero»; no se guarda nada (RF-MM-31) | Usuario (2026-10-30), consultado por coordinador_modulo_mowa_mes |
 | Cómo aparece el id de MES (antes S-MM-10) | En la web de MES es el «ID campaña» (los vistos tienen 7 dígitos, sin ser regla) y en el reporte es la columna `id`, numérica; no se escribe a mano (RF-MM-34) | Usuario (2026-11-01) |
 | Cambiar los filtros desde la campaña | «Editar en Cartera» y volver, sin editor propio en la campaña (RF-MM-09) | Usuario (2026-10-30), consultado por architec |
+| Días de envío | De lunes a sábado: los domingos no se envía. Los feriados y los días no laborables registrados siguen excluidos, también en sábado. Es la misma regla para todos los canales (RF-MM-08) | Usuario (2026-11-02), decisión D-A del plan WhatsMKT v2, consultado por architec: «No se puede enviar gestión únicamente los domingos»; ante si MOWA también envía los sábados, eligió «Los dos, lunes a sábado» |
+| Generador del archivo de carga | El archivo de RF-MM-10 se genera con el constructor de columnas compartido, desde una definición de plataforma `mowa_mes` con sus tres columnas fijas, igual byte a byte. El speech, las exclusiones y la división en archivos siguen en MOWA MES (RF-MM-37) | Usuario (2026-11-02), decisión D-C del plan WhatsMKT v2 (opción M2), consultado por architec |
 
 ## 7. Evidencia de los ejemplos
 
@@ -346,3 +354,8 @@ Queda abierto S-MM-1: depende de información externa (qué ofrece MES), no de u
 
 **2026-11-01**
 - **RF existentes ampliados:** RF-MM-34 (dónde está el id de MES): el id se nombra como «ID campaña», como en MES, y es la columna `id` del reporte. Decisión del usuario; cierra el supuesto S-MM-10.
+
+**2026-11-02**
+- **RF nuevos incorporados:** RF-MM-37 (archivo de carga desde el constructor de columnas) en la sección 3, sobre RF-72. Decisión del usuario D-C del plan WhatsMKT v2, en la sección 6. Lo implementa T-MM-B15.
+- **RF existentes modificados en su redacción:** RF-MM-08 (día gestionable) pasa de lunes a viernes a lunes a sábado y cita la regla común de RF-70. Es la decisión del usuario D-A del plan WhatsMKT v2, registrada en la sección 6. Las viñetas del cálculo de feriados y de las excepciones pasaron sin cambios a RF-70, que escribe T-HI-0. Queda en RF-MM-08 la decisión del 2026-10-26 sobre S-MM-4, como antecedente. El cambio en el código lo hace T-HI-B5. Hasta entonces el sistema sigue sugiriendo de lunes a viernes, y `docs/mowa-mes.md` §2 también lo dice así hasta ese corte.
+- **Nota de numeración:** sin renumerar, como el resto del módulo.
