@@ -14,10 +14,10 @@ defaults:
 jobs:
   calidad:
     name: Contrato, build y pruebas de nucleo
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -44,10 +44,10 @@ jobs:
 
   extremo_a_extremo:
     name: Pruebas de extremo a extremo
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -60,7 +60,7 @@ jobs:
       # dist-pruebas/) y levanta `npm run preview` sobre el (webServer). Cada
       # prueba intercepta la API, asi que no hacen falta backend ni PostgreSQL.
       - run: npm run test:e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: ${{ !cancelled() }}
         with:
           name: reporte-playwright

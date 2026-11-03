@@ -12,7 +12,16 @@ import {
 } from './api-falsa';
 
 const RUTA = '/calendario';
-const ANIO = new Date().getFullYear();
+/**
+ * The clock the page runs on. Node's own year is not used: on a runner in UTC it is already the next year on 31 Dec
+ * from 19:00 in Lima, where the browser still is. `setFixedTime` keeps the timers running.
+ */
+const AHORA = '2026-10-15T12:00:00-05:00';
+const ANIO = Number(AHORA.slice(0, 4));
+
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date(AHORA));
+});
 
 /** Requests to exactly `ruta` (query ignored); a trailing `/` matches any id under it. */
 const pedidosA = (api: ApiFalsaSupervisionCalendario, metodo: string, ruta: string) =>

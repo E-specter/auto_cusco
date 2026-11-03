@@ -14,10 +14,10 @@ defaults:
 jobs:
   calidad:
     name: Formato, lint y pruebas
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --frozen
@@ -27,7 +27,7 @@ jobs:
 
   base_de_datos:
     name: Migraciones e integracion con PostgreSQL
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         # Base desechable que vive solo durante la ejecucion: la contrasena no es un secreto.
@@ -52,8 +52,8 @@ jobs:
       DB_PASSWORD: contrasena_de_prueba
       AUTO_CUSCO_DB_TESTS: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --frozen
