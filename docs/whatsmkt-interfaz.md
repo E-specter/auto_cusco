@@ -112,15 +112,21 @@ Al crear, la página reemplaza la previsualización por las fichas «Para subir 
 Se recalcula sola, con la misma espera y cancelación que la campaña de MOWA, cada vez que cambia algo de las secciones de arriba.
 
 - **Resumen,** arriba:
-  - «Se crearán 3 campañas · 1 205 filas en total», o «Se creará 1 campaña · 400 filas».
+  - «Se crearán 3 campañas · 1,205 filas en total», o «Se creará 1 campaña · 400 filas». Las cifras van con `formatNumber`.
+  - Si hay productos fuera de las campañas, se suma a la línea: «· 87 productos fuera de las campañas», como enlace a su tabla (ver abajo).
   - Si hay problemas, un `.notice--danger` con la lista, cada uno con el texto de su código y un enlace «Ir al campo» que lleva el foco a su sección.
 - **Un `.segmented` por campaña del lote:** «Preventivo (520) · Tramo 2 (480) · Mayores al 2 (205)», con el número de filas. En modo global no hay `.segmented`: hay una sola campaña.
 - **Por campaña:**
   - **Cifras** (`.stat`), con los iconos del catálogo de MOWA: filas del archivo (`file-up`), supervisión (`user-check`) y excluidos (`ban`).
   - **Nombre:** el resultante (§3.7), en mono.
   - **Mensaje de ejemplo:** el texto con las macros reemplazadas con la primera fila de productos, en un bloque de lectura, con el título «Así lo verá el cliente». Es lo que hará WhatsMKT (RF-WM-27).
-  - **Muestra:** las primeras filas del archivo, en una tabla apilable. Los encabezados son los del archivo, con la etiqueta debajo: «[$MARCRO1$]», y en la segunda línea «Nombres del titular». Las filas de supervisión llevan el tag «Supervisión».
-  - **Exclusiones:** una tabla apilable con Pagaré, Motivo (tag con su texto corto) y Detalle, paginada con el paginador compartido. Sin exclusiones: «Ningún producto queda fuera».
+  - **Muestra:** las primeras filas del archivo, en una tabla apilable. Los encabezados salen de `cabeceras` de la campaña: el `nombre` tal como va en el archivo, y la `etiqueta` en una segunda línea, en texto apagado: «[$MARCRO1$]», y debajo «Nombres del titular». Sin etiqueta, solo el nombre. Las `celdas` de cada fila van alineadas con `cabeceras`; las filas marcadas de supervisión llevan el tag «Supervisión».
+  - **Exclusiones:** una tabla apilable con Pagaré, Motivo (tag con su texto corto) y Detalle, paginada con el paginador compartido. Si el backend recorta la lista, un `.field__hint` bajo la tabla: «Se muestran las primeras 100 de 240. La lista completa estará en el seguimiento de la campaña después de crearla». Sin exclusiones: «Ninguno de esta campaña queda fuera».
+- **Productos fuera de las campañas** (`exclusiones_sin_campana`): los excluidos que no pertenecen a ninguna campaña del lote, porque no tienen días de atraso (modo por segmento) o porque su segmento se quedó sin productos y no genera campaña.
+  - Van **debajo del `.segmented` y del bloque de la campaña elegida,** en su propia sección, que no cambia al cambiar de campaña: no son de ninguna.
+  - Título `h3`: «Productos fuera de las campañas (87)», con `total_exclusiones_sin_campana`. Debajo, el hint: «No entran en ninguna campaña del lote: no tienen días de atraso, o su segmento se quedó sin productos».
+  - La misma tabla que las exclusiones de la campaña (Pagaré, Motivo y Detalle), apilable y con el mismo paginador. Si el total pasa de los que llegan: «Se muestran las primeras {mostradas} de {total}. La lista completa estará en el seguimiento de cualquier campaña del lote después de crearlas» (§4.2).
+  - Con cero, la sección no se muestra. En el modo global no aparece: todo cae en la única campaña.
 - **Un segmento sin productos no aparece** en el `.segmented` (RF-WM-23). Si ninguno tiene productos, en lugar de la previsualización va un `.notice--warning` con el motivo, y «Crear» queda inactivo.
 
 ### 3.9 Crear (RF-WM-23)
@@ -187,6 +193,11 @@ Es el seguimiento de MOWA ([mowa-mes-interfaz.md](mowa-mes-interfaz.md) §4.2 y 
   - **Números sin correspondencia:** «Números del informe que no están en la carga: 2», con la lista en mono. Si no hay, la línea no se muestra.
   - El nombre que trae el informe, solo para leer: «Nombre en el informe: CUZCO_Vencida…». No se compara.
   - Nota bajo la tabla: «Un producto cuenta como enviado si su número aparece en el informe. Si dos productos comparten número, el envío cuenta para los dos».
+- **Exclusiones de la campaña:** la tabla de la previsualización (Pagaré, Motivo y Detalle), apilable y paginada, ahora con la lista completa.
+- **Productos fuera de las campañas del lote (B4b):** los mismos de la previsualización, guardados con el lote. Se ven desde el detalle de cualquier campaña del lote, porque no son de ninguna.
+  - Un `<details>` cerrado, debajo de las exclusiones: «Productos fuera de las campañas del lote 12 (87)». Va cerrado porque se repite en cada campaña del lote y no es de esta.
+  - Dentro, el hint de la previsualización y la misma tabla, con el paginador.
+  - Con cero, o en una campaña global, no se muestra.
 - **Descartar, restaurar y eliminar:** las confirmaciones de [mowa-mes-interfaz.md](mowa-mes-interfaz.md) §4.6, con los textos de WhatsMKT (§8). Eliminar dice además que la biblioteca y los mensajes no cambian (RF-WM-42).
 
 ## 5. Configuración (`/whatsmkt/configuracion`)
@@ -344,7 +355,15 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.previa.resumenUna` | Se creará 1 campaña · {filas} filas | 1 campaign will be created · {filas} rows |
 | `whatsmkt.previa.irAlCampo` | Ir al campo | Go to the field |
 | `whatsmkt.previa.irSupervisores` | Configurar supervisores | Set up supervisors |
-| `whatsmkt.previa.sinExclusiones` | Ningún producto queda fuera. | No product is left out. |
+| `whatsmkt.previa.sinExclusiones` | Ninguno de esta campaña queda fuera. | None from this campaign is left out. |
+| `whatsmkt.previa.exclusionesTruncadas` | Se muestran las primeras {mostradas} de {total}. La lista completa estará en el seguimiento de la campaña después de crearla. | Showing the first {mostradas} of {total}. The full list will be in the campaign tracking once it is created. |
+| `whatsmkt.previa.resumenFuera` | · {n} productos fuera de las campañas | · {n} products outside the campaigns |
+| `whatsmkt.previa.resumenFueraUno` | · 1 producto fuera de las campañas | · 1 product outside the campaigns |
+| `whatsmkt.previa.fuera.titulo` | Productos fuera de las campañas ({n}) | Products outside the campaigns ({n}) |
+| `whatsmkt.previa.fuera.hint` | No entran en ninguna campaña del lote: no tienen días de atraso, o su segmento se quedó sin productos. | They are in no campaign of the batch: they have no days overdue, or their segment was left with no products. |
+| `whatsmkt.previa.fuera.truncadas` | Se muestran las primeras {mostradas} de {total}. La lista completa estará en el seguimiento de cualquier campaña del lote después de crearlas. | Showing the first {mostradas} of {total}. The full list will be in the tracking of any campaign of the batch once they are created. |
+| `whatsmkt.seguimiento.exclusiones` | Exclusiones | Exclusions |
+| `whatsmkt.seguimiento.fueraLote` | Productos fuera de las campañas del lote {lote} ({n}) | Products outside the campaigns of batch {lote} ({n}) |
 | `whatsmkt.crear.una` | Crear campaña | Create campaign |
 | `whatsmkt.crear.varias` | Crear {n} campañas | Create {n} campaigns |
 | `whatsmkt.crear.problemas` | Corrige {n} problemas para crear. | Fix {n} problems to create. |
@@ -442,13 +461,15 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
   - los tipos de envío con sus campos condicionales, que conservan lo escrito y mandan solo lo del elegido;
   - la foto con sus tres errores;
   - el nombre con su contador y el nombre resultante por campaña;
-  - la previsualización del lote, con el `.segmented`, las cifras, el mensaje de ejemplo, la muestra con etiquetas, y las exclusiones paginadas con su detalle;
+  - la previsualización del lote, con el `.segmented`, las cifras, el mensaje de ejemplo, la muestra con sus `cabeceras` y etiquetas, y las exclusiones paginadas con su detalle;
+  - los productos fuera de las campañas: la sección con su total, el enlace del resumen, el aviso de lista recortada, y que no aparece con cero ni en el modo global;
   - sin productos; «Crear» inactivo con el motivo; el 409 de la fecha;
   - las fichas del lote, con cada «Copiar» y su anuncio.
 - **T-WM-F3 (seguimiento):**
   - Activas y Descartadas, filtros y pendientes;
   - importar, reemplazar, y el total distinto;
   - la conciliación con supervisión aparte y los números sin correspondencia;
+  - las exclusiones de la campaña y el `<details>` de los productos fuera de las campañas del lote, visible desde dos campañas del mismo lote y ausente en una global;
   - descartar, restaurar y eliminar.
 - **axe,** en claro, oscuro y 360 px, en las tres pantallas, con la previsualización de un lote, una ficha, la conciliación y la biblioteca.
 - **Capturas para `designer`,** antes del commit de cada corte: las mismas, en claro y oscuro, a 1280 y a 360 px, en es y en.
