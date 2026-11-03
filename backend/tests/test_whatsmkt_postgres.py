@@ -209,6 +209,24 @@ def test_el_adjunto_archivado_se_lista_aparte_y_se_puede_desarchivar(repositorio
     assert adjunto.id in [a.id for a in repositorio.listar_adjuntos()]
 
 
+def test_buscar_por_huella_encuentra_el_activo_el_archivado_y_no_carga_contenido(
+    repositorio,
+) -> None:
+    contenido = b"zz buscar por huella sintetico"
+    huella = hashlib.sha256(contenido).hexdigest()
+    assert repositorio.buscar_adjunto_por_huella(huella) is None
+
+    adjunto = repositorio.guardar_adjunto(TipoAdjunto.PDF, "zz prueba h.pdf", contenido)
+    activo = repositorio.buscar_adjunto_por_huella(huella)
+    repositorio.archivar_adjunto(adjunto.id)
+    archivado = repositorio.buscar_adjunto_por_huella(huella)
+
+    assert activo == adjunto
+    assert archivado.id == adjunto.id
+    assert archivado.archivado_en is not None
+    assert not hasattr(archivado, "contenido")
+
+
 def test_el_contenido_se_lee_aparte_y_listar_no_lo_carga(repositorio) -> None:
     contenido = b"\x00\x01zz binario sintetico\xff"
     adjunto = repositorio.guardar_adjunto(TipoAdjunto.AUDIO, "zz prueba a.mp3", contenido)

@@ -36,6 +36,7 @@ from app.api.supervisores import router as supervisores_router
 from app.api.texto_enriquecido import router as texto_enriquecido_router
 from app.api.texto_valido import RechazaMitadesSueltas, manejar_validacion
 from app.api.whatsmkt import router as whatsmkt_router
+from app.api.whatsmkt_adjuntos import router as whatsmkt_adjuntos_router
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -119,3 +120,4 @@ app.include_router(mowa_mes_campanas_router)
 app.include_router(texto_enriquecido_router)
 app.include_router(definiciones_columnas_router)
 app.include_router(whatsmkt_router)
+app.include_router(whatsmkt_adjuntos_router)

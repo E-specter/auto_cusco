@@ -4462,10 +4462,372 @@
           }
         }
       }
+    },
+    "/whatsmkt/adjuntos": {
+      "post": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Subir un adjunto a la biblioteca",
+        "description": "Valida, limpia y guarda el archivo; uno con la misma huella (despues de limpiarlo) devuelve\nel que ya estaba, con `ya_existia`. Un adjunto archivado que se vuelve a subir sigue archivado.",
+        "operationId": "subir_adjunto_whatsmkt_adjuntos_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_subir_adjunto_whatsmkt_adjuntos_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjuntoSubidoRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Una regla del modulo no se cumple; `codigo` dice cual y `detail` el motivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorWhatsmktRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "La biblioteca de adjuntos",
+        "operationId": "listar_adjuntos_whatsmkt_adjuntos_get",
+        "parameters": [
+          {
+            "name": "archivados",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true: los archivados, en vez de los activos",
+              "default": false,
+              "title": "Archivados"
+            },
+            "description": "true: los archivados, en vez de los activos"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdjuntoWhatsmktRespuesta"
+                  },
+                  "title": "Response Listar Adjuntos Whatsmkt Adjuntos Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/whatsmkt/adjuntos/{adjunto_id}/contenido": {
+      "get": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Descargar un adjunto",
+        "operationId": "descargar_adjunto_whatsmkt_adjuntos__adjunto_id__contenido_get",
+        "parameters": [
+          {
+            "name": "adjunto_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Adjunto Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El archivo tal como se guardo (las imagenes, sin metadatos)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Content-Disposition": {
+                "description": "attachment; filename=\"<nombre en ASCII>\"; filename*=UTF-8''<nombre original> (RFC 5987)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/whatsmkt/adjuntos/{adjunto_id}/archivar": {
+      "post": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Archivar un adjunto",
+        "description": "Deja de ofrecerse en campanas nuevas; las que lo usaron lo conservan. Repetirlo no cambia\nla fecha.",
+        "operationId": "archivar_adjunto_whatsmkt_adjuntos__adjunto_id__archivar_post",
+        "parameters": [
+          {
+            "name": "adjunto_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Adjunto Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjuntoWhatsmktRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/whatsmkt/adjuntos/{adjunto_id}/desarchivar": {
+      "post": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Restaurar un adjunto archivado",
+        "operationId": "desarchivar_adjunto_whatsmkt_adjuntos__adjunto_id__desarchivar_post",
+        "parameters": [
+          {
+            "name": "adjunto_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Adjunto Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjuntoWhatsmktRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdjuntoSubidoRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoAdjunto"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "tamano": {
+            "type": "integer",
+            "title": "Tamano"
+          },
+          "huella": {
+            "type": "string",
+            "title": "Huella"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "archivado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivado En"
+          },
+          "ya_existia": {
+            "type": "boolean",
+            "title": "Ya Existia"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tipo",
+          "nombre",
+          "tamano",
+          "huella",
+          "creado_en",
+          "archivado_en",
+          "ya_existia"
+        ],
+        "title": "AdjuntoSubidoRespuesta"
+      },
+      "AdjuntoWhatsmktRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoAdjunto"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "tamano": {
+            "type": "integer",
+            "title": "Tamano"
+          },
+          "huella": {
+            "type": "string",
+            "title": "Huella"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "archivado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tipo",
+          "nombre",
+          "tamano",
+          "huella",
+          "creado_en",
+          "archivado_en"
+        ],
+        "title": "AdjuntoWhatsmktRespuesta"
+      },
       "AdvertenciaLecturaRespuesta": {
         "properties": {
           "numero_fila": {
@@ -4834,6 +5196,31 @@
           "archivo"
         ],
         "title": "Body_importar_reporte_mowa_mes_campanas__campana_id__reportes_post"
+      },
+      "Body_subir_adjunto_whatsmkt_adjuntos_post": {
+        "properties": {
+          "archivo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "description": "Imagen JPEG o PNG, video, audio o PDF"
+          },
+          "proposito": {
+            "type": "string",
+            "enum": [
+              "adjunto",
+              "foto"
+            ],
+            "title": "Proposito",
+            "description": "`foto` ademas valida que sirva de foto de perfil: JPEG, 200 x 200, hasta 1 MB",
+            "default": "adjunto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_subir_adjunto_whatsmkt_adjuntos_post"
       },
       "Body_subir_sabana_cargas_post": {
         "properties": {
@@ -7683,6 +8070,66 @@
             ],
             "title": "Hasta",
             "description": "segmentos_con_hueco: ultimo dia sin segmento (null: +inf)"
+          },
+          "peso": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peso",
+            "description": "adjunto_peso y foto_peso: bytes del archivo"
+          },
+          "maximo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximo",
+            "description": "adjunto_peso: bytes que admite ese tipo"
+          },
+          "tipo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo",
+            "description": "adjunto_peso: el tipo (video, audio, pdf, imagen_jpeg...)"
+          },
+          "ancho": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ancho",
+            "description": "foto_medidas: ancho leido del archivo, en pixeles"
+          },
+          "alto": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alto",
+            "description": "foto_medidas: alto leido del archivo, en pixeles"
           }
         },
         "type": "object",
@@ -7694,7 +8141,12 @@
           "segmento",
           "fila",
           "desde",
-          "hasta"
+          "hasta",
+          "peso",
+          "maximo",
+          "tipo",
+          "ancho",
+          "alto"
         ],
         "title": "ErrorWhatsmktRespuesta",
         "description": "422 de una regla de negocio: el motivo, el codigo que la interfaz traduce y los datos que\nsu texto nombra. Los parametros siempre viajan; los que el codigo no usa van nulos."
@@ -11474,6 +11926,17 @@
           "fecha"
         ],
         "title": "TipoAdicional"
+      },
+      "TipoAdjunto": {
+        "type": "string",
+        "enum": [
+          "imagen_jpeg",
+          "imagen_png",
+          "video",
+          "audio",
+          "pdf"
+        ],
+        "title": "TipoAdjunto"
       },
       "TipoCarga": {
         "type": "string",

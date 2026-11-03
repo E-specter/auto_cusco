@@ -31,6 +31,10 @@ class RepositorioWhatsmktPort(Protocol):
         no, sin tocarlo. La huella la calcula el repositorio."""
         ...
 
+    def buscar_adjunto_por_huella(self, huella: str) -> AdjuntoWhatsmkt | None:
+        """El adjunto con esa huella SHA-256 (archivado o no), sin contenido."""
+        ...
+
     def listar_adjuntos(self, archivados: bool = False) -> list[AdjuntoWhatsmkt]:
         """Los activos o los archivados, sin contenido, del mas reciente al mas antiguo."""
         ...

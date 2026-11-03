@@ -150,6 +150,13 @@ class RepositorioWhatsmktPostgres(RepositorioWhatsmktPort):
                 fila = cx.execute(select(*_SIN_CONTENIDO).where(_ADJUNTO.c.huella == huella)).one()
         return _adjunto(fila)
 
+    def buscar_adjunto_por_huella(self, huella: str) -> AdjuntoWhatsmkt | None:
+        with self._engine.connect() as cx:
+            fila = cx.execute(
+                select(*_SIN_CONTENIDO).where(_ADJUNTO.c.huella == huella)
+            ).one_or_none()
+        return _adjunto(fila) if fila else None
+
     def listar_adjuntos(self, archivados: bool = False) -> list[AdjuntoWhatsmkt]:
         columna = _ADJUNTO.c.archivado_en
         consulta = (

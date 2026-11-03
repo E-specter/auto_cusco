@@ -76,6 +76,12 @@ class DefinicionDefectoNoExiste(Exception):
         self.definicion_id = definicion_id
 
 
+class AdjuntoNoEncontrado(Exception):
+    def __init__(self, adjunto_id: int) -> None:
+        super().__init__(f"No existe el adjunto {adjunto_id}")
+        self.adjunto_id = adjunto_id
+
+
 @dataclass(frozen=True)
 class Horario:
     """Franja de envio (RF-WM-07): inicio estrictamente anterior al fin."""

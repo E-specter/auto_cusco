@@ -42,7 +42,13 @@ router = APIRouter(prefix="/whatsmkt", tags=["whatsmkt"])
 _HORA = r"^([01][0-9]|2[0-3]):[0-5][0-9]$"
 _MAXIMO_DIAS = 100_000
 _MAXIMO_TOPE = 2_000_000_000
-_PARAMETROS = ("horarios", "variable", "segmento", "fila", "desde", "hasta")
+PARAMETROS = ("horarios", "variable", "segmento", "fila", "desde", "hasta") + (
+    "peso",
+    "maximo",
+    "tipo",
+    "ancho",
+    "alto",
+)
 
 
 def obtener_servicio_whatsmkt() -> ConfiguracionWhatsmktService:
@@ -67,15 +73,22 @@ class ErrorWhatsmktRespuesta(DetalleError):
     hasta: int | None = Field(
         description="segmentos_con_hueco: ultimo dia sin segmento (null: +inf)"
     )
+    peso: int | None = Field(description="adjunto_peso y foto_peso: bytes del archivo")
+    maximo: int | None = Field(description="adjunto_peso: bytes que admite ese tipo")
+    tipo: str | None = Field(
+        description="adjunto_peso: el tipo (video, audio, pdf, imagen_jpeg...)"
+    )
+    ancho: int | None = Field(description="foto_medidas: ancho leido del archivo, en pixeles")
+    alto: int | None = Field(description="foto_medidas: alto leido del archivo, en pixeles")
 
 
-def _error_whatsmkt(exc: ErrorWhatsmkt) -> ErrorConCodigo:
+def error_whatsmkt(exc: ErrorWhatsmkt) -> ErrorConCodigo:
     """El `ErrorWhatsmkt` como 422 `{detail, codigo, ...parametros}`."""
-    parametros = {campo: None for campo in _PARAMETROS} | exc.parametros
+    parametros = {campo: None for campo in PARAMETROS} | exc.parametros
     return ErrorConCodigo(422, str(exc), exc.codigo, parametros)
 
 
-_ERROR_422 = {
+RESPUESTA_422 = {
     422: {
         "model": ErrorWhatsmktRespuesta,
         "description": "Una regla del modulo no se cumple; `codigo` dice cual y `detail` el motivo",
@@ -190,7 +203,7 @@ def obtener_configuracion(
     "/configuracion",
     summary="Actualizar la configuracion de WhatsMKT (parcial)",
     response_model=ConfiguracionWhatsmktRespuesta,
-    responses={**_ERROR_422, **respuestas_de_error(404)},
+    responses={**RESPUESTA_422, **respuestas_de_error(404)},
 )
 def guardar_configuracion(
     entrada: ConfiguracionWhatsmktEntrada,
@@ -209,7 +222,7 @@ def guardar_configuracion(
             servicio.guardar_configuracion(entrada.sobre(servicio.obtener_configuracion()))
         )
     except ErrorWhatsmkt as exc:
-        raise _error_whatsmkt(exc) from exc
+        raise error_whatsmkt(exc) from exc
     except DefinicionDefectoNoExiste as exc:
         raise HTTPException(404, str(exc)) from exc
 
@@ -265,7 +278,7 @@ def listar_segmentos(
     "/segmentos",
     summary="Editar los 3 segmentos (etiqueta y limites)",
     response_model=list[SegmentoWhatsmktRespuesta],
-    responses=_ERROR_422,
+    responses=RESPUESTA_422,
 )
 def reemplazar_segmentos(
     entrada: Annotated[list[SegmentoWhatsmktEntrada], AfterValidator(_las_tres_fijas), Body()],
@@ -281,4 +294,4 @@ def reemplazar_segmentos(
     try:
         return _segmentos(servicio.reemplazar_segmentos(nuevos))
     except ErrorWhatsmkt as exc:
-        raise _error_whatsmkt(exc) from exc
+        raise error_whatsmkt(exc) from exc

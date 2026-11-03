@@ -1243,10 +1243,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/whatsmkt/adjuntos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** La biblioteca de adjuntos */
+        get: operations["listar_adjuntos_whatsmkt_adjuntos_get"];
+        put?: never;
+        /**
+         * Subir un adjunto a la biblioteca
+         * @description Valida, limpia y guarda el archivo; uno con la misma huella (despues de limpiarlo) devuelve
+         *     el que ya estaba, con `ya_existia`. Un adjunto archivado que se vuelve a subir sigue archivado.
+         */
+        post: operations["subir_adjunto_whatsmkt_adjuntos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsmkt/adjuntos/{adjunto_id}/contenido": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Descargar un adjunto */
+        get: operations["descargar_adjunto_whatsmkt_adjuntos__adjunto_id__contenido_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsmkt/adjuntos/{adjunto_id}/archivar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archivar un adjunto
+         * @description Deja de ofrecerse en campanas nuevas; las que lo usaron lo conservan. Repetirlo no cambia
+         *     la fecha.
+         */
+        post: operations["archivar_adjunto_whatsmkt_adjuntos__adjunto_id__archivar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsmkt/adjuntos/{adjunto_id}/desarchivar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restaurar un adjunto archivado */
+        post: operations["desarchivar_adjunto_whatsmkt_adjuntos__adjunto_id__desarchivar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AdjuntoSubidoRespuesta */
+        AdjuntoSubidoRespuesta: {
+            /** Id */
+            id: number;
+            tipo: components["schemas"]["TipoAdjunto"];
+            /** Nombre */
+            nombre: string;
+            /** Tamano */
+            tamano: number;
+            /** Huella */
+            huella: string;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+            /** Archivado En */
+            archivado_en: string | null;
+            /** Ya Existia */
+            ya_existia: boolean;
+        };
+        /** AdjuntoWhatsmktRespuesta */
+        AdjuntoWhatsmktRespuesta: {
+            /** Id */
+            id: number;
+            tipo: components["schemas"]["TipoAdjunto"];
+            /** Nombre */
+            nombre: string;
+            /** Tamano */
+            tamano: number;
+            /** Huella */
+            huella: string;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+            /** Archivado En */
+            archivado_en: string | null;
+        };
         /**
          * AdvertenciaLecturaRespuesta
          * @description Un aviso de la lectura en una fila (`numero_fila` en base 1, como Excel).
@@ -1391,6 +1508,21 @@ export interface components {
              * @default false
              */
             reemplazar: boolean;
+        };
+        /** Body_subir_adjunto_whatsmkt_adjuntos_post */
+        Body_subir_adjunto_whatsmkt_adjuntos_post: {
+            /**
+             * Archivo
+             * @description Imagen JPEG o PNG, video, audio o PDF
+             */
+            archivo: string;
+            /**
+             * Proposito
+             * @description `foto` ademas valida que sirva de foto de perfil: JPEG, 200 x 200, hasta 1 MB
+             * @default adjunto
+             * @enum {string}
+             */
+            proposito: "adjunto" | "foto";
         };
         /** Body_subir_sabana_cargas_post */
         Body_subir_sabana_cargas_post: {
@@ -2551,6 +2683,31 @@ export interface components {
              * @description segmentos_con_hueco: ultimo dia sin segmento (null: +inf)
              */
             hasta: number | null;
+            /**
+             * Peso
+             * @description adjunto_peso y foto_peso: bytes del archivo
+             */
+            peso: number | null;
+            /**
+             * Maximo
+             * @description adjunto_peso: bytes que admite ese tipo
+             */
+            maximo: number | null;
+            /**
+             * Tipo
+             * @description adjunto_peso: el tipo (video, audio, pdf, imagen_jpeg...)
+             */
+            tipo: string | null;
+            /**
+             * Ancho
+             * @description foto_medidas: ancho leido del archivo, en pixeles
+             */
+            ancho: number | null;
+            /**
+             * Alto
+             * @description foto_medidas: alto leido del archivo, en pixeles
+             */
+            alto: number | null;
         };
         /**
          * EstadoCarga
@@ -3983,6 +4140,11 @@ export interface components {
          * @enum {string}
          */
         TipoAdicional: "texto" | "numero" | "fecha";
+        /**
+         * TipoAdjunto
+         * @enum {string}
+         */
+        TipoAdjunto: "imagen_jpeg" | "imagen_png" | "video" | "audio" | "pdf";
         /**
          * TipoCarga
          * @enum {string}
@@ -7461,6 +7623,193 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorWhatsmktRespuesta"];
+                };
+            };
+        };
+    };
+    listar_adjuntos_whatsmkt_adjuntos_get: {
+        parameters: {
+            query?: {
+                /** @description true: los archivados, en vez de los activos */
+                archivados?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjuntoWhatsmktRespuesta"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    subir_adjunto_whatsmkt_adjuntos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_subir_adjunto_whatsmkt_adjuntos_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjuntoSubidoRespuesta"];
+                };
+            };
+            /** @description Una regla del modulo no se cumple; `codigo` dice cual y `detail` el motivo */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorWhatsmktRespuesta"];
+                };
+            };
+        };
+    };
+    descargar_adjunto_whatsmkt_adjuntos__adjunto_id__contenido_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                adjunto_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description El archivo tal como se guardo (las imagenes, sin metadatos) */
+            200: {
+                headers: {
+                    /** @description attachment; filename="<nombre en ASCII>"; filename*=UTF-8''<nombre original> (RFC 5987) */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archivar_adjunto_whatsmkt_adjuntos__adjunto_id__archivar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                adjunto_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjuntoWhatsmktRespuesta"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    desarchivar_adjunto_whatsmkt_adjuntos__adjunto_id__desarchivar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                adjunto_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjuntoWhatsmktRespuesta"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

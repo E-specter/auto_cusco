@@ -178,7 +178,8 @@ def test_una_definicion_que_no_existe_responde_404_sin_guardar(cliente) -> None:
 
 
 PARAMETROS_NULOS = {"horarios": None, "variable": None, "segmento": None, "fila": None}
-PARAMETROS_NULOS |= {"desde": None, "hasta": None}
+PARAMETROS_NULOS |= {"desde": None, "hasta": None, "peso": None, "maximo": None}
+PARAMETROS_NULOS |= {"tipo": None, "ancho": None, "alto": None}
 
 
 @pytest.mark.parametrize(
