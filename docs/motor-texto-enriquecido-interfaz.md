@@ -630,7 +630,7 @@ Un `.notice--info` bajo el encabezado de la página y antes de todo lo demás, c
 |---|---|---|
 | Columnas de carga, definición abierta | `herramientas.volver.columnas` | `herramientas.volver.sinGuardar` |
 | Columnas de carga, definición nueva con plataforma | `herramientas.volver.columnasNueva` | `herramientas.volver.sinGuardar` |
-| Supervisores | `herramientas.volver.alMomento` | `herramientas.volver.volver` |
+| Supervisores | `herramientas.volver.supervisores` | `herramientas.volver.volver` |
 | Calendario laboral | `herramientas.volver.alMomento` | `herramientas.volver.volver` |
 
 - **Con cambios sin guardar,** «Volver a {canal} sin guardar» pasa por la confirmación de siempre del selector (`selector.descartar.*`, con «Seguir editando»). Nada se pierde sin aviso.
@@ -639,7 +639,9 @@ Un `.notice--info` bajo el encabezado de la página y antes de todo lo demás, c
 ### 12.3 Al guardar
 
 - **Columnas de carga:** al guardar (una versión nueva o una definición nueva), vuelve sola a `volver` con `definicion=<id>&version=<n>`, que reemplazan a los que hubiera. El estado anuncia lo guardado antes de irse, como en Cartera. Renombrar no vuelve: no es el guardado de la definición.
-- **Supervisores y Calendario laboral:** no vuelven solos. Cada cambio se guarda al hacerlo (agregar, quitar, retirar o restaurar), así que no hay un «guardado» que devolver. Se vuelve solo con el enlace, y por eso dice «Volver a {canal}», sin «sin guardar». La pantalla de origen lee de nuevo supervisores y calendario al cargarse, así que ve los cambios.
+- **Calendario laboral:** no vuelve solo. Cada cambio se guarda al hacerlo (agregar, quitar, retirar o restaurar), así que no hay un «guardado» que devolver. Se vuelve solo con el enlace, que por eso dice «Volver a {canal}», sin «sin guardar».
+- **Supervisores:** tiene su «Guardar supervisores», con borrador. Al guardar **no** vuelve sola: no hay nada que devolver, y el analista puede seguir ajustando. El enlace dice «Volver a {canal}» y, si hay un borrador sin guardar, pasa antes por la confirmación de siempre (`selector.descartar.*`, con «Seguir editando»), igual que Columnas. Sin borrador vuelve directo.
+- En los dos casos la pantalla de origen lee de nuevo supervisores y calendario al cargarse, así que ve lo guardado.
 - **Los parámetros de Columnas** se arman con un ayudante en `volver.ts`, del estilo de `destinoConSeleccion`: `destinoConDefinicion(destino, id, version)` y `destinoSinDefinicion(destino)`. Se leen con `definicionDeLaUrl(busqueda)`, que devuelve `{id, version}` o `null` si falta alguno o no es un entero positivo.
 
 ### 12.4 En la pantalla de origen
@@ -654,6 +656,8 @@ Un `.notice--info` bajo el encabezado de la página y antes de todo lo demás, c
 - **`?definicion=<id>`:** abre esa definición en su versión vigente. Si no existe, el constructor queda en «Sin guardar: definición nueva» con un `.notice--warning`: `herramientas.volver.definicionNoExiste`. Nunca un error.
 - **`?plataforma=<clave>`:** abre una definición nueva con esa plataforma ya elegida. El `select` de plataforma queda inactivo con el hint `columnas.plataforma.fijadaPor`. No sale el diálogo de cambiar de plataforma, porque no se puede cambiar. Una clave que no está registrada se ignora y el `select` queda libre.
 - Si llegan los dos, gana `definicion`.
+- **`?plataforma=` sin un `volver` válido** preelige la plataforma pero no la fija: el `select` queda activo y sin el hint, que necesita el canal.
+- Columnas no limpia `?definicion=` ni `?plataforma=` de la URL: recargar vuelve a abrir lo mismo, y eso es lo esperable.
 
 ### 12.6 Textos (es / en)
 
@@ -662,6 +666,7 @@ Un `.notice--info` bajo el encabezado de la página y antes de todo lo demás, c
 | `herramientas.volver.columnas` | Estás editando una definición de columnas desde {canal}. Al guardarla, vuelves a {canal}. | You are editing a column definition from {canal}. Once you save it, you go back to {canal}. |
 | `herramientas.volver.columnasNueva` | Estás creando una definición de {plataforma} desde {canal}. Al guardarla, vuelves a {canal}. | You are creating a {plataforma} definition from {canal}. Once you save it, you go back to {canal}. |
 | `herramientas.volver.alMomento` | Llegaste desde {canal}. Cada cambio se guarda al hacerlo; cuando termines, vuelve. | You came from {canal}. Each change is saved as you make it; when you are done, go back. |
+| `herramientas.volver.supervisores` | Llegaste desde {canal}. Guarda los supervisores antes de volver: lo que no guardes se pierde. | You came from {canal}. Save the supervisors before going back: anything you do not save is lost. |
 | `herramientas.volver.sinGuardar` | Volver a {canal} sin guardar | Back to {canal} without saving |
 | `herramientas.volver.volver` | Volver a {canal} | Back to {canal} |
 | `herramientas.volver.elegida` | Se eligió {nombre}, versión {n}. | {nombre}, version {n}, was chosen. |
@@ -677,7 +682,8 @@ Un `.notice--info` bajo el encabezado de la página y antes de todo lo demás, c
 - `volverValido` acepta `/whatsmkt/…` y sigue rechazando `//`, otro origen, `javascript:` y rutas que salen del prefijo al normalizarse.
 - Cada herramienta con un `volver` válido muestra su aviso y su enlace, y con uno inválido no muestra nada.
 - Columnas: guardar vuelve con `definicion` y `version`; «Volver sin guardar» con cambios pide confirmar; `?plataforma=` deja el `select` inactivo con su hint; `?definicion=` de una que no existe muestra su aviso.
-- Supervisores y Calendario: un cambio no navega; el enlace vuelve.
+- Calendario: un cambio no navega; el enlace vuelve.
+- Supervisores: guardar no navega; el enlace con borrador pide confirmar y, sin borrador, vuelve directo.
 - La pantalla de origen elige la definición que llega, avisa si ya no existe o no es del canal, y limpia la URL.
 - axe en claro, oscuro y 360 px, con el aviso a la vista en las tres herramientas.
 
