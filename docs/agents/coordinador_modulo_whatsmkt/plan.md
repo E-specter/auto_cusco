@@ -15,7 +15,7 @@ Fuentes: `docs/requerimientos-whatsmkt.md` (RF-WM-01 a RF-WM-44, S-WM-1 a 9, DU-
   - frontend `/whatsmkt/*`.
 - **Dudas abiertas (DU-WM-1 a 11).** Se implementan con la regla provisional que dice cada RF. Cada una vive en un solo lugar, sea configuración o constante con comentario `DU-WM-n`, para cambiarla con una línea cuando el usuario responda.
 - **Días de envío fijos.** Son de lunes a sábado y comunes a todos los canales (RF-70). `whatsmkt_configuracion` no tiene campo de días.
-- **Códigos.** Un enum `CodigoWhatsmkt` en el contrato, con su prueba espejo en i18n (`whatsmkt.codigo.*`). Cada corte que agrega códigos los suma al enum y a la prueba.
+- **Códigos.** Un enum `CodigoWhatsmkt` en el contrato, con su prueba espejo en i18n (`whatsmkt.codigo.*`). Los nombres son los de `docs/whatsmkt-interfaz.md` §7 (designer), más `horario_invalido`: 27 códigos. El enum nace completo en B1, con todos los de B1 a B6, para que la prueba espejo nazca igual y no cambie en cada corte. Un código nuevo se acuerda primero con designer, que agrega su texto en el §7.
 - **Contrato.** `contratos/openapi.json` se regenera en el mismo corte que cambia un endpoint, y el frontend regenera sus tipos en ese mismo corte.
 - **JSONB.** Toda columna JSONB nace con `none_as_null=True` y un `CHECK jsonb_typeof(...)` (lección de T-MM-B14; T-JSON-1).
 - **Datos de prueba.** Siempre sintéticos, con teléfonos `900000xxx`. Los Excel de `data/whatsmkt/` no se abren en las pruebas.
@@ -58,8 +58,8 @@ Fuentes: `docs/requerimientos-whatsmkt.md` (RF-WM-01 a RF-WM-44, S-WM-1 a 9, DU-
   - Horario: inicio < fin, en formato `HH:MM`.
   - Plantilla del nombre: solo admite las variables `{fecha_corte}` y `{segmento}` (DU-WM-6). Una variable desconocida se rechaza, indicando cuál.
   - Plantilla por defecto: `CUZCO_Vencida ({segmento}) whatsapp {fecha_corte}`, con `{fecha_corte}` en `AAAA.MM.DD`. Es provisional (DU-WM-6).
-  - Topes: enteros > 0.
-  - Segmentos (RF-WM-20): sin superposición, sin huecos y cubriendo todos los días; el primero sin piso y el último sin tope. `clave` única. `segmento_de(dias_ajustados)` devuelve el segmento. Los días ajustados se calculan con la función común de RF-55 (`core/services/segmentacion.py`, `dias_ajustados`), sin copiarla.
+  - Topes: enteros > 0, en bytes en la API. La pantalla los muestra en MB (1 MB = 1 000 000 bytes). Un tope ≤ 0 lo rechaza la validación del modelo (422 genérico), porque la pantalla no deja escribirlo.
+  - Segmentos (RF-WM-20): sin superposición, sin huecos y cubriendo todos los días; el primero sin piso y el último sin tope. Los segmentos son fijos, los 3 de S-WM-1: se editan su etiqueta y sus límites, pero no se agregan ni se quitan. Un PUT con otras claves es un 422 genérico. `segmento_de(dias_ajustados)` devuelve el segmento. Los días ajustados se calculan con la función común de RF-55 (`core/services/segmentacion.py`, `dias_ajustados`), sin copiarla.
 - **Migración:**
   - Tablas `whatsmkt_configuracion` (una sola fila con `id` fijo, como `mowa_mes_configuracion`), `whatsmkt_segmento` y `whatsmkt_adjunto` (`huella` UNIQUE, `contenido` LargeBinary).
   - Siembra la configuración por defecto y los 3 segmentos de S-WM-1: `preventivo` (≤ 0), `tramo_2` (1 a 8) y `mayores_2` (≥ 9).
@@ -70,11 +70,11 @@ Fuentes: `docs/requerimientos-whatsmkt.md` (RF-WM-01 a RF-WM-44, S-WM-1 a 9, DU-
   - adjuntos: guardar sin repetir (si la huella existe, devuelve el existente), listar sin contenido (activos o archivados), leer el contenido, y archivar o desarchivar.
 - **API** (`api/whatsmkt.py`), para que F1 pueda empezar:
   - `GET /whatsmkt/configuracion` y `PUT /whatsmkt/configuracion`. El PUT es parcial, con la regla de MOWA (B7): un campo omitido se conserva y un `null` en un campo no nulo responde 422.
-  - `GET /whatsmkt/segmentos` y `PUT /whatsmkt/segmentos`. El PUT es un reemplazo completo de la tabla y responde 422 con código si los segmentos se superponen o dejan huecos.
+  - `GET /whatsmkt/segmentos` y `PUT /whatsmkt/segmentos`. El PUT reemplaza la etiqueta y los límites de los 3 segmentos en una transacción y responde 422 con código si los segmentos se superponen o dejan huecos.
   - Los endpoints de adjuntos van en B5. B1 deja solo el repositorio.
-- **Códigos nuevos:** `horario_invalido`, `plantilla_variable_desconocida`, `segmentos_superpuestos`, `segmentos_con_hueco`, `segmento_clave_repetida` y `tope_invalido`.
+- **Códigos:** el enum `CodigoWhatsmkt` nace con los 27 (§1). B1 emite `horario_invalido`, `variable_inexistente`, `segmentos_superpuestos` y `segmentos_con_hueco`. Los paneles de configuración de `whatsmkt-interfaz.md` §5 se guardan por separado: el PUT parcial de la configuración sirve a los paneles 3 a 6, y el PUT de segmentos, a la tabla del panel 1. Los mensajes (paneles 1 y 2) son de B3 y la biblioteca (panel 7), de B5.
 - **Pruebas:**
-  - Unitarias: horarios (bordes, inicio = fin); plantilla (variables válidas, desconocidas, sin variables); segmentos (cobertura con huecos y con superposición, `segmento_de` en −5, 0, 1, 8, 9 y 500, y las claves repetidas).
+  - Unitarias: horarios (bordes, inicio = fin); plantilla (variables válidas, desconocidas, sin variables); segmentos (cobertura con huecos y con superposición, `segmento_de` en −5, 0, 1, 8, 9 y 500, y un PUT con claves distintas de las 3).
   - API: 200 y 422 con su código, el PUT parcial (campo omitido, `null` prohibido) y el contrato contra `openapi.json`.
   - `@postgres`, las corre architec: ida y vuelta de la migración más `alembic check`, la siembra, el reemplazo de segmentos atómico y el adjunto repetido por huella.
 - **Listo cuando:** contrato publicado, ruff limpio, pytest sin base en verde y la entrega con las capas corridas y las que faltan.
