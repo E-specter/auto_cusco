@@ -5325,7 +5325,7 @@
           "whatsmkt"
         ],
         "summary": "Previsualizar los archivos de la campana",
-        "description": "Los archivos que resultarian de la seleccion, sin guardar nada (RF-WM-35).\n\nEn modo `por_segmento` sale una campana por cada segmento con productos (RF-WM-23); en\n`global`, una. Los problemas (`definicion_no_whatsmkt`, `sin_supervisores`, `sin_productos`)\nse listan con un 200: no impiden previsualizar, impiden crear.",
+        "description": "Los archivos que resultarian de la seleccion, sin guardar nada (RF-WM-35).\n\nEn modo `por_segmento` sale una campana por cada segmento con productos (RF-WM-23); en\n`global`, una. Los problemas (`definicion_no_whatsmkt`, `sin_supervisores`, `sin_productos`\ny los del mensaje: `macro_inexistente`, `mensaje_largo`, `mensaje_con_emoji`,\n`mensaje_deshabilitado`, `sin_whatsapp`) se listan con un 200: no impiden previsualizar,\nimpiden crear. Un mensaje elegido que no existe, o no es de WhatsMKT, responde 404.",
         "operationId": "previsualizar_campanas_whatsmkt_campanas_previsualizacion_post",
         "requestBody": {
           "content": {
@@ -6034,6 +6034,29 @@
             "type": "array",
             "title": "Muestra",
             "description": "Las primeras 20 filas del archivo"
+          },
+          "mensaje": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MensajeCampanaWhatsmktRespuesta"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "El mensaje elegido para esta campana; null si no se eligio ninguno"
+          },
+          "mensaje_ejemplo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mensaje Ejemplo",
+            "description": "El mensaje con las macros de la primera fila de productos y el WhatsApp de contacto (RF-WM-27); null sin mensaje"
           }
         },
         "type": "object",
@@ -6046,7 +6069,9 @@
           "cabeceras",
           "total_exclusiones",
           "exclusiones",
-          "muestra"
+          "muestra",
+          "mensaje",
+          "mensaje_ejemplo"
         ],
         "title": "CampanaPrevistaWhatsmktRespuesta"
       },
@@ -10335,6 +10360,61 @@
         ],
         "title": "MarcaFechaRespuesta"
       },
+      "MensajeCampanaWhatsmktRespuesta": {
+        "properties": {
+          "texto_guardado_id": {
+            "type": "integer",
+            "title": "Texto Guardado Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "La version que se usara: la pedida o la vigente"
+          },
+          "deshabilitado": {
+            "type": "boolean",
+            "title": "Deshabilitado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "texto_guardado_id",
+          "nombre",
+          "version",
+          "deshabilitado"
+        ],
+        "title": "MensajeCampanaWhatsmktRespuesta"
+      },
+      "MensajeWhatsmktEntrada": {
+        "properties": {
+          "texto_guardado_id": {
+            "type": "integer",
+            "title": "Texto Guardado Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "texto_guardado_id"
+        ],
+        "title": "MensajeWhatsmktEntrada",
+        "description": "Un mensaje: un texto guardado del contexto `whatsmkt.mensaje` y, sin version, la vigente."
+      },
       "MetricasRespuesta": {
         "properties": {
           "cuentas": {
@@ -11698,6 +11778,32 @@
             ],
             "title": "Fecha Envio",
             "description": "Fecha de envio, solo para los dias de atraso ajustados (RF-55); sin ella, hoy en America/Lima. Todavia SIN validar contra los dias de envio (RF-70): eso llega con el mensaje"
+          },
+          "mensaje": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MensajeWhatsmktEntrada"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "El mensaje de la unica campana en modo `global`. Sin el, la campana va sin mensaje; en modo `por_segmento` no se usa"
+          },
+          "mensajes": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MensajeWhatsmktEntrada"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mensajes",
+            "description": "En modo `por_segmento`, el mensaje de cada segmento por su clave. El segmento que no se nombra usa el de la configuracion (RF-WM-22); sin ese tampoco, va sin mensaje"
           }
         },
         "type": "object",
@@ -12126,12 +12232,41 @@
           "detalle": {
             "type": "string",
             "title": "Detalle"
+          },
+          "segmento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segmento",
+            "description": "La clave del segmento al que se refiere (los del mensaje en un lote)"
+          },
+          "parametros": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Parametros",
+            "description": "Los valores que el texto del codigo nombra: macro, n, largo, maximo..."
           }
         },
         "type": "object",
         "required": [
           "codigo",
-          "detalle"
+          "detalle",
+          "segmento",
+          "parametros"
         ],
         "title": "ProblemaWhatsmktRespuesta"
       },

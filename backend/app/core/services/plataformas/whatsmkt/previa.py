@@ -9,23 +9,52 @@ decidir si deja «Crear»:
 - los problemas, que NO son errores 4xx sino una lista: `definicion_no_whatsmkt`,
   `sin_supervisores` y `sin_productos`. La interfaz deja «Crear» inactivo mientras haya alguno.
 
-Todavia no incluye el mensaje (B4b) ni valida la fecha de envio.
+Con el mensaje (B4b1, parte 1): cada campana puede traer su mensaje elegido, con el ejemplo ya
+armado con la primera fila de productos y los problemas del mensaje (`macro_inexistente`,
+`mensaje_largo`, `mensaje_con_emoji`, `mensaje_deshabilitado`, `sin_whatsapp`), cada uno con el
+segmento al que se refiere. Todavia no valida la fecha de envio ni guarda nada.
 """
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import date
+from typing import Any
 
-from app.core.entities.whatsmkt import CodigoWhatsmkt, ModoCampana, SegmentoWhatsmkt
+from app.core.entities.textos_guardados import (
+    TextoGuardado,
+    TextoNoEncontrado,
+    VersionDeTextoNoEncontrada,
+    VersionTexto,
+)
+from app.core.entities.whatsmkt import (
+    CodigoWhatsmkt,
+    ConfiguracionWhatsmkt,
+    ErrorWhatsmkt,
+    ModoCampana,
+    SegmentoWhatsmkt,
+)
+from app.core.ports.repositorio_textos_guardados_port import RepositorioTextosGuardadosPort
 from app.core.ports.repositorio_whatsmkt_port import RepositorioWhatsmktPort
 from app.core.services.definiciones_columnas.servicio import DefinicionesColumnasService
 from app.core.services.gestiones_digitales.servicio import SupervisionService
+from app.core.services.plataformas.whatsmkt import mensaje
 from app.core.services.plataformas.whatsmkt.archivo_contactos import (
     ArchivoContactos,
     ArchivoContactosService,
     ExclusionContacto,
     SeleccionCampana,
 )
+from app.core.services.plataformas.whatsmkt.contexto import CLAVE_CONTEXTO_MENSAJE
 from app.core.services.plataformas.whatsmkt.plataforma import CLAVE
+
+
+@dataclass(frozen=True)
+class MensajePedido:
+    """El mensaje elegido: un texto guardado del contexto `whatsmkt.mensaje` y, si se pide una,
+    su version (sin ella, la vigente)."""
+
+    texto_id: int
+    version: int | None = None
 
 
 @dataclass(frozen=True)
@@ -34,14 +63,25 @@ class PeticionPrevia:
     definicion_id: int
     version: int | None  # sin version, la vigente
     modo: ModoCampana = ModoCampana.GLOBAL
+    # En modo global, el mensaje de la unica campana. Sin el, la campana va sin mensaje.
+    mensaje: MensajePedido | None = None
+    # En modo por segmento, el mensaje de cada segmento por su clave; el que no se nombre usa el
+    # de la configuracion del segmento (RF-WM-22), y sin ese tampoco, va sin mensaje.
+    mensajes_por_segmento: Mapping[str, MensajePedido] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class ProblemaCampana:
-    """Algo que impide crear la campana; la interfaz lo muestra con el texto de su `codigo`."""
+    """Algo que impide crear la campana; la interfaz lo muestra con el texto de su `codigo`.
+
+    `segmento` es la clave del segmento al que se refiere (los del mensaje en un lote por
+    segmento); `parametros`, los valores que el texto del codigo nombra (`{macro}`, `{largo}`...).
+    """
 
     codigo: CodigoWhatsmkt
     detalle: str
+    segmento: str | None = None
+    parametros: Mapping[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -53,6 +93,19 @@ class CabeceraPrevia:
 
 
 @dataclass(frozen=True)
+class MensajeDeCampana:
+    """El mensaje resuelto de una campana: el texto guardado y la version que se usaran, su texto
+    y el ejemplo con la primera fila de productos y el WhatsApp de contacto (RF-WM-27)."""
+
+    texto_id: int
+    nombre: str
+    version: int
+    texto: str
+    ejemplo: str
+    deshabilitado: bool
+
+
+@dataclass(frozen=True)
 class CampanaPrevista:
     """Una campana que resultara: su segmento (None si es global), su archivo y sus exclusiones."""
 
@@ -60,6 +113,7 @@ class CampanaPrevista:
     archivo: ArchivoContactos
     cabeceras: tuple[CabeceraPrevia, ...]
     exclusiones: tuple[ExclusionContacto, ...]
+    mensaje: MensajeDeCampana | None = None
 
 
 @dataclass(frozen=True)
@@ -85,14 +139,18 @@ class PrevisualizacionWhatsmktService:
         repositorio: RepositorioWhatsmktPort,
         definiciones: DefinicionesColumnasService,
         supervision: SupervisionService,
+        textos: RepositorioTextosGuardadosPort,
     ) -> None:
         self._archivos = archivos
         self._repositorio = repositorio
         self._definiciones = definiciones
         self._supervision = supervision
+        self._textos = textos
 
     def previsualizar(self, peticion: PeticionPrevia) -> PreviaCampanas:
-        """Lanza `DefinicionNoEncontrada` o `VersionNoEncontrada` si la definicion no existe."""
+        """Lanza `DefinicionNoEncontrada` o `VersionNoEncontrada` si la definicion no existe, y
+        `TextoNoEncontrado` o `VersionDeTextoNoEncontrada` si un mensaje elegido no existe (o no es
+        un mensaje de WhatsMKT)."""
         vista = self._definiciones.obtener(peticion.definicion_id, peticion.version)
         if vista.definicion.plataforma != CLAVE:
             return PreviaCampanas(
@@ -139,24 +197,118 @@ class PrevisualizacionWhatsmktService:
         )
         por_clave = {s.clave: s for s in segmentos}
         cabeceras = tuple(CabeceraPrevia(c.nombre, c.etiqueta) for c in cargada.definicion.campos)
-        campanas = tuple(
-            CampanaPrevista(
-                segmento=None if a.segmento is None else por_clave[a.segmento],
-                archivo=a,
-                cabeceras=cabeceras,
-                exclusiones=tuple(e for e in exclusiones if e.segmento == a.segmento),
+        configuracion = self._repositorio.obtener_configuracion()
+        campanas = []
+        problemas_del_mensaje: list[ProblemaCampana] = []
+        for a in armado.archivos:
+            segmento = None if a.segmento is None else por_clave[a.segmento]
+            resuelto, problemas = self._mensaje(
+                self._pedido(peticion, segmento), a, len(cabeceras) - 1, configuracion
             )
-            for a in armado.archivos
-        )
+            problemas_del_mensaje += problemas
+            campanas.append(
+                CampanaPrevista(
+                    segmento=segmento,
+                    archivo=a,
+                    cabeceras=cabeceras,
+                    exclusiones=tuple(e for e in exclusiones if e.segmento == a.segmento),
+                    mensaje=resuelto,
+                )
+            )
         con_campana = {a.segmento for a in armado.archivos}
         return PreviaCampanas(
-            campanas=campanas,
+            campanas=tuple(campanas),
             exclusiones_sin_campana=tuple(e for e in exclusiones if e.segmento not in con_campana),
-            problemas=self._problemas(bool(supervision.supervisores), bool(campanas)),
+            problemas=(
+                *self._problemas(bool(supervision.supervisores), bool(campanas)),
+                *problemas_del_mensaje,
+            ),
             disponibles=armado.disponibles,
             solicitados=armado.solicitados,
             fecha_envio=armado.fecha_envio,
         )
+
+    @staticmethod
+    def _pedido(
+        peticion: PeticionPrevia, segmento: SegmentoWhatsmkt | None
+    ) -> MensajePedido | None:
+        """El mensaje de la campana: el global, o el pedido para el segmento y, si no, el de su
+        configuracion (RF-WM-22)."""
+        if segmento is None:
+            return peticion.mensaje
+        pedido = peticion.mensajes_por_segmento.get(segmento.clave)
+        if pedido is None and segmento.texto_guardado_id is not None:
+            return MensajePedido(segmento.texto_guardado_id)
+        return pedido
+
+    def _mensaje(
+        self,
+        pedido: MensajePedido | None,
+        archivo: ArchivoContactos,
+        macros_de_la_definicion: int,
+        configuracion: ConfiguracionWhatsmkt,
+    ) -> tuple[MensajeDeCampana | None, list[ProblemaCampana]]:
+        if pedido is None:
+            return None, []
+        texto, version = self._texto(pedido)
+        contenido = version.contenido.get("texto")
+        contenido = contenido if isinstance(contenido, str) else ""
+        # Las macros del ejemplo son las de la primera fila de PRODUCTOS (despues de los
+        # supervisores): la que WhatsMKT mostraria primero.
+        primera = archivo.tabla.filas[archivo.supervisores]
+        macros = [None if v is None else str(v) for v in list(primera.values())[1:]]
+        resuelto = MensajeDeCampana(
+            texto_id=texto.id,
+            nombre=texto.nombre,
+            version=version.numero,
+            texto=contenido,
+            ejemplo=mensaje.vista(contenido, macros, configuracion.whatsapp_contacto),
+            deshabilitado=texto.deshabilitado,
+        )
+        segmento = archivo.segmento
+        problemas = []
+        if texto.deshabilitado:
+            problemas.append(
+                ProblemaCampana(
+                    CodigoWhatsmkt.MENSAJE_DESHABILITADO,
+                    f"El mensaje {texto.nombre!r} esta deshabilitado",
+                    segmento,
+                )
+            )
+        for regla in (
+            lambda: mensaje.validar_macros(contenido, macros_de_la_definicion),
+            lambda: mensaje.validar_sin_emojis(contenido),
+            lambda: mensaje.validar_largo(contenido, configuracion.tope_mensaje),
+        ):
+            try:
+                regla()
+            except ErrorWhatsmkt as error:
+                problemas.append(
+                    ProblemaCampana(error.codigo, str(error), segmento, dict(error.parametros))
+                )
+        usa_whatsapp = mensaje.marcadores_del_texto(contenido).usa_whatsapp
+        if usa_whatsapp and not configuracion.whatsapp_contacto:
+            problemas.append(
+                ProblemaCampana(
+                    CodigoWhatsmkt.SIN_WHATSAPP,
+                    "El mensaje usa [whatsapp] y no hay WhatsApp de contacto configurado",
+                    segmento,
+                )
+            )
+        return resuelto, problemas
+
+    def _texto(self, pedido: MensajePedido) -> tuple[TextoGuardado, VersionTexto]:
+        """El texto y la version pedida (la vigente si no se pidio una). Un texto de otro contexto
+        es, para WhatsMKT, un texto que no existe."""
+        texto = self._textos.obtener(pedido.texto_id)
+        if texto is None or texto.contexto != CLAVE_CONTEXTO_MENSAJE:
+            raise TextoNoEncontrado(pedido.texto_id)
+        if pedido.version is None:
+            return texto, max(texto.versiones, key=lambda v: v.numero)
+        version = next((v for v in texto.versiones if v.numero == pedido.version), None)
+        if version is None:
+            raise VersionDeTextoNoEncontrada(texto.id, pedido.version)
+        return texto, version
 
     @staticmethod
     def _problemas(hay_supervisores: bool, hay_campanas: bool) -> tuple[ProblemaCampana, ...]:

@@ -9,16 +9,20 @@ primeras 20 filas, las primeras 100 exclusiones y el total exacto de ellas: la p
 listas sin volver a calcular (como RF-MM-26). Lo que impide crear (`definicion_no_whatsmkt`,
 `sin_supervisores`, `sin_productos`) viaja en `problemas` con un 200, no como error 4xx.
 
-Todavia sin el mensaje ni la validacion de la fecha de envio (B4b), ni las tablas de campana.
+Con el mensaje (B4b1, parte 1): el pedido elige el mensaje y cada campana trae su ejemplo y
+los problemas del mensaje. Todavia sin la validacion de la fecha de envio ni las tablas.
 """
 
 from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.adapters.persistence.db import get_engine
+from app.adapters.persistence.repositorio_textos_guardados_postgres import (
+    RepositorioTextosGuardadosPostgres,
+)
 from app.adapters.persistence.repositorio_whatsmkt_postgres import RepositorioWhatsmktPostgres
 from app.api.archivos_carga import RESPUESTAS_ERROR, obtener_servicio_generacion
 from app.api.cartera import obtener_catalogo_cartera
@@ -32,7 +36,8 @@ from app.core.entities.cartera import ConsultaInvalida, SinVersionVigente
 from app.core.entities.definiciones_columnas import DefinicionNoEncontrada, VersionNoEncontrada
 from app.core.entities.mapeo import PlantillaInvalida
 from app.core.entities.texto_enriquecido import CodigoTexto
-from app.core.entities.whatsmkt import CodigoWhatsmkt, ModoCampana
+from app.core.entities.textos_guardados import TextoNoEncontrado, VersionDeTextoNoEncontrada
+from app.core.entities.whatsmkt import CLAVES_SEGMENTOS, CodigoWhatsmkt, ModoCampana
 from app.core.services.definiciones_columnas.servicio import DefinicionesColumnasService
 from app.core.services.fecha_envio import FechaEnvioAnterior
 from app.core.services.generacion_cargas.servicio import (
@@ -47,6 +52,7 @@ from app.core.services.plataformas.whatsmkt.archivo_contactos import (
 )
 from app.core.services.plataformas.whatsmkt.previa import (
     CampanaPrevista,
+    MensajePedido,
     PeticionPrevia,
     PreviaCampanas,
     PrevisualizacionWhatsmktService,
@@ -70,6 +76,7 @@ def obtener_servicio_previa_whatsmkt(
         RepositorioWhatsmktPostgres(get_engine()),
         definiciones,
         supervision,
+        RepositorioTextosGuardadosPostgres(get_engine()),
     )
 
 
@@ -78,6 +85,16 @@ class DefinicionWhatsmktEntrada(BaseModel):
 
     id: int
     version: int | None = Field(default=None, ge=1)
+
+
+class MensajeWhatsmktEntrada(BaseModel):
+    """Un mensaje: un texto guardado del contexto `whatsmkt.mensaje` y, sin version, la vigente."""
+
+    texto_guardado_id: int
+    version: int | None = Field(default=None, ge=1)
+
+    def pedido(self) -> MensajePedido:
+        return MensajePedido(self.texto_guardado_id, self.version)
 
 
 class PrevisualizacionCampanasWhatsmktEntrada(BaseModel):
@@ -98,6 +115,29 @@ class PrevisualizacionCampanasWhatsmktEntrada(BaseModel):
             "el mensaje"
         ),
     )
+
+    mensaje: MensajeWhatsmktEntrada | None = Field(
+        default=None,
+        description=(
+            "El mensaje de la unica campana en modo `global`. Sin el, la campana va sin mensaje; "
+            "en modo `por_segmento` no se usa"
+        ),
+    )
+    mensajes: dict[str, MensajeWhatsmktEntrada] | None = Field(
+        default=None,
+        description=(
+            "En modo `por_segmento`, el mensaje de cada segmento por su clave. El segmento que no "
+            "se nombra usa el de la configuracion (RF-WM-22); sin ese tampoco, va sin mensaje"
+        ),
+    )
+
+    @field_validator("mensajes")
+    @classmethod
+    def _claves_de_segmento(cls, mensajes):
+        desconocidas = sorted(set(mensajes or {}) - CLAVES_SEGMENTOS)
+        if desconocidas:
+            raise ValueError(f"Segmentos desconocidos: {', '.join(desconocidas)}")
+        return mensajes
 
     def seleccion(self, catalogo: CatalogoCartera) -> SeleccionCampana:
         return SeleccionCampana(
@@ -129,6 +169,13 @@ class ExclusionWhatsmktRespuesta(ModeloRespuesta):
     etiqueta: str | None = Field(description="macro_vacia: la etiqueta de la columna")
 
 
+class MensajeCampanaWhatsmktRespuesta(ModeloRespuesta):
+    texto_guardado_id: int
+    nombre: str
+    version: int = Field(description="La version que se usara: la pedida o la vigente")
+    deshabilitado: bool
+
+
 class CampanaPrevistaWhatsmktRespuesta(ModeloRespuesta):
     segmento: str | None = Field(description="La clave del segmento; null en una campana global")
     etiqueta_segmento: str | None
@@ -143,11 +190,26 @@ class CampanaPrevistaWhatsmktRespuesta(ModeloRespuesta):
     muestra: list[FilaMuestraWhatsmktRespuesta] = Field(
         description=f"Las primeras {FILAS_DE_MUESTRA} filas del archivo"
     )
+    mensaje: MensajeCampanaWhatsmktRespuesta | None = Field(
+        description="El mensaje elegido para esta campana; null si no se eligio ninguno"
+    )
+    mensaje_ejemplo: str | None = Field(
+        description=(
+            "El mensaje con las macros de la primera fila de productos y el WhatsApp de "
+            "contacto (RF-WM-27); null sin mensaje"
+        )
+    )
 
 
 class ProblemaWhatsmktRespuesta(ModeloRespuesta):
     codigo: CodigoWhatsmkt
     detalle: str
+    segmento: str | None = Field(
+        description="La clave del segmento al que se refiere (los del mensaje en un lote)"
+    )
+    parametros: dict[str, str | int] = Field(
+        description="Los valores que el texto del codigo nombra: macro, n, largo, maximo..."
+    )
 
 
 class PrevisualizacionCampanasWhatsmktRespuesta(ModeloRespuesta):
@@ -203,6 +265,15 @@ def _campana(c: CampanaPrevista) -> CampanaPrevistaWhatsmktRespuesta:
             )
             for indice, fila in enumerate(archivo.tabla.filas[:FILAS_DE_MUESTRA])
         ],
+        mensaje=None
+        if c.mensaje is None
+        else MensajeCampanaWhatsmktRespuesta(
+            texto_guardado_id=c.mensaje.texto_id,
+            nombre=c.mensaje.nombre,
+            version=c.mensaje.version,
+            deshabilitado=c.mensaje.deshabilitado,
+        ),
+        mensaje_ejemplo=None if c.mensaje is None else c.mensaje.ejemplo,
     )
 
 
@@ -210,7 +281,13 @@ def _respuesta(previa: PreviaCampanas) -> PrevisualizacionCampanasWhatsmktRespue
     return PrevisualizacionCampanasWhatsmktRespuesta(
         campanas=[_campana(c) for c in previa.campanas],
         problemas=[
-            ProblemaWhatsmktRespuesta(codigo=p.codigo, detalle=p.detalle) for p in previa.problemas
+            ProblemaWhatsmktRespuesta(
+                codigo=p.codigo,
+                detalle=p.detalle,
+                segmento=p.segmento,
+                parametros=dict(p.parametros),
+            )
+            for p in previa.problemas
         ],
         disponibles=previa.disponibles,
         solicitados=previa.solicitados,
@@ -226,6 +303,10 @@ def _error(exc: Exception) -> ErrorConCodigo:
     if isinstance(exc, DefinicionNoEncontrada):
         return ErrorConCodigo(404, str(exc), CodigoTexto.DEFINICION_NO_ENCONTRADA)
     if isinstance(exc, VersionNoEncontrada):
+        return ErrorConCodigo(404, str(exc), CodigoTexto.VERSION_NO_ENCONTRADA)
+    if isinstance(exc, TextoNoEncontrado):
+        return ErrorConCodigo(404, str(exc), CodigoTexto.TEXTO_GUARDADO_NO_ENCONTRADO)
+    if isinstance(exc, VersionDeTextoNoEncontrada):
         return ErrorConCodigo(404, str(exc), CodigoTexto.VERSION_NO_ENCONTRADA)
     if isinstance(exc, SinVersionVigente):
         return ErrorConCodigo(404, str(exc), CodigoTexto.SIN_VERSION_VIGENTE)
@@ -248,8 +329,10 @@ def previsualizar_campanas(
     """Los archivos que resultarian de la seleccion, sin guardar nada (RF-WM-35).
 
     En modo `por_segmento` sale una campana por cada segmento con productos (RF-WM-23); en
-    `global`, una. Los problemas (`definicion_no_whatsmkt`, `sin_supervisores`, `sin_productos`)
-    se listan con un 200: no impiden previsualizar, impiden crear.
+    `global`, una. Los problemas (`definicion_no_whatsmkt`, `sin_supervisores`, `sin_productos`
+    y los del mensaje: `macro_inexistente`, `mensaje_largo`, `mensaje_con_emoji`,
+    `mensaje_deshabilitado`, `sin_whatsapp`) se listan con un 200: no impiden previsualizar,
+    impiden crear. Un mensaje elegido que no existe, o no es de WhatsMKT, responde 404.
     """
     try:
         previa = servicio.previsualizar(
@@ -258,6 +341,10 @@ def previsualizar_campanas(
                 definicion_id=entrada.definicion.id,
                 version=entrada.definicion.version,
                 modo=entrada.modo,
+                mensaje=None if entrada.mensaje is None else entrada.mensaje.pedido(),
+                mensajes_por_segmento={
+                    clave: m.pedido() for clave, m in (entrada.mensajes or {}).items()
+                },
             )
         )
     except (
@@ -266,6 +353,8 @@ def previsualizar_campanas(
         SinVersionVigente,
         DefinicionNoEncontrada,
         VersionNoEncontrada,
+        TextoNoEncontrado,
+        VersionDeTextoNoEncontrada,
         FechaEnvioAnterior,
     ) as exc:
         raise _error(exc) from exc

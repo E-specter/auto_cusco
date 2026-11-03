@@ -1470,8 +1470,10 @@ export interface paths {
          * @description Los archivos que resultarian de la seleccion, sin guardar nada (RF-WM-35).
          *
          *     En modo `por_segmento` sale una campana por cada segmento con productos (RF-WM-23); en
-         *     `global`, una. Los problemas (`definicion_no_whatsmkt`, `sin_supervisores`, `sin_productos`)
-         *     se listan con un 200: no impiden previsualizar, impiden crear.
+         *     `global`, una. Los problemas (`definicion_no_whatsmkt`, `sin_supervisores`, `sin_productos`
+         *     y los del mensaje: `macro_inexistente`, `mensaje_largo`, `mensaje_con_emoji`,
+         *     `mensaje_deshabilitado`, `sin_whatsapp`) se listan con un 200: no impiden previsualizar,
+         *     impiden crear. Un mensaje elegido que no existe, o no es de WhatsMKT, responde 404.
          */
         post: operations["previsualizar_campanas_whatsmkt_campanas_previsualizacion_post"];
         delete?: never;
@@ -1758,6 +1760,13 @@ export interface components {
              * @description Las primeras 20 filas del archivo
              */
             muestra: components["schemas"]["FilaMuestraWhatsmktRespuesta"][];
+            /** @description El mensaje elegido para esta campana; null si no se eligio ninguno */
+            mensaje: components["schemas"]["MensajeCampanaWhatsmktRespuesta"] | null;
+            /**
+             * Mensaje Ejemplo
+             * @description El mensaje con las macros de la primera fila de productos y el WhatsApp de contacto (RF-WM-27); null sin mensaje
+             */
+            mensaje_ejemplo: string | null;
         };
         /** CampanaRespuesta */
         CampanaRespuesta: {
@@ -3457,6 +3466,30 @@ export interface components {
             /** Ejemplo */
             ejemplo: string;
         };
+        /** MensajeCampanaWhatsmktRespuesta */
+        MensajeCampanaWhatsmktRespuesta: {
+            /** Texto Guardado Id */
+            texto_guardado_id: number;
+            /** Nombre */
+            nombre: string;
+            /**
+             * Version
+             * @description La version que se usara: la pedida o la vigente
+             */
+            version: number;
+            /** Deshabilitado */
+            deshabilitado: boolean;
+        };
+        /**
+         * MensajeWhatsmktEntrada
+         * @description Un mensaje: un texto guardado del contexto `whatsmkt.mensaje` y, sin version, la vigente.
+         */
+        MensajeWhatsmktEntrada: {
+            /** Texto Guardado Id */
+            texto_guardado_id: number;
+            /** Version */
+            version?: number | null;
+        };
         /** MetricasRespuesta */
         MetricasRespuesta: {
             /** Cuentas */
@@ -4018,6 +4051,15 @@ export interface components {
              * @description Fecha de envio, solo para los dias de atraso ajustados (RF-55); sin ella, hoy en America/Lima. Todavia SIN validar contra los dias de envio (RF-70): eso llega con el mensaje
              */
             fecha_envio?: string | null;
+            /** @description El mensaje de la unica campana en modo `global`. Sin el, la campana va sin mensaje; en modo `por_segmento` no se usa */
+            mensaje?: components["schemas"]["MensajeWhatsmktEntrada"] | null;
+            /**
+             * Mensajes
+             * @description En modo `por_segmento`, el mensaje de cada segmento por su clave. El segmento que no se nombra usa el de la configuracion (RF-WM-22); sin ese tampoco, va sin mensaje
+             */
+            mensajes?: {
+                [key: string]: components["schemas"]["MensajeWhatsmktEntrada"];
+            } | null;
         };
         /** PrevisualizacionCampanasWhatsmktRespuesta */
         PrevisualizacionCampanasWhatsmktRespuesta: {
@@ -4156,6 +4198,18 @@ export interface components {
             codigo: components["schemas"]["CodigoWhatsmkt"];
             /** Detalle */
             detalle: string;
+            /**
+             * Segmento
+             * @description La clave del segmento al que se refiere (los del mensaje en un lote)
+             */
+            segmento: string | null;
+            /**
+             * Parametros
+             * @description Los valores que el texto del codigo nombra: macro, n, largo, maximo...
+             */
+            parametros: {
+                [key: string]: string | number;
+            };
         };
         /**
          * Programacion
