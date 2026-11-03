@@ -497,7 +497,7 @@ textos.destruir();
 
 - **Estructura,** dentro de un `.panel`:
   - Un `select` «Texto», con los habilitados por su nombre. Si el contexto agrega algo propio, como el segmento, se muestra con el nombre: «Preventivo · versión 2».
-  - Al lado, «Nuevo» (`plus`) y las acciones del elegido: «Renombrar» (`pencil`), «Deshabilitar» (`power-off`) y «Eliminar» (`trash-2`, rojo). «Eliminar» solo aparece si ninguna versión se usó. Si alguna se usó, en su lugar va el motivo: «No se puede eliminar: lo usaron campañas. Puedes deshabilitarlo».
+  - Al lado, «Nuevo» (`plus`) y las acciones del elegido: «Renombrar» (`pencil`), «Deshabilitar» (`power-off`) y «Eliminar» (`trash-2`, rojo). «Eliminar» solo aparece si ninguna versión se usó. Si alguna se usó, en su lugar va el motivo: «No se puede eliminar: ya se usó. Puedes deshabilitarlo». El texto es genérico: el componente no sabe qué usa el contexto.
   - La línea de versión, «Versión 3» o «Versión 3 · usada en 2 campañas», con un `select` de las versiones anteriores para verlas en solo lectura, como en §5.1.
   - El editor, que pone el módulo.
   - El pie, con «Guardar» (`save`, `.btn--primary`) y «Descartar cambios». Las versiones no tienen nombre propio. Bajo «Guardar» va el hint de siempre: «Al guardar se crea la versión 4; la 3 no cambia».
@@ -543,7 +543,35 @@ textos.destruir();
 | `textosGuardados.deshabilitarPara` | Deshabilitar «{nombre}» | Disable “{nombre}” |
 | `textosGuardados.habilitarPara` | Habilitar «{nombre}» | Enable “{nombre}” |
 | `textosGuardados.eliminarPara` | Eliminar «{nombre}» | Delete “{nombre}” |
-| `textosGuardados.noEliminable` | No se puede eliminar: lo usaron campañas. Puedes deshabilitarlo. | It cannot be deleted: campaigns used it. You can disable it. |
+| `textosGuardados.noEliminable` | No se puede eliminar: ya se usó. Puedes deshabilitarlo. | It cannot be deleted: it has been used. You can disable it. |
+| `textosGuardados.noEliminableDeshabilitado` | No se puede eliminar: ya se usó. | It cannot be deleted: it has been used. |
+| `textosGuardados.renombrar` | Renombrar | Rename |
+| `textosGuardados.deshabilitar` | Deshabilitar | Disable |
+| `textosGuardados.habilitar` | Habilitar | Enable |
+| `textosGuardados.eliminar` | Eliminar | Delete |
+| `textosGuardados.ver` | Ver | View |
+| `textosGuardados.verPara` | Ver «{nombre}» | View “{nombre}” |
+| `textosGuardados.guardar` | Guardar | Save |
+| `textosGuardados.descartar` | Descartar cambios | Discard changes |
+| `textosGuardados.sinGuardar` | Sin guardar: texto nuevo | Unsaved: new text |
+| `textosGuardados.versionVer` | Ver otra versión | View another version |
+| `textosGuardados.versionOpcion` | Versión {n} | Version {n} |
+| `textosGuardados.versionOpcionVigente` | Versión {n} (vigente) | Version {n} (current) |
+| `textosGuardados.versionUsadaSin` | Versión {n} · usada | Version {n} · used |
+| `textosGuardados.lectura` | Estás viendo la versión {vista}, solo para leer. La vigente es la {vigente}. | You are viewing version {vista}, read only. The current one is {vigente}. |
+| `textosGuardados.irVigente` | Ir a la vigente | Go to the current one |
+| `textosGuardados.usarBase` | Usar como base | Use as a base |
+| `textosGuardados.guardarHintBase` | Al guardar se crea la versión {nueva} con el contenido de la {base}. | Saving creates version {nueva} with the content of version {base}. |
+| `textosGuardados.deshabilitadoVer` | Este texto está deshabilitado: se ve solo para leer y no admite versiones nuevas. Para editarlo, habilítalo. | This text is disabled: it is read only and takes no new versions. To edit it, enable it. |
+| `textosGuardados.renombrarTitulo` | Renombrar {nombreCitado} | Rename {nombreCitado} |
+| `textosGuardados.renombrarCampo` | Nombre nuevo | New name |
+| `textosGuardados.renombrarConfirmar` | Renombrar | Rename |
+| `textosGuardados.nombreInvalido` | Escribe un nombre de 1 a {max} caracteres. | Enter a name of 1 to {max} characters. |
+| `textosGuardados.eliminarTitulo` | Eliminar definitivamente {nombreCitado} | Delete {nombreCitado} permanently |
+| `textosGuardados.eliminarCuerpo` | Se borran el texto y todas sus versiones. No se puede deshacer. | The text and all its versions are deleted. This cannot be undone. |
+| `textosGuardados.eliminarCasilla` | Entiendo que no se puede deshacer | I understand this cannot be undone |
+| `textosGuardados.eliminarBoton` | Eliminar definitivamente | Delete permanently |
+| `textosGuardados.errorCarga` | No se pudieron cargar los textos guardados. | The saved texts could not be loaded. |
 | `textosGuardados.deshabilitados` | Deshabilitados ({n}) | Disabled ({n}) |
 | `textosGuardados.deshabilitado` | Deshabilitado | Disabled |
 | `textosGuardados.guardado` | Se guardó la versión {n} de «{nombre}». | Version {n} of “{nombre}” was saved. |
@@ -554,7 +582,9 @@ textos.destruir();
 | `textosGuardados.eliminado` | Se eliminó «{nombre}». | “{nombre}” was deleted. |
 | `textosGuardados.nombreRepetido` | Ya existe un texto con ese nombre. Elige otro. | A text with that name already exists. Choose another one. |
 
-- Los nombres de citas usan las comillas del idioma, con `camposAdicionales.nombreCitado`.
+- Los nombres de citas usan las comillas del idioma, con `camposAdicionales.nombreCitado`: `{nombreCitado}` es ese resultado, nunca comillas escritas en la clave.
+- **Se reusan, no se copian:** el diálogo de cambios sin guardar usa `selector.descartar.titulo`, `.cuerpo`, `.mantener` («Seguir editando») y `.confirmar`; el componente no crea claves `cambios.*`. La casilla de eliminar sí es propia (`eliminarCasilla`, con el texto de MOWA), para no depender de una clave `mowaMes.*` desde un componente compartido.
+- `errorCarga` va con «Reintentar» (`selector.valores.reintentar`), que vuelve a pedir la lista.
 - «campañas» en `versionUsada` es lo que usa WhatsMKT, el primer contexto. Si otro contexto cuenta otra cosa, el contexto pasa su propio texto.
 - La confirmación de eliminar usa §4.6 de [mowa-mes-interfaz.md](mowa-mes-interfaz.md), con la casilla obligatoria. El título y el cuerpo los pone cada contexto: los de WhatsMKT están en su documento.
 
