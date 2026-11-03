@@ -19,7 +19,7 @@ Responsable: `designer`. Un cambio a estas reglas se acuerda con `designer` ante
 1. **Igual que MOWA MES donde el flujo es igual.** Campaña, Seguimiento y Configuración se leen como en MOWA: mismas secciones, mismos estados, mismos iconos, mismas confirmaciones. Lo distinto de WhatsMKT (macros por posición, lote por segmento, adjuntos y horarios) se nota por lo que dice, no por un estilo propio.
 2. **El sistema prepara, el operador sube.** Todo termina en una ficha con los datos listos para copiar en el formulario de WhatsMKT. Cada dato se copia con un botón, en el orden del formulario.
 3. **Un lote se ve como un lote.** Si el modo es por segmento, la previsualización y las fichas muestran cuántas campañas resultan y cada una por separado, sin mezclar sus cifras.
-4. **Las reglas de WhatsMKT, a la vista.** Lo que no se puede hacer (un emoji, una macro que no existe, un nombre de más de 75) se dice en su campo, al salir de él, antes de llegar a crear.
+4. **Las reglas de WhatsMKT, a la vista.** Lo que no se puede hacer (un emoji, una macro que no existe, un nombre de más de 75) se dice en su campo, al salir de él, antes de llegar a crear. Salvo cuando el foco sale hacia el botón que guarda o crea: ahí no se valida al salir, porque el mensaje movería el botón entre pulsar y soltar y el clic se perdería. Ese botón valida todo y lleva el foco al primer error (§10).
 5. **Nada propio donde ya hay una herramienta.** Supervisores, Calendario laboral y Columnas de carga se usan desde Herramientas, con ir y volver.
 
 ## 2. Navegación (RF-WM-02 y RF-WM-03)
@@ -210,11 +210,16 @@ Cada bloque se guarda por separado, como en MOWA. Los paneles van en este orden:
    - La tabla de segmentos, apilable, con Segmento, «Desde (días)» y «Hasta (días)» (días de atraso ajustados), editables. Un límite vacío se lee como par: el «Desde» del preventivo dice «sin mínimo», y el «Hasta» de «Tramos mayores al 2» dice «sin máximo». Una tabla que deja huecos o se superpone se rechaza con su código, bajo la fila.
    - Debajo, el mensaje de cada segmento con `TextosGuardados` (§11.3 del motor), un `.segmented` por segmento para elegir cuál se edita.
 2. **Mensajes globales** (RF-WM-19): `TextosGuardados`, con el título «Mensajes globales» y el hint «Para las campañas especiales, con un solo mensaje para toda la selección».
-3. **Horarios de envío** (RF-WM-07): las dos franjas, cada una con dos `input type="time"` (desde y hasta). Una franja cuyo inicio no es anterior a su fin (14:00 a 08:00, o la misma hora) se rechaza con `horario_invalido`, bajo esa franja; `{horario}` es su nombre, «Horario 1» o «Horario 2».
-4. **Nombre de la campaña** (RF-WM-33): la plantilla, con sus fichas de variables, el contador «/ 75» y un ejemplo resultante.
-5. **Archivo de carga** (RF-WM-09): el `select` de la definición por defecto, con las de plataforma WhatsMKT, y «Editar en Columnas de carga».
-6. **Topes** (RF-WM-26 y RF-WM-31): largo máximo del mensaje (caracteres) y tamaño máximo de video, audio y PDF (MB). La API los guarda en bytes; el panel los muestra y los recibe en MB, en base decimal (1 MB son un millón de bytes). Los `input` llevan `min="1"`, así que un tope de cero o negativo no llega a validarse. Cada uno con su hint del supuesto: «Valor inicial: el largo de un mensaje de WhatsApp (4096). No es un dato verificado de WhatsMKT».
-7. **Biblioteca de adjuntos** (RF-WM-30 a RF-WM-32):
+3. **WhatsApp de contacto** (DU-WM-11, regla provisional a): un panel propio, después de los mensajes, porque es lo que usa `[whatsapp]`. Es el campo de MOWA MES (RF-MM-16) con los textos de WhatsMKT:
+   - un `input` «WhatsApp de contacto», `inputmode="numeric"`, `maxlength="9"`, `autocomplete="off"`, con el hint «Número de 9 dígitos que empieza con 9. Donde un mensaje dice [whatsapp], se escribe https://wa.me/+51 y el número». Puede quedar vacío;
+   - el error `whatsapp_invalido`, bajo el campo;
+   - vacío, un `.notice--warning` dentro del panel: «Sin WhatsApp de contacto, los mensajes que usan [whatsapp] no se pueden enviar»;
+   - el número no vive en el repositorio: los mensajes sembrados llevan el marcador `[whatsapp]`, y el sistema lo cambia por el enlace al mostrar y copiar (vista previa, ficha y «Copiar»).
+4. **Horarios de envío** (RF-WM-07): las dos franjas, cada una con dos `input type="time"` (desde y hasta). Una franja cuyo inicio no es anterior a su fin (14:00 a 08:00, o la misma hora) se rechaza con `horario_invalido`, bajo esa franja; `{horario}` es su nombre, «Horario 1» o «Horario 2».
+5. **Nombre de la campaña** (RF-WM-33): la plantilla, con sus fichas de variables, el contador «/ 75» y los nombres resultantes en un `dl`: el segmento en `dt` y el nombre en `dd`, en mono y con `overflow-wrap: anywhere`, para que a 360 px la etiqueta no se parta en medio del nombre del segmento.
+6. **Archivo de carga** (RF-WM-09): el `select` de la definición por defecto, con las de plataforma WhatsMKT, y «Editar en Columnas de carga».
+7. **Topes** (RF-WM-26 y RF-WM-31): largo máximo del mensaje (caracteres) y tamaño máximo de video, audio y PDF (MB). La API los guarda en bytes; el panel los muestra y los recibe en MB, en base decimal (1 MB son un millón de bytes). Los `input` llevan `min="1"`, así que un tope de cero o negativo no llega a validarse. Cada uno con su hint del supuesto: «Valor inicial: el largo de un mensaje de WhatsApp (4096). No es un dato verificado de WhatsMKT».
+8. **Biblioteca de adjuntos** (RF-WM-30 a RF-WM-32):
    - Una tabla apilable con Nombre, Tipo, Tamaño, Subido y Acción («Descargar» y «Archivar»), y «Subir un archivo».
    - Los archivados van en un `<details>` «Archivados (N)», con «Descargar» y «Restaurar». Un adjunto no se borra: se archiva.
    - Al subir una imagen, el estado dice «Se guardó sin metadatos (EXIF, ubicación)», porque el usuario lo pidió explícitamente (P-8).
@@ -223,12 +228,12 @@ Cada bloque se guarda por separado, como en MOWA. Los paneles van en este orden:
 
 Es el editor que `TextosGuardados` recibe en el contexto `whatsmkt.mensaje`:
 
-- **Barra «Insertar macro»,** sobre el campo: un botón `.btn--sm` por macro de la definición por defecto, «MACRO1 · Nombres del titular», que inserta `[$MACRO1$]` donde está el cursor y devuelve el foco al campo. Si la columna no tiene etiqueta, solo «MACRO1».
+- **Barra «Insertar macro»,** sobre el campo: un botón `.btn--sm` por macro de la definición por defecto, «MACRO1 · Nombres del titular», que inserta `[$MACRO1$]` donde está el cursor y devuelve el foco al campo. Si la columna no tiene etiqueta, solo «MACRO1». Después de las macros, separado por un `|` como en la barra de navegación, «Enlace de WhatsApp», que inserta `[whatsapp]`.
 - **El campo:** un `textarea`, en texto plano, con `spellcheck`. Crece con el texto hasta unas 12 líneas.
-- **Contador:** «312 / 4096 caracteres», con los marcadores sin reemplazar (DU-WM-3, provisional). Pasa a `.field__error` al superar el tope. Se anuncia solo al cruzar el tope, no en cada tecla.
+- **Contador:** «312 / 4096 caracteres», con los marcadores sin reemplazar (DU-WM-3, provisional). `[whatsapp]` cuenta como el enlace, que tiene largo fijo: 26 caracteres (`https://wa.me/+51` y 9 dígitos). Pasa a `.field__error` al superar el tope. Se anuncia solo al cruzar el tope, no en cada tecla.
 - **Emojis (RF-WM-24):** al salir del campo, o al guardar, el error dice el primero y su posición: «No se admiten emojis: el primero es «😀», en la posición 42». Al enfocar el error, el cursor queda sobre ese carácter (`setSelectionRange`).
 - **Macro que no existe (RF-WM-25):** «[$MACRO4$] no existe en la definición elegida: tiene 3 macros».
-- **Vista previa,** bajo el campo: «Así lo verá el cliente», con las macros reemplazadas con la fila 1 de la muestra y un `select` «Fila de ejemplo» (1 a 3). Es la misma vista previa de la campaña.
+- **Vista previa,** bajo el campo: «Así lo verá el cliente», con las macros reemplazadas con la fila 1 de la muestra y un `select` «Fila de ejemplo» (1 a 3). Es la misma vista previa de la campaña. `[whatsapp]` sale ya como enlace; sin número configurado, en su lugar va «(sin WhatsApp configurado)», en texto apagado.
 - **DU-WM-2 y DU-WM-11, provisionales:** el texto sembrado se muestra tal cual, con sus espacios dobles y el enlace de WhatsApp dentro del mensaje.
 
 ## 6. Iconos
@@ -281,12 +286,16 @@ Los códigos los define el backend en su enum (`whatsmkt.codigo.*`, RF-WM-43) y 
 | `informe_ya_importado` | Diálogo de reemplazo | Esta campaña ya tiene un informe; confirma para reemplazarlo. | This campaign already has a report; confirm to replace it. |
 | `campana_descartada` | Bajo el informe | La campaña está descartada. Restáurala primero. | The campaign is discarded. Restore it first. |
 | `campana_no_descartada` | (respaldo) | Solo se puede eliminar una campaña descartada. Descártala primero. | Only a discarded campaign can be deleted. Discard it first. |
+| `whatsapp_invalido` | Configuración, bajo el WhatsApp de contacto | El WhatsApp debe tener 9 dígitos y empezar con 9. | WhatsApp must have 9 digits and start with 9. |
+| `sin_whatsapp` | Resumen de la previsualización y «Crear» | El mensaje usa [whatsapp] y no hay WhatsApp de contacto configurado. | The message uses [whatsapp] and no contact WhatsApp is set up. |
 
 Las cuatro primeras son motivos de exclusión: además del texto corto, llevan un detalle para la columna Detalle, con su clave `whatsmkt.exclusiones.*`, como en MOWA:
 - `macro_vacia`: es «La macro {n} ({etiqueta}) queda vacía y su columna no tiene valor por defecto.» / en «Macro {n} ({etiqueta}) is empty and its column has no default value.»
 - `sin_dias_atraso`: es «No tiene días de atraso, así que no cae en ningún segmento. En el modo «Global» sí entraría.» / en «It has no days overdue, so it falls in no segment. In “Global” mode it would be included.» Es el caso de `sin_speech` de MOWA. En el modo global no se excluye.
 
 `sin_supervisores` se detecta en la previsualización, no recién al crear: va en el resumen de problemas, deja «Crear» inactivo, y en lugar de «Ir al campo» lleva «Configurar supervisores» (`whatsmkt.previa.irSupervisores`), que abre Supervisores con ir y volver (§2). Si aun así llega al crear (alguien los borró entretanto), va arriba en `role="alert"` con el mismo enlace.
+
+`sin_whatsapp` sigue el mismo patrón: en el resumen de la previsualización, con «Crear» inactivo, y en lugar de «Ir al campo», «Configurar el WhatsApp de contacto» (`whatsmkt.previa.irWhatsapp`), que abre la configuración en ese campo, con ir y volver. Al crear, el mismo código arriba, en `role="alert"`.
 
 ## 8. Textos de la interfaz (es / en)
 
@@ -355,6 +364,9 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.previa.resumenUna` | Se creará 1 campaña · {filas} filas | 1 campaign will be created · {filas} rows |
 | `whatsmkt.previa.irAlCampo` | Ir al campo | Go to the field |
 | `whatsmkt.previa.irSupervisores` | Configurar supervisores | Set up supervisors |
+| `whatsmkt.previa.irWhatsapp` | Configurar el WhatsApp de contacto | Set up the contact WhatsApp |
+| `whatsmkt.mensaje.insertarWhatsapp` | Enlace de WhatsApp | WhatsApp link |
+| `whatsmkt.mensaje.sinWhatsapp` | (sin WhatsApp configurado) | (no WhatsApp set up) |
 | `whatsmkt.previa.sinExclusiones` | Ninguno de esta campaña queda fuera. | None from this campaign is left out. |
 | `whatsmkt.previa.exclusionesTruncadas` | Se muestran las primeras {mostradas} de {total}. La lista completa estará en el seguimiento de la campaña después de crearla. | Showing the first {mostradas} of {total}. The full list will be in the campaign tracking once it is created. |
 | `whatsmkt.previa.resumenFuera` | · {n} productos fuera de las campañas | · {n} products outside the campaigns |
@@ -411,7 +423,13 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.configuracion.pronto` | Disponible pronto. | Available soon. |
 | `whatsmkt.configuracion.nombre.variablesHint` | {fecha_corte}: la fecha de corte, como AAAA.MM.DD. {segmento}: el nombre del segmento; queda vacío en una campaña global. | {fecha_corte}: the cut-off date, as YYYY.MM.DD. {segmento}: the segment name; empty in a global campaign. |
 | `whatsmkt.configuracion.globalesHint` | Para las campañas especiales, con un solo mensaje para toda la selección. | For special campaigns, with a single message for the whole selection. |
+| `whatsmkt.configuracion.whatsapp` | WhatsApp de contacto | Contact WhatsApp |
+| `whatsmkt.configuracion.whatsapp.hint` | Número de 9 dígitos que empieza con 9. Donde un mensaje dice [whatsapp], se escribe https://wa.me/+51 y el número. | A 9-digit number that starts with 9. Where a message says [whatsapp], https://wa.me/+51 followed by the number is written. |
+| `whatsmkt.configuracion.sinWhatsapp` | Sin WhatsApp de contacto, los mensajes que usan [whatsapp] no se pueden enviar. | Without a contact WhatsApp, the messages that use [whatsapp] cannot be sent. |
+| `whatsmkt.configuracion.guardarWhatsapp` | Guardar WhatsApp | Save WhatsApp |
 | `whatsmkt.configuracion.horarios` | Horarios de envío | Send time slots |
+| `whatsmkt.configuracion.nombre.resultantes` | Nombres resultantes | Resulting names |
+| `whatsmkt.configuracion.tope.invalidoSinMaximo` | Escribe un número entero de 1 en adelante. | Enter a whole number from 1 up. |
 | `whatsmkt.configuracion.definicionDefecto` | Definición por defecto | Default definition |
 | `whatsmkt.configuracion.topes` | Topes | Limits |
 | `whatsmkt.configuracion.tope.mensaje` | Largo máximo del mensaje | Maximum message length |
@@ -442,6 +460,7 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 - Controles nativos, con las ayudas asociadas por `aria-describedby` y los grupos en `fieldset` con `legend`.
 - Los campos condicionales ocultos van con `hidden`: no se leen ni reciben foco.
 - Al fallar la validación al crear, el foco va al primer error (RF-WM-43), y el resumen de la previsualización enlaza cada problema con su campo.
+- **Validar al salir sin perder el clic:** cada campo se valida en `blur`, salvo cuando `relatedTarget` es el botón que guarda su bloque o crea la campaña. Ese botón valida todos los campos del bloque y lleva el foco al primer error. Así el error que aparece al salir no empuja el botón entre `mousedown` y `mouseup`. Vale para todos los bloques de la configuración y para la campaña.
 - Los resultados (guardado, copiado, subido, importado, descartado) se anuncian en `role="status"`. Los errores que bloquean van en `role="alert"`.
 - Contraste AA en claro y oscuro, sin opacidad en el texto que se puede leer u operar.
 
@@ -452,6 +471,8 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
   - segmentos con hueco y superpuestos, por su código;
   - mensajes con `TextosGuardados`: insertar macro, el contador, el emoji en su posición, la macro inexistente y la vista previa;
   - horarios, plantilla con su tope, definición por defecto y topes;
+  - el WhatsApp de contacto: vacío con su aviso, `whatsapp_invalido`, y guardar;
+  - salir de un campo inválido directo a su «Guardar»: un solo clic basta, y el foco va al primer error;
   - la biblioteca: subir, archivo repetido, archivar y restaurar.
 - **T-WM-F2 (campaña):**
   - las secciones en orden, con «Editar en Cartera» y «Editar en Columnas de carga» y sus vueltas;
@@ -464,6 +485,7 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
   - la previsualización del lote, con el `.segmented`, las cifras, el mensaje de ejemplo, la muestra con sus `cabeceras` y etiquetas, y las exclusiones paginadas con su detalle;
   - los productos fuera de las campañas: la sección con su total, el enlace del resumen, el aviso de lista recortada, y que no aparece con cero ni en el modo global;
   - sin productos; «Crear» inactivo con el motivo; el 409 de la fecha;
+  - `sin_supervisores` y `sin_whatsapp` en el resumen, con su enlace de ir y volver; `[whatsapp]` en la vista previa, con número y sin él;
   - las fichas del lote, con cada «Copiar» y su anuncio.
 - **T-WM-F3 (seguimiento):**
   - Activas y Descartadas, filtros y pendientes;
