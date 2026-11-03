@@ -26,13 +26,14 @@ class FichaCampana:
     # El mensaje para copiar en WhatsMKT: [whatsapp] ya es el enlace; las `[$MACROn$]` quedan
     # tal cual, porque WhatsMKT las reemplaza (RF-WM-17).
     mensaje: str
-    # `sin_whatsapp`: el mensaje usa [whatsapp] y no hay numero vigente; queda el marcador.
+    # `sin_whatsapp`: el mensaje usa [whatsapp] y la campana no tiene numero; queda el marcador.
     avisos: tuple[CodigoWhatsmkt, ...] = ()
 
 
-def ficha_de(campana: CampanaWhatsmkt, whatsapp_vigente: str | None) -> FichaCampana:
-    """La ficha con lo congelado, salvo [whatsapp]: ese lo reemplaza el numero VIGENTE al leer,
-    porque el texto se copia ahora en WhatsMKT. El numero que tenia al crear queda en la campana."""
+def ficha_de(campana: CampanaWhatsmkt) -> FichaCampana:
+    """La ficha con lo congelado al crear, el numero de contacto incluido: lo que se copia en
+    WhatsMKT es lo que se creo, como el archivo. Crear exige el numero si el mensaje usa
+    [whatsapp]; una campana sin el (un dato viejo o roto) deja el marcador y avisa."""
     usa_whatsapp = mensaje.marcadores_del_texto(campana.mensaje_texto).usa_whatsapp
     return FichaCampana(
         nombre=campana.nombre,
@@ -45,6 +46,8 @@ def ficha_de(campana: CampanaWhatsmkt, whatsapp_vigente: str | None) -> FichaCam
         tipo_envio=campana.tipo_envio,
         adjunto_id=campana.adjunto_id,
         etiqueta_vcard=campana.etiqueta_vcard,
-        mensaje=mensaje.vista(campana.mensaje_texto, [], whatsapp_vigente),
-        avisos=(CodigoWhatsmkt.SIN_WHATSAPP,) if usa_whatsapp and not whatsapp_vigente else (),
+        mensaje=mensaje.vista(campana.mensaje_texto, [], campana.whatsapp_contacto),
+        avisos=(CodigoWhatsmkt.SIN_WHATSAPP,)
+        if usa_whatsapp and not campana.whatsapp_contacto
+        else (),
     )

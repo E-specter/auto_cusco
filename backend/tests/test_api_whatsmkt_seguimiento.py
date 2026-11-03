@@ -51,7 +51,7 @@ def cliente():
     app.dependency_overrides[obtener_servicio_creacion_whatsmkt] = e.servicio
     app.dependency_overrides[obtener_repositorio_campanas_whatsmkt] = lambda: e.campanas
     app.dependency_overrides[obtener_servicio_consulta_whatsmkt] = lambda: (
-        ConsultaCampanasWhatsmktService(e.campanas, e.whatsmkt)
+        ConsultaCampanasWhatsmktService(e.campanas)
     )
     app.dependency_overrides[obtener_servicio_informes_whatsmkt] = lambda: InformesWhatsmktService(
         e.campanas, leer_tabla_del_informe

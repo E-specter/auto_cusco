@@ -12,7 +12,6 @@ from app.core.entities.whatsmkt_campana import (
     PaginaExclusiones,
 )
 from app.core.ports.repositorio_campanas_whatsmkt_port import RepositorioCampanasWhatsmktPort
-from app.core.ports.repositorio_whatsmkt_port import RepositorioWhatsmktPort
 from app.core.services.plataformas.whatsmkt.ficha import FichaCampana, ficha_de
 
 
@@ -34,11 +33,8 @@ class DetalleCampana:
 
 
 class ConsultaCampanasWhatsmktService:
-    def __init__(
-        self, campanas: RepositorioCampanasWhatsmktPort, whatsmkt: RepositorioWhatsmktPort
-    ) -> None:
+    def __init__(self, campanas: RepositorioCampanasWhatsmktPort) -> None:
         self._campanas = campanas
-        self._whatsmkt = whatsmkt
 
     def listar(
         self,
@@ -57,11 +53,10 @@ class ConsultaCampanasWhatsmktService:
         campana = self._campanas.obtener(campana_id)
         if campana is None:
             raise CampanaNoEncontrada(campana_id)
-        whatsapp = self._whatsmkt.obtener_configuracion().whatsapp_contacto
         return DetalleCampana(
             campana=campana,
             modo=self._campanas.modo_del_lote(campana.lote_id),
-            ficha=ficha_de(campana, whatsapp),
+            ficha=ficha_de(campana),
             exclusiones=self._campanas.listar_exclusiones(
                 campana.lote_id, campana.id, exclusiones.limite, exclusiones.desplazamiento
             ),

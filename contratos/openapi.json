@@ -5698,7 +5698,7 @@
           "whatsmkt"
         ],
         "summary": "Detalle de la campana",
-        "description": "La campana con su ficha (RF-WM-36), su lote y sus exclusiones, las suyas y las que quedaron\nfuera de todas las campanas del lote, cada lista con su propia paginacion.\n\nLa ficha sale de lo congelado al crear, salvo [whatsapp]: se reemplaza con el WhatsApp de\ncontacto VIGENTE, porque el texto se copia ahora en WhatsMKT. Sin numero queda el marcador y\nla ficha trae el aviso `sin_whatsapp`.",
+        "description": "La campana con su ficha (RF-WM-36), su lote y sus exclusiones, las suyas y las que quedaron\nfuera de todas las campanas del lote, cada lista con su propia paginacion.\n\nLa ficha sale entera de lo congelado al crear, el WhatsApp de contacto incluido: cambiar la\nconfiguracion despues no la toca. Si el mensaje usa [whatsapp] y la campana no tiene numero\n(no deberia pasar), queda el marcador y la ficha trae el aviso `sin_whatsapp`.",
         "operationId": "obtener_campana_whatsmkt_campanas__campana_id__get",
         "parameters": [
           {
@@ -11106,7 +11106,7 @@
           "mensaje": {
             "type": "string",
             "title": "Mensaje",
-            "description": "Texto para copiar: [whatsapp] ya es el enlace (con el numero VIGENTE al leer) y las [$MACROn$] quedan tal cual"
+            "description": "Texto para copiar: [whatsapp] ya es el enlace (con el numero congelado) y las [$MACROn$] quedan tal cual"
           },
           "avisos": {
             "items": {

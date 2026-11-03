@@ -1,7 +1,7 @@
 """GET /whatsmkt/campanas y GET /whatsmkt/campanas/{id}, sin base (T-WM-B4b1, parte 3).
 
 El servicio de lectura real sobre el repositorio en memoria (`tests/ayudas`): los filtros por lote
-y por mes, el orden y la paginacion, la ficha con el WhatsApp vigente, las exclusiones de la
+y por mes, el orden y la paginacion, la ficha con el WhatsApp congelado, las exclusiones de la
 campana y las que quedaron fuera del lote, y el 404. Telefonos 900000xxx.
 """
 
@@ -34,7 +34,7 @@ def cliente():
     e.whatsmkt.configuracion = replace(e.whatsmkt.configuracion, whatsapp_contacto="900000123")
     app.dependency_overrides[obtener_servicio_creacion_whatsmkt] = e.servicio
     app.dependency_overrides[obtener_servicio_consulta_whatsmkt] = lambda: (
-        ConsultaCampanasWhatsmktService(e.campanas, e.whatsmkt)
+        ConsultaCampanasWhatsmktService(e.campanas)
     )
     try:
         yield TestClient(app), e
@@ -251,35 +251,52 @@ def test_el_detalle_de_una_campana_por_segmento_trae_su_segmento_y_el_modo_del_l
     assert d["nombre"] == "CUZCO_Vencida (Tramo 2) whatsapp 2026.11.02"
 
 
-def test_el_mensaje_de_la_ficha_usa_el_whatsapp_vigente_no_el_del_dia_que_se_creo(
+def test_el_mensaje_de_la_ficha_usa_el_whatsapp_congelado_aunque_cambie_la_configuracion(
+    cliente,
+) -> None:
+    client, e = cliente
+    crear(cliente)
+    antes = client.get(f"{RUTA}/1").json()["ficha"]
+
+    e.whatsmkt.configuracion = replace(e.whatsmkt.configuracion, whatsapp_contacto="900000999")
+    despues = client.get(f"{RUTA}/1").json()["ficha"]
+
+    assert despues["mensaje"].endswith("INFO por https://wa.me/+51900000123")
+    assert despues["avisos"] == []
+    assert despues == antes
+
+
+def test_si_se_quita_el_whatsapp_de_la_configuracion_la_ficha_sigue_con_el_congelado(
     cliente,
 ) -> None:
     client, e = cliente
     crear(cliente)
 
-    e.whatsmkt.configuracion = replace(e.whatsmkt.configuracion, whatsapp_contacto="900000999")
+    e.whatsmkt.configuracion = replace(e.whatsmkt.configuracion, whatsapp_contacto=None)
     ficha = client.get(f"{RUTA}/1").json()["ficha"]
 
-    assert ficha["mensaje"].endswith("INFO por https://wa.me/+51900000999")
+    assert ficha["mensaje"].endswith("INFO por https://wa.me/+51900000123")
     assert ficha["avisos"] == []
 
 
-def test_sin_whatsapp_vigente_queda_el_marcador_y_la_ficha_trae_el_aviso(cliente) -> None:
+def test_una_campana_con_whatsapp_en_el_mensaje_y_sin_numero_deja_el_marcador_y_avisa(
+    cliente,
+) -> None:
     client, e = cliente
     crear(cliente)
-
-    e.whatsmkt.configuracion = replace(e.whatsmkt.configuracion, whatsapp_contacto=None)
+    # No deberia existir (crear exige el numero), pero un dato viejo o roto no rompe la lectura.
+    e.campanas.campanas[1] = replace(e.campanas.campanas[1], whatsapp_contacto=None)
     ficha = client.get(f"{RUTA}/1").json()["ficha"]
 
     assert ficha["mensaje"].endswith("INFO por [whatsapp]")
     assert ficha["avisos"] == ["sin_whatsapp"]
 
 
-def test_un_mensaje_que_no_usa_whatsapp_no_trae_aviso_aunque_no_haya_numero(cliente) -> None:
+def test_un_mensaje_sin_whatsapp_se_crea_sin_numero_y_su_ficha_no_avisa(cliente) -> None:
     client, e = cliente
-    crear(cliente, mensaje={"texto_guardado_id": 11})
-
     e.whatsmkt.configuracion = replace(e.whatsmkt.configuracion, whatsapp_contacto=None)
+    crear(cliente, mensaje={"texto_guardado_id": 11})
+    assert e.campanas.campanas[1].whatsapp_contacto is None  # nada que congelar
     ficha = client.get(f"{RUTA}/1").json()["ficha"]
 
     assert ficha["mensaje"] == "Hola [$MACRO1$]"

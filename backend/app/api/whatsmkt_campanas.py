@@ -497,7 +497,7 @@ class FichaWhatsmktRespuesta(ModeloRespuesta):
     etiqueta_vcard: str | None
     mensaje: str = Field(
         description=(
-            "Texto para copiar: [whatsapp] ya es el enlace (con el numero VIGENTE al leer) y las "
+            "Texto para copiar: [whatsapp] ya es el enlace (con el numero congelado) y las "
             "[$MACROn$] quedan tal cual"
         )
     )
@@ -543,8 +543,8 @@ def _horarios(horarios) -> list[HorarioCampanaWhatsmktRespuesta]:
     ]
 
 
-def _ficha(c: CampanaWhatsmkt, whatsapp_vigente: str | None) -> FichaWhatsmktRespuesta:
-    return _respuesta_de_ficha(ficha_de(c, whatsapp_vigente))
+def _ficha(c: CampanaWhatsmkt) -> FichaWhatsmktRespuesta:
+    return _respuesta_de_ficha(ficha_de(c))
 
 
 def _respuesta_de_ficha(f: FichaCampana) -> FichaWhatsmktRespuesta:
@@ -573,7 +573,7 @@ def _campana_creada(c: CampanaWhatsmkt) -> CampanaCreadaWhatsmktRespuesta:
         archivo=ArchivoCampanaWhatsmktRespuesta(
             nombre=c.archivo_nombre, tamano=c.archivo_tamano, filas=c.cantidad
         ),
-        ficha=_ficha(c, c.whatsapp_contacto),  # al crear, el vigente es el que se congelo
+        ficha=_ficha(c),
     )
 
 
@@ -792,10 +792,7 @@ class DetalleCampanaWhatsmktRespuesta(ResumenCampanaWhatsmktRespuesta):
 
 def obtener_servicio_consulta_whatsmkt() -> ConsultaCampanasWhatsmktService:
     """Dependencia de FastAPI; los tests la sustituyen por un doble de prueba."""
-    return ConsultaCampanasWhatsmktService(
-        RepositorioCampanasWhatsmktPostgres(get_engine()),
-        RepositorioWhatsmktPostgres(get_engine()),
-    )
+    return ConsultaCampanasWhatsmktService(RepositorioCampanasWhatsmktPostgres(get_engine()))
 
 
 def _resumen(c: CampanaWhatsmkt) -> dict[str, Any]:
@@ -883,9 +880,9 @@ def obtener_campana(
     """La campana con su ficha (RF-WM-36), su lote y sus exclusiones, las suyas y las que quedaron
     fuera de todas las campanas del lote, cada lista con su propia paginacion.
 
-    La ficha sale de lo congelado al crear, salvo [whatsapp]: se reemplaza con el WhatsApp de
-    contacto VIGENTE, porque el texto se copia ahora en WhatsMKT. Sin numero queda el marcador y
-    la ficha trae el aviso `sin_whatsapp`.
+    La ficha sale entera de lo congelado al crear, el WhatsApp de contacto incluido: cambiar la
+    configuracion despues no la toca. Si el mensaje usa [whatsapp] y la campana no tiene numero
+    (no deberia pasar), queda el marcador y la ficha trae el aviso `sin_whatsapp`.
     """
     propias = Paginacion(exclusiones_limite, exclusiones_desplazamiento)
     fuera = Paginacion(fuera_del_lote_limite, fuera_del_lote_desplazamiento)

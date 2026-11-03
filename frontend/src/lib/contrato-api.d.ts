@@ -1563,9 +1563,9 @@ export interface paths {
          * @description La campana con su ficha (RF-WM-36), su lote y sus exclusiones, las suyas y las que quedaron
          *     fuera de todas las campanas del lote, cada lista con su propia paginacion.
          *
-         *     La ficha sale de lo congelado al crear, salvo [whatsapp]: se reemplaza con el WhatsApp de
-         *     contacto VIGENTE, porque el texto se copia ahora en WhatsMKT. Sin numero queda el marcador y
-         *     la ficha trae el aviso `sin_whatsapp`.
+         *     La ficha sale entera de lo congelado al crear, el WhatsApp de contacto incluido: cambiar la
+         *     configuracion despues no la toca. Si el mensaje usa [whatsapp] y la campana no tiene numero
+         *     (no deberia pasar), queda el marcador y la ficha trae el aviso `sin_whatsapp`.
          */
         get: operations["obtener_campana_whatsmkt_campanas__campana_id__get"];
         put?: never;
@@ -3724,7 +3724,7 @@ export interface components {
             etiqueta_vcard: string | null;
             /**
              * Mensaje
-             * @description Texto para copiar: [whatsapp] ya es el enlace (con el numero VIGENTE al leer) y las [$MACROn$] quedan tal cual
+             * @description Texto para copiar: [whatsapp] ya es el enlace (con el numero congelado) y las [$MACROn$] quedan tal cual
              */
             mensaje: string;
             /**
