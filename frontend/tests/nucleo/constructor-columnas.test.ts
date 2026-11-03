@@ -724,6 +724,7 @@ function respuesta(parcial: Partial<components['schemas']['DefinicionRespuesta']
             valor_por_defecto: null,
             variantes: [],
             celda_texto: false,
+            etiqueta: null,
           },
           {
             nombre: 'mensaje',
@@ -742,10 +743,13 @@ function respuesta(parcial: Partial<components['schemas']['DefinicionRespuesta']
               { segmento: 'preventiva', expresion: { nodos: [{ tipo: 'texto', valor: 'Hola' }] } },
             ],
             celda_texto: false,
+            etiqueta: null,
           },
         ],
       },
     },
+    plataforma: null,
+    problemas: [],
   };
   return { ...completa, ...parcial };
 }

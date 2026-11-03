@@ -73,6 +73,9 @@ class CampoSalida:
       contenido por defecto. Necesitan `DefinicionCarga.segmentacion`.
     - `celda_texto` (RF-73): en XLSX la columna se escribe con el formato de celda «Texto» (`@`).
       Lo aplica el exportador, no el generador; CSV y JSON no cambian.
+    - `etiqueta` (RF-49): un nombre descriptivo para reconocer la columna en el constructor y en los
+      editores que la ofrecen, de 1 a 120 caracteres. No sale en el archivo (S-5): el encabezado es
+      siempre `nombre`, y ni el generador ni el exportador la usan.
     """
 
     nombre: str
@@ -85,6 +88,7 @@ class CampoSalida:
     valor_por_defecto: str | None = None
     variantes: tuple[VarianteCampo, ...] = ()
     celda_texto: bool = False
+    etiqueta: str | None = None
 
 
 @dataclass(frozen=True)

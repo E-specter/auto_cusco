@@ -72,6 +72,13 @@ class CodigoTexto(StrEnum):
     SELECCION_NO_ENCONTRADA = "seleccion_no_encontrada"
     # La fecha de envio de una carga (RF-55)
     FECHA_ENVIO_ANTERIOR = "fecha_envio_anterior"  # la fecha de envio es anterior a la de corte
+    # Las reglas de una plataforma de destino (RF-72)
+    PLATAFORMA_DESCONOCIDA = "plataforma_desconocida"  # no esta registrada (o nunca lo estuvo)
+    PLATAFORMA_COLUMNA_FIJA_AUSENTE = "plataforma_columna_fija_ausente"  # falta una columna fija
+    PLATAFORMA_COLUMNA_FIJA_MOVIDA = "plataforma_columna_fija_movida"  # no esta en su posicion
+    PLATAFORMA_TIPO_DE_COLUMNA_FIJA = "plataforma_tipo_de_columna_fija"  # no tiene su tipo
+    PLATAFORMA_TIPO_DEL_RESTO = "plataforma_tipo_del_resto"  # las demas deben ser de otro tipo
+    PLATAFORMA_COLUMNAS_DE_MAS = "plataforma_columnas_de_mas"  # no admite mas que las fijas
 
 
 @dataclass(frozen=True)

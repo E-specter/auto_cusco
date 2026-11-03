@@ -9,6 +9,11 @@ resuelta.
 
 Ninguna version se modifica: un cambio es una version nueva (la vigente es la ultima). Renombrar
 una definicion (RF-56) cambia solo su nombre: no crea ni toca ninguna version.
+
+La plataforma de destino (RF-72) se fija al crear y ninguna otra operacion la cambia: ni una version
+nueva ni renombrar. Al crear, una plataforma que no esta registrada es un problema (400); al guardar
+una version, la definicion se valida contra las reglas de SU plataforma. Lo guardado cuya plataforma
+ya no esta registrada se sigue leyendo y generando tal cual, con un problema en la vista.
 """
 
 from collections.abc import Mapping
@@ -30,6 +35,14 @@ from app.core.entities.mapeo import DefinicionCarga
 from app.core.entities.nombres import normalizar_nombre
 from app.core.entities.texto_enriquecido import CodigoTexto, Problema
 from app.core.ports.repositorio_definiciones_port import RepositorioDefinicionesPort
+from app.core.services.definiciones_columnas.plataformas import (
+    CAMPO as CAMPO_PLATAFORMA,
+)
+from app.core.services.definiciones_columnas.plataformas import (
+    RegistroPlataformas,
+    problema_de_plataforma_desconocida,
+    problemas_de_plataforma,
+)
 from app.core.services.mapeo_campos.diagnostico import diagnosticar_leida
 from app.core.services.mapeo_campos.serializacion import (
     DefinicionIlegible,
@@ -55,6 +68,9 @@ class VistaDefinicion:
 
     definicion: DefinicionGuardada
     version: VersionDefinicion
+    # Los problemas de la version contra las reglas de su plataforma (RF-72); vacio si cumple, si
+    # no tiene plataforma o si se acaba de guardar (guardar exige que no haya ninguno).
+    problemas: tuple[ProblemaDeDefinicion, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -68,9 +84,15 @@ class DefinicionCargada:
 
 
 class DefinicionesColumnasService:
-    def __init__(self, repositorio: RepositorioDefinicionesPort, contexto: ContextoTexto) -> None:
+    def __init__(
+        self,
+        repositorio: RepositorioDefinicionesPort,
+        contexto: ContextoTexto,
+        plataformas: RegistroPlataformas | None = None,
+    ) -> None:
         self._repositorio = repositorio
         self._contexto = contexto
+        self._plataformas = plataformas if plataformas is not None else RegistroPlataformas()
 
     # --- consulta ---
 
@@ -79,7 +101,8 @@ class DefinicionesColumnasService:
 
     def obtener(self, definicion_id: int, numero: int | None = None) -> VistaDefinicion:
         guardada = self._guardada(definicion_id)
-        return VistaDefinicion(guardada, self._version(guardada, numero))
+        version = self._version(guardada, numero)
+        return VistaDefinicion(guardada, version, self._problemas_de_plataforma(guardada, version))
 
     def cargar(self, definicion_id: int, numero: int | None = None) -> DefinicionCargada:
         """La definicion lista para `GeneradorCargas`: la version pedida o la vigente."""
@@ -96,14 +119,14 @@ class DefinicionesColumnasService:
 
     def crear(self, dato: Any) -> VistaDefinicion:
         """Guarda una definicion nueva (version 1)."""
-        nombre, leida = self._validar(dato, None)
-        guardada = self._repositorio.crear(nombre, self._contenido(leida))
+        nombre, leida = self._validar(dato, None, None)
+        guardada = self._repositorio.crear(nombre, self._contenido(leida), leida.plataforma)
         return VistaDefinicion(guardada, guardada.vigente)
 
     def agregar_version(self, definicion_id: int, dato: Any) -> VistaDefinicion:
         """Guarda la definicion como una version nueva, que pasa a ser la vigente."""
         existente = self._guardada(definicion_id)
-        _, leida = self._validar(dato, existente.nombre)
+        _, leida = self._validar(dato, existente.nombre, existente.plataforma)
         version = self._repositorio.agregar_version(definicion_id, self._contenido(leida))
         if version is None:
             raise DefinicionNoEncontrada(definicion_id)
@@ -156,12 +179,37 @@ class DefinicionesColumnasService:
             raise VersionNoEncontrada(guardada.id, numero)  # type: ignore[arg-type]
         return version
 
+    def _problemas_de_plataforma(
+        self, guardada: DefinicionGuardada, version: VersionDefinicion
+    ) -> tuple[ProblemaDeDefinicion, ...]:
+        """La version contra las reglas de la plataforma de la definicion (RF-72)."""
+        if guardada.plataforma is None:
+            return ()
+        if guardada.plataforma not in self._plataformas:
+            return (problema_de_plataforma_desconocida(guardada.plataforma),)
+        try:
+            leida = definicion_desde_dict(
+                {**version.contenido, "nombre": guardada.nombre},
+                self._contexto.tabla_rangos,
+                self._contexto.variable_dias,
+            )
+        except DefinicionIlegible:
+            return ()  # lo ilegible lo informa quien lo lee; aqui solo la plataforma
+        reglas = self._plataformas.obtener(guardada.plataforma)
+        return tuple(problemas_de_plataforma(leida, reglas))
+
     @staticmethod
     def _contenido(leida: DefinicionLeida) -> Mapping[str, Any]:
         return definicion_a_dict(leida, con_nombre=False)
 
-    def _validar(self, dato: Any, nombre_existente: str | None) -> tuple[str, DefinicionLeida]:
-        """El nombre y la definicion leida, o `DefinicionInvalida` con todos los problemas."""
+    def _validar(
+        self, dato: Any, nombre_existente: str | None, plataforma_existente: str | None
+    ) -> tuple[str, DefinicionLeida]:
+        """El nombre y la definicion leida, o `DefinicionInvalida` con todos los problemas.
+
+        `plataforma_existente` es la de la definicion a la que va una version nueva; para una
+        definicion nueva, la plataforma es la que traiga el pedido (RF-72).
+        """
         problemas: list[ProblemaDeDefinicion] = list(_problemas_de_nombre(dato, nombre_existente))
         try:
             leida = definicion_desde_dict(
@@ -174,6 +222,23 @@ class DefinicionesColumnasService:
             raise DefinicionInvalida((*problemas, *error.problemas)) from error
         problemas += _problemas_de_limites(leida)
         problemas += diagnosticar_leida(leida, self._contexto.tipos)
+        if nombre_existente is None:
+            clave = leida.plataforma
+        else:
+            clave = plataforma_existente
+            if leida.plataforma is not None and leida.plataforma != plataforma_existente:
+                problemas.append(
+                    _problema(
+                        CodigoTexto.DEFINICION_INVALIDA,
+                        "La plataforma de una definicion no cambia con una version nueva",
+                        campo=CAMPO_PLATAFORMA,
+                    )
+                )
+        if clave is not None:
+            if clave not in self._plataformas:
+                problemas.append(problema_de_plataforma_desconocida(clave))
+            else:
+                problemas += problemas_de_plataforma(leida, self._plataformas.obtener(clave))
         if problemas:
             raise DefinicionInvalida(tuple(problemas))
         nombre = nombre_existente if nombre_existente is not None else dato["nombre"].strip()

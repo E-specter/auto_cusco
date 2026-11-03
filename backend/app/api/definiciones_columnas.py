@@ -1,6 +1,7 @@
 """Adaptador de entrada HTTP de las definiciones de columnas guardadas (RF-51, RF-46, B4b).
 
     GET  /definiciones-columnas                        el listado (C-7)
+    GET  /definiciones-columnas/plataformas            las reglas de cada plataforma (RF-72)
     POST /definiciones-columnas                        guarda una definicion nueva (version 1)
     GET  /definiciones-columnas/{id}?version=N         una definicion con su version vigente o la N
     POST /definiciones-columnas/{id}/versiones         guarda un cambio como una version nueva
@@ -10,6 +11,12 @@ Ninguna version se modifica: un cambio es una version nueva y la vigente es la u
 unico sin distinguir mayusculas y no cambia con las versiones; solo `PATCH` lo cambia. El pedido
 es la misma definicion del constructor que acepta `/texto-enriquecido/previsualizacion`
 (`DefinicionColumnasEntrada`): una sola forma para armar, previsualizar y guardar.
+
+La `plataforma` (RF-72) se elige al crear y no cambia: ni una version nueva ni renombrar la tocan.
+Una clave que no esta en `/definiciones-columnas/plataformas` es un `400`. Cada plataforma declara
+sus columnas fijas (posicion, nombre, tipo) y lo que exige del resto; guardar contra una plataforma
+comprueba solo eso, con un problema por columna. El nombre por defecto de las columnas que siguen a
+las fijas (`encabezado_por_posicion`) es solo una sugerencia: no se valida.
 
 Al guardar se valida con el mismo motor (RF-46): si algo no vale, un `400` que extiende
 `DetalleError` con `codigo` y los `problemas`, cada uno con su ubicacion (columna, variante, campo,
@@ -45,26 +52,40 @@ from app.core.entities.definiciones_columnas import (
     VersionDefinicion,
     VersionNoEncontrada,
 )
+from app.core.entities.plataformas import ReglasPlataforma
 from app.core.entities.texto_enriquecido import CodigoTexto
 from app.core.services.contextos_texto import RegistroContextos
+from app.core.services.definiciones_columnas.plataformas import RegistroPlataformas
 from app.core.services.definiciones_columnas.servicio import (
     DefinicionesColumnasService,
     DefinicionInvalida,
     VistaDefinicion,
 )
+from app.core.services.mapeo_campos.serializacion import ProblemaDeDefinicion
 
 router = APIRouter(prefix="/definiciones-columnas", tags=["definiciones de columnas"])
 
 
+# Las plataformas que la aplicacion conoce: cada modulo agrega aqui las suyas (RF-72). B2 no
+# registra ninguna; los tests sustituyen `obtener_registro_plataformas`.
+_REGISTRO_PLATAFORMAS = RegistroPlataformas()
+
+
+def obtener_registro_plataformas() -> RegistroPlataformas:
+    """Dependencia de FastAPI: las plataformas registradas."""
+    return _REGISTRO_PLATAFORMAS
+
+
 def obtener_servicio_definiciones(
     contextos: RegistroContextos = Depends(obtener_registro_contextos),
+    plataformas: RegistroPlataformas = Depends(obtener_registro_plataformas),
 ) -> DefinicionesColumnasService:
     """Dependencia de FastAPI; los tests la sustituyen por un doble de prueba.
 
     Las definiciones guardadas se validan contra el contexto `cartera`: alimentan `/archivos-carga`.
     """
     return DefinicionesColumnasService(
-        RepositorioDefinicionesPostgres(get_engine()), contextos.obtener("cartera")
+        RepositorioDefinicionesPostgres(get_engine()), contextos.obtener("cartera"), plataformas
     )
 
 
@@ -158,6 +179,7 @@ class ColumnaGuardadaRespuesta(ModeloRespuesta):
     valor_por_defecto: str | None
     variantes: list[VarianteGuardadaRespuesta]
     celda_texto: bool = False  # RF-73: lo guardado antes no trae la clave
+    etiqueta: str | None = None  # RF-49: lo guardado antes no trae la clave
 
 
 class CriterioCalculadoGuardadoRespuesta(ModeloRespuesta):
@@ -208,6 +230,10 @@ class DefinicionRespuesta(ModeloRespuesta):
     version_vigente: int
     versiones: list[VersionDefinicionResumenRespuesta]
     version: VersionDefinicionRespuesta
+    plataforma: str | None  # RF-72: fija desde que se crea; None = archivo libre
+    # Lo que la version incumple de las reglas de su plataforma (vacio si cumple, si no tiene
+    # plataforma o si acaba de guardarse); `plataforma_desconocida` si ya no esta registrada.
+    problemas: list[ProblemaTextoRespuesta]
 
 
 class ResumenDefinicionRespuesta(ModeloRespuesta):
@@ -217,6 +243,49 @@ class ResumenDefinicionRespuesta(ModeloRespuesta):
     cantidad_versiones: int
     actualizado_en: datetime
     vigente_usada: bool
+    plataforma: str | None
+
+
+class ColumnaFijaRespuesta(ModeloRespuesta):
+    posicion: int  # desde 1: la 1.ª columna
+    nombre: str
+    contenido_por_defecto: str | None
+    tipo: Literal["texto", "numero", "fecha", "financiero"]
+    celda_texto: bool
+    contenido_editable: bool
+
+
+class ReglasPlataformaRespuesta(ModeloRespuesta):
+    """Lo que una plataforma fija de una definicion de columnas (RF-72)."""
+
+    clave: str
+    etiqueta: str
+    columnas_fijas: list[ColumnaFijaRespuesta]
+    # Solo el nombre por defecto de las columnas tras las fijas (`{n}` desde 1); no se valida
+    encabezado_por_posicion: str | None
+    tipo_resto: Literal["texto", "numero", "fecha", "financiero"] | None
+    admite_mas_columnas: bool
+
+
+def _reglas(reglas: ReglasPlataforma) -> ReglasPlataformaRespuesta:
+    return ReglasPlataformaRespuesta(
+        clave=reglas.clave,
+        etiqueta=reglas.etiqueta,
+        columnas_fijas=[
+            ColumnaFijaRespuesta(
+                posicion=f.posicion,
+                nombre=f.nombre,
+                contenido_por_defecto=f.contenido_por_defecto,
+                tipo=f.tipo.value,
+                celda_texto=f.celda_texto,
+                contenido_editable=f.contenido_editable,
+            )
+            for f in reglas.columnas_fijas
+        ],
+        encabezado_por_posicion=reglas.encabezado_por_posicion,
+        tipo_resto=reglas.tipo_resto.value if reglas.tipo_resto is not None else None,
+        admite_mas_columnas=reglas.admite_mas_columnas,
+    )
 
 
 def _resumen_de_version(version: VersionDefinicion) -> VersionDefinicionResumenRespuesta:
@@ -235,7 +304,11 @@ def _version(version: VersionDefinicion) -> VersionDefinicionRespuesta:
     )
 
 
-def _definicion(definicion: DefinicionGuardada, version: VersionDefinicion) -> DefinicionRespuesta:
+def _definicion(
+    definicion: DefinicionGuardada,
+    version: VersionDefinicion,
+    problemas: tuple[ProblemaDeDefinicion, ...] = (),
+) -> DefinicionRespuesta:
     return DefinicionRespuesta(
         id=definicion.id,
         nombre=definicion.nombre,
@@ -244,11 +317,13 @@ def _definicion(definicion: DefinicionGuardada, version: VersionDefinicion) -> D
         version_vigente=definicion.vigente.numero,
         versiones=[_resumen_de_version(v) for v in definicion.versiones],
         version=_version(version),
+        plataforma=definicion.plataforma,
+        problemas=[problema_respuesta(p.problema, p) for p in problemas],
     )
 
 
 def _vista(vista: VistaDefinicion) -> DefinicionRespuesta:
-    return _definicion(vista.definicion, vista.version)
+    return _definicion(vista.definicion, vista.version, vista.problemas)
 
 
 def _resumen(resumen: ResumenDefinicion) -> ResumenDefinicionRespuesta:
@@ -259,6 +334,7 @@ def _resumen(resumen: ResumenDefinicion) -> ResumenDefinicionRespuesta:
         cantidad_versiones=resumen.cantidad_versiones,
         actualizado_en=resumen.actualizado_en,
         vigente_usada=resumen.vigente_usada,
+        plataforma=resumen.plataforma,
     )
 
 
@@ -286,6 +362,15 @@ def listar_definiciones(
 ) -> list[ResumenDefinicionRespuesta]:
     """Las definiciones, ordenadas por nombre, con su version vigente (C-7). Sin paginar."""
     return [_resumen(r) for r in servicio.listar()]
+
+
+@router.get("/plataformas", response_model=list[ReglasPlataformaRespuesta])
+def listar_plataformas(
+    plataformas: RegistroPlataformas = Depends(obtener_registro_plataformas),
+) -> list[ReglasPlataformaRespuesta]:
+    """Las plataformas de destino y lo que cada una fija: columnas fijas, tipo del resto y si admite
+    mas columnas (RF-72). La pantalla y la validacion al guardar leen estas mismas reglas."""
+    return [_reglas(r) for r in plataformas.disponibles()]
 
 
 @router.post(

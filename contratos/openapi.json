@@ -4057,6 +4057,32 @@
         }
       }
     },
+    "/definiciones-columnas/plataformas": {
+      "get": {
+        "tags": [
+          "definiciones de columnas"
+        ],
+        "summary": "Listar Plataformas",
+        "description": "Las plataformas de destino y lo que cada una fija: columnas fijas, tipo del resto y si admite\nmas columnas (RF-72). La pantalla y la validacion al guardar leen estas mismas reglas.",
+        "operationId": "listar_plataformas_definiciones_columnas_plataformas_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReglasPlataformaRespuesta"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Plataformas Definiciones Columnas Plataformas Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/definiciones-columnas/{definicion_id}": {
       "get": {
         "tags": [
@@ -5697,7 +5723,13 @@
           "version_no_encontrada",
           "nombre_repetido",
           "seleccion_no_encontrada",
-          "fecha_envio_anterior"
+          "fecha_envio_anterior",
+          "plataforma_desconocida",
+          "plataforma_columna_fija_ausente",
+          "plataforma_columna_fija_movida",
+          "plataforma_tipo_de_columna_fija",
+          "plataforma_tipo_del_resto",
+          "plataforma_columnas_de_mas"
         ],
         "title": "CodigoTexto",
         "description": "Catalogo de codigos que el frontend traducira como `textoEnriquecido.codigo.<codigo>`.\n\nUn codigo por linea, con la forma `NOMBRE = \"codigo\"`: la prueba espejo del\nfrontend lee esta clase. Los primeros se detectan al compilar (una expresion\ninvalida no procesa ninguna fila); los siguientes, al evaluar una fila concreta; al final,\nlos que solo informa la API del motor (B4a): lo que no se puede leer, el contexto o el\nproducto que no existen, y por que una expresion no tiene largo maximo."
@@ -5871,6 +5903,17 @@
               }
             ],
             "title": "Celda Texto"
+          },
+          "etiqueta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etiqueta"
           }
         },
         "additionalProperties": true,
@@ -5882,6 +5925,57 @@
         ],
         "title": "ColumnaEntrada",
         "description": "Una columna de la definicion: la forma que guardara B4b. El contenido es solo expresion;\n`formato_fecha` va con marcas legibles (`dd/mm/aaaa`) y el backend las traduce."
+      },
+      "ColumnaFijaRespuesta": {
+        "properties": {
+          "posicion": {
+            "type": "integer",
+            "title": "Posicion"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "contenido_por_defecto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contenido Por Defecto"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "texto",
+              "numero",
+              "fecha",
+              "financiero"
+            ],
+            "title": "Tipo"
+          },
+          "celda_texto": {
+            "type": "boolean",
+            "title": "Celda Texto"
+          },
+          "contenido_editable": {
+            "type": "boolean",
+            "title": "Contenido Editable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "posicion",
+          "nombre",
+          "contenido_por_defecto",
+          "tipo",
+          "celda_texto",
+          "contenido_editable"
+        ],
+        "title": "ColumnaFijaRespuesta"
       },
       "ColumnaGuardadaRespuesta": {
         "properties": {
@@ -5942,6 +6036,17 @@
             "type": "boolean",
             "title": "Celda Texto",
             "default": false
+          },
+          "etiqueta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etiqueta"
           }
         },
         "type": "object",
@@ -5954,7 +6059,8 @@
           "formato_financiero",
           "valor_por_defecto",
           "variantes",
-          "celda_texto"
+          "celda_texto",
+          "etiqueta"
         ],
         "title": "ColumnaGuardadaRespuesta"
       },
@@ -6931,6 +7037,17 @@
             ],
             "title": "Nombre"
           },
+          "plataforma": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plataforma"
+          },
           "columnas": {
             "items": {
               "$ref": "#/components/schemas/ColumnaEntrada"
@@ -6966,7 +7083,7 @@
           "columnas"
         ],
         "title": "DefinicionColumnasEntrada",
-        "description": "Las columnas van con `orden` explicito y se identifican por su posicion en la lista;\n`proteger_formulas` (por defecto verdadero) lo aplica el exportador (RF-53)."
+        "description": "Las columnas van con `orden` explicito y se identifican por su posicion en la lista;\n`proteger_formulas` (por defecto verdadero) lo aplica el exportador (RF-53). La `plataforma`\n(RF-72) solo cuenta al crear: despues no cambia; la previsualizacion no la usa."
       },
       "DefinicionEntrada": {
         "properties": {
@@ -7049,6 +7166,24 @@
           },
           "version": {
             "$ref": "#/components/schemas/VersionDefinicionRespuesta"
+          },
+          "plataforma": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plataforma"
+          },
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaTextoRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
           }
         },
         "type": "object",
@@ -7059,7 +7194,9 @@
           "actualizado_en",
           "version_vigente",
           "versiones",
-          "version"
+          "version",
+          "plataforma",
+          "problemas"
         ],
         "title": "DefinicionRespuesta",
         "description": "La definicion, todas sus versiones (sin contenido) y la pedida (la vigente por defecto)."
@@ -10468,6 +10605,68 @@
         ],
         "title": "RangoRespuesta"
       },
+      "ReglasPlataformaRespuesta": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta"
+          },
+          "columnas_fijas": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnaFijaRespuesta"
+            },
+            "type": "array",
+            "title": "Columnas Fijas"
+          },
+          "encabezado_por_posicion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encabezado Por Posicion"
+          },
+          "tipo_resto": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "texto",
+                  "numero",
+                  "fecha",
+                  "financiero"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Resto"
+          },
+          "admite_mas_columnas": {
+            "type": "boolean",
+            "title": "Admite Mas Columnas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "etiqueta",
+          "columnas_fijas",
+          "encabezado_por_posicion",
+          "tipo_resto",
+          "admite_mas_columnas"
+        ],
+        "title": "ReglasPlataformaRespuesta",
+        "description": "Lo que una plataforma fija de una definicion de columnas (RF-72)."
+      },
       "RenombrarDefinicionEntrada": {
         "properties": {
           "nombre": {
@@ -10537,6 +10736,17 @@
           "vigente_usada": {
             "type": "boolean",
             "title": "Vigente Usada"
+          },
+          "plataforma": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plataforma"
           }
         },
         "type": "object",
@@ -10546,7 +10756,8 @@
           "version_vigente",
           "cantidad_versiones",
           "actualizado_en",
-          "vigente_usada"
+          "vigente_usada",
+          "plataforma"
         ],
         "title": "ResumenDefinicionRespuesta"
       },

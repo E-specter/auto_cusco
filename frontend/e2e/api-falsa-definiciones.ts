@@ -81,6 +81,7 @@ export function contenidoSintetico(sufijo = ''): Contenido {
     valor_por_defecto: null,
     variantes: [],
     celda_texto: false,
+    etiqueta: null,
   });
   return {
     proteger_formulas: true,
@@ -215,6 +216,7 @@ function contenidoDe(entrada: Entrada): Contenido {
         expresion: expresionDe(c.expresion),
         valor_por_defecto: c.valor_por_defecto ?? null,
         celda_texto: c.celda_texto ?? false,
+        etiqueta: c.etiqueta?.trim() || null,
         variantes: (c.variantes ?? []).map((v) => ({ segmento: v.segmento as never, expresion: expresionDe(v.expresion) })),
       })),
   };
@@ -233,6 +235,7 @@ function resumen(d: DefinicionFalsa): ResumenDefinicion {
     cantidad_versiones: d.versiones.length,
     actualizado_en: vigente(d).creado_en,
     vigente_usada: esUsada(vigente(d)),
+    plataforma: null,
   };
 }
 
@@ -256,6 +259,8 @@ function respuestaDe(d: DefinicionFalsa, version: VersionFalsa = vigente(d)): De
       usada: esUsada(version),
       contenido: version.contenido,
     },
+    plataforma: null,
+    problemas: [],
   };
 }
 

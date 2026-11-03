@@ -1119,6 +1119,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/definiciones-columnas/plataformas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar Plataformas
+         * @description Las plataformas de destino y lo que cada una fija: columnas fijas, tipo del resto y si admite
+         *     mas columnas (RF-72). La pantalla y la validacion al guardar leen estas mismas reglas.
+         */
+        get: operations["listar_plataformas_definiciones_columnas_plataformas_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/definiciones-columnas/{definicion_id}": {
         parameters: {
             query?: never;
@@ -1754,7 +1775,7 @@ export interface components {
          *     producto que no existen, y por que una expresion no tiene largo maximo.
          * @enum {string}
          */
-        CodigoTexto: "expresion_invalida" | "definicion_invalida" | "sintaxis_invalida" | "referencia_vacia" | "variable_desconocida" | "funcion_desconocida" | "parametro_invalido" | "tipo_incompatible" | "limite_excedido" | "no_se_puede_escribir_como_texto" | "sin_segmento" | "variable_obligatoria_vacia" | "argumento_vacio" | "division_por_cero" | "no_es_numero" | "no_es_fecha" | "telefono_invalido" | "resultado_fuera_de_rango" | "valor_no_convertible" | "sin_cota_variable" | "sin_cota_funcion" | "contexto_desconocido" | "producto_no_encontrado" | "sin_version_vigente" | "definicion_no_encontrada" | "version_no_encontrada" | "nombre_repetido" | "seleccion_no_encontrada" | "fecha_envio_anterior";
+        CodigoTexto: "expresion_invalida" | "definicion_invalida" | "sintaxis_invalida" | "referencia_vacia" | "variable_desconocida" | "funcion_desconocida" | "parametro_invalido" | "tipo_incompatible" | "limite_excedido" | "no_se_puede_escribir_como_texto" | "sin_segmento" | "variable_obligatoria_vacia" | "argumento_vacio" | "division_por_cero" | "no_es_numero" | "no_es_fecha" | "telefono_invalido" | "resultado_fuera_de_rango" | "valor_no_convertible" | "sin_cota_variable" | "sin_cota_funcion" | "contexto_desconocido" | "producto_no_encontrado" | "sin_version_vigente" | "definicion_no_encontrada" | "version_no_encontrada" | "nombre_repetido" | "seleccion_no_encontrada" | "fecha_envio_anterior" | "plataforma_desconocida" | "plataforma_columna_fija_ausente" | "plataforma_columna_fija_movida" | "plataforma_tipo_de_columna_fija" | "plataforma_tipo_del_resto" | "plataforma_columnas_de_mas";
         /**
          * CodigoWhatsmkt
          * @description Codigos de error del modulo; el frontend los traduce como `whatsmkt.codigo.<codigo>`.
@@ -1808,8 +1829,28 @@ export interface components {
             variantes?: components["schemas"]["VarianteEntrada"][] | null;
             /** Celda Texto */
             celda_texto?: boolean | null;
+            /** Etiqueta */
+            etiqueta?: string | null;
         } & {
             [key: string]: unknown;
+        };
+        /** ColumnaFijaRespuesta */
+        ColumnaFijaRespuesta: {
+            /** Posicion */
+            posicion: number;
+            /** Nombre */
+            nombre: string;
+            /** Contenido Por Defecto */
+            contenido_por_defecto: string | null;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "texto" | "numero" | "fecha" | "financiero";
+            /** Celda Texto */
+            celda_texto: boolean;
+            /** Contenido Editable */
+            contenido_editable: boolean;
         };
         /** ColumnaGuardadaRespuesta */
         ColumnaGuardadaRespuesta: {
@@ -1835,6 +1876,8 @@ export interface components {
              * @default false
              */
             celda_texto: boolean;
+            /** Etiqueta */
+            etiqueta: string | null;
         };
         /** ColumnaRespuesta */
         ColumnaRespuesta: {
@@ -2234,11 +2277,14 @@ export interface components {
         /**
          * DefinicionColumnasEntrada
          * @description Las columnas van con `orden` explicito y se identifican por su posicion en la lista;
-         *     `proteger_formulas` (por defecto verdadero) lo aplica el exportador (RF-53).
+         *     `proteger_formulas` (por defecto verdadero) lo aplica el exportador (RF-53). La `plataforma`
+         *     (RF-72) solo cuenta al crear: despues no cambia; la previsualizacion no la usa.
          */
         DefinicionColumnasEntrada: {
             /** Nombre */
             nombre?: string | null;
+            /** Plataforma */
+            plataforma?: string | null;
             /** Columnas */
             columnas: components["schemas"]["ColumnaEntrada"][];
             segmentacion?: components["schemas"]["SegmentacionEntrada"] | null;
@@ -2288,6 +2334,10 @@ export interface components {
             /** Versiones */
             versiones: components["schemas"]["VersionDefinicionResumenRespuesta"][];
             version: components["schemas"]["VersionDefinicionRespuesta"];
+            /** Plataforma */
+            plataforma: string | null;
+            /** Problemas */
+            problemas: components["schemas"]["ProblemaTextoRespuesta"][];
         };
         /**
          * DetalleError
@@ -3615,6 +3665,24 @@ export interface components {
             hasta: number | null;
         };
         /**
+         * ReglasPlataformaRespuesta
+         * @description Lo que una plataforma fija de una definicion de columnas (RF-72).
+         */
+        ReglasPlataformaRespuesta: {
+            /** Clave */
+            clave: string;
+            /** Etiqueta */
+            etiqueta: string;
+            /** Columnas Fijas */
+            columnas_fijas: components["schemas"]["ColumnaFijaRespuesta"][];
+            /** Encabezado Por Posicion */
+            encabezado_por_posicion: string | null;
+            /** Tipo Resto */
+            tipo_resto: ("texto" | "numero" | "fecha" | "financiero") | null;
+            /** Admite Mas Columnas */
+            admite_mas_columnas: boolean;
+        };
+        /**
          * RenombrarDefinicionEntrada
          * @description RF-56: el nombre nuevo. Se recortan los espacios de los extremos.
          */
@@ -3653,6 +3721,8 @@ export interface components {
             actualizado_en: string;
             /** Vigente Usada */
             vigente_usada: boolean;
+            /** Plataforma */
+            plataforma: string | null;
         };
         /** ResumenRespuesta */
         ResumenRespuesta: {
@@ -7089,6 +7159,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_plataformas_definiciones_columnas_plataformas_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReglasPlataformaRespuesta"][];
                 };
             };
         };

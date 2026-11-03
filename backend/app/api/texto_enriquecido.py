@@ -172,6 +172,7 @@ class ColumnaEntrada(_Entrada):
     valor_por_defecto: str | None = None
     variantes: list[VarianteEntrada] | None = None
     celda_texto: bool | None = None  # RF-73: en XLSX, la columna va en celda de texto
+    etiqueta: str | None = None  # RF-49: de 1 a 120 caracteres; no sale en el archivo
 
 
 class RangoEntrada(_Entrada):
@@ -195,9 +196,11 @@ class SegmentacionEntrada(_Entrada):
 
 class DefinicionColumnasEntrada(_Entrada):
     """Las columnas van con `orden` explicito y se identifican por su posicion en la lista;
-    `proteger_formulas` (por defecto verdadero) lo aplica el exportador (RF-53)."""
+    `proteger_formulas` (por defecto verdadero) lo aplica el exportador (RF-53). La `plataforma`
+    (RF-72) solo cuenta al crear: despues no cambia; la previsualizacion no la usa."""
 
     nombre: str | None = None
+    plataforma: str | None = None
     columnas: list[ColumnaEntrada]
     segmentacion: SegmentacionEntrada | None = None
     proteger_formulas: bool | None = None

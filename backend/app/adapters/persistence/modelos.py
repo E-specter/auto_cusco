@@ -366,8 +366,16 @@ class DefinicionCargaGuardada(Base):
     actualizado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # La plataforma de destino (RF-72): se fija al crear y no cambia. NULL = archivo libre (RF-54).
+    # Es la clave de una plataforma registrada; la base no la conoce, solo exige que no sea vacia.
+    plataforma: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    __table_args__ = (UniqueConstraint("nombre_normalizado"),)
+    __table_args__ = (
+        UniqueConstraint("nombre_normalizado"),
+        CheckConstraint(
+            "plataforma IS NULL OR length(btrim(plataforma)) > 0", name="plataforma_no_vacia"
+        ),
+    )
 
 
 class DefinicionCargaVersion(Base):

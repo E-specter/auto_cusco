@@ -60,6 +60,7 @@ class RepositorioDefinicionesPostgres(RepositorioDefinicionesPort):
                 _DEFINICION.c.id,
                 _DEFINICION.c.nombre,
                 _DEFINICION.c.actualizado_en,
+                _DEFINICION.c.plataforma,
                 por_definicion.c.vigente,
                 por_definicion.c.cantidad,
                 _VERSION.c.usada_en.is_not(None).label("vigente_usada"),
@@ -83,6 +84,7 @@ class RepositorioDefinicionesPostgres(RepositorioDefinicionesPort):
                     cantidad_versiones=fila.cantidad,
                     actualizado_en=fila.actualizado_en,
                     vigente_usada=fila.vigente_usada,
+                    plataforma=fila.plataforma,
                 )
                 for fila in cx.execute(consulta).all()
             ]
@@ -105,14 +107,21 @@ class RepositorioDefinicionesPostgres(RepositorioDefinicionesPort):
             creado_en=definicion.creado_en,
             actualizado_en=definicion.actualizado_en,
             versiones=tuple(_version(v) for v in versiones),
+            plataforma=definicion.plataforma,
         )
 
-    def crear(self, nombre: str, contenido: Mapping[str, Any]) -> DefinicionGuardada:
+    def crear(
+        self, nombre: str, contenido: Mapping[str, Any], plataforma: str | None = None
+    ) -> DefinicionGuardada:
         try:
             with self._engine.begin() as cx:
                 definicion = cx.execute(
                     insert(_DEFINICION)
-                    .values(nombre=nombre, nombre_normalizado=normalizar_nombre(nombre))
+                    .values(
+                        nombre=nombre,
+                        nombre_normalizado=normalizar_nombre(nombre),
+                        plataforma=plataforma,
+                    )
                     .returning(*_DEFINICION.c)
                 ).one()
                 version = cx.execute(
@@ -130,6 +139,7 @@ class RepositorioDefinicionesPostgres(RepositorioDefinicionesPort):
             creado_en=definicion.creado_en,
             actualizado_en=definicion.actualizado_en,
             versiones=(_version(version),),
+            plataforma=definicion.plataforma,
         )
 
     def agregar_version(

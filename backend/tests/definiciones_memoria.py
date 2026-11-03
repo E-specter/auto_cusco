@@ -39,6 +39,7 @@ class RepositorioEnMemoria:
                 cantidad_versiones=len(d.versiones),
                 actualizado_en=d.actualizado_en,
                 vigente_usada=d.vigente.usada,
+                plataforma=d.plataforma,
             )
             for d in self.definiciones.values()
         ]
@@ -47,7 +48,9 @@ class RepositorioEnMemoria:
     def obtener(self, definicion_id: int) -> DefinicionGuardada | None:
         return self.definiciones.get(definicion_id)
 
-    def crear(self, nombre: str, contenido: Mapping[str, Any]) -> DefinicionGuardada:
+    def crear(
+        self, nombre: str, contenido: Mapping[str, Any], plataforma: str | None = None
+    ) -> DefinicionGuardada:
         if any(
             normalizar_nombre(d.nombre) == normalizar_nombre(nombre)
             for d in self.definiciones.values()
@@ -60,6 +63,7 @@ class RepositorioEnMemoria:
             creado_en=ahora,
             actualizado_en=ahora,
             versiones=(VersionDefinicion(1, dict(contenido), None, ahora),),
+            plataforma=plataforma,
         )
         self.definiciones[definicion.id] = definicion
         self._siguiente += 1

@@ -18,6 +18,8 @@ from app.api.definiciones_columnas import obtener_servicio_definiciones
 from app.api.selecciones import obtener_servicio_selecciones
 from app.core.entities import texto_enriquecido as entidades
 from app.core.entities.cartera import PaginaCartera, SinVersionVigente
+from app.core.entities.mapeo import TipoSalida
+from app.core.entities.plataformas import ColumnaFija, ReglasPlataforma
 from app.core.entities.selecciones import SeleccionNoEncontrada
 from app.core.entities.texto_enriquecido import (
     CodigoTexto,
@@ -29,7 +31,11 @@ from app.core.entities.texto_enriquecido import (
     TipoValor,
 )
 from app.core.services.contextos_texto import contexto_cartera
-from app.core.services.definiciones_columnas.servicio import DefinicionesColumnasService
+from app.core.services.definiciones_columnas.plataformas import RegistroPlataformas
+from app.core.services.definiciones_columnas.servicio import (
+    DefinicionesColumnasService,
+    DefinicionInvalida,
+)
 from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.texto_enriquecido import evaluador, sintaxis
 from app.main import app
@@ -104,6 +110,47 @@ def _emitidos_por_la_api() -> set[CodigoTexto]:
             obtener_servicio_selecciones,
         ):
             app.dependency_overrides.pop(dependencia, None)
+
+
+def _emitidos_por_las_plataformas() -> set[CodigoTexto]:
+    """Los codigos de las reglas de una plataforma (RF-72): se guarda contra una sintetica."""
+    destino = ColumnaFija(1, "destino", None, TipoSalida.TEXTO)
+    canal = ColumnaFija(2, "canal", None, TipoSalida.TEXTO)
+    estricta = ReglasPlataforma(
+        "estricta", "Estricta", (destino, canal), None, TipoSalida.TEXTO, False
+    )
+    abierta = ReglasPlataforma("abierta", "Abierta", (destino,), None, TipoSalida.TEXTO)
+
+    def columna(nombre: str, orden: int, tipo: str) -> dict:
+        texto = {"tipo": "texto", "valor": "x"}
+        return {"nombre": nombre, "orden": orden, "tipo": tipo, "expresion": {"nodos": [texto]}}
+
+    pedidos = [
+        ("inventada", [columna("destino", 0, "texto")]),
+        (
+            "estricta",
+            [
+                columna("destino", 0, "numero"),
+                columna("canal", 1, "texto"),
+                columna("x", 2, "texto"),
+            ],
+        ),
+        ("abierta", [columna("destino", 0, "texto"), columna("extra", 1, "numero")]),
+        ("abierta", [columna("otra", 0, "texto")]),
+        ("abierta", [columna("otra", 0, "texto"), columna("destino", 1, "texto")]),
+    ]
+    servicio = DefinicionesColumnasService(
+        RepositorioEnMemoria(),
+        contexto_cartera(CatalogoCartera()),
+        RegistroPlataformas([estricta, abierta]),
+    )
+    emitidos: set[CodigoTexto] = set()
+    for plataforma, columnas in pedidos:
+        try:
+            servicio.crear({"nombre": "n", "plataforma": plataforma, "columnas": columnas})
+        except DefinicionInvalida as error:
+            emitidos.update(p.problema.codigo for p in error.problemas)
+    return emitidos
 
 
 def _pedir_a_la_api(cliente: TestClient, cartera: _CarteraVacia) -> set[CodigoTexto]:
@@ -234,6 +281,7 @@ def _emitidos() -> set[CodigoTexto]:
     evaluando("[@f | sumar_dias(1)]", f=date(9999, 12, 31))
     emitidos.update(_emitidos_por_el_generador())
     emitidos.update(_emitidos_por_la_api())
+    emitidos.update(_emitidos_por_las_plataformas())
     return emitidos
 
 

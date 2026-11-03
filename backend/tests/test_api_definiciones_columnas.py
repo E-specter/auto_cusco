@@ -237,6 +237,7 @@ def test_el_listado_trae_lo_de_c7_ordenado_por_nombre(cliente) -> None:
         "cantidad_versiones",
         "actualizado_en",
         "vigente_usada",
+        "plataforma",
     }
 
 

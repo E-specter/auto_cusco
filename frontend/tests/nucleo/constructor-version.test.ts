@@ -49,6 +49,8 @@ function respuesta(mostrada: number, vigente: number): DefinicionRespuesta {
       usada: false,
       contenido: { proteger_formulas: true, segmentacion: null, columnas: [] },
     },
+    plataforma: null,
+    problemas: [],
   };
 }
 

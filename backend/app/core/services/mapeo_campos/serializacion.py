@@ -34,6 +34,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, NamedTuple
 
+from app.core.entities.definiciones_columnas import LARGO_MAXIMO_ETIQUETA
 from app.core.entities.mapeo import (
     CampoSalida,
     DefinicionCarga,
@@ -89,6 +90,9 @@ class DefinicionLeida(NamedTuple):
     definicion: DefinicionCarga
     posiciones: tuple[int, ...]
     ordenes: tuple[int, ...] = ()
+    # La plataforma de destino (RF-72) que traia el pedido. NO es parte del contenido de una
+    # version: se guarda con la definicion, al crearla, y `definicion_a_dict` no la escribe.
+    plataforma: str | None = None
 
 
 class DefinicionIlegible(Exception):
@@ -168,10 +172,14 @@ class _Lector:
             return None
         self._claves(
             dato,
-            {"nombre", "columnas", "segmentacion", "proteger_formulas"},
+            {"nombre", "columnas", "segmentacion", "proteger_formulas", "plataforma"},
             "Una definicion",
             campo="definicion",
         )
+        plataforma = dato.get("plataforma")
+        if plataforma is not None and not (isinstance(plataforma, str) and plataforma.strip()):
+            self._falla("`plataforma` es el texto de su clave", campo="plataforma")
+            plataforma = None
         nombre = dato.get("nombre") or ""
         if not isinstance(nombre, str):
             self._falla("El `nombre` de la definicion es un texto", campo="nombre")
@@ -197,7 +205,10 @@ class _Lector:
         columnas.sort(key=lambda c: (c[0], c[1]))
         definicion = DefinicionCarga(nombre, tuple(c[2] for c in columnas), segmentacion, proteger)
         return DefinicionLeida(
-            definicion, tuple(c[1] for c in columnas), tuple(c[0] for c in columnas)
+            definicion,
+            tuple(c[1] for c in columnas),
+            tuple(c[0] for c in columnas),
+            plataforma.strip() if plataforma is not None else None,
         )
 
     # --- columnas ---
@@ -221,6 +232,7 @@ class _Lector:
                 "valor_por_defecto",
                 "variantes",
                 "celda_texto",
+                "etiqueta",
                 *(("plantilla",) if self._plantillas else ()),
             },
             "Una columna",
@@ -239,6 +251,7 @@ class _Lector:
             celda_texto = False
         elif not isinstance(celda_texto, bool):
             self._falla("`celda_texto` es verdadero o falso", indice, campo="celda_texto")
+        etiqueta = self._etiqueta(crudo.get("etiqueta"), indice)
         if len(self._problemas) > antes or nombre is None or orden is None:
             return None
         return orden, CampoSalida(
@@ -251,7 +264,22 @@ class _Lector:
             valor_por_defecto=por_defecto,
             variantes=variantes,
             celda_texto=celda_texto,
+            etiqueta=etiqueta,
         )
+
+    def _etiqueta(self, valor: Any, indice: int) -> str | None:
+        """La etiqueta de la columna (RF-49): opcional, de 1 a 120 caracteres sin los extremos."""
+        if valor is None:
+            return None
+        recortada = valor.strip() if isinstance(valor, str) else ""
+        if not 1 <= len(recortada) <= LARGO_MAXIMO_ETIQUETA:
+            self._falla(
+                f"La `etiqueta` es un texto de 1 a {LARGO_MAXIMO_ETIQUETA} caracteres",
+                indice,
+                campo="etiqueta",
+            )
+            return None
+        return recortada
 
     def _nombre(self, valor: Any, indice: int, vistos: set[str]) -> str | None:
         if not isinstance(valor, str) or not valor.strip():
@@ -557,6 +585,8 @@ def _columna_a_dict(campo: CampoSalida, orden: int) -> dict[str, Any]:
     }
     if campo.celda_texto:  # solo si es verdadero: el JSON canonico de lo ya guardado no cambia
         dato["celda_texto"] = True
+    if campo.etiqueta:  # solo si esta: una version guardada sin etiqueta se lee y se guarda igual
+        dato["etiqueta"] = campo.etiqueta
     return dato
 
 

@@ -19,9 +19,12 @@ class RepositorioDefinicionesPort(Protocol):
         """La definicion con todas sus versiones, o None si no existe."""
         ...
 
-    def crear(self, nombre: str, contenido: Mapping[str, Any]) -> DefinicionGuardada:
-        """Crea la definicion con su version 1. Lanza NombreDeDefinicionRepetido si el nombre ya
-        existe, sin distinguir mayusculas."""
+    def crear(
+        self, nombre: str, contenido: Mapping[str, Any], plataforma: str | None = None
+    ) -> DefinicionGuardada:
+        """Crea la definicion con su version 1 y su plataforma (RF-72: se fija aqui y ninguna otra
+        operacion la cambia). Lanza NombreDeDefinicionRepetido si el nombre ya existe, sin
+        distinguir mayusculas."""
         ...
 
     def agregar_version(

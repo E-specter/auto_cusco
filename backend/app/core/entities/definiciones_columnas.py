@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import Any
 
 LARGO_MAXIMO_NOMBRE = 120
+LARGO_MAXIMO_ETIQUETA = 120  # la etiqueta de una columna (RF-49)
 # Limites que la interfaz recibe en el catalogo para no ofrecer lo que se rechazaria (C-9).
 MAXIMO_COLUMNAS = 100
 MAXIMO_VARIANTES = 50
@@ -44,6 +45,8 @@ class DefinicionGuardada:
     creado_en: datetime
     actualizado_en: datetime
     versiones: tuple[VersionDefinicion, ...]
+    # La plataforma de destino (RF-72): se fija al crear y no cambia. None = archivo libre.
+    plataforma: str | None = None
 
     @property
     def vigente(self) -> VersionDefinicion:
@@ -66,6 +69,7 @@ class ResumenDefinicion:
     cantidad_versiones: int
     actualizado_en: datetime
     vigente_usada: bool
+    plataforma: str | None = None
 
 
 class DefinicionNoEncontrada(Exception):
