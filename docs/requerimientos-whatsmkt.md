@@ -120,10 +120,12 @@ Fuente: «al momento de generar la carga, se use el generador de columnas para a
 * **RF-WM-14 — Supervisores en WhatsMKT:** Ubicar los registros de supervisión (RF-37 a RF-40) al inicio del archivo, antes de los productos, sin cambios respecto de la regla general (decisión del usuario, 2026-11-02, P-11).
   * `número`: `51` más el número del supervisor.
   * Las macros copian las de la primera fila de productos del archivo (RF-40). En un lote por segmento (RF-WM-23), es la primera fila de productos del archivo de esa campaña.
+  * Si no hay supervisores configurados, entonces la campaña no se crea, como en MOWA MES (RF-37). La previsualización ya lo indica con el código `sin_supervisores` y no deja crear, con un enlace a Supervisores.
 * **RF-WM-15 — Productos excluidos de la carga:** Excluir de la carga, y reportar con su código, cada producto que cumpla alguna de estas condiciones:
   * `sin_telefono`: no tiene teléfono;
   * `telefono_invalido`: el teléfono no es válido según RF-02;
   * `macro_vacia`: una de sus macros queda vacía y la columna no tiene valor por defecto. Así no sale un mensaje como «Hola  Caja Cusco». Si la columna tiene valor por defecto, entonces se usa ese valor y el producto no se excluye.
+  * `sin_dias_atraso`: en el modo por segmento (RF-WM-18), el producto no tiene días de atraso y no cae en ningún segmento (RF-WM-20). En el modo global no es motivo de exclusión.
 * **RF-WM-16 — Formato del archivo:** Generar la lista de contactos en `.xlsx`, con una sola hoja (supuesto S-WM-9).
   * Los textos pasan por la protección contra fórmulas del exportador (RF-53).
   * No se divide en varios archivos: el campo de cantidad de WhatsMKT admite 18 dígitos, así que no hay un tope práctico (RF-WM-34).
@@ -376,3 +378,4 @@ No están en el plan v2 ni en las decisiones del 2026-11-02. Mientras no se resp
 - **Nota de numeración:** secuencia propia del módulo, continua y sin huecos. Los RF que se agreguen después continúan la secuencia sin renumerar los existentes, como en MOWA MES.
 - **RF existentes ampliados:** RF-WM-21: el enlace de WhatsApp de contacto de los speeches pasa a `[whatsapp]`, porque el número real no puede estar en el repositorio (la prueba `test_datos_sinteticos` lo detectó en `main`). DU-WM-11 se reescribe con las dos opciones.
 - **RF existentes ampliados:** RF-WM-31 (tope fijo de las imágenes) y RF-WM-32 (del EXIF se conserva solo la orientación), según lo implementado en T-WM-B5. **Dudas nuevas:** DU-WM-12 y DU-WM-13.
+- **RF existentes ampliados:** RF-WM-14 (sin supervisores configurados no se crea la campaña, código `sin_supervisores`) y RF-WM-15 (exclusión `sin_dias_atraso` en el modo por segmento), según las decisiones de la entrega de T-WM-B2, con los textos de designer.
