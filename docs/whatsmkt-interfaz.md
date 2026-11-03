@@ -191,12 +191,12 @@ Es el seguimiento de MOWA ([mowa-mes-interfaz.md](mowa-mes-interfaz.md) §4.2 y 
 
 ## 5. Configuración (`/whatsmkt/configuracion`)
 
-Arriba, un `.notice--info`: «Columnas de carga, Supervisores y Calendario laboral se usan desde Herramientas:», con los tres enlaces.
+Arriba, un `.notice--info`: «Columnas de carga, Supervisores y Calendario laboral tienen su propia pantalla:», con los tres enlaces. No nombra la sección «Herramientas»: en la barra ese nombre no se ve (es el `aria-label` de la lista), y un texto no manda a un lugar que no se lee.
 
 Cada bloque se guarda por separado, como en MOWA. Los paneles van en este orden:
 
 1. **Segmentos y mensajes** (RF-WM-20 y RF-WM-21):
-   - La tabla de segmentos, apilable, con Segmento, Desde y Hasta (días de atraso ajustados), editables. «Tramos mayores al 2» no tiene «Hasta»: dice «sin tope». Una tabla que deja huecos o se superpone se rechaza con su código, bajo la fila.
+   - La tabla de segmentos, apilable, con Segmento, «Desde (días)» y «Hasta (días)» (días de atraso ajustados), editables. Un límite vacío se lee como par: el «Desde» del preventivo dice «sin mínimo», y el «Hasta» de «Tramos mayores al 2» dice «sin máximo». Una tabla que deja huecos o se superpone se rechaza con su código, bajo la fila.
    - Debajo, el mensaje de cada segmento con `TextosGuardados` (§11.3 del motor), un `.segmented` por segmento para elegir cuál se edita.
 2. **Mensajes globales** (RF-WM-19): `TextosGuardados`, con el título «Mensajes globales» y el hint «Para las campañas especiales, con un solo mensaje para toda la selección».
 3. **Horarios de envío** (RF-WM-07): las dos franjas, cada una con dos `input type="time"` (desde y hasta). Una franja cuyo inicio no es anterior a su fin (14:00 a 08:00, o la misma hora) se rechaza con `horario_invalido`, bajo esa franja; `{horario}` es su nombre, «Horario 1» o «Horario 2».
@@ -374,9 +374,16 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.conciliacion.nota` | Un producto cuenta como enviado si su número aparece en el informe. Si dos productos comparten número, el envío cuenta para los dos. | A product counts as sent if its number appears in the report. If two products share a number, the sending counts for both. |
 | `whatsmkt.confirmar.eliminar.cuerpo` | Se borran la campaña, su lista de contactos, sus filas, exclusiones e informe. La biblioteca de adjuntos y los mensajes no cambian. No se puede deshacer. | The campaign, its contact list, rows, exclusions and report are deleted. The attachment library and the messages do not change. This cannot be undone. |
 | `whatsmkt.configuracion.titulo` | Configuración de WhatsMKT | WhatsMKT settings |
-| `whatsmkt.configuracion.herramientas` | Columnas de carga, Supervisores y Calendario laboral se usan desde Herramientas: | Load columns, Supervisors and Working calendar are used from Tools: |
+| `whatsmkt.configuracion.herramientas` | Columnas de carga, Supervisores y Calendario laboral tienen su propia pantalla: | Load columns, Supervisors and Working calendar have their own screens: |
 | `whatsmkt.configuracion.segmentos` | Segmentos y mensajes | Segments and messages |
-| `whatsmkt.configuracion.sinTope` | sin tope | no limit |
+| `whatsmkt.configuracion.sinPiso` | sin mínimo | no minimum |
+| `whatsmkt.configuracion.sinTope` | sin máximo | no maximum |
+| `whatsmkt.configuracion.col.segmento` | Segmento | Segment |
+| `whatsmkt.configuracion.col.desde` | Desde (días) | From (days) |
+| `whatsmkt.configuracion.col.hasta` | Hasta (días) | To (days) |
+| `whatsmkt.configuracion.horario.desde` | Desde | From |
+| `whatsmkt.configuracion.horario.hasta` | Hasta | To |
+| `whatsmkt.configuracion.pronto` | Disponible pronto. | Available soon. |
 | `whatsmkt.configuracion.globalesHint` | Para las campañas especiales, con un solo mensaje para toda la selección. | For special campaigns, with a single message for the whole selection. |
 | `whatsmkt.configuracion.horarios` | Horarios de envío | Send time slots |
 | `whatsmkt.configuracion.definicionDefecto` | Definición por defecto | Default definition |
@@ -393,6 +400,7 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 
 - «Deseo que salga mi envío lo antes posible» y «¿Cuántos teléfonos tiene en su Lista de contactos?» quedan en español también en inglés: son el texto exacto del formulario de WhatsMKT, y el operador los busca así.
 - Las citas de nombres usan las comillas del idioma (`camposAdicionales.nombreCitado`).
+- Un rango en inglés es "From … To", no "Until": en los encabezados, en las etiquetas accesibles de cada campo y en sus errores.
 - Las fechas van con `format.ts`, y los meses sueltos con `formatMesGestion`.
 
 ## 9. A 360 px
