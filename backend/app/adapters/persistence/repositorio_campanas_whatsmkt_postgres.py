@@ -23,7 +23,7 @@ from app.adapters.persistence.modelos import (
     WhatsmktReporte,
     WhatsmktReporteFila,
 )
-from app.core.entities.whatsmkt import CodigoWhatsmkt, ModoCampana, TipoEnvio
+from app.core.entities.whatsmkt import CodigoWhatsmkt, ExclusionContacto, ModoCampana, TipoEnvio
 from app.core.entities.whatsmkt_campana import (
     ArchivoGuardado,
     CampanaNueva,
@@ -42,7 +42,6 @@ from app.core.entities.whatsmkt_informe import (
     ReporteNuevo,
 )
 from app.core.ports.repositorio_campanas_whatsmkt_port import RepositorioCampanasWhatsmktPort
-from app.core.services.plataformas.whatsmkt.archivo_contactos import ExclusionContacto
 
 _LOTE = WhatsmktLote.__table__
 _CAMPANA = WhatsmktCampana.__table__

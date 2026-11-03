@@ -11,8 +11,7 @@ from datetime import date
 
 import pytest
 
-from app.core.entities.whatsmkt import CodigoWhatsmkt, ModoCampana
-from app.core.services.plataformas.whatsmkt.archivo_contactos import ExclusionContacto
+from app.core.entities.whatsmkt import CodigoWhatsmkt, ExclusionContacto, ModoCampana
 from tests.test_whatsmkt_campanas_postgres import PREFIJO, XLSX, Entorno
 
 pytestmark = [

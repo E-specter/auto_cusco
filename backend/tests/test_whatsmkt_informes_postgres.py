@@ -14,10 +14,9 @@ from alembic import command
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import DataError, IntegrityError
 
-from app.core.entities.whatsmkt import CodigoWhatsmkt, TipoEnvio
+from app.core.entities.whatsmkt import CodigoWhatsmkt, ExclusionContacto, TipoEnvio
 from app.core.entities.whatsmkt_campana import EstadoCampana
 from app.core.entities.whatsmkt_informe import InformeWhatsmkt, ReporteNuevo
-from app.core.services.plataformas.whatsmkt.archivo_contactos import ExclusionContacto
 from tests.test_whatsmkt_campanas_postgres import PREFIJO, Entorno, _alembic
 
 pytestmark = [

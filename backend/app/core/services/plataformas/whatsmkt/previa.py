@@ -30,6 +30,7 @@ from app.core.entities.whatsmkt import (
     CodigoWhatsmkt,
     ConfiguracionWhatsmkt,
     ErrorWhatsmkt,
+    ExclusionContacto,
     ModoCampana,
     SegmentoWhatsmkt,
 )
@@ -41,7 +42,6 @@ from app.core.services.plataformas.whatsmkt import mensaje
 from app.core.services.plataformas.whatsmkt.archivo_contactos import (
     ArchivoContactos,
     ArchivoContactosService,
-    ExclusionContacto,
     SeleccionCampana,
 )
 from app.core.services.plataformas.whatsmkt.contexto import CLAVE_CONTEXTO_MENSAJE

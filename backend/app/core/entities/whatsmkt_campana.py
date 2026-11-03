@@ -8,8 +8,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time
 from enum import StrEnum
 
-from app.core.entities.whatsmkt import ModoCampana, TipoEnvio
-from app.core.services.plataformas.whatsmkt.archivo_contactos import ExclusionContacto
+from app.core.entities.whatsmkt import ExclusionContacto, ModoCampana, TipoEnvio
 
 
 @dataclass(frozen=True)

@@ -31,14 +31,19 @@ from app.adapters.persistence.repositorio_definiciones_postgres import (
 )
 from app.adapters.persistence.repositorio_whatsmkt_postgres import RepositorioWhatsmktPostgres
 from app.core.entities.nombres import normalizar_nombre
-from app.core.entities.whatsmkt import CodigoWhatsmkt, ModoCampana, TipoAdjunto, TipoEnvio
+from app.core.entities.whatsmkt import (
+    CodigoWhatsmkt,
+    ExclusionContacto,
+    ModoCampana,
+    TipoAdjunto,
+    TipoEnvio,
+)
 from app.core.entities.whatsmkt_campana import (
     CampanaNueva,
     FilaNueva,
     HorarioElegido,
     LoteNuevo,
 )
-from app.core.services.plataformas.whatsmkt.archivo_contactos import ExclusionContacto
 
 pytestmark = [
     pytest.mark.postgres,

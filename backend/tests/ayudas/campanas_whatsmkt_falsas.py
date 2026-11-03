@@ -8,7 +8,7 @@ from dataclasses import replace
 from datetime import date, datetime, timedelta
 
 from app.adapters.output.plataformas.whatsmkt.exportador_contactos import exportar_contactos
-from app.core.entities.whatsmkt import ModoCampana
+from app.core.entities.whatsmkt import ExclusionContacto, ModoCampana
 from app.core.entities.whatsmkt_campana import (
     ArchivoGuardado,
     CampanaNueva,
@@ -27,7 +27,6 @@ from app.core.entities.whatsmkt_informe import (
 from app.core.services.generacion_cargas.servicio import GeneracionCargasService
 from app.core.services.plataformas.whatsmkt.archivo_contactos import (
     ArchivoContactosService,
-    ExclusionContacto,
 )
 from app.core.services.plataformas.whatsmkt.biblioteca import BibliotecaWhatsmktService
 from app.core.services.plataformas.whatsmkt.crear import CreacionCampanasWhatsmktService

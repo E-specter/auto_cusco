@@ -53,6 +53,7 @@ from app.core.entities.whatsmkt import (
     CLAVES_SEGMENTOS,
     AdjuntoNoEncontrado,
     CodigoWhatsmkt,
+    ExclusionContacto,
     ModoCampana,
     TipoEnvio,
 )
@@ -71,7 +72,6 @@ from app.core.services.generacion_cargas.servicio import (
 from app.core.services.gestiones_digitales.servicio import SupervisionService
 from app.core.services.plataformas.whatsmkt.archivo_contactos import (
     ArchivoContactosService,
-    ExclusionContacto,
     SeleccionCampana,
 )
 from app.core.services.plataformas.whatsmkt.biblioteca import BibliotecaWhatsmktService

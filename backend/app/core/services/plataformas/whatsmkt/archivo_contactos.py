@@ -29,7 +29,7 @@ from app.core.entities.gestiones_digitales import Supervisor
 from app.core.entities.mapeo import CampoSalida, DefinicionCarga, ErrorGeneracion, FilaExcluida
 from app.core.entities.telefono import numero_valido
 from app.core.entities.valores import vacia
-from app.core.entities.whatsmkt import CodigoWhatsmkt, SegmentoWhatsmkt
+from app.core.entities.whatsmkt import CodigoWhatsmkt, ExclusionContacto, SegmentoWhatsmkt
 from app.core.services.fecha_envio import DIAS_AJUSTADOS
 from app.core.services.generacion_cargas.servicio import (
     CANTIDAD_POR_DEFECTO,
@@ -57,24 +57,6 @@ class SeleccionCampana:
     filtros: Sequence[Filtro] = ()
     orden: Orden | None = None
     cantidad: int = CANTIDAD_POR_DEFECTO
-
-
-@dataclass(frozen=True)
-class ExclusionContacto:
-    """Un producto que no sale en el archivo, con su unico codigo (RF-WM-15).
-
-    `fila` es la posicion del producto entre los que genero la seleccion (desde 1). Para
-    `macro_vacia`, `macro` es su numero (1 es la segunda columna) y `etiqueta`, la de la columna.
-    """
-
-    fila: int
-    pagare: str | None
-    codigo: CodigoWhatsmkt
-    detalle: str
-    macro: int | None = None
-    etiqueta: str | None = None
-    # El segmento al que pertenece el producto (solo en un lote por segmento; None si no tiene).
-    segmento: str | None = None
 
 
 @dataclass(frozen=True)

@@ -187,3 +187,21 @@ class AdjuntoWhatsmkt:
     huella: str  # SHA-256 en hexadecimal
     creado_en: datetime
     archivado_en: datetime | None = None
+
+
+@dataclass(frozen=True)
+class ExclusionContacto:
+    """Un producto que no sale en el archivo, con su unico codigo (RF-WM-15).
+
+    `fila` es la posicion del producto entre los que genero la seleccion (desde 1). Para
+    `macro_vacia`, `macro` es su numero (1 es la segunda columna) y `etiqueta`, la de la columna.
+    """
+
+    fila: int
+    pagare: str | None
+    codigo: CodigoWhatsmkt
+    detalle: str
+    macro: int | None = None
+    etiqueta: str | None = None
+    # El segmento al que pertenece el producto (solo en un lote por segmento; None si no tiene).
+    segmento: str | None = None
