@@ -180,6 +180,7 @@ Extiende `DefinicionCarga` y `CampoSalida` en su lugar, con campos nuevos y opci
 | valor | `plantilla` (texto `[@...]`) | `expresion` (sección 4), o `plantilla` por compatibilidad, que se compila a expresión |
 | `valor_por_defecto` | — | opcional |
 | `variantes` | — | opcional: por segmento, según la segmentación de la definición |
+| `celda_texto` | — | opcional, falso por defecto (RF-73): en XLSX la columna se escribe con el formato de celda «Texto» (`@`), sea cual sea el valor. Se guarda **solo si es verdadero**, así el JSON de lo ya guardado no cambia. CSV y JSON no cambian |
 | `segmentacion` | — | a nivel de definición: criterio, tabla o campo, y política sin segmento |
 
 Una columna con variable directa es una expresión de un solo nodo `variable` sin funciones. Conserva el valor original sin pasarlo por texto, igual que hoy (`valor_crudo`).

@@ -1806,6 +1806,8 @@ export interface components {
             valor_por_defecto?: string | null;
             /** Variantes */
             variantes?: components["schemas"]["VarianteEntrada"][] | null;
+            /** Celda Texto */
+            celda_texto?: boolean | null;
         } & {
             [key: string]: unknown;
         };
@@ -1828,6 +1830,11 @@ export interface components {
             valor_por_defecto: string | null;
             /** Variantes */
             variantes: components["schemas"]["VarianteGuardadaRespuesta"][];
+            /**
+             * Celda Texto
+             * @default false
+             */
+            celda_texto: boolean;
         };
         /** ColumnaRespuesta */
         ColumnaRespuesta: {

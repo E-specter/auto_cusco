@@ -80,6 +80,7 @@ export function contenidoSintetico(sufijo = ''): Contenido {
     expresion: { nodos },
     valor_por_defecto: null,
     variantes: [],
+    celda_texto: false,
   });
   return {
     proteger_formulas: true,
@@ -213,6 +214,7 @@ function contenidoDe(entrada: Entrada): Contenido {
         },
         expresion: expresionDe(c.expresion),
         valor_por_defecto: c.valor_por_defecto ?? null,
+        celda_texto: c.celda_texto ?? false,
         variantes: (c.variantes ?? []).map((v) => ({ segmento: v.segmento as never, expresion: expresionDe(v.expresion) })),
       })),
   };

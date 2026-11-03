@@ -5860,6 +5860,17 @@
               }
             ],
             "title": "Variantes"
+          },
+          "celda_texto": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Celda Texto"
           }
         },
         "additionalProperties": true,
@@ -5926,6 +5937,11 @@
             },
             "type": "array",
             "title": "Variantes"
+          },
+          "celda_texto": {
+            "type": "boolean",
+            "title": "Celda Texto",
+            "default": false
           }
         },
         "type": "object",
@@ -5937,7 +5953,8 @@
           "formato_fecha",
           "formato_financiero",
           "valor_por_defecto",
-          "variantes"
+          "variantes",
+          "celda_texto"
         ],
         "title": "ColumnaGuardadaRespuesta"
       },

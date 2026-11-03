@@ -723,6 +723,7 @@ function respuesta(parcial: Partial<components['schemas']['DefinicionRespuesta']
             expresion: { nodos: [{ tipo: 'variable', nombre: 'telefono', funciones: [], obligatoria: false }] },
             valor_por_defecto: null,
             variantes: [],
+            celda_texto: false,
           },
           {
             nombre: 'mensaje',
@@ -740,6 +741,7 @@ function respuesta(parcial: Partial<components['schemas']['DefinicionRespuesta']
             variantes: [
               { segmento: 'preventiva', expresion: { nodos: [{ tipo: 'texto', valor: 'Hola' }] } },
             ],
+            celda_texto: false,
           },
         ],
       },

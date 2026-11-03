@@ -9,6 +9,10 @@ pasar por float), una fecha como fecha de Excel, y un texto como texto aunque
 parezca un numero, que es lo que salva los ceros a la izquierda del pagare y
 del documento.
 
+Celda de texto (RF-73): las columnas de `OpcionesArchivo.columnas_texto` se escriben con el formato
+de celda «Texto» (`@`) y como texto explicito, sea cual sea el valor (un numero pasa por `str`, un
+`None` queda vacio). Las demas celdas no cambian.
+
 Proteccion contra formulas (RF-53): un texto que empieza con `=` se escribe con el tipo de
 texto explicito, igual que el resto de los textos (`inlineStr`), y no como formula. El
 contenido no cambia nunca: sin apostrofo y sin `quotePrefix`. No es una opcion.
@@ -58,8 +62,16 @@ def exportar(tabla: Tabla, opciones: OpcionesArchivo = OPCIONES_POR_DEFECTO) -> 
     try:
         if opciones.con_cabeceras:
             hoja.append([_celda(hoja, cabecera) for cabecera in tabla.cabeceras])
+        es_texto = [cabecera in opciones.columnas_texto for cabecera in tabla.cabeceras]
         for fila in tabla.filas:
-            hoja.append([_celda(hoja, valor) for valor in comunes.columnas(fila, tabla.cabeceras)])
+            hoja.append(
+                [
+                    _celda_de_texto(hoja, valor) if texto else _celda(hoja, valor)
+                    for texto, valor in zip(
+                        es_texto, comunes.columnas(fila, tabla.cabeceras), strict=True
+                    )
+                ]
+            )
         libro.save(buffer)
     except IllegalCharacterError as exc:
         # Caracteres de control que Excel no puede guardar; se avisa en vez de
@@ -114,6 +126,17 @@ def _celda(hoja: Any, valor: Any) -> Any:
         celda.data_type = "s"  # sin esto openpyxl lo escribe como formula
         return celda
     return valor
+
+
+def _celda_de_texto(hoja: Any, valor: Any) -> Any:
+    """Una celda de una columna de texto (RF-73): texto explicito con formato `@`, sin cambiar el
+    contenido. `None` queda como celda vacia, no como el texto «None»."""
+    if valor is None:
+        return None
+    celda = WriteOnlyCell(hoja, value=valor if isinstance(valor, str) else str(valor))
+    celda.data_type = "s"  # texto aunque parezca numero, y aunque empiece con `=` (RF-53)
+    celda.number_format = "@"
+    return celda
 
 
 def nombre_de_hoja(nombre: str) -> str:

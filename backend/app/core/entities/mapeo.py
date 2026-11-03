@@ -71,6 +71,8 @@ class CampoSalida:
       de la columna.
     - `variantes`: un contenido por segmento; el de la columna (`expresion` o `plantilla`) es el
       contenido por defecto. Necesitan `DefinicionCarga.segmentacion`.
+    - `celda_texto` (RF-73): en XLSX la columna se escribe con el formato de celda «Texto» (`@`).
+      Lo aplica el exportador, no el generador; CSV y JSON no cambian.
     """
 
     nombre: str
@@ -82,6 +84,7 @@ class CampoSalida:
     expresion: Expresion | None = None
     valor_por_defecto: str | None = None
     variantes: tuple[VarianteCampo, ...] = ()
+    celda_texto: bool = False
 
 
 @dataclass(frozen=True)
@@ -96,6 +99,11 @@ class DefinicionCarga:
     campos: tuple[CampoSalida, ...]
     segmentacion: Segmentacion | None = None
     proteger_formulas: bool = True  # RF-53: lo aplica el exportador, no el generador
+
+    @property
+    def columnas_texto(self) -> frozenset[str]:
+        """Las columnas que van en celda de texto (RF-73): sus `nombre`, que son las cabeceras."""
+        return frozenset(campo.nombre for campo in self.campos if campo.celda_texto)
 
 
 class PlantillaInvalida(Exception):

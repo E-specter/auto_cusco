@@ -283,9 +283,15 @@ def _definicion(entrada: DefinicionEntrada) -> DefinicionCarga:
     )
 
 
-def _opciones(entrada: OpcionesEntrada | None, proteger_formulas: bool = True) -> OpcionesArchivo:
+def _opciones(
+    entrada: OpcionesEntrada | None,
+    proteger_formulas: bool = True,
+    columnas_texto: frozenset[str] = frozenset(),
+) -> OpcionesArchivo:
     valores = {} if entrada is None else entrada.model_dump()
-    return OpcionesArchivo(**valores, proteger_formulas=proteger_formulas)
+    return OpcionesArchivo(
+        **valores, proteger_formulas=proteger_formulas, columnas_texto=columnas_texto
+    )
 
 
 def _resolver_definicion(
@@ -449,7 +455,7 @@ def generar_archivo(
         archivo = exportadores.exportar(
             resultado.tabla,
             peticion.formato,
-            _opciones(peticion.opciones, definicion.proteger_formulas),
+            _opciones(peticion.opciones, definicion.proteger_formulas, definicion.columnas_texto),
         )
     except ExportacionInvalida as exc:
         raise _error(exc) from exc

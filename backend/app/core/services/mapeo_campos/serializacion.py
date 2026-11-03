@@ -220,6 +220,7 @@ class _Lector:
                 "formato_financiero",
                 "valor_por_defecto",
                 "variantes",
+                "celda_texto",
                 *(("plantilla",) if self._plantillas else ()),
             },
             "Una columna",
@@ -233,6 +234,11 @@ class _Lector:
         tipo = self._tipo(crudo.get("tipo"), indice)
         financiero = self._financiero(crudo.get("formato_financiero"), indice)
         variantes = self._variantes(crudo.get("variantes"), indice)
+        celda_texto = crudo.get("celda_texto", False)
+        if celda_texto is None:
+            celda_texto = False
+        elif not isinstance(celda_texto, bool):
+            self._falla("`celda_texto` es verdadero o falso", indice, campo="celda_texto")
         if len(self._problemas) > antes or nombre is None or orden is None:
             return None
         return orden, CampoSalida(
@@ -244,6 +250,7 @@ class _Lector:
             expresion=expresion,
             valor_por_defecto=por_defecto,
             variantes=variantes,
+            celda_texto=celda_texto,
         )
 
     def _nombre(self, valor: Any, indice: int, vistos: set[str]) -> str | None:
@@ -528,7 +535,7 @@ def definicion_a_dict(leida: DefinicionLeida, con_nombre: bool = True) -> dict[s
 
 def _columna_a_dict(campo: CampoSalida, orden: int) -> dict[str, Any]:
     formato = campo.formato_financiero
-    return {
+    dato = {
         "nombre": campo.nombre,
         "orden": orden,
         "expresion": expresion_a_dict(campo.expresion or Expresion()),
@@ -548,6 +555,9 @@ def _columna_a_dict(campo: CampoSalida, orden: int) -> dict[str, Any]:
             for variante in campo.variantes
         ],
     }
+    if campo.celda_texto:  # solo si es verdadero: el JSON canonico de lo ya guardado no cambia
+        dato["celda_texto"] = True
+    return dato
 
 
 def _segmentacion_a_dict(segmentacion: Segmentacion | None) -> dict[str, Any] | None:

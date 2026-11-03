@@ -45,6 +45,11 @@ class OpcionesArchivo:
     - `delimitador` y `codificacion`: CSV (y `codificacion` tambien en JSON).
     - `con_cabeceras`: CSV y XLSX.
     - `hoja`: XLSX.
+    - `columnas_texto`: XLSX (RF-73). Las cabeceras de las columnas que se escriben con el formato
+      de celda «Texto» (`@`), para que la hoja de calculo no cambie el valor al abrirlo (un telefono
+      de 11 digitos pasaria a notacion cientifica). Un valor que no es texto pasa por `str` y
+      `None` queda como celda vacia. CSV y JSON no cambian. Vacio por defecto: el archivo sale como
+      siempre.
     - `sangria`: JSON; `None` deja el archivo en una sola linea.
     - `proteger_formulas`: CSV (RF-53). Un texto que una hoja de calculo podria tomar por formula
       (empieza con `=`, `+`, `-`, `@`, tabulacion o retorno de carro) lleva un apostrofo delante,
@@ -62,6 +67,7 @@ class OpcionesArchivo:
     hoja: str = "Carga"
     sangria: int | None = None
     proteger_formulas: bool = True
+    columnas_texto: frozenset[str] = frozenset()
 
 
 OPCIONES_POR_DEFECTO = OpcionesArchivo()

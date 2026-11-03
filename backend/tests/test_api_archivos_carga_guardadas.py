@@ -429,3 +429,49 @@ def test_la_muestra_de_la_previsualizacion_no_es_la_carga_entera(segmentada) -> 
     assert len(previa["exclusiones"]) == 20
     assert descarga.headers["x-carga-excluidos"] == "25"
     assert descarga.headers["x-carga-generados"] == "0"
+
+
+# --- Celda de texto (T-HI-B3, RF-73) --------------------------------------------------------------
+
+
+def test_celda_texto_de_la_definicion_guardada_rige_la_columna_del_xlsx(cliente) -> None:
+    client, _, servicio = cliente
+    dato = _guardada("con celda de texto")
+    dato["columnas"][1]["celda_texto"] = True  # `numero`
+    identificador = servicio.crear(dato).definicion.id
+
+    respuesta = client.post("/archivos-carga", json=_pedido(identificador, formato="xlsx"))
+
+    hoja = openpyxl.load_workbook(io.BytesIO(respuesta.content)).active
+    cabeceras = [celda.value for celda in hoja[1]]
+    formatos = {c: hoja.cell(2, i + 1).number_format for i, c in enumerate(cabeceras)}
+    assert formatos["numero"] == "@" and hoja.cell(2, 2).data_type == "s"
+    assert all(f != "@" for c, f in formatos.items() if c != "numero")  # solo la marcada
+    assert formatos["anexo"] == "General"
+
+
+def test_sin_celda_texto_el_xlsx_de_una_guardada_no_tiene_formato_de_texto(cliente) -> None:
+    client, _, servicio = cliente
+    identificador = servicio.crear(_guardada("sin celda de texto")).definicion.id
+
+    respuesta = client.post("/archivos-carga", json=_pedido(identificador, formato="xlsx"))
+
+    hoja = openpyxl.load_workbook(io.BytesIO(respuesta.content)).active
+    assert all(hoja.cell(2, c).number_format != "@" for c in range(1, hoja.max_column + 1))
+
+
+def test_el_detalle_de_la_definicion_trae_celda_texto_y_la_guardada_sin_clave_trae_falso(
+    cliente,
+) -> None:
+    client, _, servicio = cliente
+    marcada = _guardada("marcada")
+    marcada["columnas"][1]["celda_texto"] = True
+    id_marcada = servicio.crear(marcada).definicion.id
+    id_sin_clave = servicio.crear(_guardada("sin clave")).definicion.id
+
+    con = client.get(f"/definiciones-columnas/{id_marcada}").json()
+    sin = client.get(f"/definiciones-columnas/{id_sin_clave}").json()
+
+    columnas = lambda cuerpo: cuerpo["version"]["contenido"]["columnas"]  # noqa: E731
+    assert [c["celda_texto"] for c in columnas(con)] == [False, True, False, False, False]
+    assert [c["celda_texto"] for c in columnas(sin)] == [False] * 5

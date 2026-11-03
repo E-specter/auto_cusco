@@ -171,6 +171,7 @@ class ColumnaEntrada(_Entrada):
     formato_financiero: FormatoFinancieroColumnaEntrada | None = None
     valor_por_defecto: str | None = None
     variantes: list[VarianteEntrada] | None = None
+    celda_texto: bool | None = None  # RF-73: en XLSX, la columna va en celda de texto
 
 
 class RangoEntrada(_Entrada):

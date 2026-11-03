@@ -157,6 +157,7 @@ class ColumnaGuardadaRespuesta(ModeloRespuesta):
     formato_financiero: FormatoFinancieroGuardadoRespuesta
     valor_por_defecto: str | None
     variantes: list[VarianteGuardadaRespuesta]
+    celda_texto: bool = False  # RF-73: lo guardado antes no trae la clave
 
 
 class CriterioCalculadoGuardadoRespuesta(ModeloRespuesta):
