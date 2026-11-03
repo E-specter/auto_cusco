@@ -4319,6 +4319,607 @@
         }
       }
     },
+    "/textos-guardados/contextos": {
+      "get": {
+        "tags": [
+          "textos guardados"
+        ],
+        "summary": "Listar Contextos",
+        "description": "Los contextos que los modulos registraron, con la forma de su contenido.",
+        "operationId": "listar_contextos_textos_guardados_contextos_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ContextoGuardadoRespuesta"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Contextos Textos Guardados Contextos Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/textos-guardados": {
+      "get": {
+        "tags": [
+          "textos guardados"
+        ],
+        "summary": "Listar Textos",
+        "description": "Los textos del `contexto` ordenados por nombre, con su version vigente. Sin paginar.",
+        "operationId": "listar_textos_textos_guardados_get",
+        "parameters": [
+          {
+            "name": "contexto",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Contexto"
+            }
+          },
+          {
+            "name": "deshabilitados",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Incluir los deshabilitados",
+              "default": false,
+              "title": "Deshabilitados"
+            },
+            "description": "Incluir los deshabilitados"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResumenTextoRespuesta"
+                  },
+                  "title": "Response Listar Textos Textos Guardados Get"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "El contexto no esta registrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el texto o su version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "textos guardados"
+        ],
+        "summary": "Crear Texto",
+        "description": "Guarda un texto nuevo con su version 1. El nombre es obligatorio y unico en el contexto.",
+        "operationId": "crear_texto_textos_guardados_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextoEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TextoRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "El texto no se puede guardar o el contexto no esta registrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTextoGuardado"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el texto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "El nombre ya existe en el contexto, el texto esta deshabilitado o alguna version se uso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/textos-guardados/{texto_id}": {
+      "get": {
+        "tags": [
+          "textos guardados"
+        ],
+        "summary": "Obtener Texto",
+        "description": "Un texto con la version vigente o con la `version` pedida; tambien si esta deshabilitado.",
+        "operationId": "obtener_texto_textos_guardados__texto_id__get",
+        "parameters": [
+          {
+            "name": "texto_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Texto Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Por defecto, la vigente",
+              "title": "Version"
+            },
+            "description": "Por defecto, la vigente"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TextoRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "El contexto no esta registrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el texto o su version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "textos guardados"
+        ],
+        "summary": "Renombrar Texto",
+        "description": "Cambia solo el nombre (RF-56): no crea una version ni modifica ninguna, y mueve\n`actualizado_en`. Mismo nombre que el actual: sin error y sin cambios. Otro nombre ya en uso en\nel contexto es `409 nombre_repetido`; vacio o de mas de 120 caracteres, `400` con el problema en\n`campo = nombre`. Devuelve el texto con su version vigente.",
+        "operationId": "renombrar_texto_textos_guardados__texto_id__patch",
+        "parameters": [
+          {
+            "name": "texto_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Texto Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenombrarTextoEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TextoRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "El texto no se puede guardar o el contexto no esta registrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTextoGuardado"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el texto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "El nombre ya existe en el contexto, el texto esta deshabilitado o alguna version se uso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "textos guardados"
+        ],
+        "summary": "Eliminar Texto",
+        "description": "Lo elimina con sus versiones; si alguna tiene `usada_en`, `409 texto_guardado_usado`.",
+        "operationId": "eliminar_texto_textos_guardados__texto_id__delete",
+        "parameters": [
+          {
+            "name": "texto_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Texto Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No existe el texto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Alguna version se uso: solo se deshabilita",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/textos-guardados/{texto_id}/versiones": {
+      "post": {
+        "tags": [
+          "textos guardados"
+        ],
+        "summary": "Agregar Version",
+        "description": "Guarda el contenido como una version nueva, que pasa a ser la vigente.",
+        "operationId": "agregar_version_textos_guardados__texto_id__versiones_post",
+        "parameters": [
+          {
+            "name": "texto_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Texto Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContenidoEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TextoRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "El texto no se puede guardar o el contexto no esta registrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTextoGuardado"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el texto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "El nombre ya existe en el contexto, el texto esta deshabilitado o alguna version se uso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/textos-guardados/{texto_id}/deshabilitar": {
+      "post": {
+        "tags": [
+          "textos guardados"
+        ],
+        "summary": "Deshabilitar Texto",
+        "description": "Deja de ofrecerlo para lo nuevo; lo que ya lo uso lo sigue leyendo. Idempotente.",
+        "operationId": "deshabilitar_texto_textos_guardados__texto_id__deshabilitar_post",
+        "parameters": [
+          {
+            "name": "texto_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Texto Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TextoRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "El contexto no esta registrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el texto o su version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/textos-guardados/{texto_id}/habilitar": {
+      "post": {
+        "tags": [
+          "textos guardados"
+        ],
+        "summary": "Habilitar Texto",
+        "description": "Lo vuelve a ofrecer para lo nuevo y admite versiones nuevas. Si ya esta habilitado, 200 sin\ncambio.",
+        "operationId": "habilitar_texto_textos_guardados__texto_id__habilitar_post",
+        "parameters": [
+          {
+            "name": "texto_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Texto Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TextoRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "El contexto no esta registrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el texto o su version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorTexto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/whatsmkt/configuracion": {
       "get": {
         "tags": [
@@ -6285,7 +6886,12 @@
           "plataforma_columna_fija_movida",
           "plataforma_tipo_de_columna_fija",
           "plataforma_tipo_del_resto",
-          "plataforma_columnas_de_mas"
+          "plataforma_columnas_de_mas",
+          "texto_guardado_invalido",
+          "texto_guardado_no_encontrado",
+          "texto_guardado_usado",
+          "texto_guardado_deshabilitado",
+          "contexto_guardado_desconocido"
         ],
         "title": "CodigoTexto",
         "description": "Catalogo de codigos que el frontend traducira como `textoEnriquecido.codigo.<codigo>`.\n\nUn codigo por linea, con la forma `NOMBRE = \"codigo\"`: la prueba espejo del\nfrontend lee esta clase. Los primeros se detectan al compilar (una expresion\ninvalida no procesa ninguna fila); los siguientes, al evaluar una fila concreta; al final,\nlos que solo informa la API del motor (B4a): lo que no se puede leer, el contexto o el\nproducto que no existen, y por que una expresion no tiene largo maximo."
@@ -7202,6 +7808,15 @@
         ],
         "title": "ConsumoLimiteRespuesta"
       },
+      "ContenidoEntrada": {
+        "properties": {
+          "contenido": {
+            "title": "Contenido"
+          }
+        },
+        "type": "object",
+        "title": "ContenidoEntrada"
+      },
       "ContenidoGuardadoRespuesta": {
         "properties": {
           "proteger_formulas": {
@@ -7252,6 +7867,33 @@
           "clave_nombre"
         ],
         "title": "ContextoDisponibleRespuesta"
+      },
+      "ContextoGuardadoRespuesta": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "expresion",
+              "texto_plano"
+            ],
+            "title": "Tipo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "etiqueta",
+          "tipo"
+        ],
+        "title": "ContextoGuardadoRespuesta"
       },
       "ContextoRespuesta": {
         "properties": {
@@ -8046,6 +8688,32 @@
         ],
         "title": "DetalleErrorTexto",
         "description": "El motivo y el `codigo` del catalogo (`CodigoTexto`) que la interfaz traduce."
+      },
+      "DetalleErrorTextoGuardado": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoTexto"
+          },
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaTextoRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "codigo",
+          "problemas"
+        ],
+        "title": "DetalleErrorTextoGuardado",
+        "description": "Un `400` al guardar: el motivo, el `codigo` y los problemas con su campo."
       },
       "DiaNoLaborableRespuesta": {
         "properties": {
@@ -11576,6 +12244,16 @@
         "title": "RenombrarDefinicionEntrada",
         "description": "RF-56: el nombre nuevo. Se recortan los espacios de los extremos."
       },
+      "RenombrarTextoEntrada": {
+        "properties": {
+          "nombre": {
+            "title": "Nombre"
+          }
+        },
+        "type": "object",
+        "title": "RenombrarTextoEntrada",
+        "description": "RF-56: el nombre nuevo. Se recortan los espacios de los extremos."
+      },
       "ReporteImportadoRespuesta": {
         "properties": {
           "mes_id": {
@@ -11700,6 +12378,63 @@
           "seleccion"
         ],
         "title": "ResumenRespuesta"
+      },
+      "ResumenTextoRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "contexto": {
+            "type": "string",
+            "title": "Contexto"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "version_vigente": {
+            "type": "integer",
+            "title": "Version Vigente"
+          },
+          "cantidad_versiones": {
+            "type": "integer",
+            "title": "Cantidad Versiones"
+          },
+          "actualizado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Actualizado En"
+          },
+          "vigente_usada": {
+            "type": "boolean",
+            "title": "Vigente Usada"
+          },
+          "deshabilitado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deshabilitado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "contexto",
+          "nombre",
+          "version_vigente",
+          "cantidad_versiones",
+          "actualizado_en",
+          "vigente_usada",
+          "deshabilitado_en"
+        ],
+        "title": "ResumenTextoRespuesta"
       },
       "RevisionRespuesta": {
         "properties": {
@@ -12360,6 +13095,92 @@
           "documento"
         ],
         "title": "SupervisorRespuesta"
+      },
+      "TextoEntrada": {
+        "properties": {
+          "contexto": {
+            "type": "string",
+            "title": "Contexto"
+          },
+          "nombre": {
+            "title": "Nombre"
+          },
+          "contenido": {
+            "title": "Contenido"
+          }
+        },
+        "type": "object",
+        "required": [
+          "contexto"
+        ],
+        "title": "TextoEntrada",
+        "description": "Lo que no es texto o objeto llega al servicio tal cual y se informa como problema."
+      },
+      "TextoRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "contexto": {
+            "type": "string",
+            "title": "Contexto"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "actualizado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Actualizado En"
+          },
+          "deshabilitado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deshabilitado En"
+          },
+          "version_vigente": {
+            "type": "integer",
+            "title": "Version Vigente"
+          },
+          "versiones": {
+            "items": {
+              "$ref": "#/components/schemas/VersionTextoResumenRespuesta"
+            },
+            "type": "array",
+            "title": "Versiones"
+          },
+          "version": {
+            "$ref": "#/components/schemas/VersionTextoRespuesta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "contexto",
+          "nombre",
+          "creado_en",
+          "actualizado_en",
+          "deshabilitado_en",
+          "version_vigente",
+          "versiones",
+          "version"
+        ],
+        "title": "TextoRespuesta",
+        "description": "El texto, todas sus versiones (sin contenido) y la pedida (la vigente por defecto)."
       },
       "TipoAdicional": {
         "type": "string",
@@ -13064,6 +13885,86 @@
         ],
         "title": "VersionSpeechRespuesta",
         "description": "Una version del speech: su contenido son las `expresiones`, una por segmento."
+      },
+      "VersionTextoRespuesta": {
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "title": "Numero"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "usada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usada En"
+          },
+          "usada": {
+            "type": "boolean",
+            "title": "Usada"
+          },
+          "contenido": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Contenido"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "creado_en",
+          "usada_en",
+          "usada",
+          "contenido"
+        ],
+        "title": "VersionTextoRespuesta"
+      },
+      "VersionTextoResumenRespuesta": {
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "title": "Numero"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "usada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usada En"
+          },
+          "usada": {
+            "type": "boolean",
+            "title": "Usada"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "creado_en",
+          "usada_en",
+          "usada"
+        ],
+        "title": "VersionTextoResumenRespuesta"
       },
       "app__api__archivos_carga__PrevisualizacionRespuesta": {
         "properties": {

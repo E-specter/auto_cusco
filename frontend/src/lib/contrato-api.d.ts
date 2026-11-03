@@ -1190,6 +1190,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/textos-guardados/contextos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar Contextos
+         * @description Los contextos que los modulos registraron, con la forma de su contenido.
+         */
+        get: operations["listar_contextos_textos_guardados_contextos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/textos-guardados": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar Textos
+         * @description Los textos del `contexto` ordenados por nombre, con su version vigente. Sin paginar.
+         */
+        get: operations["listar_textos_textos_guardados_get"];
+        put?: never;
+        /**
+         * Crear Texto
+         * @description Guarda un texto nuevo con su version 1. El nombre es obligatorio y unico en el contexto.
+         */
+        post: operations["crear_texto_textos_guardados_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/textos-guardados/{texto_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obtener Texto
+         * @description Un texto con la version vigente o con la `version` pedida; tambien si esta deshabilitado.
+         */
+        get: operations["obtener_texto_textos_guardados__texto_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Eliminar Texto
+         * @description Lo elimina con sus versiones; si alguna tiene `usada_en`, `409 texto_guardado_usado`.
+         */
+        delete: operations["eliminar_texto_textos_guardados__texto_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Renombrar Texto
+         * @description Cambia solo el nombre (RF-56): no crea una version ni modifica ninguna, y mueve
+         *     `actualizado_en`. Mismo nombre que el actual: sin error y sin cambios. Otro nombre ya en uso en
+         *     el contexto es `409 nombre_repetido`; vacio o de mas de 120 caracteres, `400` con el problema en
+         *     `campo = nombre`. Devuelve el texto con su version vigente.
+         */
+        patch: operations["renombrar_texto_textos_guardados__texto_id__patch"];
+        trace?: never;
+    };
+    "/textos-guardados/{texto_id}/versiones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Agregar Version
+         * @description Guarda el contenido como una version nueva, que pasa a ser la vigente.
+         */
+        post: operations["agregar_version_textos_guardados__texto_id__versiones_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/textos-guardados/{texto_id}/deshabilitar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deshabilitar Texto
+         * @description Deja de ofrecerlo para lo nuevo; lo que ya lo uso lo sigue leyendo. Idempotente.
+         */
+        post: operations["deshabilitar_texto_textos_guardados__texto_id__deshabilitar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/textos-guardados/{texto_id}/habilitar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Habilitar Texto
+         * @description Lo vuelve a ofrecer para lo nuevo y admite versiones nuevas. Si ya esta habilitado, 200 sin
+         *     cambio.
+         */
+        post: operations["habilitar_texto_textos_guardados__texto_id__habilitar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/whatsmkt/configuracion": {
         parameters: {
             query?: never;
@@ -1977,7 +2113,7 @@ export interface components {
          *     producto que no existen, y por que una expresion no tiene largo maximo.
          * @enum {string}
          */
-        CodigoTexto: "expresion_invalida" | "definicion_invalida" | "sintaxis_invalida" | "referencia_vacia" | "variable_desconocida" | "funcion_desconocida" | "parametro_invalido" | "tipo_incompatible" | "limite_excedido" | "no_se_puede_escribir_como_texto" | "sin_segmento" | "variable_obligatoria_vacia" | "argumento_vacio" | "division_por_cero" | "no_es_numero" | "no_es_fecha" | "telefono_invalido" | "resultado_fuera_de_rango" | "valor_no_convertible" | "sin_cota_variable" | "sin_cota_funcion" | "contexto_desconocido" | "producto_no_encontrado" | "sin_version_vigente" | "definicion_no_encontrada" | "version_no_encontrada" | "nombre_repetido" | "seleccion_no_encontrada" | "fecha_envio_anterior" | "plataforma_desconocida" | "plataforma_columna_fija_ausente" | "plataforma_columna_fija_movida" | "plataforma_tipo_de_columna_fija" | "plataforma_tipo_del_resto" | "plataforma_columnas_de_mas";
+        CodigoTexto: "expresion_invalida" | "definicion_invalida" | "sintaxis_invalida" | "referencia_vacia" | "variable_desconocida" | "funcion_desconocida" | "parametro_invalido" | "tipo_incompatible" | "limite_excedido" | "no_se_puede_escribir_como_texto" | "sin_segmento" | "variable_obligatoria_vacia" | "argumento_vacio" | "division_por_cero" | "no_es_numero" | "no_es_fecha" | "telefono_invalido" | "resultado_fuera_de_rango" | "valor_no_convertible" | "sin_cota_variable" | "sin_cota_funcion" | "contexto_desconocido" | "producto_no_encontrado" | "sin_version_vigente" | "definicion_no_encontrada" | "version_no_encontrada" | "nombre_repetido" | "seleccion_no_encontrada" | "fecha_envio_anterior" | "plataforma_desconocida" | "plataforma_columna_fija_ausente" | "plataforma_columna_fija_movida" | "plataforma_tipo_de_columna_fija" | "plataforma_tipo_del_resto" | "plataforma_columnas_de_mas" | "texto_guardado_invalido" | "texto_guardado_no_encontrado" | "texto_guardado_usado" | "texto_guardado_deshabilitado" | "contexto_guardado_desconocido";
         /**
          * CodigoWhatsmkt
          * @description Codigos de error del modulo; el frontend los traduce como `whatsmkt.codigo.<codigo>`.
@@ -2324,6 +2460,11 @@ export interface components {
              */
             costo_total: string;
         };
+        /** ContenidoEntrada */
+        ContenidoEntrada: {
+            /** Contenido */
+            contenido?: unknown;
+        };
         /**
          * ContenidoGuardadoRespuesta
          * @description La definicion de una version, con la tabla de rangos resuelta y las columnas por `orden`.
@@ -2341,6 +2482,18 @@ export interface components {
             nombre: string;
             /** Clave Nombre */
             clave_nombre: string;
+        };
+        /** ContextoGuardadoRespuesta */
+        ContextoGuardadoRespuesta: {
+            /** Clave */
+            clave: string;
+            /** Etiqueta */
+            etiqueta: string;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "expresion" | "texto_plano";
         };
         /** ContextoRespuesta */
         ContextoRespuesta: {
@@ -2656,6 +2809,17 @@ export interface components {
             /** Detail */
             detail: string;
             codigo: components["schemas"]["CodigoTexto"];
+        };
+        /**
+         * DetalleErrorTextoGuardado
+         * @description Un `400` al guardar: el motivo, el `codigo` y los problemas con su campo.
+         */
+        DetalleErrorTextoGuardado: {
+            /** Detail */
+            detail: string;
+            codigo: components["schemas"]["CodigoTexto"];
+            /** Problemas */
+            problemas: components["schemas"]["ProblemaTextoRespuesta"][];
         };
         /** DiaNoLaborableRespuesta */
         DiaNoLaborableRespuesta: {
@@ -4036,6 +4200,14 @@ export interface components {
             /** Nombre */
             nombre: string;
         };
+        /**
+         * RenombrarTextoEntrada
+         * @description RF-56: el nombre nuevo. Se recortan los espacios de los extremos.
+         */
+        RenombrarTextoEntrada: {
+            /** Nombre */
+            nombre?: unknown;
+        };
         /** ReporteImportadoRespuesta */
         ReporteImportadoRespuesta: {
             /** Mes Id */
@@ -4080,6 +4252,28 @@ export interface components {
             suficiente: boolean;
             universo: components["schemas"]["BloqueRespuesta"];
             seleccion: components["schemas"]["BloqueRespuesta"] | null;
+        };
+        /** ResumenTextoRespuesta */
+        ResumenTextoRespuesta: {
+            /** Id */
+            id: number;
+            /** Contexto */
+            contexto: string;
+            /** Nombre */
+            nombre: string;
+            /** Version Vigente */
+            version_vigente: number;
+            /** Cantidad Versiones */
+            cantidad_versiones: number;
+            /**
+             * Actualizado En
+             * Format: date-time
+             */
+            actualizado_en: string;
+            /** Vigente Usada */
+            vigente_usada: boolean;
+            /** Deshabilitado En */
+            deshabilitado_en: string | null;
         };
         /** RevisionRespuesta */
         RevisionRespuesta: {
@@ -4323,6 +4517,47 @@ export interface components {
             procedencia: string;
             /** Documento */
             documento: string;
+        };
+        /**
+         * TextoEntrada
+         * @description Lo que no es texto o objeto llega al servicio tal cual y se informa como problema.
+         */
+        TextoEntrada: {
+            /** Contexto */
+            contexto: string;
+            /** Nombre */
+            nombre?: unknown;
+            /** Contenido */
+            contenido?: unknown;
+        };
+        /**
+         * TextoRespuesta
+         * @description El texto, todas sus versiones (sin contenido) y la pedida (la vigente por defecto).
+         */
+        TextoRespuesta: {
+            /** Id */
+            id: number;
+            /** Contexto */
+            contexto: string;
+            /** Nombre */
+            nombre: string;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+            /**
+             * Actualizado En
+             * Format: date-time
+             */
+            actualizado_en: string;
+            /** Deshabilitado En */
+            deshabilitado_en: string | null;
+            /** Version Vigente */
+            version_vigente: number;
+            /** Versiones */
+            versiones: components["schemas"]["VersionTextoResumenRespuesta"][];
+            version: components["schemas"]["VersionTextoRespuesta"];
         };
         /**
          * TipoAdicional
@@ -4599,6 +4834,38 @@ export interface components {
             motivo_no_eliminable: components["schemas"]["MotivoNoEliminable"] | null;
             /** Expresiones */
             expresiones: components["schemas"]["ExpresionSegmentoRespuesta"][];
+        };
+        /** VersionTextoRespuesta */
+        VersionTextoRespuesta: {
+            /** Numero */
+            numero: number;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+            /** Usada En */
+            usada_en: string | null;
+            /** Usada */
+            usada: boolean;
+            /** Contenido */
+            contenido: {
+                [key: string]: unknown;
+            };
+        };
+        /** VersionTextoResumenRespuesta */
+        VersionTextoResumenRespuesta: {
+            /** Numero */
+            numero: number;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+            /** Usada En */
+            usada_en: string | null;
+            /** Usada */
+            usada: boolean;
         };
         /**
          * PrevisualizacionRespuesta
@@ -7683,6 +7950,458 @@ export interface operations {
             };
             /** @description Ya hay una definicion con ese nombre */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_contextos_textos_guardados_contextos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContextoGuardadoRespuesta"][];
+                };
+            };
+        };
+    };
+    listar_textos_textos_guardados_get: {
+        parameters: {
+            query: {
+                contexto: string;
+                /** @description Incluir los deshabilitados */
+                deshabilitados?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumenTextoRespuesta"][];
+                };
+            };
+            /** @description El contexto no esta registrado */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description No existe el texto o su version */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    crear_texto_textos_guardados_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextoEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TextoRespuesta"];
+                };
+            };
+            /** @description El texto no se puede guardar o el contexto no esta registrado */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTextoGuardado"];
+                };
+            };
+            /** @description No existe el texto */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description El nombre ya existe en el contexto, el texto esta deshabilitado o alguna version se uso */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtener_texto_textos_guardados__texto_id__get: {
+        parameters: {
+            query?: {
+                /** @description Por defecto, la vigente */
+                version?: number | null;
+            };
+            header?: never;
+            path: {
+                texto_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TextoRespuesta"];
+                };
+            };
+            /** @description El contexto no esta registrado */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description No existe el texto o su version */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    eliminar_texto_textos_guardados__texto_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                texto_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No existe el texto */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Alguna version se uso: solo se deshabilita */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    renombrar_texto_textos_guardados__texto_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                texto_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenombrarTextoEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TextoRespuesta"];
+                };
+            };
+            /** @description El texto no se puede guardar o el contexto no esta registrado */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTextoGuardado"];
+                };
+            };
+            /** @description No existe el texto */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description El nombre ya existe en el contexto, el texto esta deshabilitado o alguna version se uso */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agregar_version_textos_guardados__texto_id__versiones_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                texto_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContenidoEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TextoRespuesta"];
+                };
+            };
+            /** @description El texto no se puede guardar o el contexto no esta registrado */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTextoGuardado"];
+                };
+            };
+            /** @description No existe el texto */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description El nombre ya existe en el contexto, el texto esta deshabilitado o alguna version se uso */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deshabilitar_texto_textos_guardados__texto_id__deshabilitar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                texto_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TextoRespuesta"];
+                };
+            };
+            /** @description El contexto no esta registrado */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description No existe el texto o su version */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    habilitar_texto_textos_guardados__texto_id__habilitar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                texto_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TextoRespuesta"];
+                };
+            };
+            /** @description El contexto no esta registrado */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorTexto"];
+                };
+            };
+            /** @description No existe el texto o su version */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

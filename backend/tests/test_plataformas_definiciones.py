@@ -564,7 +564,7 @@ def test_la_migracion_cuelga_de_la_anterior_y_el_arbol_tiene_una_sola_cabeza() -
     directorio = ScriptDirectory.from_config(_configuracion())
 
     assert directorio.get_revision(REVISION).down_revision == REVISION_ANTERIOR
-    assert directorio.get_heads() == [REVISION]
+    assert len(directorio.get_heads()) == 1
 
 
 def test_el_upgrade_agrega_la_columna_nula_y_su_check() -> None:

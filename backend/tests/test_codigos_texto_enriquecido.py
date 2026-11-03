@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from app.api.cartera import obtener_servicio_cartera
 from app.api.definiciones_columnas import obtener_servicio_definiciones
 from app.api.selecciones import obtener_servicio_selecciones
+from app.api.textos_guardados import obtener_servicio_textos_guardados
 from app.core.entities import texto_enriquecido as entidades
 from app.core.entities.cartera import PaginaCartera, SinVersionVigente
 from app.core.entities.mapeo import TipoSalida
@@ -38,8 +39,16 @@ from app.core.services.definiciones_columnas.servicio import (
 )
 from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.texto_enriquecido import evaluador, sintaxis
+from app.core.services.textos_guardados.contextos import (
+    ContextoGuardado,
+    RegistroContextosGuardados,
+    TipoContenido,
+    validador_de_texto_plano,
+)
+from app.core.services.textos_guardados.servicio import TextosGuardadosService
 from app.main import app
 from tests.definiciones_memoria import RepositorioEnMemoria
+from tests.textos_memoria import RepositorioTextosEnMemoria
 
 VARIABLES = {
     "t": TipoValor.TEXTO,
@@ -150,6 +159,49 @@ def _emitidos_por_las_plataformas() -> set[CodigoTexto]:
             servicio.crear({"nombre": "n", "plataforma": plataforma, "columnas": columnas})
         except DefinicionInvalida as error:
             emitidos.update(p.problema.codigo for p in error.problemas)
+    return emitidos
+
+
+def _emitidos_por_los_textos_guardados() -> set[CodigoTexto]:
+    """Los codigos de los textos guardados (RF-69), pedidos por HTTP a un contexto sintetico."""
+    registro = RegistroContextosGuardados(
+        [
+            ContextoGuardado(
+                "prueba", "Prueba", TipoContenido.TEXTO_PLANO, validador_de_texto_plano(20)
+            )
+        ]
+    )
+    servicio = TextosGuardadosService(RepositorioTextosEnMemoria(), registro)
+    app.dependency_overrides[obtener_servicio_textos_guardados] = lambda: servicio
+    emitidos: set[CodigoTexto] = set()
+    try:
+        http = TestClient(app)
+        usado = http.post(
+            "/textos-guardados",
+            json={"contexto": "prueba", "nombre": "a", "contenido": {"texto": "x"}},
+        ).json()["id"]
+        deshabilitado = http.post(
+            "/textos-guardados",
+            json={"contexto": "prueba", "nombre": "b", "contenido": {"texto": "x"}},
+        ).json()["id"]
+        servicio.marcar_usada(usado, 1)
+        http.post(f"/textos-guardados/{deshabilitado}/deshabilitar")
+        respuestas = [
+            http.post(
+                "/textos-guardados", json={"contexto": "prueba", "nombre": " ", "contenido": {}}
+            ),
+            http.post(
+                "/textos-guardados", json={"contexto": "nada", "nombre": "c", "contenido": {}}
+            ),
+            http.get("/textos-guardados/999"),
+            http.delete(f"/textos-guardados/{usado}"),
+            http.post(
+                f"/textos-guardados/{deshabilitado}/versiones", json={"contenido": {"texto": "y"}}
+            ),
+        ]
+    finally:
+        app.dependency_overrides.pop(obtener_servicio_textos_guardados, None)
+    emitidos.update(CodigoTexto(r.json()["codigo"]) for r in respuestas)
     return emitidos
 
 
@@ -282,6 +334,7 @@ def _emitidos() -> set[CodigoTexto]:
     emitidos.update(_emitidos_por_el_generador())
     emitidos.update(_emitidos_por_la_api())
     emitidos.update(_emitidos_por_las_plataformas())
+    emitidos.update(_emitidos_por_los_textos_guardados())
     return emitidos
 
 

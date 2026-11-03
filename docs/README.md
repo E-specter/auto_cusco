@@ -16,6 +16,7 @@
 | [requerimientos-mowa-mes.md](requerimientos-mowa-mes.md) | Requerimientos del conector SMS de MOWA MES (`mowa_mes`): inputs de campaña, archivo de carga, speech, reporte de enviados, decisiones y evidencia |
 | [agents/_registry.md](agents/_registry.md) · [agents/tasks.md](agents/tasks.md) | Registro vivo de `/docs` y tablero de subtareas multiagente (skill `coordinador-multiagente`) |
 | [selecciones-guardadas.md](selecciones-guardadas.md) | Selecciones de cartera guardadas y compartidas: qué se guarda, validez al guardar y al cargar, nombre único y endpoints |
+| [textos-guardados.md](textos-guardados.md) | Textos guardados y versionados por contexto (RF-69): tablas, contextos registrables con su validador, endpoints y códigos |
 | [generacion-cargas.md](generacion-cargas.md) | Generación de archivos de carga (RF-09, RF-13, RF-15): endpoints, previsualización, formatos XLSX/CSV/JSON y sus opciones |
 | [testing.md](testing.md) | Protocolo de pruebas y de corrección de errores por módulo: niveles, convenciones, criterio para cerrar una tarea e integración continua |
 | [versionado-sabanas.md](versionado-sabanas.md) | Evaluación y diseño del versionado de sábanas por fecha de corte: versión vigente, corrección de días pasados, eliminación y trazabilidad de formatos |

@@ -79,6 +79,12 @@ class CodigoTexto(StrEnum):
     PLATAFORMA_TIPO_DE_COLUMNA_FIJA = "plataforma_tipo_de_columna_fija"  # no tiene su tipo
     PLATAFORMA_TIPO_DEL_RESTO = "plataforma_tipo_del_resto"  # las demas deben ser de otro tipo
     PLATAFORMA_COLUMNAS_DE_MAS = "plataforma_columnas_de_mas"  # no admite mas que las fijas
+    # Los textos guardados por contexto (RF-69)
+    TEXTO_GUARDADO_INVALIDO = "texto_guardado_invalido"  # el nombre o el contenido no valen
+    TEXTO_GUARDADO_NO_ENCONTRADO = "texto_guardado_no_encontrado"
+    TEXTO_GUARDADO_USADO = "texto_guardado_usado"  # alguna version se uso: solo se deshabilita
+    TEXTO_GUARDADO_DESHABILITADO = "texto_guardado_deshabilitado"  # no admite versiones nuevas
+    CONTEXTO_GUARDADO_DESCONOCIDO = "contexto_guardado_desconocido"  # el modulo no lo registro
 
 
 @dataclass(frozen=True)

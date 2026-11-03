@@ -402,6 +402,56 @@ class DefinicionCargaVersion(Base):
     )
 
 
+class TextoGuardado(Base):
+    """Texto guardado en el contexto de un modulo (RF-69, T-HI-B4); el contenido vive en sus
+    versiones. El nombre es unico dentro del contexto, sin distinguir mayusculas. Sin usuario hasta
+    que exista autenticacion (como las definiciones)."""
+
+    __tablename__ = "texto_guardado"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    contexto: Mapped[str] = mapped_column(Text)
+    nombre: Mapped[str] = mapped_column(Text)
+    # Sin espacios en los extremos y en minusculas: la unicidad no distingue mayusculas.
+    nombre_normalizado: Mapped[str] = mapped_column(Text)
+    # Nulo = habilitado. Un texto deshabilitado deja de ofrecerse para lo nuevo.
+    deshabilitado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    actualizado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("contexto", "nombre_normalizado"),
+        CheckConstraint("length(btrim(contexto)) > 0", name="contexto_no_vacio"),
+        CheckConstraint("length(btrim(nombre)) > 0", name="nombre_no_vacio"),
+    )
+
+
+class TextoGuardadoVersion(Base):
+    """Una version de un texto: un objeto JSON que valido el contexto. Ninguna se modifica; un
+    cambio crea la siguiente. `usada_en` marca la primera vez que algo la uso."""
+
+    __tablename__ = "texto_guardado_version"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    texto_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("texto_guardado.id", ondelete="CASCADE")
+    )
+    numero: Mapped[int] = mapped_column(Integer)
+    # `none_as_null`: un None de Python es NULL de SQL (que NOT NULL rechaza), no el JSON `null`;
+    # el CHECK exige un objeto: NOT NULL solo no basta, `null`, `[]` o `3` tambien son JSON.
+    contenido: Mapped[dict[str, Any]] = mapped_column(JSONB(none_as_null=True))
+    usada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("texto_id", "numero"),
+        CheckConstraint("numero >= 1", name="numero_positivo"),
+        CheckConstraint("jsonb_typeof(contenido) = 'object'", name="contenido_es_un_objeto"),
+    )
+
+
 # --- Calendario laboral (RF-MM-08) ---------------------------------------
 
 _TELEFONO_RF02 = "'^9[0-9]{8}$'"
