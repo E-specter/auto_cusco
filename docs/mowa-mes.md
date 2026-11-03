@@ -101,7 +101,8 @@ Este documento describe lo implementado. **Estado: primer corte (B1, B2, B3 y B6
 | Entidades | `app/core/entities/mowa_mes_campana.py` |
 | Caso de uso | `app/core/services/plataformas/mowa_mes/campana.py` (`CampanasMowaMesService`, `evaluar_producto`, `huella_speech`, `descripcion_sugerida`) |
 | División | `app/core/services/plataformas/mowa_mes/division.py`: arma `ArchivoCarga` y `ArchivoPrevisto` con el algoritmo común de `app/core/services/division_archivos.py` (T-MM-C10, L-B9) |
-| Archivo `.xlsx` | `app/adapters/output/plataformas/mowa_mes/archivo_carga.py` (sobre el exportador XLSX) |
+| Archivo `.xlsx` | `app/adapters/output/plataformas/mowa_mes/archivo_carga.py`: sale de la definición `mowa_mes` (`DEFINICION_MOWA_MES`, RF-MM-37, §33) con `GeneradorCargas` y el exportador XLSX común |
+| Plataforma `mowa_mes` | `app/core/services/plataformas/mowa_mes/plataforma.py` (`REGLAS_MOWA_MES`, `DEFINICION_MOWA_MES`) |
 | Persistencia | `app/adapters/persistence/repositorio_campanas_mowa_mes_postgres.py`, migración `7a91278726ae` |
 | API | `app/api/mowa_mes_campanas.py` |
 
@@ -664,3 +665,22 @@ El contrato no cambia (`mes_id` sigue siendo `mes_id`). El backend solo cambia d
 - **Los ids de las pruebas siguen sintéticos** (99xxxxxxx), sin ejemplos en pantalla. El `detail` falso de la 409 de reemplazo imita la frase nueva del backend («Ya se importó el reporte de los ID campaña 990000001; confirma para reemplazarlo.»), que el backend cambia en un corte aparte.
 - **Lo que no cambia:** los comentarios de código y el contrato.
 - **Pruebas.** Playwright: `e2e/mowa-mes-seguimiento.spec.ts`, bloque «RF-MM-34» (los siete textos visibles en es y en, a través de una importación con 409 y reemplazo) y los textos nuevos de S5. Vitest: los espejos de i18n y el `detail` de `api-mowa-mes.test.ts`. Las de backend son `test_lector_reporte_mowa_mes.py` y `test_mowa_mes_campana.py`, que verifican la frase completa de cada mensaje.
+
+## 33. El archivo de carga sale de la definición `mowa_mes` (T-MM-B15, paso 2; RF-MM-37, RF-72)
+
+El `.xlsx` de RF-MM-10 deja de armarse a mano y sale de una definición de plataforma `mowa_mes`, con el generador y el exportador comunes. **El archivo es el mismo byte a byte** que antes: lo fijan el oro del paso 1 (`test_mowa_mes_archivo_oro`, constantes congeladas con el código de `main` en `0e19b0d`) y `XLSX_MOWA_SIN_IGUAL`, que no se tocaron.
+
+- **Qué hay.** `plataforma.py` (en el paquete de MOWA) declara `REGLAS_MOWA_MES` (RF-72: `numero` NUMERO, `mensaje` TEXTO y `dni` TEXTO, en ese orden y sin más columnas, `admite_mas_columnas=False`, sin `celda_texto`) y `DEFINICION_MOWA_MES` (tres `CampoSalida`: `[@numero]`, `[@mensaje]` y `[@dni]`). La definición vive en código, no en la base: una campaña tiene que ser reproducible y el formato lo exige MES. No hay migración ni cambia el contrato.
+- **Cómo se escribe.** `escribir_archivo_carga(filas)` conserva su nombre y su firma (la API sigue inyectándolo igual). Aplica `DEFINICION_MOWA_MES` a `FilaCarga.celdas()` con `GeneradorCargas` (leyendo `errores` y las filas; no `detallar_fila`, que es de la previsualización) y escribe con `exportador_xlsx.exportar`, con `hoja=HOJA_CARGA` (`Hoja1`), cabeceras y sin `columnas_texto`. Si el generador da un error, excluye una fila o cambia la cantidad de filas, lanza `ArchivoCargaInvalido`, cuyo mensaje dice la fila, la columna y el código, **nunca** el teléfono, el DNI ni el texto del mensaje.
+- **El `mensaje` no se reinterpreta.** Llega hecho: el speech v2, GSM-7 (RF-MM-27) y el tope de 160 los aplica `campana.evaluar_producto`. En la definición es una referencia directa (`[@mensaje]`) y el valor no se vuelve a leer como plantilla: un `[@telefono]` o un `{x}` dentro del mensaje salen literales en la celda, sin depender de que GSM-7 transliteré los corchetes.
+- **Por qué no pasa por `GeneracionCargasService`.** Ese servicio lee la cartera él mismo (`SeleccionPaginada`) y arma la tabla desde una definición; MOWA ya trae las filas evaluadas (speech, exclusiones y supervisión). Se usan las piezas que ese servicio envuelve, `GeneradorCargas` y el exportador. Se descartó mover el speech al generador (`variantes` por segmento): RF-MM-13 tiene 11 exclusiones en orden fijo, el generador no aplica GSM-7 ni los 160 al generar, y los supervisores heredan el mensaje del primer producto. Se descartó también extraer una función compartida del servicio (D2, §13 con herramientas): hoy solo la usaría MOWA.
+- **`mowa_mes` no está en el registro público de plataformas.** Decisión del usuario (2026-11-02, consultado por architec): el constructor de columnas no la ofrece, porque sacaría archivos de MES sin speech, sin exclusiones, sin supervisores y fuera del límite mensual. Por eso `api/definiciones_columnas.py` no cambia y `GET /definiciones-columnas/plataformas` no la lista. Las reglas quedan en el paquete de MOWA y una prueba valida la definición contra ellas con `problemas_de_plataforma` (una columna de más, otro orden, otro tipo o una columna ausente lo rompen).
+- **Rendimiento.** Se mide con `scripts/medir_campana_mowa_mes.py` (46 000 filas) antes (en `main`) y después; si el corte sale más de un 10 % más lento, se reporta antes de entregar.
+
+### 33.1 Pruebas
+
+| Archivo | Qué fija |
+|---|---|
+| `tests/test_mowa_mes_plataforma.py` | Las reglas (orden, tipos, sin más columnas, sin `celda_texto`), que la definición las cumple y declara la plataforma `mowa_mes`, que sus cabeceras son `CABECERAS_CARGA` y que una columna de más, otro orden, otro tipo, una ausente o una renombrada se detectan |
+| `tests/test_mowa_mes_archivo_carga.py` | Los mismos bytes que armar la tabla a mano (huella y largo sin comprimir, con y sin filas), la hoja `Hoja1` y las cabeceras, los tipos de celda leídos (`numero` numérico; `dni` texto con sus ceros y un `ZZCE…`), el mensaje literal (`[@telefono]`, `[@titular] {x}`...), que un mensaje con `=` es texto, y el error del escritor sin datos de las filas (error del generador, filas de menos y exclusión) |
+| `tests/test_mowa_mes_archivo_oro.py`, `tests/test_exportacion_segura.py` | Sin cambios: los bytes congelados del archivo de una campaña dividida y del archivo de una carga |

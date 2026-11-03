@@ -88,6 +88,7 @@ Formato confirmado con el ejemplo de carga (sección 7).
   * Con la misma entrada, el archivo es el mismo byte a byte que antes de este cambio. Lo comprueba la prueba de oro del módulo.
   * El archivo de MES no usa la celda con formato «Texto» de RF-73: `dni` se escribe como hasta ahora, y por eso el archivo no cambia.
   * Siguen en MOWA MES el armado del `mensaje` (sección 4), las exclusiones (RF-MM-13) y la división en archivos (RF-MM-11).
+  * La definición `mowa_mes` no se ofrece en el constructor de columnas: solo la usa la campaña (decisión del usuario, 2026-11-02).
   * Decisión del usuario, 2026-11-02: «ambos usarán el mismo generador de archivos de carga robusto con constructor de columnas» (MOWA MES y WhatsMKT).
 * **RF-MM-11 — Límites por archivo y división:** Limitar cada archivo de carga a **50 000 registros y 2 MB**; si la carga supera cualquiera de los dos límites, entonces dividirla en dos o más archivos que respeten ambos.
   * Los registros de supervisión van en el primer archivo (RF-41).
@@ -286,6 +287,7 @@ Estructura confirmada con el ejemplo de reporte (sección 7).
 | Cambiar los filtros desde la campaña | «Editar en Cartera» y volver, sin editor propio en la campaña (RF-MM-09) | Usuario (2026-10-30), consultado por architec |
 | Días de envío | De lunes a sábado: los domingos no se envía. Los feriados y los días no laborables registrados siguen excluidos, también en sábado. Es la misma regla para todos los canales (RF-MM-08) | Usuario (2026-11-02), decisión D-A del plan WhatsMKT v2, consultado por architec: «No se puede enviar gestión únicamente los domingos»; ante si MOWA también envía los sábados, eligió «Los dos, lunes a sábado» |
 | Generador del archivo de carga | El archivo de RF-MM-10 se genera con el constructor de columnas compartido, desde una definición de plataforma `mowa_mes` con sus tres columnas fijas, igual byte a byte. El speech, las exclusiones y la división en archivos siguen en MOWA MES (RF-MM-37) | Usuario (2026-11-02), decisión D-C del plan WhatsMKT v2 (opción M2), consultado por architec |
+| ¿La definición «MOWA MES» se ofrece en el constructor de columnas? | No: solo la usa la campaña. Ofrecerla sacaría archivos de MES sin speech, sin exclusiones, sin supervisores y fuera del límite mensual. Las reglas quedan en el paquete de MOWA y una prueba valida la definición contra ellas (RF-MM-37) | Usuario (2026-11-02), consultado por architec |
 
 ## 7. Evidencia de los ejemplos
 
@@ -357,6 +359,7 @@ Queda abierto S-MM-1: depende de información externa (qué ofrece MES), no de u
 
 **2026-11-02**
 - **RF nuevos incorporados:** RF-MM-37 (archivo de carga desde el constructor de columnas) en la sección 3, sobre RF-72. Decisión del usuario D-C del plan WhatsMKT v2, en la sección 6. Lo implementa T-MM-B15.
+- **RF existentes ampliados:** RF-MM-37 ampliado: la definición no se ofrece en el constructor (decisión del usuario en la sección 6).
 - **RF existentes modificados en su redacción:** RF-MM-08 (día gestionable) pasa de lunes a viernes a lunes a sábado y cita la regla común de RF-70. Es la decisión del usuario D-A del plan WhatsMKT v2, registrada en la sección 6. Las viñetas del cálculo de feriados y de las excepciones pasaron sin cambios a RF-70, que escribe T-HI-0. Queda en RF-MM-08 la decisión del 2026-10-26 sobre S-MM-4, como antecedente. El cambio en el código lo hace T-HI-B5. Hasta entonces el sistema sigue sugiriendo de lunes a viernes, y `docs/mowa-mes.md` §2 también lo dice así hasta ese corte.
 - **Nota en la sección 6:** la decisión E1 aclara que la sección del menú se llama «Herramientas» desde RF-74 (T-HI-F2a). No cambia ningún RF.
 - **Nota de numeración:** sin renumerar, como el resto del módulo.
