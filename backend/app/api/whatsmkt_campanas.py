@@ -449,7 +449,7 @@ class CreacionCampanasWhatsmktEntrada(PrevisualizacionCampanasWhatsmktEntrada):
         )
 
 
-class HorarioWhatsmktRespuesta(ModeloRespuesta):
+class HorarioCampanaWhatsmktRespuesta(ModeloRespuesta):
     nombre: str = Field(description="horario_1 u horario_2")
     inicio: str = Field(description="HH:MM")
     fin: str = Field(description="HH:MM")
@@ -466,7 +466,7 @@ class FichaWhatsmktRespuesta(ModeloRespuesta):
 
     nombre: str
     fecha_envio: date
-    horarios: list[HorarioWhatsmktRespuesta]
+    horarios: list[HorarioCampanaWhatsmktRespuesta]
     lo_antes_posible: bool
     pais: str
     foto_id: int | None = Field(description="La foto de perfil, para descargar de la biblioteca")
@@ -501,7 +501,7 @@ def _ficha(c: CampanaWhatsmkt) -> FichaWhatsmktRespuesta:
         nombre=f.nombre,
         fecha_envio=f.fecha_envio,
         horarios=[
-            HorarioWhatsmktRespuesta(
+            HorarioCampanaWhatsmktRespuesta(
                 nombre=h.nombre, inicio=h.inicio.strftime("%H:%M"), fin=h.fin.strftime("%H:%M")
             )
             for h in f.horarios

@@ -7871,10 +7871,10 @@
       "ConfiguracionWhatsmktRespuesta": {
         "properties": {
           "horario_1": {
-            "$ref": "#/components/schemas/app__api__whatsmkt__HorarioWhatsmktRespuesta"
+            "$ref": "#/components/schemas/HorarioWhatsmktRespuesta"
           },
           "horario_2": {
-            "$ref": "#/components/schemas/app__api__whatsmkt__HorarioWhatsmktRespuesta"
+            "$ref": "#/components/schemas/HorarioWhatsmktRespuesta"
           },
           "plantilla_nombre": {
             "type": "string",
@@ -10036,7 +10036,7 @@
           },
           "horarios": {
             "items": {
-              "$ref": "#/components/schemas/app__api__whatsmkt_campanas__HorarioWhatsmktRespuesta"
+              "$ref": "#/components/schemas/HorarioCampanaWhatsmktRespuesta"
             },
             "type": "array",
             "title": "Horarios"
@@ -10636,6 +10636,32 @@
         ],
         "title": "HerramientasRespuesta"
       },
+      "HorarioCampanaWhatsmktRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre",
+            "description": "horario_1 u horario_2"
+          },
+          "inicio": {
+            "type": "string",
+            "title": "Inicio",
+            "description": "HH:MM"
+          },
+          "fin": {
+            "type": "string",
+            "title": "Fin",
+            "description": "HH:MM"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "inicio",
+          "fin"
+        ],
+        "title": "HorarioCampanaWhatsmktRespuesta"
+      },
       "HorarioWhatsmktEntrada": {
         "properties": {
           "inicio": {
@@ -10657,6 +10683,24 @@
           "fin"
         ],
         "title": "HorarioWhatsmktEntrada"
+      },
+      "HorarioWhatsmktRespuesta": {
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "title": "Inicio"
+          },
+          "fin": {
+            "type": "string",
+            "title": "Fin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inicio",
+          "fin"
+        ],
+        "title": "HorarioWhatsmktRespuesta"
       },
       "IncidenciaRespuesta": {
         "properties": {
@@ -14968,50 +15012,6 @@
           "campos_archivados"
         ],
         "title": "PrevisualizacionRespuesta"
-      },
-      "app__api__whatsmkt__HorarioWhatsmktRespuesta": {
-        "properties": {
-          "inicio": {
-            "type": "string",
-            "title": "Inicio"
-          },
-          "fin": {
-            "type": "string",
-            "title": "Fin"
-          }
-        },
-        "type": "object",
-        "required": [
-          "inicio",
-          "fin"
-        ],
-        "title": "HorarioWhatsmktRespuesta"
-      },
-      "app__api__whatsmkt_campanas__HorarioWhatsmktRespuesta": {
-        "properties": {
-          "nombre": {
-            "type": "string",
-            "title": "Nombre",
-            "description": "horario_1 u horario_2"
-          },
-          "inicio": {
-            "type": "string",
-            "title": "Inicio",
-            "description": "HH:MM"
-          },
-          "fin": {
-            "type": "string",
-            "title": "Fin",
-            "description": "HH:MM"
-          }
-        },
-        "type": "object",
-        "required": [
-          "nombre",
-          "inicio",
-          "fin"
-        ],
-        "title": "HorarioWhatsmktRespuesta"
       }
     }
   }

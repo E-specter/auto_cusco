@@ -180,3 +180,18 @@ def test_todo_campo_de_una_respuesta_es_obligatorio() -> None:
     opcionales = [campo for campo in opcionales if campo not in OPCIONALES_PORQUE_A_VECES_NO_VIENEN]
 
     assert opcionales == [], f"Campos de respuesta opcionales en el contrato: {opcionales}"
+
+
+# FastAPI antepone `app__<modulo>__` cuando dos modelos de distintos modulos se llaman igual, y el
+# esquema que el frontend nombraba desaparece (paso con HorarioWhatsmktRespuesta en 3dc3db8). Estos
+# dos son historicos y el frontend los usa con ese nombre (api-mowa-mes.ts y generar-carga.ts).
+NOMBRES_DE_MODULO_HISTORICOS = {
+    "app__api__archivos_carga__PrevisualizacionRespuesta",
+    "app__api__mowa_mes__PrevisualizacionRespuesta",
+}
+
+
+def test_ningun_esquema_nuevo_repite_el_nombre_de_otro_modulo() -> None:
+    con_modulo = {n for n in ESQUEMA["components"]["schemas"] if n.startswith("app__")}
+    nuevos = sorted(con_modulo - NOMBRES_DE_MODULO_HISTORICOS)
+    assert nuevos == [], f"Modelos con el mismo nombre en dos modulos: {nuevos}"

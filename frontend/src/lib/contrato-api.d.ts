@@ -2471,8 +2471,8 @@ export interface components {
         };
         /** ConfiguracionWhatsmktRespuesta */
         ConfiguracionWhatsmktRespuesta: {
-            horario_1: components["schemas"]["app__api__whatsmkt__HorarioWhatsmktRespuesta"];
-            horario_2: components["schemas"]["app__api__whatsmkt__HorarioWhatsmktRespuesta"];
+            horario_1: components["schemas"]["HorarioWhatsmktRespuesta"];
+            horario_2: components["schemas"]["HorarioWhatsmktRespuesta"];
             /** Plantilla Nombre */
             plantilla_nombre: string;
             /** Definicion Defecto Id */
@@ -3365,7 +3365,7 @@ export interface components {
              */
             fecha_envio: string;
             /** Horarios */
-            horarios: components["schemas"]["app__api__whatsmkt_campanas__HorarioWhatsmktRespuesta"][];
+            horarios: components["schemas"]["HorarioCampanaWhatsmktRespuesta"][];
             /** Lo Antes Posible */
             lo_antes_posible: boolean;
             /** Pais */
@@ -3590,6 +3590,24 @@ export interface components {
             /** Speech Optimizado */
             speech_optimizado: boolean;
         };
+        /** HorarioCampanaWhatsmktRespuesta */
+        HorarioCampanaWhatsmktRespuesta: {
+            /**
+             * Nombre
+             * @description horario_1 u horario_2
+             */
+            nombre: string;
+            /**
+             * Inicio
+             * @description HH:MM
+             */
+            inicio: string;
+            /**
+             * Fin
+             * @description HH:MM
+             */
+            fin: string;
+        };
         /** HorarioWhatsmktEntrada */
         HorarioWhatsmktEntrada: {
             /**
@@ -3601,6 +3619,13 @@ export interface components {
              * Fin
              * @description HH:MM, 24 horas; posterior al inicio
              */
+            fin: string;
+        };
+        /** HorarioWhatsmktRespuesta */
+        HorarioWhatsmktRespuesta: {
+            /** Inicio */
+            inicio: string;
+            /** Fin */
             fin: string;
         };
         /** IncidenciaRespuesta */
@@ -5263,31 +5288,6 @@ export interface components {
              * @description Los campos adicionales ARCHIVADOS que usan las expresiones de una v2 (RF-65): un aviso, nunca un bloqueo; el campo sigue resolviendo. Vacia en una v1 y si no hay ninguno
              */
             campos_archivados: components["schemas"]["CampoNombradoRespuesta"][];
-        };
-        /** HorarioWhatsmktRespuesta */
-        app__api__whatsmkt__HorarioWhatsmktRespuesta: {
-            /** Inicio */
-            inicio: string;
-            /** Fin */
-            fin: string;
-        };
-        /** HorarioWhatsmktRespuesta */
-        app__api__whatsmkt_campanas__HorarioWhatsmktRespuesta: {
-            /**
-             * Nombre
-             * @description horario_1 u horario_2
-             */
-            nombre: string;
-            /**
-             * Inicio
-             * @description HH:MM
-             */
-            inicio: string;
-            /**
-             * Fin
-             * @description HH:MM
-             */
-            fin: string;
         };
     };
     responses: never;
