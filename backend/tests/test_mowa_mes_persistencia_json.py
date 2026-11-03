@@ -12,6 +12,7 @@ corre en todos los entornos.
 
 import json
 
+import pytest
 from sqlalchemy import insert, update
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import JSONB
@@ -33,23 +34,18 @@ def _como_viaja(sentencia, columna: str):
     return valor if procesador is None else procesador(valor)
 
 
-# JSONB que no llevan `none_as_null`, fuera de la version del speech (inventario de M-B4; 5 son de
-# MOWA MES: campana y fila cargada; el resto, de otros modulos). No se tocan: cambiarlas
-# cambia la semantica de NULL frente a JSON null en datos que ya existen). En una columna NOT NULL
-# de la lista un `None` se colaria pasando el NOT NULL como JSON `null`; en una nulable quedaria
-# como JSON `null` y no como NULL. Una columna nueva NO puede sumarse a la lista sin decidirlo a
-# proposito, y si una de la lista recibe la opcion, hay que quitarla de aqui.
+# JSONB que no llevan `none_as_null`, fuera de la version del speech y de las de MOWA MES
+# (inventario de M-B4; las 5 de campana y fila cargada ya la llevan, T-MM-B14). No se tocan:
+# cambiarlas cambia la semantica de NULL frente a JSON null en datos que ya existen. En una
+# columna NOT NULL de la lista un `None` se colaria pasando el NOT NULL como JSON `null`; en una
+# nulable quedaria como JSON `null` y no como NULL. Una columna nueva NO puede sumarse a la lista
+# sin decidirlo a proposito, y si una de la lista recibe la opcion, hay que quitarla de aqui.
 JSONB_SIN_NONE_AS_NULL = {
     # NOT NULL
     "borrador_carga_archivo.opciones",
     "borrador_carga_archivo.analisis",
     "carga.opciones_lectura",
     "definicion_carga_version.contenido",
-    "mowa_mes_campana.filtros",
-    "mowa_mes_campana.herramientas",
-    "mowa_mes_campana.envios",
-    "mowa_mes_campana.supervisores",
-    "mowa_mes_fila_cargada.advertencias",
     "seleccion.filtros",
     "seleccion.indicadores",
     # nulables
@@ -93,6 +89,30 @@ def test_toda_jsonb_not_null_del_modelo_lleva_none_as_null_salvo_las_conocidas()
     # Ninguna JSONB NOT NULL nueva sin la opcion; y la lista no guarda columnas que ya la tienen.
     assert sin_la_opcion == JSONB_SIN_NONE_AS_NULL
     assert not any(n.startswith("mowa_mes_speech_version.") for n in sin_la_opcion)
+
+
+# Las JSONB NOT NULL de MOWA MES (T-MM-B14): un `None` no puede llegar como JSON `null`.
+JSONB_NOT_NULL_DE_MOWA_MES = [
+    "mowa_mes_campana.filtros",
+    "mowa_mes_campana.herramientas",
+    "mowa_mes_campana.envios",
+    "mowa_mes_campana.supervisores",
+    "mowa_mes_fila_cargada.advertencias",
+]
+
+
+@pytest.mark.parametrize("nombre", JSONB_NOT_NULL_DE_MOWA_MES)
+def test_un_none_en_las_jsonb_not_null_de_mowa_mes_viaja_como_null_de_sql(nombre) -> None:
+    columna = _jsonb_del_modelo()[nombre]
+    tabla = columna.table
+    claves = {c.name: 1 for c in tabla.primary_key.columns}  # sin aviso de clave sin valor
+
+    assert columna.type.none_as_null and not columna.nullable
+    for sentencia in (
+        insert(tabla).values(**{**claves, columna.name: None}),
+        update(tabla).values(**{columna.name: None}),
+    ):
+        assert _como_viaja(sentencia, columna.name) is None  # NULL de SQL: lo rechaza el NOT NULL
 
 
 def test_el_modelo_declara_el_check_de_que_expresiones_es_una_lista() -> None:

@@ -685,3 +685,19 @@ El `.xlsx` de RF-MM-10 deja de armarse a mano y sale de una definición de plata
 | `tests/test_mowa_mes_plataforma.py` | Las reglas (orden, tipos, sin más columnas, sin `celda_texto`), que la definición las cumple y declara la plataforma `mowa_mes`, que sus cabeceras son `CABECERAS_CARGA` y que una columna de más, otro orden, otro tipo, una ausente o una renombrada se detectan |
 | `tests/test_mowa_mes_archivo_carga.py` | Los mismos bytes que armar la tabla a mano (huella y largo sin comprimir, con y sin filas), la hoja `Hoja1` y las cabeceras, los tipos de celda leídos (`numero` numérico; `dni` texto con sus ceros y un `ZZCE…`), el mensaje literal (`[@telefono]`, `[@titular] {x}`...), que un mensaje con `=` es texto, y el error del escritor sin datos de las filas (error del generador, filas de menos y exclusión) |
 | `tests/test_mowa_mes_archivo_oro.py`, `tests/test_exportacion_segura.py` | Sin cambios: los bytes congelados del archivo de una campaña dividida y del archivo de una carga |
+
+## 34. Las JSONB NOT NULL de MOWA MES exigen su tipo (T-MM-B14)
+
+NOT NULL no basta en una columna JSONB: el JSON `null` no es NULL de SQL y pasa. Igual que `expresiones` en §31, las cinco JSONB NOT NULL de MOWA MES llevan `JSONB(none_as_null=True)` (un `None` de Python viaja como NULL de SQL y la base lo rechaza) y un CHECK `jsonb_typeof(col) = '<tipo>'` (lo rechaza también por SQL directo).
+
+| Columna | Tipo | CHECK |
+|---|---|---|
+| `mowa_mes_campana.filtros` | `array` | `ck_mowa_mes_campana_filtros_es_una_lista` |
+| `mowa_mes_campana.herramientas` | `object` | `ck_mowa_mes_campana_herramientas_es_un_objeto` |
+| `mowa_mes_campana.envios` | `array` | `ck_mowa_mes_campana_envios_es_una_lista` |
+| `mowa_mes_campana.supervisores` | `array` | `ck_mowa_mes_campana_supervisores_es_una_lista` |
+| `mowa_mes_fila_cargada.advertencias` | `array` | `ck_mowa_mes_fila_cargada_advertencias_es_una_lista` |
+
+- **Migración `c4f8a2d6b173`** (sobre `a6c3e8d1f259`, escrita a mano): un `create_check_constraint` por columna y su `drop_constraint` al bajar, con `op.f(...)` (el nombre ya trae el prefijo de la convención). **No reescribe ningún dato**: si una fila trajera otro tipo, el `upgrade` falla al crear el CHECK. El conteo previo de `architec` en `auto_cusco` (solo lectura) dio 0 filas de otro tipo en las cinco columnas, así que no necesita limpieza.
+- **Quién escribe en ellas:** solo `repositorio_campanas_mowa_mes_postgres.py` (`_valores_campana` y `_filas_cargadas`); ningún otro INSERT.
+- **Pruebas sin base:** `test_mowa_mes_persistencia_json.py` (las cinco llevan `none_as_null`, un `None` viaja como NULL de SQL y el inventario `JSONB_SIN_NONE_AS_NULL` ya no las lista) y `test_mowa_mes_json_check_migracion.py` (el modelo declara los mismos CHECK que la migración, nombres de 63 caracteres o menos, y el SQL offline en los dos sentidos). La ida y vuelta contra una base la corre `architec`.

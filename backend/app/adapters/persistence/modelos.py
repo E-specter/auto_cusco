@@ -598,16 +598,16 @@ class MowaMesCampana(Base):
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     fecha_corte: Mapped[date] = mapped_column(Date)
-    filtros: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
+    filtros: Mapped[list[str]] = mapped_column(JSONB(none_as_null=True), server_default="[]")
     orden: Mapped[str | None] = mapped_column(Text)
     cantidad: Mapped[int] = mapped_column(Integer)
     seleccion_id: Mapped[int | None] = mapped_column(BigInteger)
     tipo_carga: Mapped[str] = mapped_column(String(20))
     descripcion: Mapped[str] = mapped_column(Text)
     salida: Mapped[str] = mapped_column(String(20))
-    herramientas: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    herramientas: Mapped[dict[str, Any]] = mapped_column(JSONB(none_as_null=True))
     programacion: Mapped[str] = mapped_column(String(20))
-    envios: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
+    envios: Mapped[list[str]] = mapped_column(JSONB(none_as_null=True), server_default="[]")
     fecha_generacion: Mapped[date] = mapped_column(Date)
     fecha_envio: Mapped[date] = mapped_column(Date)
     mes_imputacion: Mapped[date] = mapped_column(Date)  # S-MM-7: mes de la fecha de envio
@@ -616,7 +616,7 @@ class MowaMesCampana(Base):
     )
     speech_huella: Mapped[str] = mapped_column(String(64))
     whatsapp: Mapped[str | None] = mapped_column(String(9))
-    supervisores: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    supervisores: Mapped[list[dict[str, Any]]] = mapped_column(JSONB(none_as_null=True))
     disponibles: Mapped[int] = mapped_column(Integer)
     evaluados: Mapped[int] = mapped_column(Integer)
     productos_cargados: Mapped[int] = mapped_column(Integer)
@@ -653,6 +653,11 @@ class MowaMesCampana(Base):
         CheckConstraint(
             "total_cargados = productos_cargados + supervision_cargados", name="total_cuadra"
         ),
+        # NOT NULL no basta: el JSON `null` no es NULL de SQL y pasa (T-MM-B14).
+        CheckConstraint("jsonb_typeof(filtros) = 'array'", name="filtros_es_una_lista"),
+        CheckConstraint("jsonb_typeof(herramientas) = 'object'", name="herramientas_es_un_objeto"),
+        CheckConstraint("jsonb_typeof(envios) = 'array'", name="envios_es_una_lista"),
+        CheckConstraint("jsonb_typeof(supervisores) = 'array'", name="supervisores_es_una_lista"),
         Index(None, "mes_imputacion"),
         Index(None, "creado_en"),
     )
@@ -698,7 +703,11 @@ class MowaMesFilaCargada(Base):
     supervision: Mapped[bool] = mapped_column(Boolean)
     pagare: Mapped[str | None] = mapped_column(Text)
     segmento: Mapped[str | None] = mapped_column(String(12))
-    advertencias: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
+    advertencias: Mapped[list[str]] = mapped_column(JSONB(none_as_null=True), server_default="[]")
+
+    __table_args__ = (
+        CheckConstraint("jsonb_typeof(advertencias) = 'array'", name="advertencias_es_una_lista"),
+    )
 
 
 class MowaMesExclusion(Base):
