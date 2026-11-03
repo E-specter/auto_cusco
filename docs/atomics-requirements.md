@@ -266,7 +266,7 @@ Capacidad transversal que amplía RF-12: la usan todas las cargas digitales y Vo
   * Una definición sin plataforma se valida y se genera como hoy (RF-54).
   * **Supuesto (a confirmar con el usuario):** la plataforma se elige al crear la definición y no cambia después, para no reinterpretar sus versiones guardadas.
   * Ejemplos; el detalle vive en el documento de cada módulo:
-    * **WhatsMKT:** la 1.ª columna es `número`, fija, de texto enriquecido, con valor por defecto `51[@telefono]` y escrita en celda de texto (RF-73). Las siguientes se llaman `[$MARCRO1$]`, `[$MARCRO2$]`… por su posición, y son siempre de tipo texto. Se escribe `MARCRO` tal como en el archivo que acepta la plataforma.
+    * **WhatsMKT:** la 1.ª columna es `número`, fija, de texto enriquecido, con valor por defecto `51[@telefono]` y escrita en celda de texto (RF-73). Las siguientes se llaman `[$MARCRO1$]`, `[$MARCRO2$]`… por su posición, y son siempre de tipo texto. Se escribe `MARCRO` tal como en el archivo que acepta la plataforma. Detalle en RF-WM-09 a RF-WM-11 (`requerimientos-whatsmkt.md`).
     * **MOWA MES:** `numero`, `mensaje` y `dni`, fijas (RF-MM-37; decisión del usuario del 2026-11-02 de que el archivo de MOWA MES pase al constructor en esta entrega).
 * **RF-73 — Celda de texto en XLSX:** Permitir que una columna se escriba en XLSX con el formato de celda «Texto» (`@`), para que la hoja de cálculo no cambie el valor al abrirlo; por ejemplo, un teléfono de 11 dígitos que pasaría a notación científica.
   * Se activa por columna, como opción de la definición o como regla de su plataforma (RF-72). Está desactivada por defecto.

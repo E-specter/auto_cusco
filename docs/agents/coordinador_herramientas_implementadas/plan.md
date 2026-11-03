@@ -855,3 +855,71 @@ Cada lista abierta es una consulta. Antes de cerrar B2, un script `scripts/medir
 **Orden:** B1 → B2, con F0 en paralelo desde la aprobación. F1 puede ir apenas entre B1. F2 y F3 son secuenciales porque tocan el mismo componente. architec corre `-ConBase`, la medición de B2 y el Playwright completo en F2 y F3.
 
 **Aprobado por `architec` el 2026-10-28.** Decisiones del usuario del mismo día: D-FV-1, comparación tal cual; D-FV-2, orden por cantidad con desempate alfabético y «(vacío)» al final. P-3: en `auto_cusco` hay 1 selección y 2 campañas guardadas; ninguna tiene «\» en sus filtros (los «|» que tienen son separadores de «es uno de»), así que el escape no necesita migración. B1 arranca con el visto bueno §13 de `coordinador_modulo_mowa_mes`.
+
+## 30. Fase 1 de herramientas del plan WhatsMKT v2: cortes T-HI-B1 a B5, F1 y F2 (2026-11-02)
+
+RF en `3dbfc97` (T-HI-0) y RF-MM-08/RF-MM-37 en `a86e524` (T-MM-0). Los supuestos de T-HI-0 se implementan tal como están escritos; si el usuario corrige uno, architec avisa.
+
+### Orden
+
+**B1 → B3 → B2**, que bloquean T-WM-B2 y T-MM-B15. Después **B5** y **B4**. **F1** va después de B2 y **F2** después de B4; el menú «Herramientas» de F2 puede adelantarse porque no depende de B4. Lo hace un solo dev de backend, de a un corte por worktree, así no chocan en `serializacion.py`. B3 va antes de B2 porque la regla `número` de WhatsMKT necesita la celda de texto ya declarable en la columna.
+
+### Cortes
+
+- **T-HI-B1, `nombres` y `apellidos` (RF-44).** Dos funciones de la familia texto, en el registro de funciones, sin tocar el núcleo (RF-14).
+  - Parten por la PRIMERA coma y recortan los extremos de cada parte. La `/` entre apellidos se conserva.
+  - Sin coma, `nombres` devuelve el texto completo recortado y `apellidos` devuelve vacío (supuesto de RF-44). La entrada vacía se trata según RF-45.
+  - La cota de largo es la de la entrada.
+  - Claves i18n de nombre y descripción, con su prueba espejo.
+  - Pruebas de propiedad: con coma, `apellidos + "," + nombres` reconstruye la entrada sin los espacios de los extremos de cada parte. Además, la cota nunca es menor que el resultado.
+  - El catálogo se arma desde el registro, así que el contrato no debería cambiar: si cambia, se regenera.
+- **T-HI-B3, celda de texto en XLSX (RF-73).**
+  - `OpcionesArchivo.columnas_texto: frozenset[str]` (cabeceras), vacío por defecto. En XLSX, esas celdas se escriben como texto con `number_format = "@"`: un valor que no es texto pasa por `str`, y `None` queda como celda vacía. CSV y JSON lo ignoran.
+  - En la definición, `CampoSalida.celda_texto: bool = False`, que se serializa SOLO si es `true`. Así el JSON canónico de las versiones guardadas no cambia.
+  - El generador arma `columnas_texto` desde la definición.
+  - Pruebas:
+    - un exportador sin la opción da los mismos bytes que hoy;
+    - un adaptador lee el archivo de vuelta y encuentra el `@` y el texto de 11 dígitos intacto;
+    - la prueba de oro de MOWA pasa sin cambios.
+- **T-HI-B2, etiqueta y plataforma (RF-49 y RF-72).**
+  - **Etiqueta:** `CampoSalida.etiqueta: str | None`, de 1 a 120 caracteres recortados, que se serializa solo si está. No la ve el generador ni el exportador: el encabezado sigue siendo `nombre` (S-5).
+  - **Plataforma:**
+    - `definicion_carga.plataforma TEXT NULL`, con migración de ida y vuelta. Se fija al crear y no cambia (supuesto de RF-72): ni `agregar_version` ni renombrar la tocan.
+    - La API la recibe en `POST` y la devuelve en el detalle y en el listado. El contrato se regenera.
+  - **Reglas DECLARATIVAS, para que el frontend las lea igual que el backend:**
+    - `ReglasPlataforma(clave, etiqueta, columnas_fijas, encabezado_por_posicion, tipo_resto, admite_mas_columnas)`;
+    - `ColumnaFija(posicion, nombre, contenido_por_defecto, tipo, celda_texto, contenido_editable)`;
+    - `encabezado_por_posicion` es un patrón con `{n}`, por ejemplo `[$MARCRO{n}$]`, que empieza en 1 después de las fijas.
+  - **Registro:** un registro en el núcleo, `RegistroPlataformas`, al que cada módulo agrega sus reglas desde su propio paquete, como hoy los contextos del motor. B2 no registra ninguna plataforma real: las de WhatsMKT (RF-WM-09 a RF-WM-11) y MOWA MES (RF-MM-37) las registran sus equipos en T-WM-B2 y T-MM-B15. Las pruebas usan una plataforma sintética.
+  - **Validación:** genérica, sobre las reglas, al crear y al versionar. Cada problema indica la columna y la regla (como RF-46), con códigos nuevos en el enum del contrato y su espejo i18n.
+  - **Casos de borde:**
+    - una plataforma desconocida al crear da 400;
+    - una definición guardada cuya plataforma ya no está registrada se sigue leyendo y generando como guardada, y se marca con un problema al validar;
+    - sin plataforma, todo queda como hoy (RF-54).
+  - **Endpoint para F1:** `GET /definiciones-columnas/plataformas` devuelve las reglas registradas.
+  - Pruebas: la prueba de oro de MOWA y la de RF-54 pasan sin cambios.
+- **T-HI-B5, lunes a sábado y los próximos N días (RF-70 y RF-71).**
+  - `calendario/servicio.py` solo excluye el domingo. Un feriado o un día registrado en sábado no es gestionable.
+  - `proximos(desde, n)`, con `n` entre 1 y un tope configurable (RF-32; valor inicial 31). Fuera de rango, 400 con el rango.
+  - `GET /calendario/proximos`, con el contrato regenerado.
+  - Cambian en el mismo corte la lista de T-HI-B5 en tasks.md y las pruebas de MOWA que suponen lunes a viernes. Revisión de coordinador_modulo_mowa_mes, prueba de oro, y el texto de `/calendario` con capturas aprobadas por designer.
+- **T-HI-B4, textos guardados (RF-69).**
+  - Tablas `texto_guardado`: `id`, `contexto`, `nombre`, `nombre_normalizado` único por contexto, `deshabilitado_en` y las marcas de tiempo.
+  - `texto_guardado_version`: `texto_id`, `numero`, `contenido` y `usada_en`. `contenido` es JSONB NOT NULL, con `none_as_null` y un CHECK `jsonb_typeof = 'object'` desde el inicio (lección de T-MM-B14 y T-JSON-1).
+  - Contextos registrables desde cada módulo, cada uno con su validador: expresión del motor (RF-46) o texto plano con reglas propias. B4 trae un contexto sintético de pruebas; `whatsmkt.mensaje` lo registra WhatsMKT.
+  - API `/textos-guardados?contexto=`: listar, crear, versionar, renombrar, deshabilitar y eliminar. Eliminar da 409 si alguna versión tiene `usada_en`.
+- **T-HI-F1, constructor (después de B2).**
+  - Campo Etiqueta por columna y elección de plataforma al crear.
+  - En modo plataforma, las columnas fijas no se quitan ni se mueven, los encabezados por posición se renumeran al reordenar y el tipo queda fijo. Muestra los problemas de la validación en su columna.
+  - Con designer: capturas a 1280 y 360 px, en es y en.
+- **T-HI-F2, componente de textos guardados y menú (después de B4; el menú, antes).**
+  - Menú: «Herramientas» según la fila de tasks.md (P-13). `nav.seccion.herramientas` reemplaza a `nav.seccion.configuracion`, y cambia `mowaMes.config.pantallasNuevas`.
+  - Componente reutilizable: lista, versiones, renombrar, deshabilitar y eliminar, que lo usa WhatsMKT en su configuración.
+
+### Reglas de los cortes
+
+- Un worktree por corte, con ruta absoluta y sin commits.
+- `ruff format` y `ruff check`; el contrato y los tipos del frontend se regeneran en el mismo corte.
+- La mutación va sobre una copia.
+- La cola de máquina la llevo yo; `-ConBase` y `@postgres` las corre architec.
+- La prueba de oro de MOWA corre en B2, B3 y B5.
