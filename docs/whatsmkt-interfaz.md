@@ -199,10 +199,10 @@ Cada bloque se guarda por separado, como en MOWA. Los paneles van en este orden:
    - La tabla de segmentos, apilable, con Segmento, Desde y Hasta (días de atraso ajustados), editables. «Tramos mayores al 2» no tiene «Hasta»: dice «sin tope». Una tabla que deja huecos o se superpone se rechaza con su código, bajo la fila.
    - Debajo, el mensaje de cada segmento con `TextosGuardados` (§11.3 del motor), un `.segmented` por segmento para elegir cuál se edita.
 2. **Mensajes globales** (RF-WM-19): `TextosGuardados`, con el título «Mensajes globales» y el hint «Para las campañas especiales, con un solo mensaje para toda la selección».
-3. **Horarios de envío** (RF-WM-07): las dos franjas, cada una con dos `input type="time"` (desde y hasta).
+3. **Horarios de envío** (RF-WM-07): las dos franjas, cada una con dos `input type="time"` (desde y hasta). Una franja cuyo inicio no es anterior a su fin (14:00 a 08:00, o la misma hora) se rechaza con `horario_invalido`, bajo esa franja; `{horario}` es su nombre, «Horario 1» o «Horario 2».
 4. **Nombre de la campaña** (RF-WM-33): la plantilla, con sus fichas de variables, el contador «/ 75» y un ejemplo resultante.
 5. **Archivo de carga** (RF-WM-09): el `select` de la definición por defecto, con las de plataforma WhatsMKT, y «Editar en Columnas de carga».
-6. **Topes** (RF-WM-26 y RF-WM-31): largo máximo del mensaje (caracteres) y tamaño máximo de video, audio y PDF (MB). Cada uno con su hint del supuesto: «Valor inicial: el largo de un mensaje de WhatsApp (4096). No es un dato verificado de WhatsMKT».
+6. **Topes** (RF-WM-26 y RF-WM-31): largo máximo del mensaje (caracteres) y tamaño máximo de video, audio y PDF (MB). La API los guarda en bytes; el panel los muestra y los recibe en MB, en base decimal (1 MB son un millón de bytes). Los `input` llevan `min="1"`, así que un tope de cero o negativo no llega a validarse. Cada uno con su hint del supuesto: «Valor inicial: el largo de un mensaje de WhatsApp (4096). No es un dato verificado de WhatsMKT».
 7. **Biblioteca de adjuntos** (RF-WM-30 a RF-WM-32):
    - Una tabla apilable con Nombre, Tipo, Tamaño, Subido y Acción («Descargar» y «Archivar»), y «Subir un archivo».
    - Los archivados van en un `<details>` «Archivados (N)», con «Descargar» y «Restaurar». Un adjunto no se borra: se archiva.
@@ -252,6 +252,7 @@ Los códigos los define el backend en su enum (`whatsmkt.codigo.*`, RF-WM-43) y 
 | `variable_inexistente` | Bajo la plantilla | La variable {variable} no existe. Usa las de la lista. | The variable {variable} does not exist. Use the ones in the list. |
 | `fecha_no_gestionable` | Bajo la fecha | El {fecha} no es un día gestionable. El siguiente es el {sugerida}. | {fecha} is not a working day. The next one is {sugerida}. |
 | `sin_horario` | En los horarios | Marca al menos un horario. | Check at least one time slot. |
+| `horario_invalido` | Configuración, bajo la franja | {horario} termina antes de empezar: la hora de inicio tiene que ser anterior a la de fin. | {horario} ends before it starts: the start time must be earlier than the end time. |
 | `sin_productos` | En la previsualización | Ningún segmento tiene productos después de las exclusiones: no se crea ninguna campaña. | No segment has products after the exclusions: no campaign is created. |
 | `definicion_no_whatsmkt` | Bajo la definición | La definición elegida no es de WhatsMKT. | The chosen definition is not a WhatsMKT one. |
 | `foto_formato` | Bajo la foto | La foto tiene que ser JPEG. | The photo must be a JPEG. |
