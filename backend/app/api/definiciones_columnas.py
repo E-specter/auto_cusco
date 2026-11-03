@@ -62,13 +62,14 @@ from app.core.services.definiciones_columnas.servicio import (
     VistaDefinicion,
 )
 from app.core.services.mapeo_campos.serializacion import ProblemaDeDefinicion
+from app.core.services.plataformas.whatsmkt.plataforma import REGLAS_WHATSMKT
 
 router = APIRouter(prefix="/definiciones-columnas", tags=["definiciones de columnas"])
 
 
-# Las plataformas que la aplicacion conoce: cada modulo agrega aqui las suyas (RF-72). B2 no
-# registra ninguna; los tests sustituyen `obtener_registro_plataformas`.
-_REGISTRO_PLATAFORMAS = RegistroPlataformas()
+# Las plataformas que la aplicacion conoce: cada modulo agrega aqui las suyas (RF-72). El nucleo
+# no importa ninguna; los tests sustituyen `obtener_registro_plataformas`.
+_REGISTRO_PLATAFORMAS = RegistroPlataformas([REGLAS_WHATSMKT])
 
 
 def obtener_registro_plataformas() -> RegistroPlataformas:

@@ -22,6 +22,9 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import AfterValidator, BaseModel, Field, StringConstraints, model_validator
 
 from app.adapters.persistence.db import get_engine
+from app.adapters.persistence.repositorio_definiciones_postgres import (
+    RepositorioDefinicionesPostgres,
+)
 from app.adapters.persistence.repositorio_whatsmkt_postgres import RepositorioWhatsmktPostgres
 from app.api.errores import DetalleError, ErrorConCodigo, respuestas_de_error
 from app.api.respuestas import ModeloRespuesta
@@ -53,7 +56,9 @@ PARAMETROS = ("horarios", "variable", "segmento", "fila", "desde", "hasta") + (
 
 def obtener_servicio_whatsmkt() -> ConfiguracionWhatsmktService:
     """Dependencia de FastAPI; los tests la sustituyen por un doble de prueba."""
-    return ConfiguracionWhatsmktService(RepositorioWhatsmktPostgres(get_engine()))
+    return ConfiguracionWhatsmktService(
+        RepositorioWhatsmktPostgres(get_engine()), RepositorioDefinicionesPostgres(get_engine())
+    )
 
 
 class ErrorWhatsmktRespuesta(DetalleError):

@@ -6,6 +6,7 @@ se prueba la traduccion HTTP (parcial, 422 con codigo, forma de la respuesta), n
 
 from dataclasses import replace
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -49,11 +50,26 @@ class RepositorioWhatsmktFalso:
         return list(self.segmentos)
 
 
+class DefinicionesFalsas:
+    """Las definiciones guardadas con su plataforma (RF-72): 7 es de WhatsMKT, 8 es libre y 9 es
+    de otra plataforma."""
+
+    def __init__(self) -> None:
+        self.plataformas = {7: "whatsmkt", 8: None, 9: "mowa_mes"}
+
+    def obtener(self, definicion_id):
+        if definicion_id not in self.plataformas:
+            return None
+        return SimpleNamespace(
+            nombre=f"Definicion {definicion_id}", plataforma=self.plataformas[definicion_id]
+        )
+
+
 @pytest.fixture
 def cliente():
     repositorio = RepositorioWhatsmktFalso()
     app.dependency_overrides[obtener_servicio_whatsmkt] = lambda: ConfiguracionWhatsmktService(
-        repositorio
+        repositorio, DefinicionesFalsas()
     )
     try:
         yield TestClient(app), repositorio
@@ -165,6 +181,31 @@ def test_la_definicion_por_defecto_se_elige_y_se_quita_con_null(cliente) -> None
 
     assert elegida.json()["definicion_defecto_id"] == 7
     assert quitada.json()["definicion_defecto_id"] is None
+
+
+@pytest.mark.parametrize("definicion_id", [8, 9])
+def test_una_definicion_que_no_es_de_whatsmkt_responde_422_con_su_codigo_sin_guardar(
+    cliente, definicion_id: int
+) -> None:
+    client, repositorio = cliente
+
+    respuesta = client.put("/whatsmkt/configuracion", json={"definicion_defecto_id": definicion_id})
+
+    assert respuesta.status_code == 422
+    assert respuesta.json()["codigo"] == "definicion_no_whatsmkt"
+    assert isinstance(respuesta.json()["detail"], str)
+    assert repositorio.escrituras == 0
+    assert repositorio.configuracion.definicion_defecto_id is None
+
+
+def test_la_definicion_de_whatsmkt_se_acepta_y_un_put_posterior_la_conserva(cliente) -> None:
+    client, _ = cliente
+    client.put("/whatsmkt/configuracion", json={"definicion_defecto_id": 7})
+
+    otro = client.put("/whatsmkt/configuracion", json={"tope_mensaje": 100})
+
+    assert otro.status_code == 200
+    assert otro.json()["definicion_defecto_id"] == 7
 
 
 def test_una_definicion_que_no_existe_responde_404_sin_guardar(cliente) -> None:
