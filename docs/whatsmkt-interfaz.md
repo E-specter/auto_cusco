@@ -96,11 +96,10 @@ Al crear, la página reemplaza la previsualización por las fichas «Para subir 
 
 - **«Tipo de envío»:** un `fieldset` con tres radios: «Solo texto» (por defecto), «Texto + archivo» y «Texto + vCard».
 - **Campos condicionales:** van justo debajo del radio que los muestra, con `hidden` en los otros. Cambiar de tipo conserva lo elegido en los demás, pero solo se manda lo del tipo elegido.
-  - **Texto + archivo:** un `select` «Archivo», con los adjuntos activos de la biblioteca (imagen, video, audio o PDF), cada uno con su tipo y su tamaño: «Afiche octubre.jpg · imagen · 240 KB». Al lado, «Subir un archivo» (`upload`), que lo agrega a la biblioteca y lo deja elegido.
+  - **Texto + archivo:** un `select` «Archivo», con los adjuntos activos de la biblioteca (imagen, video, audio o PDF), cada uno con su tipo y su tamaño: «Afiche octubre.jpg · imagen · 240 KB». Sin adjuntos, el `select` queda inactivo con «Elige un archivo», y al lado va el enlace «Subir en la configuración» (ir y volver, §2).
   - **Texto + vCard:** un `input` «Etiqueta del contacto» (DU-WM-4, provisional: solo la etiqueta).
-- **«Foto de perfil»:** un `select` con las fotos de la biblioteca y «Sin foto» (DU-WM-5, provisional: opcional), más «Subir una foto». Hint: «JPEG de 200 × 200 píxeles, hasta 1 MB».
-- **Subir:** el selector de archivo propio del sitio, con el tipo y el tope del hint. El archivo se valida al elegirlo, y el error va bajo el campo, por su código. Mientras sube, el botón queda con `data-loading`.
-- **Archivo repetido:** si el archivo ya estaba en la biblioteca (misma huella), se elige el existente y el estado dice «Ya estaba en la biblioteca: se usa el mismo archivo».
+- **«Foto de perfil»:** un `select` con las fotos de la biblioteca y «Sin foto» (DU-WM-5, provisional: opcional). Hint: «JPEG de 200 × 200 píxeles, hasta 1 MB».
+- **La campaña no sube archivos** (decisión de `coordinador_modulo_whatsmkt`, 2026-11-03): se suben en la biblioteca de la configuración (§5, punto 8), y la campaña elige. Si el usuario pide subir desde la campaña, se suma después; las claves `envio.subir`, `envio.subirFoto` y `envio.repetido` quedan reservadas para eso.
 
 ### 3.7 Nombre de la campaña (RF-WM-33)
 
@@ -327,6 +326,11 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.archivo.crearAviso` | Crea una definición de WhatsMKT en Columnas de carga para armar el archivo. | Create a WhatsMKT definition in Load columns to build the file. |
 | `whatsmkt.archivo.crear` | Crear en Columnas de carga | Create in Load columns |
 | `whatsmkt.archivo.editar` | Editar en Columnas de carga | Edit in Load columns |
+| `whatsmkt.archivo.elegirDefinicion` | Elige una definición | Choose a definition |
+| `whatsmkt.archivo.versionLinea` | Versión {n} · WhatsMKT | Version {n} · WhatsMKT |
+| `whatsmkt.archivo.contenidoVacio` | Vacío | Empty |
+| `whatsmkt.archivo.contenidoVariable` | Variable: {variable} | Variable: {variable} |
+| `whatsmkt.archivo.tabla` | Columnas de la definición | Columns of the definition |
 | `whatsmkt.archivo.col.macro` | Macro | Macro |
 | `whatsmkt.archivo.col.encabezado` | Encabezado | Header |
 | `whatsmkt.archivo.col.etiqueta` | Etiqueta | Label |
@@ -364,6 +368,10 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.envio.subirFoto` | Subir una foto | Upload a photo |
 | `whatsmkt.envio.fotoHint` | JPEG de 200 × 200 píxeles, hasta 1 MB. | JPEG of 200 × 200 pixels, up to 1 MB. |
 | `whatsmkt.envio.repetido` | Ya estaba en la biblioteca: se usa el mismo archivo. | It was already in the library: the same file is used. |
+| `whatsmkt.envio.elegirArchivo` | Elige un archivo | Choose a file |
+| `whatsmkt.envio.sinAdjunto` | Elige el archivo que se envía. | Choose the file to send. |
+| `whatsmkt.envio.sinEtiqueta` | Escribe la etiqueta del contacto. | Enter the contact label. |
+| `whatsmkt.envio.subirEnConfiguracion` | Subir en la configuración | Upload in the settings |
 | `whatsmkt.nombre.segmentoAlFinal` | Se agrega el segmento al final para que los nombres no se repitan. | The segment is added at the end so the names do not repeat. |
 | `whatsmkt.nombre.resultante` | Nombre de la campaña {segmento}: | Campaign name {segmento}: |
 | `whatsmkt.previa.resumenVarias` | Se crearán {n} campañas · {filas} filas en total | {n} campaigns will be created · {filas} rows in total |
@@ -372,10 +380,36 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.previa.irSupervisores` | Configurar supervisores | Set up supervisors |
 | `whatsmkt.problema.sin_mensaje.global` | Elige el mensaje de la campaña. | Choose the campaign's message. |
 | `whatsmkt.mensaje.elegir` | Elige un mensaje | Choose a message |
+| `whatsmkt.mensaje.modo` | Modo del mensaje | Message mode |
+| `whatsmkt.mensaje.paraSegmento` | Mensaje de {segmento} | Message for {segmento} |
+| `whatsmkt.mensaje.global` | Mensaje | Message |
+| `whatsmkt.mensaje.sinMensajes` | No hay mensajes guardados. Se escriben en la configuración. | There are no saved messages. They are written in the settings. |
+| `whatsmkt.mensaje.sinProductos` | Sin productos en esta selección: no genera campaña. | No products in this selection: it creates no campaign. |
+| `whatsmkt.campana.col.dias` | Días de atraso | Days overdue |
+| `whatsmkt.campana.diasRango` | {desde} a {hasta} | {desde} to {hasta} |
+| `whatsmkt.campana.diasHasta` | hasta {n} | up to {n} |
+| `whatsmkt.campana.diasDesde` | {n} o más | {n} or more |
+| `whatsmkt.campana.diasTodos` | todos | all |
+| `whatsmkt.campana.sinSeleccion` | Elige una selección guardada para armar la campaña. | Choose a saved selection to build the campaign. |
+| `whatsmkt.campana.sinCantidad` | La selección no dice cuántos productos lleva. Elige una con «Cantidad (primeros n)» para armar la campaña. | The selection does not say how many products it takes. Choose one with “Count (first n)” to build the campaign. |
+| `whatsmkt.campana.seleccionBorrada` | La selección que editaste en Cartera ya no existe. Elige otra selección guardada. | The selection you edited in Portfolio no longer exists. Choose another saved selection. |
+| `whatsmkt.base.editarEnCartera` | Editar en Cartera | Edit in Portfolio |
+| `whatsmkt.base.editarInactivo` | Elige una selección guardada para editarla en Cartera. | Choose a saved selection to edit it in Portfolio. |
 | `whatsmkt.previa.irWhatsapp` | Configurar el WhatsApp de contacto | Set up the contact WhatsApp |
 | `whatsmkt.mensaje.insertarWhatsapp` | Enlace de WhatsApp | WhatsApp link |
 | `whatsmkt.mensaje.sinWhatsapp` | (sin WhatsApp configurado) | (no WhatsApp set up) |
 | `whatsmkt.previa.sinExclusiones` | Ninguno de esta campaña queda fuera. | None from this campaign is left out. |
+| `whatsmkt.previa.calculando` | Calculando la previsualización… | Calculating the preview… |
+| `whatsmkt.previa.campanas` | Campañas del lote | Campaigns in the batch |
+| `whatsmkt.previa.problemasTitulo` | Corrige esto para poder crear: | Fix this to be able to create: |
+| `whatsmkt.previa.cifra.filas` | Filas del archivo | File rows |
+| `whatsmkt.previa.cifra.supervision` | Supervisión | Supervision |
+| `whatsmkt.previa.cifra.excluidos` | Excluidos | Excluded |
+| `whatsmkt.previa.muestra` | Muestra | Sample |
+| `whatsmkt.previa.exclusiones` | Exclusiones | Exclusions |
+| `whatsmkt.previa.col.pagare` | Pagaré | Promissory note |
+| `whatsmkt.previa.col.motivo` | Motivo | Reason |
+| `whatsmkt.previa.col.detalle` | Detalle | Detail |
 | `whatsmkt.previa.exclusionesTruncadas` | Se muestran las primeras {mostradas} de {total}. La lista completa estará en el seguimiento de la campaña después de crearla. | Showing the first {mostradas} of {total}. The full list will be in the campaign tracking once it is created. |
 | `whatsmkt.previa.resumenFuera` | · {n} productos fuera de las campañas | · {n} products outside the campaigns |
 | `whatsmkt.previa.resumenFueraUno` | · 1 producto fuera de las campañas | · 1 product outside the campaigns |
