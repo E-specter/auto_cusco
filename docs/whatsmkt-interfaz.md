@@ -45,7 +45,7 @@ Un `.panel` por sección, en el orden del flujo:
 6. **Nombre de la campaña** (§3.7)
 7. **Previsualización** (§3.8), con «Crear» al pie (§3.9)
 
-Al crear, la página reemplaza la previsualización por las fichas «Para subir a WhatsMKT» (§3.10), como hace la campaña de MOWA.
+Al crear, la página reemplaza la previsualización por las fichas «Para subir a WhatsMKT» (§3.10), como hace la campaña de MOWA. «Crear» desaparece, y el formulario queda inactivo (`inert` o `disabled`) **al contraste normal, sin opacidad**: es lo que se creó, y se sigue leyendo. Así no se crea el mismo lote dos veces sin querer. Debajo de las fichas va «Armar otra campaña» (`whatsmkt.creada.otra`), que recarga la página, como en MOWA.
 
 ### 3.2 Base (RF-WM-05)
 
@@ -140,7 +140,7 @@ Se recalcula sola, con la misma espera y cancelación que la campaña de MOWA, c
 
 - **Botón:** «Crear campaña» o «Crear 3 campañas», `.btn--primary`. Mientras haya problemas, queda inactivo con el motivo en texto al lado, como en la carga de sábanas (por ejemplo, «Corrige 2 problemas para crear»).
 - **El lote se crea entero o no se crea.** Si falla, nada se crea, y el error va arriba, en `role="alert"`.
-- **Fecha que dejó de ser válida (409):** un `.notice--warning` en Programación, «El {fecha} ya no es un día gestionable. El siguiente es el {nueva}», con «Usar el {nueva}». Lo escrito se conserva.
+- **Fecha que dejó de ser válida (409):** un `.notice--warning` en Programación, «El {fecha} ya no es un día gestionable. El siguiente es el {nueva}.» (`whatsmkt.crear.fechaVencida`), con «Usar el {nueva}», que ocupa solo el ancho de su texto. Lo escrito se conserva.
 
 ### 3.10 «Para subir a WhatsMKT» (RF-WM-36)
 
@@ -149,7 +149,7 @@ Es el patrón de «Para subir a MES» ([mowa-mes-interfaz.md](mowa-mes-interfaz.
 - **`.notice--success`:** «Se crearon 3 campañas (lote 12). Ahora súbelas a WhatsMKT con estos datos», o «Se creó la campaña 37…» si es una sola.
 - **Un `.segmented` por campaña,** como en la previsualización, cuando hay más de una.
 - **Por campaña, tres pasos numerados:**
-  1. **«Descarga los archivos»:** la lista de contactos (`.xlsx`), la foto de perfil y el adjunto, si los hay, cada uno con «Descargar» (`download`) y su nombre en mono.
+  1. **«Descarga los archivos»:** la lista de contactos (`.xlsx`), la foto de perfil y el adjunto, si los hay, cada uno con «Descargar» (`download`) y su nombre en mono. Cada fila lleva delante qué es, en sans muted: «Lista de contactos», «Foto de perfil» o «Adjunto». Así dos archivos con el mismo nombre no confunden.
   2. **«Completa el formulario de WhatsMKT»:** un `dl` en rejilla (dato | valor | Copiar), en el orden del formulario:
      - Nombre de campaña;
      - Fecha y horarios: «29/10/2026 · Horario 1 (08:00 – 14:00)»;
@@ -161,7 +161,9 @@ Es el patrón de «Para subir a MES» ([mowa-mes-interfaz.md](mowa-mes-interfaz.
 
      Cada «Copiar» anuncia «Copiado: {dato}», como en MOWA.
   3. **«Después del envío, importa el informe»:** «Ir al seguimiento de la campaña».
-- **A 360 px,** el `dl` se apila: el dato arriba, y el valor con su botón debajo.
+- **A 360 px,** el `dl` se apila: en la primera fila, el dato con su «Copiar» a la derecha; debajo, el valor a todo el ancho. Así el texto del mensaje no queda en una columna angosta.
+- **«Copiar»** es un botón de solo icono (`copy`), con `aria-label` «Copiar {dato}», y anuncia «Copiado: {dato}» en `role="status"`.
+- **El mensaje de la ficha está congelado:** es el de la campaña tal como quedó al crearla, con `[whatsapp]` ya cambiado por el enlace del número de ese momento (T-WM-B8). Si el número cambia después, la ficha de una campaña vieja no cambia, igual que su archivo y la versión de su mensaje. Por eso `sin_whatsapp` no aparece en la ficha ni en el seguimiento.
 
 ## 4. Seguimiento (`/whatsmkt/seguimiento`)
 
@@ -186,7 +188,8 @@ Es el seguimiento de MOWA ([mowa-mes-interfaz.md](mowa-mes-interfaz.md) §4.2 y 
 - **Encabezado del panel:** «Campaña 37 · Preventivo · lote 12», y a la derecha, en mono: «Corte 13 set. 2026 · envío 15 set. 2026 · Horario 1».
 - **Pendiente del informe:** un `.notice--warning` con «Falta importar el informe de WhatsMKT. Cuando la campaña se haya enviado, descárgalo de WhatsMKT e impórtalo aquí», y «Importar el informe» (`upload`).
 - **Cifras,** con los iconos del catálogo: productos cargados, supervisión (`user-check`), total cargados (`file-up`), excluidos (`ban`) y, con informe, enviados (`send`) y no enviados (`circle-x`).
-- **Archivos:** la lista de contactos, la foto y el adjunto, con «Descargar».
+- **Archivos:** la lista de contactos, la foto y el adjunto, con «Descargar» y su rótulo, como en la ficha.
+- **El mensaje:** el congelado al crear (§3.10), nunca uno armado con la configuración de hoy.
 - **Informe de WhatsMKT (RF-WM-37 y RF-WM-38):**
   - El selector de archivo propio, con el hint «El informe que descargas de WhatsMKT al terminar el envío (hoja «Informe»), en Excel, CSV o JSON, hasta 32 MB».
   - «Importar informe» (`upload`, `.btn--primary`).
@@ -441,10 +444,15 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.crear.varias` | Crear {n} campañas | Create {n} campaigns |
 | `whatsmkt.crear.problemas` | Corrige {n} problemas para crear. | Fix {n} problems to create. |
 | `whatsmkt.crear.problemasUno` | Corrige 1 problema para crear. | Fix 1 problem to create. |
+| `whatsmkt.crear.fechaVencida` | El {fecha} ya no es un día gestionable. El siguiente es el {nueva}. | {fecha} is no longer a working day. The next one is {nueva}. |
+| `whatsmkt.creada.otra` | Armar otra campaña | Build another campaign |
 | `whatsmkt.subir.titulo` | Para subir a WhatsMKT | To upload to WhatsMKT |
 | `whatsmkt.subir.creadas` | Se crearon {n} campañas (lote {lote}). Ahora súbelas a WhatsMKT con estos datos. | {n} campaigns were created (batch {lote}). Now upload them to WhatsMKT with this data. |
 | `whatsmkt.subir.creada` | Se creó la campaña {id}. Ahora súbela a WhatsMKT con estos datos. | Campaign {id} was created. Now upload it to WhatsMKT with this data. |
 | `whatsmkt.subir.paso1` | Descarga los archivos | Download the files |
+| `whatsmkt.subir.archivo.lista` | Lista de contactos | Contact list |
+| `whatsmkt.subir.archivo.foto` | Foto de perfil | Profile photo |
+| `whatsmkt.subir.archivo.adjunto` | Adjunto | Attachment |
 | `whatsmkt.subir.paso2` | Completa el formulario de WhatsMKT | Fill in the WhatsMKT form |
 | `whatsmkt.subir.paso3` | Después del envío, importa el informe | After sending, import the report |
 | `whatsmkt.subir.dato.nombre` | Nombre de campaña | Campaign name |
