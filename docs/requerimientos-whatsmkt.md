@@ -186,6 +186,7 @@ Fuente: «El campo de mensaje es un solo bloque, WhatsMKT ya hace el reemplazo d
   * Si ningún segmento tiene productos, después de las exclusiones, entonces no se crea nada y se informa el motivo.
 * **RF-WM-24 — Mensaje sin emojis:** Rechazar el mensaje que contenga emojis: «mensaje solo texto, sin emoticons» (decisión del usuario, 2026-11-02, P-14).
   * Se rechazan los pictogramas, el unificador de ancho cero (ZWJ) y los selectores de variante, con una lista explícita de rangos.
+  * Criterio: se rechaza lo que Unicode dibuja como emoji por defecto, más las piezas de los emojis compuestos (ZWJ, selectores de variante, el cierre de tecla y las etiquetas). Los símbolos de texto como `©`, `®`, `™`, `✓` o `→` pasan; con un selector de variante pegado (por ejemplo `©️`) se rechazan. `❤` y `♥` pasan por ahora (duda DU-WM-14).
   * Las tildes, la `ñ`, la `ü` y los signos `¿` y `¡` se aceptan.
   * El rechazo indica la posición del primer carácter rechazado.
 * **RF-WM-25 — Macros del mensaje contra las columnas:** Rechazar el mensaje si contiene un `[$MACROn$]` cuya macro n no existe en la definición de columnas elegida.
@@ -193,7 +194,8 @@ Fuente: «El campo de mensaje es un solo bloque, WhatsMKT ya hace el reemplazo d
   * Una macro de la definición que el mensaje no usa no es un error.
 * **RF-WM-26 — Largo del mensaje:** Mostrar un contador de caracteres del mensaje y rechazar el que pase el tope configurado: «con el largo que define WhatsApp» (decisión del usuario, 2026-11-02, P-14).
   * El tope inicial es de 4096 caracteres (supuesto S-WM-7).
-  * El largo se mide sobre el mensaje tal como se guarda, con los marcadores sin reemplazar (duda DU-WM-3).
+  * El largo se mide sobre el mensaje tal como se guarda, con los marcadores `[$MACROn$]` sin reemplazar (duda DU-WM-3).
+  * `[whatsapp]` cuenta como 26 caracteres, el largo fijo del enlace que lo reemplaza (`https://wa.me/+51` y 9 dígitos), no como los 10 del marcador. El contador de la pantalla cuenta igual.
 * **RF-WM-27 — Editor del mensaje:** Ofrecer en el editor del mensaje botones que insertan `[$MACROn$]` mostrando su etiqueta (por ejemplo, «MACRO2 · Vencimiento de la cuota») y una vista previa que reemplaza las macros con los valores de las primeras filas, como lo hará WhatsMKT.
 
 ## 5. Envío, adjuntos y ficha
@@ -368,14 +370,16 @@ No están en el plan v2 ni en las decisiones del 2026-11-02. Mientras no se resp
 | DU-WM-11 | El speech original trae el enlace de WhatsApp de contacto de la Caja dentro del texto, pero el número real no puede guardarse en el repositorio, ni en la siembra de B3. ¿Cómo entra? (a) Como en MOWA (RF-MM-16): un número de contacto en la configuración de WhatsMKT, que el sistema pone en lugar de `[whatsapp]` al mostrar y copiar el mensaje; sin número configurado, no se crea una campaña cuyo mensaje lo use. (b) La v1 se siembra con `[whatsapp]` literal, y el usuario lo cambia por el enlace al editar el mensaje en la configuración. (Provisional: (a), el patrón ya probado en MOWA; se decide antes de B3.) | RF-WM-21 |
 | DU-WM-12 | Al limpiar un JPEG, ¿se conserva la orientación del EXIF (que la foto no se vea girada) o se quita todo el EXIF, como decía RF-WM-32? (Se conserva solo la orientación; todo lo demás, incluido el GPS, se quita.) | RF-WM-32 |
 | DU-WM-13 | La configuración no tiene tope para las imágenes. ¿Se agrega como los de video, audio y PDF, o queda fijo? (Fijo, de 5 000 000 bytes, el máximo de imagen de WhatsApp; no está verificado en WhatsMKT.) | RF-WM-31 |
+| DU-WM-14 | `❤` y `♥` son símbolos de texto para Unicode, pero WhatsApp puede mostrar `❤` como emoji. ¿Se rechazan, por el «sin emoticons» de P-14? (Pasan.) | RF-WM-24 |
 
 ## 12. Registro de cambios
 
 **2026-11-02**
 - **RF nuevos incorporados:** RF-WM-01 a RF-WM-44, documento nuevo (T-WM-0b), a partir del plan WhatsMKT v2 y de las decisiones del usuario del 2026-11-02.
 - **RF existentes ampliados o modificados:** ninguno en este documento. Cita los RF globales RF-44 y RF-49 (ampliados) y RF-69 a RF-74 (nuevos), que escribe T-HI-0, y el cambio de RF-MM-08 a lunes a sábado (T-MM-0), que escriben sus dueños.
-- **Supuestos nuevos:** S-WM-1 a S-WM-9 (los S-1 a S-9 del plan). **Dudas nuevas:** DU-WM-1 a DU-WM-13.
+- **Supuestos nuevos:** S-WM-1 a S-WM-9 (los S-1 a S-9 del plan). **Dudas nuevas:** DU-WM-1 a DU-WM-14.
 - **Nota de numeración:** secuencia propia del módulo, continua y sin huecos. Los RF que se agreguen después continúan la secuencia sin renumerar los existentes, como en MOWA MES.
 - **RF existentes ampliados:** RF-WM-21: el enlace de WhatsApp de contacto de los speeches pasa a `[whatsapp]`, porque el número real no puede estar en el repositorio (la prueba `test_datos_sinteticos` lo detectó en `main`). DU-WM-11 se reescribe con las dos opciones.
 - **RF existentes ampliados:** RF-WM-31 (tope fijo de las imágenes) y RF-WM-32 (del EXIF se conserva solo la orientación), según lo implementado en T-WM-B5. **Dudas nuevas:** DU-WM-12 y DU-WM-13.
 - **RF existentes ampliados:** RF-WM-14 (sin supervisores configurados no se crea la campaña, código `sin_supervisores`) y RF-WM-15 (exclusión `sin_dias_atraso` en el modo por segmento), según las decisiones de la entrega de T-WM-B2, con los textos de designer.
+- **RF existentes ampliados:** RF-WM-24 (criterio de qué es un emoji) y RF-WM-26 (`[whatsapp]` cuenta como 26 caracteres), según lo implementado en T-WM-B3. **Duda nueva:** DU-WM-14.
