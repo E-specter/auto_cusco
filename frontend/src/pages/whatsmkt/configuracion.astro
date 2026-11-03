@@ -1,0 +1,926 @@
+---
+/**
+ * WhatsMKT configuration (T-WM-F1a): what every campaign starts from. The segment table, the send time
+ * slots, the campaign-name template and the limits. The messages, the default definition and the
+ * attachment library are panels that wait for their endpoints (T-WM-F1b) and say so.
+ *
+ * Every panel saves on its own: they are independent settings, and a failed save in one must not throw
+ * away edits in another. The supervisors, the working-day calendar and the load columns are shared by every
+ * connector and live under Herramientas.
+ */
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import '../../styles/whatsmkt.css';
+---
+
+<Shell
+  title="Configuración de WhatsMKT — auto_cusco"
+  description="Segmentos, horarios de envío, plantilla del nombre de la campaña y topes del conector WhatsMKT."
+>
+  <div class="page">
+    <header class="page__head">
+      <p class="eyebrow" data-i18n="whatsmkt.eyebrow">Canales · WhatsMKT</p>
+      <h1 class="page__title" data-i18n="whatsmkt.configuracion.titulo">Configuración de WhatsMKT</h1>
+      <p class="page__intro" data-i18n="whatsmkt.configuracion.intro">
+        Lo que toda campaña de WhatsMKT toma por defecto. Cada bloque se guarda por separado.
+      </p>
+    </header>
+
+    <section class="standIn" data-offline hidden aria-labelledby="wm-offline-title">
+      <h2 class="standIn__title" id="wm-offline-title" data-i18n="console.offline.title">Sin conexión con la API</h2>
+      <p class="standIn__body" data-i18n="console.offline.body">
+        No se pudo contactar con el backend. Comprueba que esté en marcha y vuelve a intentarlo.
+      </p>
+      <button type="button" class="btn btn--primary" data-reintentar>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span class="btn__label" data-i18n="console.offline.retry">Reintentar</span>
+      </button>
+    </section>
+
+    <div class="wm__contenido" data-contenido hidden>
+      <p class="notice notice--info" data-herramientas>
+        <Icon name="info" size={20} />
+        <span>
+          <span data-i18n="whatsmkt.configuracion.herramientas">Columnas de carga, Supervisores y Calendario laboral tienen su propia pantalla:</span>
+          {' '}<a href="/columnas" data-i18n="nav.columnas">Columnas de carga</a> · <a href="/supervisores" data-i18n="nav.supervisores">Supervisores</a> · <a href="/calendario" data-i18n="nav.calendario">Calendario laboral</a>.
+        </span>
+      </p>
+
+      <!-- ---- 1. Segments (the messages of each segment wait for T-WM-F1b) ----------- -->
+      <section class="panel" aria-labelledby="wm-segmentos-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="wm-segmentos-title" data-i18n="whatsmkt.configuracion.segmentos">Segmentos y mensajes</h2>
+        </div>
+        <form class="panel__body wm-form" data-form-segmentos novalidate>
+          <p class="field__hint" data-i18n="whatsmkt.configuracion.segmentosHint">
+            Días de atraso ajustados a la fecha de envío. Cada día tiene que caer en un segmento.
+          </p>
+          <div data-segmentos-tabla></div>
+          <p class="field__error" data-segmentos-error role="alert"></p>
+          <div class="wm-form__foot">
+            <button type="submit" class="btn btn--primary" data-segmentos-guardar>
+              <span class="btn__spinner" aria-hidden="true"></span>
+              <span class="btn__label" data-i18n="whatsmkt.configuracion.guardarSegmentos">Guardar segmentos</span>
+            </button>
+            <p class="mono muted" data-segmentos-estado role="status"></p>
+          </div>
+
+          <div class="wm-pronto">
+            <h3 class="wm-pronto__titulo" data-i18n="whatsmkt.configuracion.mensajesSegmento">Mensaje de cada segmento</h3>
+            <p class="field__hint" data-i18n="whatsmkt.configuracion.pronto">Disponible pronto.</p>
+          </div>
+        </form>
+      </section>
+
+      <!-- ---- 2. Global messages: waits for the saved texts (T-WM-F1b) ----------------- -->
+      <section class="panel" aria-labelledby="wm-globales-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="wm-globales-title" data-i18n="whatsmkt.mensaje.globales">Mensajes globales</h2>
+        </div>
+        <div class="panel__body wm-pronto">
+          <p class="field__hint" data-i18n="whatsmkt.configuracion.globalesHint">
+            Para las campañas especiales, con un solo mensaje para toda la selección.
+          </p>
+          <p class="field__hint" data-i18n="whatsmkt.configuracion.pronto">Disponible pronto.</p>
+        </div>
+      </section>
+
+      <!-- ---- 3. Send time slots ---------------------------------------------------- -->
+      <section class="panel" aria-labelledby="wm-horarios-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="wm-horarios-title" data-i18n="whatsmkt.configuracion.horarios">Horarios de envío</h2>
+          <p class="mono muted wm__meta" data-horarios-meta></p>
+        </div>
+        <form class="panel__body wm-form" data-form-horarios novalidate>
+          <div class="wm-franjas">
+            <fieldset class="wm-grupo" data-franja="horario_1">
+              <legend class="field__label" data-franja-leyenda>Horario 1</legend>
+              <div class="wm-hora">
+                <div class="field">
+                  <label class="field__label" for="wm-h1-inicio" data-i18n="whatsmkt.configuracion.horario.desde">Desde</label>
+                  <input class="input" id="wm-h1-inicio" data-campo="inicio" type="time" required aria-describedby="wm-h1-error" />
+                </div>
+                <div class="field">
+                  <label class="field__label" for="wm-h1-fin" data-i18n="whatsmkt.configuracion.horario.hasta">Hasta</label>
+                  <input class="input" id="wm-h1-fin" data-campo="fin" type="time" required aria-describedby="wm-h1-error" />
+                </div>
+              </div>
+              <p class="field__error" id="wm-h1-error" data-franja-error role="alert"></p>
+            </fieldset>
+
+            <fieldset class="wm-grupo" data-franja="horario_2">
+              <legend class="field__label" data-franja-leyenda>Horario 2</legend>
+              <div class="wm-hora">
+                <div class="field">
+                  <label class="field__label" for="wm-h2-inicio" data-i18n="whatsmkt.configuracion.horario.desde">Desde</label>
+                  <input class="input" id="wm-h2-inicio" data-campo="inicio" type="time" required aria-describedby="wm-h2-error" />
+                </div>
+                <div class="field">
+                  <label class="field__label" for="wm-h2-fin" data-i18n="whatsmkt.configuracion.horario.hasta">Hasta</label>
+                  <input class="input" id="wm-h2-fin" data-campo="fin" type="time" required aria-describedby="wm-h2-error" />
+                </div>
+              </div>
+              <p class="field__error" id="wm-h2-error" data-franja-error role="alert"></p>
+            </fieldset>
+          </div>
+
+          <p class="field__error" data-horarios-error role="alert"></p>
+          <div class="wm-form__foot">
+            <button type="submit" class="btn btn--primary" data-horarios-guardar>
+              <span class="btn__spinner" aria-hidden="true"></span>
+              <span class="btn__label" data-i18n="whatsmkt.configuracion.guardarHorarios">Guardar horarios</span>
+            </button>
+            <p class="mono muted" data-horarios-estado role="status"></p>
+          </div>
+        </form>
+      </section>
+
+      <!-- ---- 4. Campaign name ------------------------------------------------------- -->
+      <section class="panel" aria-labelledby="wm-nombre-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="wm-nombre-title" data-i18n="whatsmkt.seccion.nombre">Nombre de la campaña</h2>
+        </div>
+        <form class="panel__body wm-form" data-form-nombre novalidate>
+          <div class="field">
+            <label class="field__label" for="wm-plantilla" data-i18n="whatsmkt.configuracion.nombre.plantilla">Plantilla del nombre</label>
+            <input
+              class="input mono"
+              id="wm-plantilla"
+              type="text"
+              maxlength="75"
+              autocomplete="off"
+              spellcheck="false"
+              aria-describedby="wm-plantilla-hint wm-plantilla-contador wm-plantilla-ejemplo wm-plantilla-error"
+            />
+            <div
+              class="wm-variables"
+              role="group"
+              data-i18n-attr="aria-label:whatsmkt.configuracion.nombre.variables"
+              aria-label="Variables de la plantilla"
+              aria-describedby="wm-variables-hint"
+              data-variables
+            ></div>
+            <!-- Visible, because a title is read by neither the keyboard nor a touch screen. The braces are literal:
+                 `t()` only replaces them when it is given parameters, and the dictionary text is applied without. -->
+            <p
+              class="field__hint"
+              id="wm-variables-hint"
+              data-i18n="whatsmkt.configuracion.nombre.variablesHint"
+              set:text="{fecha_corte}: la fecha de corte, como AAAA.MM.DD. {segmento}: el nombre del segmento; queda vacío en una campaña global."
+            />
+
+            <p class="field__hint" id="wm-plantilla-hint" data-i18n="whatsmkt.configuracion.nombre.hint">
+              Texto fijo con las variables de la lista. Cada campaña nueva parte de esta plantilla; en la campaña se puede cambiar solo para ella.
+            </p>
+            <p class="wm-contador" id="wm-plantilla-contador" data-contador></p>
+            <div class="wm-nombre" id="wm-plantilla-ejemplo" data-bloque-ejemplos hidden>
+              <p class="wm-nombre__rotulo" data-i18n="whatsmkt.configuracion.nombre.resultantes">Nombres resultantes</p>
+              <dl data-ejemplos></dl>
+            </div>
+            <p class="field__error" id="wm-plantilla-error" data-plantilla-error role="alert"></p>
+          </div>
+
+          <p class="field__error" data-nombre-error role="alert"></p>
+          <div class="wm-form__foot">
+            <button type="submit" class="btn btn--primary" data-nombre-guardar>
+              <span class="btn__spinner" aria-hidden="true"></span>
+              <span class="btn__label" data-i18n="whatsmkt.configuracion.guardarNombre">Guardar nombre</span>
+            </button>
+            <p class="mono muted" data-nombre-estado role="status"></p>
+          </div>
+        </form>
+      </section>
+
+      <!-- ---- 5. Default definition: waits for the platform in the definitions (T-WM-F1b) -- -->
+      <section class="panel" aria-labelledby="wm-definicion-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="wm-definicion-title" data-i18n="whatsmkt.configuracion.definicionDefecto">Definición por defecto</h2>
+        </div>
+        <div class="panel__body wm-pronto">
+          <p class="field__hint" data-i18n="whatsmkt.configuracion.pronto">Disponible pronto.</p>
+        </div>
+      </section>
+
+      <!-- ---- 6. Limits ------------------------------------------------------------------- -->
+      <section class="panel" aria-labelledby="wm-topes-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="wm-topes-title" data-i18n="whatsmkt.configuracion.topes">Topes</h2>
+        </div>
+        <form class="panel__body wm-form" data-form-topes novalidate>
+          <div class="wm-topes">
+            <div class="field">
+              <label class="field__label" for="wm-tope-mensaje" data-i18n="whatsmkt.configuracion.tope.mensaje">Largo máximo del mensaje</label>
+              <div class="wm-valor">
+                <input
+                  class="input"
+                  id="wm-tope-mensaje"
+                  data-tope="tope_mensaje"
+                  type="number"
+                  inputmode="numeric"
+                  min="1"
+                  max="2000000000"
+                  step="1"
+                  required
+                  aria-describedby="wm-tope-mensaje-unidad wm-tope-mensaje-hint wm-tope-mensaje-error"
+                />
+                <span class="wm-unidad" id="wm-tope-mensaje-unidad" data-i18n="whatsmkt.configuracion.unidad.caracteres">caracteres</span>
+              </div>
+              <p class="field__hint" id="wm-tope-mensaje-hint" data-i18n="whatsmkt.configuracion.tope.mensajeHint">
+                Valor inicial: el largo de un mensaje de WhatsApp (4096). No es un dato verificado de WhatsMKT.
+              </p>
+              <p class="field__error" id="wm-tope-mensaje-error" data-tope-error="tope_mensaje" role="alert"></p>
+            </div>
+
+            <fieldset class="wm-grupo">
+              <legend class="field__label" data-i18n="whatsmkt.configuracion.tope.adjuntos">Tamaño máximo de video, audio y PDF</legend>
+              <div class="field">
+                <label class="field__label" for="wm-tope-video" data-i18n="whatsmkt.configuracion.tope.video">Video</label>
+                <div class="wm-valor">
+                  <input
+                    class="input"
+                    id="wm-tope-video"
+                    data-tope="tope_video"
+                    type="number"
+                    inputmode="decimal"
+                    min="1"
+                    max="2000"
+                    step="any"
+                    required
+                    aria-describedby="wm-tope-video-unidad wm-tope-adjuntos-hint wm-tope-video-error"
+                  />
+                  <span class="wm-unidad" id="wm-tope-video-unidad" data-i18n="whatsmkt.configuracion.unidad.mb">MB</span>
+                </div>
+                <p class="field__error" id="wm-tope-video-error" data-tope-error="tope_video" role="alert"></p>
+              </div>
+              <div class="field">
+                <label class="field__label" for="wm-tope-audio" data-i18n="whatsmkt.configuracion.tope.audio">Audio</label>
+                <div class="wm-valor">
+                  <input
+                    class="input"
+                    id="wm-tope-audio"
+                    data-tope="tope_audio"
+                    type="number"
+                    inputmode="decimal"
+                    min="1"
+                    max="2000"
+                    step="any"
+                    required
+                    aria-describedby="wm-tope-audio-unidad wm-tope-adjuntos-hint wm-tope-audio-error"
+                  />
+                  <span class="wm-unidad" id="wm-tope-audio-unidad" data-i18n="whatsmkt.configuracion.unidad.mb">MB</span>
+                </div>
+                <p class="field__error" id="wm-tope-audio-error" data-tope-error="tope_audio" role="alert"></p>
+              </div>
+              <div class="field">
+                <label class="field__label" for="wm-tope-pdf" data-i18n="whatsmkt.configuracion.tope.pdf">PDF</label>
+                <div class="wm-valor">
+                  <input
+                    class="input"
+                    id="wm-tope-pdf"
+                    data-tope="tope_pdf"
+                    type="number"
+                    inputmode="decimal"
+                    min="1"
+                    max="2000"
+                    step="any"
+                    required
+                    aria-describedby="wm-tope-pdf-unidad wm-tope-adjuntos-hint wm-tope-pdf-error"
+                  />
+                  <span class="wm-unidad" id="wm-tope-pdf-unidad" data-i18n="whatsmkt.configuracion.unidad.mb">MB</span>
+                </div>
+                <p class="field__error" id="wm-tope-pdf-error" data-tope-error="tope_pdf" role="alert"></p>
+              </div>
+              <p class="field__hint" id="wm-tope-adjuntos-hint" data-i18n="whatsmkt.configuracion.tope.adjuntosHint">
+                Valor inicial: el límite general de WhatsApp para multimedia (16 MB). No es un dato verificado de WhatsMKT.
+              </p>
+            </fieldset>
+          </div>
+
+          <p class="field__error" data-topes-error role="alert"></p>
+          <div class="wm-form__foot">
+            <button type="submit" class="btn btn--primary" data-topes-guardar>
+              <span class="btn__spinner" aria-hidden="true"></span>
+              <span class="btn__label" data-i18n="whatsmkt.configuracion.guardarTopes">Guardar topes</span>
+            </button>
+            <p class="mono muted" data-topes-estado role="status"></p>
+          </div>
+        </form>
+      </section>
+
+      <!-- ---- 7. Attachment library: waits for the attachment endpoints (T-WM-F1b) ----------- -->
+      <section class="panel" aria-labelledby="wm-biblioteca-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="wm-biblioteca-title" data-i18n="whatsmkt.biblioteca.titulo">Biblioteca de adjuntos</h2>
+        </div>
+        <div class="panel__body wm-pronto">
+          <p class="field__hint" data-i18n="whatsmkt.configuracion.pronto">Disponible pronto.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ---- Generic failure ---------------------------------------------- -->
+  <dialog class="dialog" data-dialog="error" aria-labelledby="wm-error-title">
+    <div class="dialog__head">
+      <h2 id="wm-error-title" data-i18n="common.error">Algo salió mal</h2>
+    </div>
+    <div class="dialog__body">
+      <p class="notice notice--danger">
+        <Icon name="circle-alert" size={20} />
+        <span data-error-body></span>
+      </p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn btn--primary" data-close data-i18n="common.close">Cerrar</button>
+    </div>
+  </dialog>
+</Shell>
+
+<script>
+  import { NetworkError, mensajeDeError } from '../../lib/api';
+  import { $, ocupado } from '../../lib/dom';
+  import {
+    guardarConfiguracion,
+    guardarSegmentos,
+    listarSegmentos,
+    obtenerConfiguracion,
+    type ConfiguracionWhatsmkt,
+    type ConfiguracionWhatsmktEntrada,
+    type SegmentoWhatsmkt,
+  } from '../../lib/api-whatsmkt';
+  import { openWhenFree } from '../../lib/dialogs';
+  import { formatDateTime, formatNumber } from '../../lib/format';
+  import { applyTranslations, t } from '../../lib/i18n';
+  import { variablesDesconocidas } from '../../lib/mowa-mes';
+  import { pintarBotonesDeVariables } from '../../lib/mowa-mes-plantilla';
+  import { celda, celdaDeFila, tabla } from '../../lib/tabla-dom';
+  import {
+    LARGO_MAXIMO_NOMBRE,
+    RANGOS_TOPES,
+    RANGO_DIAS,
+    LARGO_MAXIMO_ETIQUETA,
+    errorDeModulo,
+    errorDeSegmentos,
+    horarioValido,
+    leerSegmentos,
+    leerTope,
+    nombresDeEjemplo,
+    textoDeCodigo,
+    textoDeHorarioInvalido,
+    nombreDeFranja,
+    textoDeTope,
+    type CampoTope,
+    type FilaSegmentoTexto,
+    type Franja,
+  } from '../../lib/whatsmkt';
+
+  const estado = {
+    configuracion: null as ConfiguracionWhatsmkt | null,
+    segmentos: [] as SegmentoWhatsmkt[],
+  };
+
+  const dialogoError = $<HTMLDialogElement>('[data-dialog="error"]');
+  document.querySelectorAll<HTMLElement>('[data-close]').forEach((boton) => {
+    boton.addEventListener('click', () => boton.closest('dialog')?.close());
+  });
+
+  // ---- Shared helpers -------------------------------------------------------------
+
+  function mostrarError(error: unknown): void {
+    $<HTMLElement>('[data-error-body]').textContent = mensajeDeError(error);
+    void openWhenFree(dialogoError);
+  }
+
+  /** A status line that says what just happened, then gets out of the way. */
+  function avisarGuardado(nodo: HTMLElement): void {
+    const texto = t('whatsmkt.configuracion.guardado');
+    nodo.textContent = texto;
+    window.setTimeout(() => {
+      if (nodo.textContent === texto) nodo.textContent = '';
+    }, 4000);
+  }
+
+  /** Run a save with its button busy; whatever fails goes to `alFallar`, which puts it where it belongs. */
+  async function guardar(boton: HTMLButtonElement, accion: () => Promise<void>, alFallar: (error: unknown) => void): Promise<void> {
+    ocupado(boton, true);
+    try {
+      await accion();
+    } catch (caido) {
+      alFallar(caido);
+    } finally {
+      ocupado(boton, false);
+    }
+  }
+
+  function marcar(control: HTMLElement, invalido: boolean): void {
+    if (invalido) control.setAttribute('aria-invalid', 'true');
+    else control.removeAttribute('aria-invalid');
+  }
+
+  /**
+   * Run `revisar` when the focus leaves `control` (RF-WM-43), except towards the button that saves its block, and inside
+   * the control itself (a time field moves between its hours and its minutes): an error line appearing as the button is
+   * pressed would push it from under the pointer before the release, and the click would be lost. Saving checks every
+   * field of the block and focuses the first error.
+   */
+  function alSalir(control: HTMLElement, guardar: HTMLElement, revisar: () => void): void {
+    control.addEventListener('focusout', (evento) => {
+      const destino = evento.relatedTarget;
+      if (destino === guardar || (destino instanceof Node && control.contains(destino))) return;
+      revisar();
+    });
+  }
+
+  // ---- 1. Segments ---------------------------------------------------------------------
+
+  const formSegmentos = $<HTMLFormElement>('[data-form-segmentos]');
+  const botonSegmentos = $<HTMLButtonElement>('[data-segmentos-guardar]');
+  const erroresDeFila = () => document.querySelectorAll<HTMLElement>('[data-error-fila] p');
+  const errorTablaSegmentos = $<HTMLElement>('[data-segmentos-error]');
+
+  function campoDeFila(tipo: 'text' | 'number', campo: 'etiqueta' | 'desde' | 'hasta', valor: string, nombre: string, errorId: string): HTMLInputElement {
+    const entrada = document.createElement('input');
+    entrada.className = 'input';
+    entrada.type = tipo;
+    entrada.value = valor;
+    entrada.dataset.campo = campo;
+    entrada.setAttribute('aria-label', nombre);
+    entrada.setAttribute('aria-describedby', errorId);
+    if (tipo === 'text') {
+      entrada.maxLength = LARGO_MAXIMO_ETIQUETA;
+      entrada.autocomplete = 'off';
+      entrada.required = true;
+    } else {
+      entrada.inputMode = 'numeric';
+      entrada.min = String(-RANGO_DIAS);
+      entrada.max = String(RANGO_DIAS);
+      entrada.step = '1';
+      entrada.required = true;
+    }
+    return entrada;
+  }
+
+  const fijo = (clave: 'sinPiso' | 'sinTope'): HTMLElement => {
+    const nodo = document.createElement('span');
+    // `.input` gives it the box of the fields around it; `.wm-segmentos__fijo` takes away what makes it look editable.
+    nodo.className = 'input wm-segmentos__fijo';
+    nodo.textContent = t(`whatsmkt.configuracion.${clave}`);
+    return nodo;
+  };
+
+  /** The table of the 3 fixed segments. `borrador` keeps what was typed when the table is drawn again (a language switch). */
+  function pintarSegmentos(borrador: readonly FilaSegmentoTexto[] = []): void {
+    const { envoltorio, cuerpo } = tabla(
+      'wm-segmentos',
+      [
+        [t('whatsmkt.configuracion.col.segmento'), false],
+        [t('whatsmkt.configuracion.col.desde'), false],
+        [t('whatsmkt.configuracion.col.hasta'), false],
+      ],
+      { apilable: true },
+    );
+    estado.segmentos.forEach((segmento) => {
+      const previo = borrador.find((fila) => fila.clave === segmento.clave);
+      const errorId = `wm-seg-error-${segmento.clave}`;
+      const nombre = (clave: string) => t(`whatsmkt.configuracion.segmento.${clave}`, { segmento: segmento.etiqueta });
+
+      const fila = document.createElement('tr');
+      fila.dataset.clave = segmento.clave;
+      const etiqueta = celdaDeFila('', '', t('whatsmkt.configuracion.col.segmento'));
+      etiqueta.append(campoDeFila('text', 'etiqueta', previo?.etiqueta ?? segmento.etiqueta, nombre('etiquetaDe'), errorId));
+      const desde = celda('td', '', '', t('whatsmkt.configuracion.col.desde'));
+      desde.append(
+        segmento.desde === null
+          ? fijo('sinPiso')
+          : campoDeFila('number', 'desde', previo?.desde ?? String(segmento.desde), nombre('desdeDe'), errorId),
+      );
+      const hasta = celda('td', '', '', t('whatsmkt.configuracion.col.hasta'));
+      hasta.append(
+        segmento.hasta === null
+          ? fijo('sinTope')
+          : campoDeFila('number', 'hasta', previo?.hasta ?? String(segmento.hasta), nombre('hastaDe'), errorId),
+      );
+      fila.append(etiqueta, desde, hasta);
+      fila.querySelectorAll('input').forEach((control) => alSalir(control, botonSegmentos, () => revisarFila(segmento.clave)));
+
+      // The row's own error, right under it; the row stays out of the way while it is empty.
+      const filaError = document.createElement('tr');
+      filaError.dataset.errorFila = segmento.clave;
+      filaError.hidden = true;
+      const celdaError = document.createElement('td');
+      celdaError.colSpan = 3;
+      const error = document.createElement('p');
+      error.className = 'field__error';
+      error.id = errorId;
+      error.setAttribute('role', 'alert');
+      celdaError.append(error);
+      filaError.append(celdaError);
+
+      cuerpo.append(fila, filaError);
+    });
+    $<HTMLElement>('[data-segmentos-tabla]').replaceChildren(envoltorio);
+  }
+
+  function filaDeSegmento(clave: string): HTMLTableRowElement | null {
+    return document.querySelector<HTMLTableRowElement>(`[data-segmentos-tabla] tr[data-clave="${clave}"]`);
+  }
+
+  function errorDeFila(clave: string, texto: string): void {
+    const celdaError = document.querySelector<HTMLElement>(`[data-error-fila="${clave}"]`);
+    if (!celdaError) return;
+    celdaError.querySelector('p')!.textContent = texto;
+    celdaError.hidden = texto === '';
+  }
+
+  function limpiarErroresDeSegmentos(): void {
+    erroresDeFila().forEach((p) => {
+      p.textContent = '';
+      p.closest<HTMLElement>('[data-error-fila]')!.hidden = true;
+    });
+    errorTablaSegmentos.textContent = '';
+    document.querySelectorAll<HTMLElement>('[data-segmentos-tabla] input').forEach((control) => marcar(control, false));
+  }
+
+  function filasEscritas(): FilaSegmentoTexto[] {
+    return estado.segmentos.map((segmento) => {
+      const fila = filaDeSegmento(segmento.clave)!;
+      const valor = (campo: string) => fila.querySelector<HTMLInputElement>(`[data-campo="${campo}"]`)?.value ?? null;
+      return {
+        clave: segmento.clave,
+        etiqueta: valor('etiqueta') ?? '',
+        desde: valor('desde'),
+        hasta: valor('hasta'),
+      };
+    });
+  }
+
+  /**
+   * Leaving a field of a row says the first thing wrong with the row. It never clears a reason the API gave: typing
+   * does that (`limpiarErroresDeSegmentos`), and a row left as it is keeps its message.
+   */
+  function revisarFila(clave: string): void {
+    const propios = leerSegmentos(filasEscritas()).problemas.filter((problema) => problema.clave === clave);
+    if (propios.length === 0) return;
+    errorDeFila(clave, propios[0].texto);
+    propios.forEach(({ campo }) => marcar(filaDeSegmento(clave)!.querySelector<HTMLElement>(`[data-campo="${campo}"]`)!, true));
+  }
+
+  formSegmentos.addEventListener('input', limpiarErroresDeSegmentos);
+
+  formSegmentos.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    limpiarErroresDeSegmentos();
+
+    const { entrada, problemas } = leerSegmentos(filasEscritas());
+    if (problemas.length > 0) {
+      problemas.forEach(({ clave, campo, texto }) => {
+        // One sentence per row: the first problem found in it.
+        const fila = filaDeSegmento(clave)!;
+        if (document.querySelector(`[data-error-fila="${clave}"] p`)?.textContent === '') errorDeFila(clave, texto);
+        marcar(fila.querySelector<HTMLElement>(`[data-campo="${campo}"]`)!, true);
+      });
+      filaDeSegmento(problemas[0].clave)!.querySelector<HTMLElement>(`[data-campo="${problemas[0].campo}"]`)!.focus();
+      return;
+    }
+
+    await guardar(
+      $<HTMLButtonElement>('[data-segmentos-guardar]'),
+      async () => {
+        estado.segmentos = await guardarSegmentos(entrada);
+        pintarSegmentos();
+        avisarGuardado($<HTMLElement>('[data-segmentos-estado]'));
+        // The name examples carry the labels.
+        revisarPlantilla();
+      },
+      (caido) => {
+        const error = errorDeModulo(caido);
+        if (!error) {
+          errorTablaSegmentos.textContent = mensajeDeError(caido);
+          return;
+        }
+        const etiquetas = Object.fromEntries(entrada.map((segmento) => [segmento.clave, segmento.etiqueta]));
+        const { fila, texto } = errorDeSegmentos(error, etiquetas);
+        if (fila === null) {
+          errorTablaSegmentos.textContent = texto;
+          return;
+        }
+        errorDeFila(fila, texto);
+        // The overlap is about the row's range: «Desde» takes the mark and the focus (the name only when there is none).
+        const filaNodo = filaDeSegmento(fila);
+        const campo =
+          filaNodo?.querySelector<HTMLElement>('[data-campo="desde"]') ??
+          filaNodo?.querySelector<HTMLElement>('[data-campo="etiqueta"]');
+        if (campo) {
+          marcar(campo, true);
+          campo.focus();
+        }
+      },
+    );
+  });
+
+  // ---- 3. Time slots -----------------------------------------------------------------------
+
+  const formHorarios = $<HTMLFormElement>('[data-form-horarios]');
+  const franjas: Franja[] = ['horario_1', 'horario_2'];
+  const nodoDeFranja = (franja: Franja) => $<HTMLElement>(`[data-franja="${franja}"]`);
+  const horaDe = (franja: Franja, campo: 'inicio' | 'fin') =>
+    nodoDeFranja(franja).querySelector<HTMLInputElement>(`[data-campo="${campo}"]`)!;
+  const errorDeFranja = (franja: Franja) => nodoDeFranja(franja).querySelector<HTMLElement>('[data-franja-error]')!;
+
+  function pintarHorarios(): void {
+    const config = estado.configuracion;
+    franjas.forEach((franja) => {
+      nodoDeFranja(franja).querySelector('[data-franja-leyenda]')!.textContent = nombreDeFranja(franja);
+      if (!config) return;
+      horaDe(franja, 'inicio').value = config[franja].inicio;
+      horaDe(franja, 'fin').value = config[franja].fin;
+    });
+    pintarMeta();
+  }
+
+  function pintarMeta(): void {
+    $<HTMLElement>('[data-horarios-meta]').textContent = estado.configuracion?.actualizado_en
+      ? t('whatsmkt.configuracion.actualizado', { fecha: formatDateTime(estado.configuracion.actualizado_en) })
+      : '';
+  }
+
+  function errorDeHorario(franja: Franja, texto: string): void {
+    errorDeFranja(franja).textContent = texto;
+    marcar(horaDe(franja, 'inicio'), texto !== '');
+    marcar(horaDe(franja, 'fin'), texto !== '');
+  }
+
+  /** Leaving a field says if its slot holds together (RF-WM-43); the API says it again on saving. */
+  function revisarFranja(franja: Franja): boolean {
+    const valido = horarioValido(horaDe(franja, 'inicio').value, horaDe(franja, 'fin').value);
+    errorDeHorario(franja, valido ? '' : textoDeHorarioInvalido(franja));
+    return valido;
+  }
+
+  const botonHorarios = $<HTMLButtonElement>('[data-horarios-guardar]');
+  franjas.forEach((franja) => {
+    (['inicio', 'fin'] as const).forEach((campo) => {
+      const control = horaDe(franja, campo);
+      alSalir(control, botonHorarios, () => revisarFranja(franja));
+      // An error already on screen goes as soon as the slot holds together, without waiting to leave the field.
+      control.addEventListener('change', () => {
+        if (errorDeFranja(franja).textContent !== '') revisarFranja(franja);
+      });
+    });
+  });
+
+  formHorarios.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    const error = $<HTMLElement>('[data-horarios-error]');
+    error.textContent = '';
+    const malas = franjas.filter((franja) => !revisarFranja(franja));
+    if (malas.length > 0) {
+      horaDe(malas[0], 'inicio').focus();
+      return;
+    }
+
+    await guardar(
+      $<HTMLButtonElement>('[data-horarios-guardar]'),
+      async () => {
+        estado.configuracion = await guardarConfiguracion({
+          horario_1: { inicio: horaDe('horario_1', 'inicio').value, fin: horaDe('horario_1', 'fin').value },
+          horario_2: { inicio: horaDe('horario_2', 'inicio').value, fin: horaDe('horario_2', 'fin').value },
+        });
+        pintarHorarios();
+        avisarGuardado($<HTMLElement>('[data-horarios-estado]'));
+      },
+      (caido) => {
+        const fallo = errorDeModulo(caido);
+        const nombradas = fallo?.codigo === 'horario_invalido' ? franjas.filter((franja) => fallo.horarios?.includes(franja)) : [];
+        if (nombradas.length === 0) {
+          error.textContent = mensajeDeError(caido);
+          return;
+        }
+        nombradas.forEach((franja) => errorDeHorario(franja, textoDeHorarioInvalido(franja)));
+        horaDe(nombradas[0], 'inicio').focus();
+      },
+    );
+  });
+
+  // ---- 4. Campaign name ------------------------------------------------------------------------
+
+  const formNombre = $<HTMLFormElement>('[data-form-nombre]');
+  const inputPlantilla = $<HTMLInputElement>('#wm-plantilla');
+  const errorPlantilla = $<HTMLElement>('[data-plantilla-error]');
+
+  function errorDePlantilla(texto: string): void {
+    errorPlantilla.textContent = texto;
+    marcar(inputPlantilla, texto !== '');
+  }
+
+  /**
+   * The examples, the counter and the notes of the template, from what is typed. The variable list is the API's;
+   * the name each template gives is worked out here with the same two variables (DU-WM-6) and one label per segment.
+   * Returns whether the template can be saved.
+   */
+  function revisarPlantilla(): boolean {
+    const variables = estado.configuracion?.variables_plantilla ?? [];
+    const ejemplos = $<HTMLElement>('[data-ejemplos]');
+    const bloqueEjemplos = $<HTMLElement>('[data-bloque-ejemplos]');
+    const contador = $<HTMLElement>('[data-contador]');
+    const desconocidas = variablesDesconocidas(inputPlantilla.value, variables.map((nombre) => ({ nombre })));
+    if (desconocidas.length > 0) {
+      errorDePlantilla(textoDeCodigo({ codigo: 'variable_inexistente', detail: '' }, { variable: `{${desconocidas[0]}}` }));
+      ejemplos.replaceChildren();
+      bloqueEjemplos.hidden = true;
+      contador.textContent = '';
+      contador.dataset.excede = 'false';
+      return false;
+    }
+    const etiquetas = estado.segmentos.map((segmento) => segmento.etiqueta);
+    const nombres = nombresDeEjemplo(inputPlantilla.value, etiquetas);
+    ejemplos.replaceChildren(
+      ...nombres.map((nombre, indice) => {
+        // The segment is the term and the name its description, so a name never loses its label in the middle of a word.
+        const par = document.createElement('div');
+        const segmento = document.createElement('dt');
+        segmento.textContent = etiquetas[indice];
+        const valor = document.createElement('dd');
+        valor.textContent = nombre;
+        par.append(segmento, valor);
+        return par;
+      }),
+    );
+    bloqueEjemplos.hidden = nombres.length === 0;
+    // The longest name is the one that counts: a campaign over 75 is refused (RF-WM-33).
+    const largo = Math.max(0, ...nombres.map((nombre) => nombre.length));
+    const excede = largo > LARGO_MAXIMO_NOMBRE;
+    contador.textContent = t('whatsmkt.configuracion.nombre.contador', { largo, maximo: LARGO_MAXIMO_NOMBRE });
+    contador.dataset.excede = String(excede);
+    errorDePlantilla(excede ? textoDeCodigo({ codigo: 'nombre_largo', detail: '' }, { largo }) : '');
+    return !excede;
+  }
+
+  function pintarNombre(): void {
+    const config = estado.configuracion;
+    if (!config) return;
+    inputPlantilla.value = config.plantilla_nombre;
+    pintarBotonesDeVariables(
+      $<HTMLElement>('[data-variables]'),
+      inputPlantilla,
+      config.variables_plantilla.map((nombre) => ({ nombre, descripcion: '' })),
+    );
+    // The helper sets the API's sentence as a title; WhatsMKT has none, and the hint under the chips says it in view.
+    $<HTMLElement>('[data-variables]').querySelectorAll('button').forEach((boton) => boton.removeAttribute('title'));
+    revisarPlantilla();
+  }
+
+  inputPlantilla.addEventListener('input', () => {
+    $<HTMLElement>('[data-nombre-error]').textContent = '';
+    revisarPlantilla();
+  });
+
+  formNombre.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    const error = $<HTMLElement>('[data-nombre-error]');
+    error.textContent = '';
+    if (!revisarPlantilla()) {
+      inputPlantilla.focus();
+      return;
+    }
+
+    await guardar(
+      $<HTMLButtonElement>('[data-nombre-guardar]'),
+      async () => {
+        estado.configuracion = await guardarConfiguracion({ plantilla_nombre: inputPlantilla.value });
+        pintarNombre();
+        avisarGuardado($<HTMLElement>('[data-nombre-estado]'));
+      },
+      (caido) => {
+        const fallo = errorDeModulo(caido);
+        if (fallo?.codigo === 'variable_inexistente') {
+          errorDePlantilla(textoDeCodigo(fallo, { variable: fallo.variable }));
+          inputPlantilla.focus();
+          return;
+        }
+        error.textContent = mensajeDeError(caido);
+      },
+    );
+  });
+
+  // ---- 6. Limits ------------------------------------------------------------------------------------
+
+  const formTopes = $<HTMLFormElement>('[data-form-topes]');
+  const campos: CampoTope[] = ['tope_mensaje', 'tope_video', 'tope_audio', 'tope_pdf'];
+  const inputTope = (campo: CampoTope) => $<HTMLInputElement>(`[data-tope="${campo}"]`);
+  const errorTope = (campo: CampoTope) => $<HTMLElement>(`[data-tope-error="${campo}"]`);
+
+  function pintarTopes(): void {
+    const config = estado.configuracion;
+    if (!config) return;
+    campos.forEach((campo) => {
+      inputTope(campo).value = textoDeTope(campo, config[campo]);
+    });
+  }
+
+  /** The field says if its value is in range on leaving it (RF-WM-43); `min="1"` already keeps zero out of the keyboard. */
+  function revisarTope(campo: CampoTope): number | null {
+    const valor = leerTope(campo, inputTope(campo).value);
+    const { minimo, maximo } = RANGOS_TOPES[campo];
+    // The message's ceiling is the API's technical limit, not a figure anyone would choose: it is not shown.
+    errorTope(campo).textContent =
+      valor !== null
+        ? ''
+        : campo === 'tope_mensaje'
+          ? t('whatsmkt.configuracion.tope.invalidoSinMaximo')
+          : t('whatsmkt.configuracion.tope.invalido', { min: formatNumber(minimo), max: formatNumber(maximo) });
+    marcar(inputTope(campo), valor === null);
+    return valor;
+  }
+
+  const guardarTopes = $<HTMLButtonElement>('[data-topes-guardar]');
+  campos.forEach((campo) => {
+    alSalir(inputTope(campo), guardarTopes, () => revisarTope(campo));
+    // An error already on screen goes as soon as the value is right, without waiting to leave the field.
+    inputTope(campo).addEventListener('input', () => {
+      if (errorTope(campo).textContent !== '') revisarTope(campo);
+    });
+  });
+
+  formTopes.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    const error = $<HTMLElement>('[data-topes-error]');
+    error.textContent = '';
+    // Every field is checked, so each one that is wrong says so; the first of them gets the focus.
+    const valores = campos.map((campo) => [campo, revisarTope(campo)] as const);
+    const mala = valores.find(([, valor]) => valor === null);
+    if (mala) {
+      inputTope(mala[0]).focus();
+      return;
+    }
+    const entrada: ConfiguracionWhatsmktEntrada = {};
+    valores.forEach(([campo, valor]) => {
+      entrada[campo] = valor as number;
+    });
+
+    await guardar(
+      $<HTMLButtonElement>('[data-topes-guardar]'),
+      async () => {
+        // The attachments travel in bytes: the field holds megabytes (1 MB = 1 000 000 bytes).
+        estado.configuracion = await guardarConfiguracion(entrada);
+        pintarTopes();
+        avisarGuardado($<HTMLElement>('[data-topes-estado]'));
+      },
+      (caido) => {
+        error.textContent = mensajeDeError(caido);
+      },
+    );
+  });
+
+  // ---- Boot ----------------------------------------------------------------------------------------
+
+  function sinConexion(si: boolean): void {
+    $<HTMLElement>('[data-offline]').hidden = !si;
+    $<HTMLElement>('[data-contenido]').hidden = si;
+    document.dispatchEvent(new CustomEvent('healthchanged'));
+  }
+
+  async function arrancar(): Promise<void> {
+    try {
+      const [configuracion, segmentos] = await Promise.all([obtenerConfiguracion(), listarSegmentos()]);
+      estado.configuracion = configuracion;
+      estado.segmentos = segmentos;
+
+      sinConexion(false);
+      pintarSegmentos();
+      pintarHorarios();
+      pintarNombre();
+      pintarTopes();
+    } catch (caido) {
+      if (caido instanceof NetworkError) {
+        sinConexion(true);
+      } else {
+        sinConexion(false);
+        mostrarError(caido);
+      }
+    }
+  }
+
+  const reintentar = $<HTMLButtonElement>('[data-reintentar]');
+  reintentar.addEventListener('click', async () => {
+    ocupado(reintentar, true);
+    try {
+      await arrancar();
+    } finally {
+      ocupado(reintentar, false);
+    }
+  });
+
+  // A language switch repaints what the script drew, keeping what was typed in the segment table.
+  document.addEventListener('languagechange', () => {
+    applyTranslations();
+    if (estado.segmentos.length > 0) pintarSegmentos(filasEscritas());
+    franjas.forEach((franja) => {
+      nodoDeFranja(franja).querySelector('[data-franja-leyenda]')!.textContent = nombreDeFranja(franja);
+    });
+    pintarMeta();
+    revisarPlantilla();
+  });
+
+  void arrancar();
+</script>

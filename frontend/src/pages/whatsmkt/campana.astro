@@ -1,0 +1,31 @@
+---
+/**
+ * WhatsMKT campaign (T-WM-F2). Until that cut lands this is the screen's place in the menu: its title and a
+ * notice that says what it will do, so the module reads as one from its first release.
+ */
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import '../../styles/whatsmkt.css';
+---
+
+<Shell
+  title="Campaña de WhatsMKT — auto_cusco"
+  description="Arma la lista de contactos sobre una selección de cartera y crea la campaña de WhatsMKT."
+>
+  <div class="page">
+    <header class="page__head">
+      <p class="eyebrow" data-i18n="whatsmkt.eyebrow">Canales · WhatsMKT</p>
+      <h1 class="page__title" data-i18n="whatsmkt.campana.titulo">Campaña de WhatsMKT</h1>
+      <p class="page__intro" data-i18n="whatsmkt.campana.intro">
+        Arma la lista de contactos sobre una selección de cartera, revisa la previsualización y crea la campaña.
+      </p>
+    </header>
+
+    <p class="notice notice--info">
+      <Icon name="info" size={20} />
+      <span data-i18n="whatsmkt.campana.enConstruccion">
+        Esta pantalla está en construcción. Aquí armarás la lista de contactos sobre una selección de cartera, elegirás el mensaje, la fecha y los horarios de envío, y crearás la campaña.
+      </span>
+    </p>
+  </div>
+</Shell>

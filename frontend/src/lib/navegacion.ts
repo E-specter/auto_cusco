@@ -89,6 +89,35 @@ export const NAVEGACION: SeccionNav[] = [
           ],
         },
       },
+      {
+        tipo: 'modulo',
+        modulo: {
+          id: 'whatsmkt',
+          i18n: 'nav.whatsmkt',
+          texto: 'WhatsMKT',
+          prefijo: '/whatsmkt',
+          enlaces: [
+            {
+              ruta: '/whatsmkt/campana',
+              i18n: 'nav.whatsmkt.campana',
+              texto: 'Campaña',
+              aria: { i18n: 'nav.whatsmkt.campanaLargo', texto: 'WhatsMKT: campaña' },
+            },
+            {
+              ruta: '/whatsmkt/seguimiento',
+              i18n: 'nav.whatsmkt.seguimiento',
+              texto: 'Seguimiento',
+              aria: { i18n: 'nav.whatsmkt.seguimientoLargo', texto: 'WhatsMKT: seguimiento' },
+            },
+            {
+              ruta: '/whatsmkt/configuracion',
+              i18n: 'nav.whatsmkt.configuracion',
+              texto: 'Configuración',
+              aria: { i18n: 'nav.whatsmkt.configuracionLargo', texto: 'WhatsMKT: configuración' },
+            },
+          ],
+        },
+      },
     ],
   },
   {

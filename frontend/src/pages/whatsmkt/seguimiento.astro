@@ -1,0 +1,29 @@
+---
+/**
+ * WhatsMKT tracking (T-WM-F3). Until that cut lands this is the screen's place in the menu: its title and a
+ * notice that says what it will do, so the module reads as one from its first release.
+ */
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import '../../styles/whatsmkt.css';
+---
+
+<Shell
+  title="Seguimiento de WhatsMKT — auto_cusco"
+  description="Las campañas de WhatsMKT creadas, el informe de cada una y su conciliación."
+>
+  <div class="page">
+    <header class="page__head">
+      <p class="eyebrow" data-i18n="whatsmkt.eyebrow">Canales · WhatsMKT</p>
+      <h1 class="page__title" data-i18n="whatsmkt.seguimiento.titulo">Seguimiento de WhatsMKT</h1>
+      <p class="page__intro" data-i18n="whatsmkt.seguimiento.intro">Las campañas creadas y el informe de cada una.</p>
+    </header>
+
+    <p class="notice notice--info">
+      <Icon name="info" size={20} />
+      <span data-i18n="whatsmkt.seguimiento.enConstruccion">
+        Esta pantalla está en construcción. Aquí verás las campañas creadas, importarás el informe de WhatsMKT y revisarás cuántos productos se enviaron y cuántos no.
+      </span>
+    </p>
+  </div>
+</Shell>

@@ -1,0 +1,187 @@
+/*
+ * WhatsMKT connector screens.
+ *
+ * Global for the same reason as mowa-mes.css: the segment table and the name examples are built by the
+ * page script at runtime. Every class is prefixed `wm` so nothing here reaches another screen.
+ */
+
+.wm__contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* «Actualizado …» in a panel's head: mono, muted, small, like MOWA MES's `.mm__meta`. */
+.wm__meta {
+  font-size: var(--text-xs);
+}
+
+/* The links of the tools notice: the notice's own colour, underlined. The default link colour does not
+   hold its contrast on the info wash. */
+[data-herramientas] a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.wm-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+.wm-form__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.wm-form__foot > p:empty {
+  display: none;
+}
+
+/* ---- Segment table ----------------------------------------------------------
+   Inputs fill their cell; a fixed bound («sin mínimo», «sin máximo») is plain text. The row's error sits in a
+   row of its own right under it, and the whole row is hidden while it has nothing to say. */
+
+.wm-segmentos .input {
+  min-inline-size: 6rem;
+}
+
+/* A fixed bound has the box of the fields around it (it wears `.input`, without its border, fill or hover), so its
+   cell is as tall as theirs and the text sits centred in it. */
+.wm-segmentos .wm-segmentos__fijo {
+  display: flex;
+  align-items: center;
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.wm-segmentos tr[data-error-fila][hidden] {
+  display: none;
+}
+
+.wm-segmentos tr[data-error-fila] > td {
+  padding-block-start: 0;
+}
+
+/* ---- Time slots and limits --------------------------------------------------- */
+
+.wm-franjas,
+.wm-topes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  align-items: start;
+  gap: var(--space-3) var(--space-4);
+  min-inline-size: 0;
+}
+
+.wm-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.wm-grupo > legend {
+  margin-block-end: var(--space-1);
+  padding: 0;
+}
+
+.wm-hora {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+}
+
+.wm-hora .field {
+  min-inline-size: 0;
+}
+
+/* A number with its unit written after it: the unit is read with the field (aria-describedby). */
+.wm-valor {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.wm-valor .input {
+  flex: 1 1 auto;
+}
+
+.wm-unidad {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* ---- Campaign name ------------------------------------------------------------ */
+
+.wm-variables {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
+
+.wm-contador {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.wm-contador[data-excede='true'] {
+  color: var(--color-danger-text);
+}
+
+/* The names a template gives, one per segment: the segment in sans and muted, the name under it in mono and
+   free to wrap anywhere, so at 360 px a label is never cut in the middle of a segment's name. */
+.wm-nombre {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.wm-nombre__rotulo {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.wm-nombre dl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.wm-nombre dt {
+  font-family: var(--font-primary);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.wm-nombre dd {
+  margin: 0;
+  font-family: var(--font-secondary);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+/* ---- Panels that wait for another cut ------------------------------------------- */
+
+.wm-pronto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-block-start: var(--space-2);
+}
+
+.wm-pronto__titulo {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
