@@ -65,6 +65,7 @@
 | /docs/agents/dev_frontend_modulo_whatsmkt/profile.md | Doc | Perfil del desarrollador frontend del módulo `whatsmkt` | architec | 2026-11-02 |
 | /docs/agents/coordinador_herramientas_implementadas/revision-c2.md | Doc | Revisión integral del motor de texto enriquecido (T-MTE-C2): trazabilidad de RF-42 a RF-54, hallazgos, límites, lecciones y commits | coordinador_herramientas_implementadas | 2026-10-19 |
 | /docs/requerimientos-mowa-mes.md | Doc | Requerimientos del conector SMS MOWA MES (RF-MM-01 a RF-MM-22), decisiones y evidencia de los ejemplos | architec (requisitos) | 2026-09-13 |
+| /docs/requerimientos-whatsmkt.md | Doc | Requerimientos del conector de WhatsApp WhatsMKT (RF-WM-01 a RF-WM-44): plataforma, programación, archivo desde el constructor, mensaje por segmento, adjuntos, ficha y conciliación; decisiones, evidencia agregada, supuestos S-WM y dudas DU-WM | coordinador_modulo_whatsmkt | 2026-11-02 |
 
 ## Pendientes de incorporar formalmente a la skill
 
