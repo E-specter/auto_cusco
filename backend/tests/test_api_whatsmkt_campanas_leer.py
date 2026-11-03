@@ -166,9 +166,9 @@ def test_el_filtro_por_lote_deja_solo_las_campanas_de_ese_lote(cliente) -> None:
 
 def test_el_filtro_por_mes_usa_el_mes_de_la_fecha_de_envio(cliente) -> None:
     client, _ = cliente
-    # 31 de octubre y 1 de noviembre: el limite entre un mes y el siguiente.
+    # 31 de octubre y 2 de noviembre: el limite entre un mes y el siguiente (el 1 es domingo).
     crear(cliente, fecha_corte="2026-10-30", fecha_envio="2026-10-31")  # 1
-    crear(cliente, fecha_corte="2026-10-30", fecha_envio="2026-11-01")  # 2
+    crear(cliente, fecha_corte="2026-10-30", fecha_envio="2026-11-02")  # 2
     crear(cliente, fecha_corte="2026-11-02", fecha_envio="2026-11-30")  # 3
     crear(cliente, fecha_corte="2026-11-02", fecha_envio="2026-12-01")  # 4
 

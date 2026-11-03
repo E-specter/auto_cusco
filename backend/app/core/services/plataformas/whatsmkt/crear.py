@@ -7,8 +7,9 @@ exacta de la definicion y del texto guardado (la pedida o, sin ella, la vigente 
 copia del texto, la fecha de envio, los horarios con sus horas, el tipo de envio, la foto, el
 adjunto, los supervisores y el archivo, que se descarga siempre igual (RF-WM-16).
 
-`fecha_envio` llega SIN validar contra los dias de envio (RF-70): solo sirve para los dias de
-atraso ajustados. B4c la valida cuando entre T-HI-B5.
+La fecha de envio se valida contra los dias gestionables (RF-70, T-WM-B4c) al previsualizar: si
+ya no lo es (paso la medianoche, o alguien registro un dia no laborable), se lanza
+`FechaNoGestionable` con la nueva sugerida y no se guarda nada.
 """
 
 from collections.abc import Callable, Mapping
@@ -94,8 +95,8 @@ class CreacionCampanasWhatsmktService:
 
     def crear(self, peticion: PeticionCreacion) -> LoteCreado:
         """Lanza `CreacionInvalida` si algo impide crear (nada se guarda), `AdjuntoNoEncontrado` si
-        la foto o el adjunto no existen, y los errores de la previsualizacion (definicion o texto
-        que no existe)."""
+        la foto o el adjunto no existen, `FechaNoGestionable` si la fecha de envio ya no es un dia
+        gestionable, y los errores de la previsualizacion (definicion o texto que no existe)."""
         problemas: list[ProblemaCampana] = []
         if not peticion.horarios:
             problemas.append(
@@ -104,6 +105,10 @@ class CreacionCampanasWhatsmktService:
                 )
             )
         previa = self._previa.previsualizar(peticion.previa)
+        if previa.fecha_no_gestionable is not None:
+            # La fecha ya no sirve (paso la medianoche, o se registro un dia no laborable): se
+            # avisa con la nueva sugerida, y no se crea nada.
+            raise previa.fecha_no_gestionable
         problemas += previa.problemas
         problemas += self._problemas_de_la_foto_y_el_adjunto(peticion)
         configuracion = self._repositorio.obtener_configuracion()
@@ -200,7 +205,6 @@ class CreacionCampanasWhatsmktService:
             filtros=peticion.filtros,
             orden=peticion.orden,
             cantidad_pedida=previa.solicitados,
-            # shortcut: fecha_envio llega sin validar; B4c la valida con RF-70 cuando entre T-HI-B5
             fecha_envio=previa.fecha_envio,
             horarios=horarios,
             lo_antes_posible=peticion.lo_antes_posible,

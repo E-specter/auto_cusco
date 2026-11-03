@@ -5504,6 +5504,16 @@
               }
             }
           },
+          "409": {
+            "description": "La fecha de envio ya no es un dia gestionable (`fecha_no_gestionable`): trae la nueva sugerida y no se crea nada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFechaNoGestionableWhatsmktRespuesta"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Algo impide crear (nada se guarda): `codigo` es el del primero y `problemas` los trae todos",
             "content": {
@@ -6060,6 +6070,62 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/whatsmkt/programacion": {
+      "get": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "La fecha de envio sugerida y los proximos dias gestionables",
+        "description": "Para elegir la fecha de envio (RF-WM-06). `sugerida` es el siguiente dia gestionable despues\nde hoy en Lima; `minima` es la primera fecha que se admite (hoy nunca sirve) y hoy coincide con\nla sugerida; `proximas` son los `n` siguientes, de lunes a sabado, sin feriados ni dias no\nlaborables registrados (RF-70 y RF-71).",
+        "operationId": "programacion_whatsmkt_programacion_get",
+        "parameters": [
+          {
+            "name": "n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "Cuantos dias gestionables se piden (RF-71)",
+              "default": 7,
+              "title": "N"
+            },
+            "description": "Cuantos dias gestionables se piden (RF-71)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgramacionWhatsmktRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`n` fuera de rango: el codigo es proximos_fuera_de_rango y trae `minimo` y `maximo`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorProximos"
                 }
               }
             }
@@ -9089,7 +9155,7 @@
               }
             ],
             "title": "Fecha Envio",
-            "description": "Fecha de envio, solo para los dias de atraso ajustados (RF-55); sin ella, hoy en America/Lima. Todavia SIN validar contra los dias de envio (RF-70): eso llega con el mensaje"
+            "description": "Fecha de envio: de lunes a sabado, sin feriados ni dias no laborables, y posterior a hoy en America/Lima (RF-70). Sin ella se usa la sugerida (el siguiente dia gestionable). Si no sirve, la previsualizacion trae `fecha_no_gestionable` con la sugerida; tambien cuenta para los dias de atraso ajustados (RF-55)"
           },
           "mensaje": {
             "anyOf": [
@@ -9213,7 +9279,7 @@
           "definicion"
         ],
         "title": "CreacionCampanasWhatsmktEntrada",
-        "description": "La previsualizacion mas lo que se agrega para crear. `fecha_envio` llega SIN validar contra\nlos dias de envio (RF-70); la validacion llega con B4c."
+        "description": "La previsualizacion mas lo que se agrega para crear. Una `fecha_envio` que ya no es un dia\ngestionable (RF-70) responde 409 con `fecha_no_gestionable` y la nueva sugerida."
       },
       "CriterioCalculadoGuardadoRespuesta": {
         "properties": {
@@ -10251,6 +10317,38 @@
         ],
         "title": "ErrorCreacionWhatsmktRespuesta",
         "description": "422 al crear: `codigo` y sus parametros son los del PRIMER problema; `problemas` los trae\ntodos (la campana no se crea mientras haya alguno)."
+      },
+      "ErrorFechaNoGestionableWhatsmktRespuesta": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoWhatsmkt"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha",
+            "description": "La fecha de envio que se pidio"
+          },
+          "sugerida": {
+            "type": "string",
+            "format": "date",
+            "title": "Sugerida",
+            "description": "El siguiente dia gestionable, para usar en su lugar"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "codigo",
+          "fecha",
+          "sugerida"
+        ],
+        "title": "ErrorFechaNoGestionableWhatsmktRespuesta",
+        "description": "409 al crear: la fecha de envio dejo de ser un dia gestionable."
       },
       "ErrorGeneracionRespuesta": {
         "properties": {
@@ -13564,7 +13662,7 @@
               }
             ],
             "title": "Fecha Envio",
-            "description": "Fecha de envio, solo para los dias de atraso ajustados (RF-55); sin ella, hoy en America/Lima. Todavia SIN validar contra los dias de envio (RF-70): eso llega con el mensaje"
+            "description": "Fecha de envio: de lunes a sabado, sin feriados ni dias no laborables, y posterior a hoy en America/Lima (RF-70). Sin ella se usa la sugerida (el siguiente dia gestionable). Si no sirve, la previsualizacion trae `fecha_no_gestionable` con la sugerida; tambien cuenta para los dias de atraso ajustados (RF-55)"
           },
           "mensaje": {
             "anyOf": [
@@ -14066,6 +14164,35 @@
         ],
         "title": "Programacion",
         "description": "Modalidades de envio de RF-MM-07."
+      },
+      "ProgramacionWhatsmktRespuesta": {
+        "properties": {
+          "sugerida": {
+            "type": "string",
+            "format": "date",
+            "title": "Sugerida"
+          },
+          "minima": {
+            "type": "string",
+            "format": "date",
+            "title": "Minima"
+          },
+          "proximas": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Proximas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sugerida",
+          "minima",
+          "proximas"
+        ],
+        "title": "ProgramacionWhatsmktRespuesta"
       },
       "ProximosRespuesta": {
         "properties": {

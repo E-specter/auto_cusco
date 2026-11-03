@@ -16,7 +16,7 @@ segmento al que se refiere. Todavia no valida la fecha de envio ni guarda nada.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Any
 
@@ -46,6 +46,10 @@ from app.core.services.plataformas.whatsmkt.archivo_contactos import (
 )
 from app.core.services.plataformas.whatsmkt.contexto import CLAVE_CONTEXTO_MENSAJE
 from app.core.services.plataformas.whatsmkt.plataforma import CLAVE
+from app.core.services.plataformas.whatsmkt.programacion import (
+    FechaNoGestionable,
+    ProgramacionWhatsmktService,
+)
 
 
 @dataclass(frozen=True)
@@ -131,10 +135,22 @@ class PreviaCampanas:
     definicion_nombre: str = ""
     definicion_version: int = 0
     whatsapp_contacto: str | None = None
+    # La fecha de envio no es un dia gestionable (RF-70): tambien viaja en `problemas`, y la
+    # creacion la usa para responder 409 en vez de 422.
+    fecha_no_gestionable: FechaNoGestionable | None = None
 
     @property
     def total_exclusiones(self) -> int:
         return sum(len(c.exclusiones) for c in self.campanas) + len(self.exclusiones_sin_campana)
+
+
+def _problema_de_fecha(error: FechaNoGestionable) -> ProblemaCampana:
+    return ProblemaCampana(
+        CodigoWhatsmkt.FECHA_NO_GESTIONABLE,
+        str(error),
+        None,
+        {"fecha": error.fecha.isoformat(), "sugerida": error.sugerida.isoformat()},
+    )
 
 
 class PrevisualizacionWhatsmktService:
@@ -145,12 +161,14 @@ class PrevisualizacionWhatsmktService:
         definiciones: DefinicionesColumnasService,
         supervision: SupervisionService,
         textos: RepositorioTextosGuardadosPort,
+        programacion: ProgramacionWhatsmktService,
     ) -> None:
         self._archivos = archivos
         self._repositorio = repositorio
         self._definiciones = definiciones
         self._supervision = supervision
         self._textos = textos
+        self._programacion = programacion
 
     def previsualizar(self, peticion: PeticionPrevia) -> PreviaCampanas:
         """Lanza `DefinicionNoEncontrada` o `VersionNoEncontrada` si la definicion no existe, y
@@ -176,8 +194,12 @@ class PrevisualizacionWhatsmktService:
         supervision = self._supervision.obtener()
         segmentos = self._repositorio.listar_segmentos()
         por_segmento = peticion.modo is ModoCampana.POR_SEGMENTO
+        seleccion = peticion.seleccion
+        if seleccion.fecha_envio is None:
+            # Sin fecha se sugiere la siguiente gestionable: hoy nunca es un dia de envio.
+            seleccion = replace(seleccion, fecha_envio=self._programacion.sugerida())
         armado = self._archivos.armar(
-            peticion.seleccion,
+            seleccion,
             cargada.definicion,
             segmentos,
             supervision.supervisores,
@@ -221,11 +243,17 @@ class PrevisualizacionWhatsmktService:
                 )
             )
         con_campana = {a.segmento for a in armado.archivos}
+        fecha_no_gestionable = self._fecha_no_gestionable(armado.fecha_envio)
         return PreviaCampanas(
             campanas=tuple(campanas),
             exclusiones_sin_campana=tuple(e for e in exclusiones if e.segmento not in con_campana),
             problemas=(
                 *self._problemas(bool(supervision.supervisores), bool(campanas)),
+                *(
+                    ()
+                    if fecha_no_gestionable is None
+                    else (_problema_de_fecha(fecha_no_gestionable),)
+                ),
                 *problemas_del_mensaje,
             ),
             disponibles=armado.disponibles,
@@ -235,7 +263,17 @@ class PrevisualizacionWhatsmktService:
             definicion_nombre=cargada.nombre,
             definicion_version=cargada.numero,
             whatsapp_contacto=configuracion.whatsapp_contacto,
+            fecha_no_gestionable=fecha_no_gestionable,
         )
+
+    def _fecha_no_gestionable(self, fecha_envio: date | None) -> FechaNoGestionable | None:
+        if fecha_envio is None:
+            return None
+        try:
+            self._programacion.validar(fecha_envio)
+        except FechaNoGestionable as error:
+            return error
+        return None
 
     @staticmethod
     def _pedido(

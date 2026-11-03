@@ -39,6 +39,7 @@ from app.api.textos_guardados import router as textos_guardados_router
 from app.api.whatsmkt import router as whatsmkt_router
 from app.api.whatsmkt_adjuntos import router as whatsmkt_adjuntos_router
 from app.api.whatsmkt_campanas import router as whatsmkt_campanas_router
+from app.api.whatsmkt_programacion import router as whatsmkt_programacion_router
 from app.api.whatsmkt_seguimiento import router as whatsmkt_seguimiento_router
 from app.core.config import get_settings
 
@@ -127,3 +128,4 @@ app.include_router(whatsmkt_router)
 app.include_router(whatsmkt_adjuntos_router)
 app.include_router(whatsmkt_campanas_router)
 app.include_router(whatsmkt_seguimiento_router)
+app.include_router(whatsmkt_programacion_router)

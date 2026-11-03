@@ -1669,6 +1669,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/whatsmkt/programacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * La fecha de envio sugerida y los proximos dias gestionables
+         * @description Para elegir la fecha de envio (RF-WM-06). `sugerida` es el siguiente dia gestionable despues
+         *     de hoy en Lima; `minima` es la primera fecha que se admite (hoy nunca sirve) y hoy coincide con
+         *     la sugerida; `proximas` son los `n` siguientes, de lunes a sabado, sin feriados ni dias no
+         *     laborables registrados (RF-70 y RF-71).
+         */
+        get: operations["programacion_whatsmkt_programacion_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2868,8 +2891,8 @@ export interface components {
         };
         /**
          * CreacionCampanasWhatsmktEntrada
-         * @description La previsualizacion mas lo que se agrega para crear. `fecha_envio` llega SIN validar contra
-         *     los dias de envio (RF-70); la validacion llega con B4c.
+         * @description La previsualizacion mas lo que se agrega para crear. Una `fecha_envio` que ya no es un dia
+         *     gestionable (RF-70) responde 409 con `fecha_no_gestionable` y la nueva sugerida.
          */
         CreacionCampanasWhatsmktEntrada: {
             /**
@@ -2896,7 +2919,7 @@ export interface components {
             modo: components["schemas"]["ModoCampana"];
             /**
              * Fecha Envio
-             * @description Fecha de envio, solo para los dias de atraso ajustados (RF-55); sin ella, hoy en America/Lima. Todavia SIN validar contra los dias de envio (RF-70): eso llega con el mensaje
+             * @description Fecha de envio: de lunes a sabado, sin feriados ni dias no laborables, y posterior a hoy en America/Lima (RF-70). Sin ella se usa la sugerida (el siguiente dia gestionable). Si no sirve, la previsualizacion trae `fecha_no_gestionable` con la sugerida; tambien cuenta para los dias de atraso ajustados (RF-55)
              */
             fecha_envio?: string | null;
             /** @description El mensaje de la unica campana en modo `global`. Sin el, la campana va sin mensaje; en modo `por_segmento` no se usa */
@@ -3371,6 +3394,27 @@ export interface components {
             alto: number | null;
             /** Problemas */
             problemas: components["schemas"]["ProblemaWhatsmktRespuesta"][];
+        };
+        /**
+         * ErrorFechaNoGestionableWhatsmktRespuesta
+         * @description 409 al crear: la fecha de envio dejo de ser un dia gestionable.
+         */
+        ErrorFechaNoGestionableWhatsmktRespuesta: {
+            /** Detail */
+            detail: string;
+            codigo: components["schemas"]["CodigoWhatsmkt"];
+            /**
+             * Fecha
+             * Format: date
+             * @description La fecha de envio que se pidio
+             */
+            fecha: string;
+            /**
+             * Sugerida
+             * Format: date
+             * @description El siguiente dia gestionable, para usar en su lugar
+             */
+            sugerida: string;
         };
         /** ErrorGeneracionRespuesta */
         ErrorGeneracionRespuesta: {
@@ -4717,7 +4761,7 @@ export interface components {
             modo: components["schemas"]["ModoCampana"];
             /**
              * Fecha Envio
-             * @description Fecha de envio, solo para los dias de atraso ajustados (RF-55); sin ella, hoy en America/Lima. Todavia SIN validar contra los dias de envio (RF-70): eso llega con el mensaje
+             * @description Fecha de envio: de lunes a sabado, sin feriados ni dias no laborables, y posterior a hoy en America/Lima (RF-70). Sin ella se usa la sugerida (el siguiente dia gestionable). Si no sirve, la previsualizacion trae `fecha_no_gestionable` con la sugerida; tambien cuenta para los dias de atraso ajustados (RF-55)
              */
             fecha_envio?: string | null;
             /** @description El mensaje de la unica campana en modo `global`. Sin el, la campana va sin mensaje; en modo `por_segmento` no se usa */
@@ -4886,6 +4930,21 @@ export interface components {
          * @enum {string}
          */
         Programacion: "enviar_ahora" | "hora_determinada" | "diferentes_horas";
+        /** ProgramacionWhatsmktRespuesta */
+        ProgramacionWhatsmktRespuesta: {
+            /**
+             * Sugerida
+             * Format: date
+             */
+            sugerida: string;
+            /**
+             * Minima
+             * Format: date
+             */
+            minima: string;
+            /** Proximas */
+            proximas: string[];
+        };
         /** ProximosRespuesta */
         ProximosRespuesta: {
             /**
@@ -9701,6 +9760,15 @@ export interface operations {
                     "application/json": components["schemas"]["DetalleErrorConCodigo"];
                 };
             };
+            /** @description La fecha de envio ya no es un dia gestionable (`fecha_no_gestionable`): trae la nueva sugerida y no se crea nada */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorFechaNoGestionableWhatsmktRespuesta"];
+                };
+            };
             /** @description Algo impide crear (nada se guarda): `codigo` es el del primero y `problemas` los trae todos */
             422: {
                 headers: {
@@ -10015,6 +10083,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    programacion_whatsmkt_programacion_get: {
+        parameters: {
+            query?: {
+                /** @description Cuantos dias gestionables se piden (RF-71) */
+                n?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramacionWhatsmktRespuesta"];
+                };
+            };
+            /** @description `n` fuera de rango: el codigo es proximos_fuera_de_rango y trae `minimo` y `maximo` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorProximos"];
                 };
             };
             /** @description Validation Error */

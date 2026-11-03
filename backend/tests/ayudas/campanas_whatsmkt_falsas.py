@@ -32,7 +32,9 @@ from app.core.services.plataformas.whatsmkt.archivo_contactos import (
 from app.core.services.plataformas.whatsmkt.biblioteca import BibliotecaWhatsmktService
 from app.core.services.plataformas.whatsmkt.crear import CreacionCampanasWhatsmktService
 from app.core.services.plataformas.whatsmkt.previa import PrevisualizacionWhatsmktService
+from app.core.services.plataformas.whatsmkt.programacion import ProgramacionWhatsmktService
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
+from tests.ayudas.calendario_falso import calendario_de_prueba
 from tests.ayudas.previa_whatsmkt_falsos import (
     DefinicionesGuardadasFalsas,
     RepositorioWhatsmktFalso,
@@ -236,6 +238,7 @@ class Entorno:
         self.whatsmkt = RepositorioWhatsmktFalso()
         self.adjuntos = RepositorioAdjuntosFalso(self.whatsmkt.configuracion)
         self.campanas = RepositorioCampanasFalso()
+        self.calendario = calendario_de_prueba()  # se puede cambiar entre un pedido y otro
         self.productos = productos
         self.supervisores = supervisores
 
@@ -249,6 +252,7 @@ class Entorno:
             DefinicionesGuardadasFalsas(definicion(), "whatsmkt"),
             SupervisionFalsa(self.supervisores),
             self.textos,
+            ProgramacionWhatsmktService(self.calendario),
         )
         # La biblioteca lee las dos cosas del mismo repositorio de adjuntos en memoria.
         self.adjuntos.configuracion = self.whatsmkt.configuracion

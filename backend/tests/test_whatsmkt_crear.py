@@ -21,6 +21,7 @@ from app.core.entities.whatsmkt import (
 from app.core.services.plataformas.whatsmkt.archivo_contactos import SeleccionCampana
 from app.core.services.plataformas.whatsmkt.crear import CreacionInvalida, PeticionCreacion
 from app.core.services.plataformas.whatsmkt.previa import MensajePedido, PeticionPrevia
+from app.core.services.plataformas.whatsmkt.programacion import FechaNoGestionable
 from tests.ayudas import adjuntos_sinteticos as sint
 from tests.ayudas.campanas_whatsmkt_falsas import Entorno
 from tests.ayudas.previa_whatsmkt_falsos import DEFINICION_ID
@@ -401,14 +402,24 @@ def test_los_horarios_se_congelan_con_las_horas_de_la_configuracion_del_momento(
     assert e.campanas.campanas[c.id].horarios == c.horarios  # lo guardado no cambia
 
 
-def test_la_fecha_de_envio_se_acepta_tal_como_llega_aunque_sea_domingo() -> None:
-    # shortcut de B4b1: sin validar contra RF-70 (lunes a sabado); B4c la valida.
+def test_un_sabado_se_acepta_como_fecha_de_envio() -> None:
+    sabado = date(2026, 11, 7)
+
+    [c] = entorno().servicio().crear(pedido(fecha_envio=sabado)).campanas
+
+    assert c.fecha_envio == sabado
+
+
+def test_un_domingo_se_rechaza_con_la_nueva_sugerida_y_no_se_crea_nada() -> None:
     domingo = date(2026, 11, 8)
     assert domingo.weekday() == 6
+    e = entorno()
 
-    [c] = entorno().servicio().crear(pedido(fecha_envio=domingo)).campanas
+    with pytest.raises(FechaNoGestionable) as error:
+        e.servicio().crear(pedido(fecha_envio=domingo))
 
-    assert c.fecha_envio == domingo
+    assert (error.value.fecha, error.value.sugerida) == (domingo, date(2026, 11, 9))
+    assert e.campanas.lotes == []
 
 
 def _biblioteca(e: Entorno):

@@ -42,6 +42,7 @@ from app.api.fecha_envio import error_de_fecha_envio
 from app.api.respuestas import ModeloRespuesta
 from app.api.supervisores import obtener_servicio_supervision
 from app.api.whatsmkt import PARAMETROS, ErrorWhatsmktRespuesta
+from app.api.whatsmkt_programacion import obtener_servicio_programacion_whatsmkt
 from app.core.entities.cartera import ConsultaInvalida, SinVersionVigente
 from app.core.entities.definiciones_columnas import DefinicionNoEncontrada, VersionNoEncontrada
 from app.core.entities.exportacion import TIPOS_MIME, FormatoArchivo
@@ -92,6 +93,10 @@ from app.core.services.plataformas.whatsmkt.previa import (
     PreviaCampanas,
     PrevisualizacionWhatsmktService,
 )
+from app.core.services.plataformas.whatsmkt.programacion import (
+    FechaNoGestionable,
+    ProgramacionWhatsmktService,
+)
 from app.core.services.seleccion_cartera.campos import CatalogoCartera
 
 router = APIRouter(prefix="/whatsmkt/campanas", tags=["whatsmkt"])
@@ -104,6 +109,7 @@ def obtener_servicio_previa_whatsmkt(
     generacion: GeneracionCargasService = Depends(obtener_servicio_generacion),
     definiciones: DefinicionesColumnasService = Depends(obtener_servicio_definiciones),
     supervision: SupervisionService = Depends(obtener_servicio_supervision),
+    programacion: ProgramacionWhatsmktService = Depends(obtener_servicio_programacion_whatsmkt),
 ) -> PrevisualizacionWhatsmktService:
     """Dependencia de FastAPI; los tests la sustituyen por un doble de prueba."""
     return PrevisualizacionWhatsmktService(
@@ -112,6 +118,7 @@ def obtener_servicio_previa_whatsmkt(
         definiciones,
         supervision,
         RepositorioTextosGuardadosPostgres(get_engine()),
+        programacion,
     )
 
 
@@ -145,9 +152,10 @@ class PrevisualizacionCampanasWhatsmktEntrada(BaseModel):
     fecha_envio: date | None = Field(
         default=None,
         description=(
-            "Fecha de envio, solo para los dias de atraso ajustados (RF-55); sin ella, hoy en "
-            "America/Lima. Todavia SIN validar contra los dias de envio (RF-70): eso llega con "
-            "el mensaje"
+            "Fecha de envio: de lunes a sabado, sin feriados ni dias no laborables, y posterior "
+            "a hoy en America/Lima (RF-70). Sin ella se usa la sugerida (el siguiente dia "
+            "gestionable). Si no sirve, la previsualizacion trae `fecha_no_gestionable` "
+            "con la sugerida; tambien cuenta para los dias de atraso ajustados (RF-55)"
         ),
     )
 
@@ -187,7 +195,6 @@ class PrevisualizacionCampanasWhatsmktEntrada(BaseModel):
     def seleccion(self, catalogo: CatalogoCartera) -> SeleccionCampana:
         return SeleccionCampana(
             fecha_corte=self.fecha_corte,
-            # shortcut: fecha_envio llega sin validar; B4b la valida con RF-70 cuando entre T-HI-B5
             fecha_envio=self.fecha_envio,
             filtros=[parsear_filtro(crudo, catalogo) for crudo in self.filtros],
             orden=parsear_orden(self.orden),
@@ -401,8 +408,8 @@ def previsualizar_campanas(
 
 
 class CreacionCampanasWhatsmktEntrada(PrevisualizacionCampanasWhatsmktEntrada):
-    """La previsualizacion mas lo que se agrega para crear. `fecha_envio` llega SIN validar contra
-    los dias de envio (RF-70); la validacion llega con B4c."""
+    """La previsualizacion mas lo que se agrega para crear. Una `fecha_envio` que ya no es un dia
+    gestionable (RF-70) responde 409 con `fecha_no_gestionable` y la nueva sugerida."""
 
     horarios: list[Literal["horario_1", "horario_2"]] = Field(
         default=[],
@@ -511,6 +518,15 @@ class CampanaCreadaWhatsmktRespuesta(ModeloRespuesta):
     ficha: FichaWhatsmktRespuesta
 
 
+class ErrorFechaNoGestionableWhatsmktRespuesta(ModeloRespuesta):
+    """409 al crear: la fecha de envio dejo de ser un dia gestionable."""
+
+    detail: str
+    codigo: CodigoWhatsmkt
+    fecha: date = Field(description="La fecha de envio que se pidio")
+    sugerida: date = Field(description="El siguiente dia gestionable, para usar en su lugar")
+
+
 class ErrorCreacionWhatsmktRespuesta(ErrorWhatsmktRespuesta):
     """422 al crear: `codigo` y sus parametros son los del PRIMER problema; `problemas` los trae
     todos (la campana no se crea mientras haya alguno)."""
@@ -609,6 +625,13 @@ def obtener_repositorio_campanas_whatsmkt() -> RepositorioCampanasWhatsmktPostgr
     response_model=list[CampanaCreadaWhatsmktRespuesta],
     responses={
         **RESPUESTAS_ERROR,
+        409: {
+            "model": ErrorFechaNoGestionableWhatsmktRespuesta,
+            "description": (
+                "La fecha de envio ya no es un dia gestionable (`fecha_no_gestionable`): "
+                "trae la nueva sugerida y no se crea nada"
+            ),
+        },
         422: {
             "model": ErrorCreacionWhatsmktRespuesta,
             "description": (
@@ -635,6 +658,13 @@ def crear_campanas(
         lote = servicio.crear(entrada.a_peticion_de_creacion(catalogo))
     except CreacionInvalida as exc:
         raise _creacion_invalida(exc) from exc
+    except FechaNoGestionable as exc:
+        raise ErrorConCodigo(
+            409,
+            str(exc),
+            CodigoWhatsmkt.FECHA_NO_GESTIONABLE,
+            {"fecha": exc.fecha.isoformat(), "sugerida": exc.sugerida.isoformat()},
+        ) from exc
     except AdjuntoNoEncontrado as exc:
         raise ErrorConCodigo(404, str(exc), None) from exc
     except (

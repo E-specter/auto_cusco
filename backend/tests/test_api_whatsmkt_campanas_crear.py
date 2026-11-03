@@ -151,12 +151,11 @@ def test_solo_se_manda_lo_del_tipo_elegido(cliente) -> None:
     assert (ficha["adjunto_id"], ficha["etiqueta_vcard"]) == (None, None)
 
 
-def test_la_fecha_de_envio_se_acepta_tal_como_llega_aunque_sea_domingo(cliente) -> None:
-    # shortcut de B4b1: sin validar contra RF-70 (lunes a sabado); B4c la valida.
-    respuesta = crear(cliente, fecha_envio="2026-11-08")
+def test_un_sabado_se_acepta_como_fecha_de_envio(cliente) -> None:
+    respuesta = crear(cliente, fecha_envio="2026-11-07")
 
     assert respuesta.status_code == 201
-    assert respuesta.json()[0]["ficha"]["fecha_envio"] == "2026-11-08"
+    assert respuesta.json()[0]["ficha"]["fecha_envio"] == "2026-11-07"
 
 
 # --- 422 con todos los problemas --------------------------------------------------------------

@@ -23,9 +23,9 @@ GLOBAL, POR_SEGMENTO = ModoCampana.GLOBAL, ModoCampana.POR_SEGMENTO
 MENSAJE = MensajePedido(10)
 
 
-def previa(productos, modo=GLOBAL, *, fecha_envio=CORTE, version=None, **servicio):
+def previa(productos, modo=GLOBAL, *, fecha_envio=CORTE, version=None, corte=CORTE, **servicio):
     peticion = PeticionPrevia(
-        SeleccionCampana(fecha_corte=CORTE, fecha_envio=fecha_envio, cantidad=1000),
+        SeleccionCampana(fecha_corte=corte, fecha_envio=fecha_envio, cantidad=1000),
         DEFINICION_ID,
         version,
         modo,
@@ -243,12 +243,27 @@ def test_la_fecha_de_envio_cambia_el_segmento_en_los_bordes(dias, dias_extra, se
     assert [c.segmento.clave for c in resultado.campanas] == [segmento]
 
 
-def test_la_fecha_de_envio_se_usa_tal_como_llega_aunque_no_sea_dia_de_envio() -> None:
-    # shortcut de B4a: sin validar contra RF-70 (lunes a sabado). B4b la valida; hoy se usa asi.
+def test_un_sabado_es_dia_de_envio_y_los_dias_se_ajustan_a_el() -> None:
+    sabado = date(2026, 11, 7)
+    assert sabado.weekday() == 5
+
+    resultado = previa([producto(1, 4)], POR_SEGMENTO, fecha_envio=sabado)
+
+    assert resultado.fecha_no_gestionable is None
+    assert resultado.problemas == ()
+    assert [c.segmento.clave for c in resultado.campanas] == ["mayores_2"]  # 4 + 5 dias = 9
+
+
+def test_un_domingo_no_es_dia_de_envio_y_la_previa_lo_dice_con_la_sugerida() -> None:
     domingo = date(2026, 11, 8)
     assert domingo.weekday() == 6
 
     resultado = previa([producto(1, 3)], POR_SEGMENTO, fecha_envio=domingo)
 
+    [problema] = [p for p in resultado.problemas if p.codigo is CodigoWhatsmkt.FECHA_NO_GESTIONABLE]
+    assert problema.parametros == {"fecha": "2026-11-08", "sugerida": "2026-11-09"}
+    assert problema.segmento is None
+    assert resultado.fecha_no_gestionable.sugerida == date(2026, 11, 9)
+    # Lo demas se calcula igual: es un problema, no un error.
     assert resultado.fecha_envio == domingo
     assert [c.segmento.clave for c in resultado.campanas] == ["mayores_2"]  # 3 + 6 dias = 9

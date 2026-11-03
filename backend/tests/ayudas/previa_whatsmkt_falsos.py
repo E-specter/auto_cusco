@@ -16,7 +16,9 @@ from app.core.entities.whatsmkt import SEGMENTOS_POR_DEFECTO, ConfiguracionWhats
 from app.core.services.generacion_cargas.servicio import GeneracionCargasService
 from app.core.services.plataformas.whatsmkt.archivo_contactos import ArchivoContactosService
 from app.core.services.plataformas.whatsmkt.previa import PrevisualizacionWhatsmktService
+from app.core.services.plataformas.whatsmkt.programacion import ProgramacionWhatsmktService
 from app.core.services.seleccion_cartera.servicio import ConsultaCarteraService
+from tests.ayudas.calendario_falso import programacion_de_prueba
 from tests.test_whatsmkt_contactos import PROCEDENCIAS, SUPERVISORES, RepositorioCartera
 
 DEFINICION_ID = 5
@@ -119,6 +121,7 @@ def servicio_de_previa(
     supervisores: tuple[Supervisor, ...] = SUPERVISORES,
     textos: TextosFalsos | None = None,
     whatsmkt: RepositorioWhatsmktFalso | None = None,
+    programacion: ProgramacionWhatsmktService | None = None,
 ) -> PrevisualizacionWhatsmktService:
     generacion = GeneracionCargasService(ConsultaCarteraService(RepositorioCartera(productos)))
     return PrevisualizacionWhatsmktService(
@@ -127,4 +130,5 @@ def servicio_de_previa(
         DefinicionesGuardadasFalsas(definicion, plataforma),
         SupervisionFalsa(supervisores),
         textos or TextosFalsos(),
+        programacion or programacion_de_prueba(),
     )

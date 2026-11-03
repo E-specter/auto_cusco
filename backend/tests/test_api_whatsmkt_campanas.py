@@ -224,12 +224,17 @@ def test_la_fecha_de_envio_cambia_el_segmento_en_los_bordes(cliente, dias, envio
     assert [c["segmento"] for c in respuesta.json()["campanas"]] == [segmento]
 
 
-def test_la_fecha_de_envio_se_usa_tal_como_llega_aunque_sea_domingo(cliente) -> None:
-    # shortcut de B4a: sin validar contra RF-70; B4b la valida. Hoy un domingo no se rechaza.
+def test_un_domingo_no_se_rechaza_pero_la_previa_trae_el_problema_con_la_sugerida(
+    cliente,
+) -> None:
     respuesta = pedir(cliente, [producto(1, 3)], modo="por_segmento", fecha_envio="2026-11-08")
 
     assert respuesta.status_code == 200
-    assert [c["segmento"] for c in respuesta.json()["campanas"]] == ["mayores_2"]
+    cuerpo_ = respuesta.json()
+    [problema] = [p for p in cuerpo_["problemas"] if p["codigo"] == "fecha_no_gestionable"]
+    assert problema["parametros"] == {"fecha": "2026-11-08", "sugerida": "2026-11-09"}
+    assert problema["segmento"] is None
+    assert [c["segmento"] for c in cuerpo_["campanas"]] == ["mayores_2"]
 
 
 def test_una_fecha_de_envio_anterior_al_corte_responde_400_con_su_codigo(cliente) -> None:
