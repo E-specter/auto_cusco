@@ -5,6 +5,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { apiWhatsmkt, montarApiWhatsmkt } from './api-falsa-whatsmkt';
+import { mensajesFalsos, montarMensajesWhatsmkt } from './api-falsa-whatsmkt-mensajes';
 import { campanaFalsa, montarCampanaWhatsmkt } from './api-falsa-whatsmkt-campana';
 import { montarSeleccion } from './apoyo-seleccion';
 
@@ -13,6 +14,8 @@ const disparador = (page: Page) => page.getByRole('button', { name: 'WhatsMKT' }
 
 async function abrir(page: Page, ruta: string): Promise<void> {
   await montarApiWhatsmkt(page, apiWhatsmkt());
+  // The settings read the saved messages and the default definition; what a spec registers after this one answers first.
+  await montarMensajesWhatsmkt(page, mensajesFalsos());
   // The campaign screen also reads the selection, the saved texts and a definition: registered after, they fall back to the rest.
   await montarCampanaWhatsmkt(page, campanaFalsa());
   await montarSeleccion(page);

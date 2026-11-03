@@ -7,6 +7,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 import { apiWhatsmkt, montarApiWhatsmkt } from './api-falsa-whatsmkt';
+import { mensajesFalsos, montarMensajesWhatsmkt } from './api-falsa-whatsmkt-mensajes';
 import { campanaFalsa, montarCampanaWhatsmkt } from './api-falsa-whatsmkt-campana';
 import { montarSeleccion } from './apoyo-seleccion';
 
@@ -38,6 +39,8 @@ for (const tema of ['light', 'dark'] as const) {
           localStorage.setItem('app:appearance', JSON.stringify({ theme: elegido, language: 'es' }));
         }, tema);
         await montarApiWhatsmkt(page, apiWhatsmkt());
+        // The settings read the saved messages and the default definition; what a spec registers after this one answers first.
+        await montarMensajesWhatsmkt(page, mensajesFalsos());
       });
 
       test('campaña, sin selección elegida', async ({ page }) => {
@@ -123,6 +126,28 @@ for (const tema of ['light', 'dark'] as const) {
 
         await sinViolaciones(page);
       });
+
+      test('configuración, con los mensajes: el emoji, la macro que no existe, el tope pasado y la vista previa', async ({ page }) => {
+        const api = apiWhatsmkt();
+        api.configuracion.definicion_defecto_id = 11;
+        api.configuracion.tope_mensaje = 30;
+        api.configuracion.whatsapp_contacto = '900000123';
+        api.segmentos[0].texto_guardado_id = 101;
+        api.segmentos[1].texto_guardado_id = 102;
+        await montarApiWhatsmkt(page, api);
+        await montarMensajesWhatsmkt(page, mensajesFalsos());
+        await page.goto('/whatsmkt/configuracion');
+        await expect(page.locator('#wm-mensajes-segmento')).toHaveAttribute('data-montado', 'true');
+        await expect(page.getByRole('button', { name: 'MACRO1 · Nombres del titular' }).first()).toBeVisible();
+        await expect(page.locator('#wm-msg-segmento-texto')).toHaveValue(/tu cuota vence el/);
+        await page.locator('#wm-msg-segmento-texto').fill('Hola 😀 INFO por [whatsapp] y [$MACRO4$]');
+        // Leaving the field says the error, and the counter is over the limit.
+        await page.locator('#wm-whatsapp').focus();
+        await expect(page.locator('#wm-msg-segmento-error')).not.toBeEmpty();
+        await expect(page.locator('#wm-msg-segmento-contador')).toHaveAttribute('data-excede', 'true');
+        await expect(page.locator('#wm-mensajes-segmento .wm-vista__texto')).toContainText('https://wa.me/+51900000123');
+        await sinViolaciones(page);
+      });
     });
   }
 
@@ -131,6 +156,8 @@ for (const tema of ['light', 'dark'] as const) {
       localStorage.setItem('app:appearance', JSON.stringify({ theme: elegido, language: 'es' }));
     }, tema);
     await montarApiWhatsmkt(page, apiWhatsmkt());
+    // The settings read the saved messages and the default definition; what a spec registers after this one answers first.
+    await montarMensajesWhatsmkt(page, mensajesFalsos());
     // The campaign screen reads the selection, the saved texts and a definition: without them it opens its error dialog.
     await montarCampanaWhatsmkt(page, campanaFalsa());
     await montarSeleccion(page);

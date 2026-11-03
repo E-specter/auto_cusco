@@ -158,7 +158,7 @@ export function siguienteDiaGestionable(fecha: string): string {
 }
 
 /** The columns of a definition: the number, then the macros (the first with a label, the second without). */
-function definicionConColumnas(id: number) {
+export function definicionConColumnas(id: number) {
   const variable = (nombre: string) => ({ nodos: [{ tipo: 'variable' as const, nombre, funciones: [], obligatoria: false }] });
   const columna = (orden: number, nombre: string, etiqueta: string | null, expresion: { nodos: unknown[] }) => ({
     nombre,

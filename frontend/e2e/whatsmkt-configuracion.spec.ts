@@ -9,6 +9,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { apiWhatsmkt, errorWhatsmkt, montarApiWhatsmkt, type ApiFalsaWhatsmkt } from './api-falsa-whatsmkt';
+import { mensajesFalsos, montarMensajesWhatsmkt } from './api-falsa-whatsmkt-mensajes';
 
 const RUTA = '/whatsmkt/configuracion';
 
@@ -18,6 +19,8 @@ const pedidosA = (api: ApiFalsaWhatsmkt, metodo: string, ruta: string) =>
 
 async function abrir(page: Page, api: ApiFalsaWhatsmkt): Promise<void> {
   await montarApiWhatsmkt(page, api);
+  // The settings read the saved messages and the default definition; what a spec registers after this one answers first.
+  await montarMensajesWhatsmkt(page, mensajesFalsos());
   await page.goto(RUTA);
   await expect(page.getByRole('heading', { name: 'Configuración de WhatsMKT', level: 1 })).toBeVisible();
   await expect(page.getByLabel('Nombre del segmento Preventivo')).toBeVisible();
@@ -31,7 +34,7 @@ const plantilla = (page: Page) => page.locator('#wm-plantilla');
 const guardar = (page: Page, nombre: string) => page.getByRole('button', { name: nombre });
 
 test.describe('carga inicial', () => {
-  test('muestra lo guardado en cada panel y los marcadores de lo que viene después', async ({ page }) => {
+  test('muestra lo guardado en cada panel, con los mensajes en los dos primeros', async ({ page }) => {
     await abrir(page, apiWhatsmkt());
 
     await expect(horaDe(page, 1, 'inicio')).toHaveValue('08:00');
@@ -43,9 +46,11 @@ test.describe('carga inicial', () => {
     await expect(topeDe(page, 'mensaje')).toHaveValue('4096');
     for (const campo of ['video', 'audio', 'pdf'] as const) await expect(topeDe(page, campo)).toHaveValue('16');
 
-    // The eight panels, in the order of the interface rules (§5). Only the two of saved messages still wait (T-HI-F2b).
+    // The eight panels, in the order of the interface rules (§5). The messages of the segments are the component's own panel inside the
+    // first one (its heading is hidden: the block carries its own), and the global ones are the second.
     await expect(page.locator('h2.panel__title')).toHaveText([
       'Segmentos y mensajes',
+      'Mensajes por segmento',
       'Mensajes globales',
       'WhatsApp de contacto',
       'Horarios de envío',
@@ -54,10 +59,9 @@ test.describe('carga inicial', () => {
       'Topes',
       'Biblioteca de adjuntos',
     ]);
-    await expect(page.getByRole('region', { name: 'Mensajes globales' })).toContainText('Disponible pronto.');
+    await expect(page.getByRole('region', { name: 'Mensajes globales' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Segmentos y mensajes' })).toContainText('Mensaje de cada segmento');
-    await expect(page.getByRole('region', { name: 'Segmentos y mensajes' })).toContainText('Disponible pronto.');
-    for (const titulo of ['WhatsApp de contacto', 'Definición por defecto', 'Biblioteca de adjuntos']) {
+    for (const titulo of ['Segmentos y mensajes', 'Mensajes globales', 'WhatsApp de contacto', 'Definición por defecto', 'Biblioteca de adjuntos']) {
       await expect(page.getByRole('region', { name: titulo })).not.toContainText('Disponible pronto.');
     }
   });
@@ -79,6 +83,8 @@ test.describe('carga inicial', () => {
     const api = apiWhatsmkt();
     api.sinRed = true;
     await montarApiWhatsmkt(page, api);
+    // The settings read the saved messages and the default definition; what a spec registers after this one answers first.
+    await montarMensajesWhatsmkt(page, mensajesFalsos());
     await page.goto(RUTA);
 
     await expect(page.getByRole('heading', { name: 'Sin conexión con la API' })).toBeVisible();
@@ -215,6 +221,8 @@ test.describe('segmentos', () => {
       localStorage.setItem('app:appearance', JSON.stringify({ language: 'en' }));
     });
     await montarApiWhatsmkt(page, apiWhatsmkt());
+    // The settings read the saved messages and the default definition; what a spec registers after this one answers first.
+    await montarMensajesWhatsmkt(page, mensajesFalsos());
     await page.goto(RUTA);
     await expect(page.getByRole('heading', { name: 'WhatsMKT settings', level: 1 })).toBeVisible();
 

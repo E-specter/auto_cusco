@@ -6,6 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { json } from './apoyo';
 import { apiWhatsmkt, definicionSintetica, errorWhatsmkt, montarApiWhatsmkt, type ApiFalsaWhatsmkt } from './api-falsa-whatsmkt';
+import { mensajesFalsos, montarMensajesWhatsmkt } from './api-falsa-whatsmkt-mensajes';
 
 const RUTA = '/whatsmkt/configuracion';
 
@@ -14,6 +15,8 @@ const pedidosA = (api: ApiFalsaWhatsmkt, metodo: string, ruta: string) =>
 
 async function abrir(page: Page, api: ApiFalsaWhatsmkt): Promise<void> {
   await montarApiWhatsmkt(page, api);
+  // The settings read the saved messages and the default definition; what a spec registers after this one answers first.
+  await montarMensajesWhatsmkt(page, mensajesFalsos());
   await page.goto(RUTA);
   await expect(page.getByRole('heading', { name: 'Configuración de WhatsMKT', level: 1 })).toBeVisible();
   await expect(page.getByLabel('Nombre del segmento Preventivo')).toBeVisible();
@@ -229,6 +232,8 @@ test.describe('definición por defecto', () => {
   test('si la lista de definiciones no se puede leer, lo dice en el panel y el resto de la pantalla funciona', async ({ page }) => {
     const api = apiWhatsmkt();
     await montarApiWhatsmkt(page, api);
+    // The settings read the saved messages and the default definition; what a spec registers after this one answers first.
+    await montarMensajesWhatsmkt(page, mensajesFalsos());
     // Registered last, it answers first: only this call fails.
     await page.route('**/api/definiciones-columnas', (ruta) => json(ruta, 500, { detail: 'La lista no respondió' }));
     await page.goto(RUTA);

@@ -2,7 +2,7 @@
 /**
  * WhatsMKT configuration (T-WM-F1a, T-WM-F1b1): what every campaign starts from. The segment table, the
  * contact WhatsApp, the send time slots, the campaign-name template, the default definition, the limits and the
- * attachment library. The messages (the two panels of saved texts) wait for T-HI-F2b and say so.
+ * attachment library, and the messages (the two panels of saved texts, T-WM-F1b2).
  *
  * Every panel saves on its own: they are independent settings, and a failed save in one must not throw
  * away edits in another. The supervisors, the working-day calendar and the load columns are shared by every
@@ -10,6 +10,7 @@
  */
 import Shell from '../../layouts/Shell.astro';
 import Icon from '../../components/Icon.astro';
+import TextosGuardados from '../../components/TextosGuardados.astro';
 import '../../styles/whatsmkt.css';
 ---
 
@@ -46,7 +47,7 @@ import '../../styles/whatsmkt.css';
         </span>
       </p>
 
-      <!-- ---- 1. Segments (the messages of each segment wait for T-WM-F1b) ----------- -->
+      <!-- ---- 1. Segments, and the message of each one ------------------------------------ -->
       <section class="panel" aria-labelledby="wm-segmentos-title">
         <div class="panel__head">
           <h2 class="panel__title" id="wm-segmentos-title" data-i18n="whatsmkt.configuracion.segmentos">Segmentos y mensajes</h2>
@@ -65,25 +66,29 @@ import '../../styles/whatsmkt.css';
             <p class="mono muted" data-segmentos-estado role="status"></p>
           </div>
 
-          <div class="wm-pronto">
-            <h3 class="wm-pronto__titulo" data-i18n="whatsmkt.configuracion.mensajesSegmento">Mensaje de cada segmento</h3>
-            <p class="field__hint" data-i18n="whatsmkt.configuracion.pronto">Disponible pronto.</p>
-          </div>
         </form>
+
+        <!-- Outside the form: the saved-texts component carries its own dialogs, which are forms. -->
+        <div class="panel__body wm-mensajes-segmento" data-mensajes-segmento>
+          <h3 class="wm-subtitulo" data-i18n="whatsmkt.configuracion.mensajesSegmento">Mensaje de cada segmento</h3>
+          <div
+            class="segmented"
+            role="group"
+            data-segmentos-mensaje
+            data-i18n-attr="aria-label:whatsmkt.configuracion.segmentoDelMensaje"
+            aria-label="Segmento del mensaje"
+          >
+          </div>
+          <div class="wm-vinculo">
+            <p class="field__hint" data-vinculo-texto role="status"></p>
+            <button type="button" class="btn btn--sm" data-vinculo-usar hidden></button>
+          </div>
+          <TextosGuardados id="wm-mensajes-segmento" />
+        </div>
       </section>
 
-      <!-- ---- 2. Global messages: waits for the saved texts (T-WM-F1b) ----------------- -->
-      <section class="panel" aria-labelledby="wm-globales-title">
-        <div class="panel__head">
-          <h2 class="panel__title" id="wm-globales-title" data-i18n="whatsmkt.mensaje.globales">Mensajes globales</h2>
-        </div>
-        <div class="panel__body wm-pronto">
-          <p class="field__hint" data-i18n="whatsmkt.configuracion.globalesHint">
-            Para las campañas especiales, con un solo mensaje para toda la selección.
-          </p>
-          <p class="field__hint" data-i18n="whatsmkt.configuracion.pronto">Disponible pronto.</p>
-        </div>
-      </section>
+      <!-- ---- 2. Global messages: the saved texts no segment owns (the title and the hint are put by `montarMensajes`) ------ -->
+      <TextosGuardados id="wm-globales" />
 
       <!-- ---- 3. Contact WhatsApp: what `[whatsapp]` in a message is replaced with (DU-WM-11) ---------- -->
       <section class="panel" aria-labelledby="wm-whatsapp-title">
@@ -456,6 +461,7 @@ import '../../styles/whatsmkt.css';
   import { NetworkError, mensajeDeError } from '../../lib/api';
   import { listarDefiniciones, type ResumenDefinicion } from '../../lib/api-definiciones';
   import { montarBiblioteca } from '../../scripts/whatsmkt-biblioteca';
+  import { montarMensajes, type ControladorMensajes } from '../../scripts/whatsmkt-mensajes';
   import { $, ocupado } from '../../lib/dom';
   import {
     guardarConfiguracion,
@@ -495,6 +501,9 @@ import '../../styles/whatsmkt.css';
     type Franja,
   } from '../../lib/whatsmkt';
 
+  /** The messages of panels 1 and 2: they read the limit, the contact WhatsApp and the default definition of what is saved here. */
+  let mensajes: ControladorMensajes | null = null;
+
   const estado = {
     configuracion: null as ConfiguracionWhatsmkt | null,
     segmentos: [] as SegmentoWhatsmkt[],
@@ -508,6 +517,13 @@ import '../../styles/whatsmkt.css';
   });
 
   // ---- Shared helpers -------------------------------------------------------------
+
+  /** Saves a part of the configuration and tells the message editors, which count against the limit and replace `[whatsapp]` with what is saved. */
+  async function guardarConfig(entrada: ConfiguracionWhatsmktEntrada): Promise<ConfiguracionWhatsmkt> {
+    const guardada = await guardarConfiguracion(entrada);
+    mensajes?.configuracionCambio(guardada);
+    return guardada;
+  }
 
   function mostrarError(error: unknown): void {
     $<HTMLElement>('[data-error-body]').textContent = mensajeDeError(error);
@@ -710,6 +726,7 @@ import '../../styles/whatsmkt.css';
       $<HTMLButtonElement>('[data-segmentos-guardar]'),
       async () => {
         estado.segmentos = await guardarSegmentos(entrada);
+        mensajes?.segmentosCambiaron(estado.segmentos);
         pintarSegmentos();
         avisarGuardado($<HTMLElement>('[data-segmentos-estado]'));
         // The name examples carry the labels.
@@ -805,7 +822,7 @@ import '../../styles/whatsmkt.css';
     await guardar(
       $<HTMLButtonElement>('[data-horarios-guardar]'),
       async () => {
-        estado.configuracion = await guardarConfiguracion({
+        estado.configuracion = await guardarConfig({
           horario_1: { inicio: horaDe('horario_1', 'inicio').value, fin: horaDe('horario_1', 'fin').value },
           horario_2: { inicio: horaDe('horario_2', 'inicio').value, fin: horaDe('horario_2', 'fin').value },
         });
@@ -910,7 +927,7 @@ import '../../styles/whatsmkt.css';
     await guardar(
       $<HTMLButtonElement>('[data-nombre-guardar]'),
       async () => {
-        estado.configuracion = await guardarConfiguracion({ plantilla_nombre: inputPlantilla.value });
+        estado.configuracion = await guardarConfig({ plantilla_nombre: inputPlantilla.value });
         pintarNombre();
         avisarGuardado($<HTMLElement>('[data-nombre-estado]'));
       },
@@ -985,7 +1002,7 @@ import '../../styles/whatsmkt.css';
       $<HTMLButtonElement>('[data-topes-guardar]'),
       async () => {
         // The attachments travel in bytes: the field holds megabytes (1 MB = 1 000 000 bytes).
-        estado.configuracion = await guardarConfiguracion(entrada);
+        estado.configuracion = await guardarConfig(entrada);
         pintarTopes();
         avisarGuardado($<HTMLElement>('[data-topes-estado]'));
       },
@@ -1041,7 +1058,7 @@ import '../../styles/whatsmkt.css';
       botonWhatsapp,
       async () => {
         // An empty field clears the number (`null`); a field left out would keep it.
-        estado.configuracion = await guardarConfiguracion({ whatsapp_contacto: whatsappAEnviar(inputWhatsapp.value) });
+        estado.configuracion = await guardarConfig({ whatsapp_contacto: whatsappAEnviar(inputWhatsapp.value) });
         pintarWhatsapp();
         avisarGuardado($<HTMLElement>('[data-whatsapp-estado]'));
       },
@@ -1118,7 +1135,7 @@ import '../../styles/whatsmkt.css';
       botonDefinicion,
       async () => {
         const elegida = selectDefinicion.value;
-        estado.configuracion = await guardarConfiguracion({ definicion_defecto_id: elegida === '' ? null : Number(elegida) });
+        estado.configuracion = await guardarConfig({ definicion_defecto_id: elegida === '' ? null : Number(elegida) });
         pintarDefinicion();
         avisarGuardado($<HTMLElement>('[data-definicion-estado]'));
       },
@@ -1146,6 +1163,26 @@ import '../../styles/whatsmkt.css';
     document.dispatchEvent(new CustomEvent('healthchanged'));
   }
 
+  /** The two message panels: a failure of theirs says itself in their panel and never takes the rest of the screen down. */
+  async function montarLosMensajes(configuracion: ConfiguracionWhatsmkt, segmentos: SegmentoWhatsmkt[]): Promise<void> {
+    mensajes?.destruir();
+    mensajes = null;
+    try {
+      mensajes = await montarMensajes({
+        configuracion,
+        segmentos,
+        raizSegmentos: $<HTMLElement>('#wm-mensajes-segmento'),
+        raizGlobales: $<HTMLElement>('#wm-globales'),
+        bloqueSegmentos: $<HTMLElement>('[data-mensajes-segmento]'),
+        alVincular: (nuevos) => {
+          estado.segmentos = nuevos;
+        },
+      });
+    } catch (caido) {
+      mostrarError(caido);
+    }
+  }
+
   async function arrancar(): Promise<void> {
     try {
       const [configuracion, segmentos] = await Promise.all([obtenerConfiguracion(), listarSegmentos()]);
@@ -1158,6 +1195,8 @@ import '../../styles/whatsmkt.css';
       pintarNombre();
       pintarTopes();
       pintarWhatsapp();
+      // Not waited for: the messages read their own lists, and the definitions and the library below must not queue behind them.
+      void montarLosMensajes(configuracion, segmentos);
 
       // Neither list may take the rest of the screen down: each says its own failure in its panel.
       try {

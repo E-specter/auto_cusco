@@ -252,16 +252,107 @@
 
 /* ---- Panels that wait for another cut ------------------------------------------- */
 
-.wm-pronto {
+/* Panel 1 holds the saved-texts component of the segments below its own table: the component's panel is the block, not a box in a box. */
+.wm-mensajes-segmento {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  margin-block-start: var(--space-2);
+  gap: var(--space-3);
+  border-block-start: 1px solid var(--color-border);
 }
 
-.wm-pronto__titulo {
+.wm-mensajes-segmento .textos > .panel {
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.wm-mensajes-segmento .textos > .panel > .panel__head {
+  display: none;
+}
+
+.wm-mensajes-segmento .textos > .panel > .panel__body {
+  padding-inline: 0;
+}
+
+/* The segment buttons are as wide as their names, never past the screen; on a phone the box scrolls sideways and a name is never split. */
+.wm-mensajes-segmento .segmented {
+  position: relative;
+  align-self: flex-start;
+  max-inline-size: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.wm-mensajes-segmento .segmented__item {
+  flex: none;
+  white-space: nowrap;
+}
+
+.wm-vinculo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.wm-vinculo .field__hint {
+  margin: 0;
+}
+
+/* The editor of a message (§5.1): the macros over the field, the counter and the errors under it, and the preview. */
+.wm-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+.wm-editor__barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.wm-editor__separador {
+  color: var(--color-text-muted);
+}
+
+.wm-editor__aviso {
+  margin: 0;
+}
+
+.wm-editor__errores:empty {
+  display: none;
+}
+
+.wm-editor__campo {
+  resize: vertical;
+  min-block-size: 6rem;
+  /* It grows with the text up to about 12 lines, then scrolls. */
+  max-block-size: calc(12 * 1.5em + var(--space-4));
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+.wm-vista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wm-vista__fila {
+  max-inline-size: 12rem;
+}
+
+/* The message as WhatsMKT will send it, kept as written (line breaks and double spaces). */
+.wm-vista__texto {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
   font-size: var(--text-sm);
-  font-weight: 600;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* ---- Campaign screen (T-WM-F2a1, docs/whatsmkt-interfaz.md §3) --------------------------------------------------

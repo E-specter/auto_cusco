@@ -10,6 +10,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { apiSupervisionCalendario, apiVacia, montarApi, montarApiSupervisionCalendario } from './api-falsa';
 import { apiMowaMes, montarApiMowaMes } from './api-falsa-mowa-mes';
 import { apiWhatsmkt, montarApiWhatsmkt } from './api-falsa-whatsmkt';
+import { mensajesFalsos, montarMensajesWhatsmkt } from './api-falsa-whatsmkt-mensajes';
 import { campanaFalsa, montarCampanaWhatsmkt } from './api-falsa-whatsmkt-campana';
 import { montarSeleccion } from './apoyo-seleccion';
 import { montarConfiguracion } from './api-falsa-speech-v2';
@@ -30,6 +31,8 @@ const conConfiguracionMowaMes = async (page: Page) => void (await montarConfigur
 const conSupervision = (page: Page) => montarApiSupervisionCalendario(page, apiSupervisionCalendario());
 const conWhatsmkt = async (page: Page) => {
   await montarApiWhatsmkt(page, apiWhatsmkt());
+  // The settings read the saved messages and the default definition; what a spec registers after this one answers first.
+  await montarMensajesWhatsmkt(page, mensajesFalsos());
   // The campaign screen also reads the selection, the saved texts and a definition; the rest falls back to the fake above.
   await montarCampanaWhatsmkt(page, campanaFalsa());
   await montarSeleccion(page);
