@@ -21,7 +21,9 @@ export type CampoDeColumna =
   | 'formato_financiero'
   | 'valor_por_defecto'
   | 'variantes'
-  | 'expresion';
+  | 'expresion'
+  | 'etiqueta'
+  | 'plataforma';
 
 export type Destino =
   | { tipo: 'definicion'; campo: string | null }

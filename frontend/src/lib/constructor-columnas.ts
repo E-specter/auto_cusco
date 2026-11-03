@@ -26,6 +26,7 @@
 
 import type { components } from './contrato-api';
 import type { Expresion } from './expresion';
+import { cantidadDeFijas, encabezadoPorPosicion, expresionDeTexto, type ReglasPlataforma } from './plataformas';
 
 export type { Expresion } from './expresion';
 
@@ -61,6 +62,10 @@ export type ColumnaGuardada = {
   expresion: Expresion;
   valor_por_defecto: string | null;
   variantes: VarianteColumna[];
+  /** RF-73: in an XLSX the column is written as Excel text. The platform's fixed columns set it; carried, never edited. */
+  celda_texto?: boolean;
+  /** RF-49: a name to recognise the column on screen. It never reaches the file: the header is `nombre`. */
+  etiqueta?: string | null;
 }
 
 /** The row of a segment table, as the catalogue and the saved definitions give it. */
@@ -79,6 +84,8 @@ export type Segmentacion = {
 
 export type DefinicionGuardada = {
   nombre: string;
+  /** RF-72: set when the definition is created and never changed after. `null` is a free file. */
+  plataforma?: string | null;
   columnas: ColumnaGuardada[];
   segmentacion: Segmentacion | null;
   proteger_formulas: boolean;
@@ -93,6 +100,7 @@ export type Columna = Omit<ColumnaGuardada, 'orden'> & {
 
 export type Borrador = {
   nombre: string;
+  plataforma: string | null;
   columnas: Columna[];
   segmentacion: Segmentacion | null;
   proteger_formulas: boolean;
@@ -122,9 +130,40 @@ function columnaVacia(nombre = ''): Columna {
   };
 }
 
-/** A new definition: one empty column and the formula protection on (RF-53). */
-export function definicionNueva(): Borrador {
-  return { nombre: '', columnas: [columnaVacia()], segmentacion: null, proteger_formulas: true };
+/** A column that follows the rule of the platform for the rest: its header by position and its type. */
+function columnaDePlataforma(reglas: ReglasPlataforma, indice: number): Columna {
+  return { ...columnaVacia(encabezadoPorPosicion(reglas, indice) ?? ''), tipo: reglas.tipo_resto ?? 'texto' };
+}
+
+/** What a platform starts a definition with: its fixed columns, or one column by position when it has none. */
+function columnasDeInicio(reglas: ReglasPlataforma): Columna[] {
+  if (reglas.columnas_fijas.length === 0) return [columnaDePlataforma(reglas, 0)];
+  return reglas.columnas_fijas.map((fija) => ({
+    ...columnaVacia(fija.nombre),
+    tipo: fija.tipo,
+    expresion: expresionDeTexto(fija.contenido_por_defecto ?? ''),
+    ...(fija.celda_texto ? { celda_texto: true } : {}),
+  }));
+}
+
+/**
+ * A new definition: one empty column and the formula protection on (RF-53); with a platform, the
+ * columns it fixes instead (RF-72).
+ */
+export function definicionNueva(reglas: ReglasPlataforma | null = null): Borrador {
+  return {
+    nombre: '',
+    plataforma: reglas?.clave ?? null,
+    columnas: reglas ? columnasDeInicio(reglas) : [columnaVacia()],
+    segmentacion: null,
+    proteger_formulas: true,
+  };
+}
+
+/** The platform of a definition that has not been saved: it starts again from what the platform fixes. The name stays. */
+export function fijarPlataforma(borrador: Borrador, reglas: ReglasPlataforma | null): Borrador {
+  const inicio = definicionNueva(reglas);
+  return { ...borrador, plataforma: inicio.plataforma, columnas: inicio.columnas };
 }
 
 /** Saved definition → draft. The result shares nothing with its input. */
@@ -132,6 +171,7 @@ export function desdeDefinicion(definicion: DefinicionGuardada): Borrador {
   const ordenadas = [...definicion.columnas].sort((a, b) => a.orden - b.orden);
   return {
     nombre: definicion.nombre,
+    plataforma: definicion.plataforma ?? null,
     segmentacion: copia(definicion.segmentacion),
     proteger_formulas: definicion.proteger_formulas,
     columnas: ordenadas.map(({ orden: _orden, ...resto }) => ({ id: nuevoId(), ...copia(resto) })),
@@ -142,6 +182,8 @@ export function desdeDefinicion(definicion: DefinicionGuardada): Borrador {
 export function aDefinicion(borrador: Borrador): DefinicionGuardada {
   return {
     nombre: borrador.nombre,
+    // Only a platform travels: a free file's request stays as it always was.
+    ...(borrador.plataforma === null ? {} : { plataforma: borrador.plataforma }),
     segmentacion: copia(borrador.segmentacion),
     proteger_formulas: borrador.proteger_formulas,
     columnas: borrador.columnas.map(({ id: _id, ...resto }, orden) => ({ orden, ...copia(resto) })),
@@ -192,36 +234,86 @@ function insertarDespues(
   borrador: Borrador,
   despuesDe: string | null,
   columna: Columna,
+  /** Nothing goes above this position: the platform's fixed columns hold the top. */
+  minimo = 0,
 ): Borrador {
   const indice = despuesDe === null ? -1 : indiceDe(borrador, despuesDe);
-  const posicion = indice < 0 ? borrador.columnas.length : indice + 1;
+  const posicion = Math.max(minimo, indice < 0 ? borrador.columnas.length : indice + 1);
   const columnas = [...borrador.columnas.slice(0, posicion), columna, ...borrador.columnas.slice(posicion)];
   return { ...borrador, columnas };
 }
 
-/** An empty column after `despuesDe`, or at the end. Returns its id so the screen opens it. */
-export function agregarColumna(borrador: Borrador, despuesDe: string | null = null): { borrador: Borrador; id: string } {
-  const columna = columnaVacia();
-  return { borrador: insertarDespues(borrador, despuesDe, columna), id: columna.id };
+/**
+ * With a platform that gives headers by position, the columns still carrying the header of the
+ * position they had are renamed for the one they have now; one the analyst renamed keeps its name.
+ * `antes` is the draft before the change, `despues` the one after it.
+ */
+function renumerar(antes: Borrador, despues: Borrador, reglas: ReglasPlataforma | null): Borrador {
+  if (reglas === null || reglas.encabezado_por_posicion === null) return despues;
+  return {
+    ...despues,
+    columnas: despues.columnas.map((columna, indice) => {
+      const previo = antes.columnas.findIndex((c) => c.id === columna.id);
+      const nuevo = encabezadoPorPosicion(reglas, indice);
+      const eraPorDefecto = previo >= 0 && columna.nombre === encabezadoPorPosicion(reglas, previo);
+      return eraPorDefecto && nuevo !== null ? { ...columna, nombre: nuevo } : columna;
+    }),
+  };
 }
 
-/** Removes a column. `foco` is where focus belongs afterwards: the next one, else the previous. */
-export function quitarColumna(borrador: Borrador, id: string): { borrador: Borrador; foco: string | null } {
+/**
+ * An empty column after `despuesDe`, or at the end. Returns its id so the screen opens it. With a
+ * platform it is born with the header and the type of its position, and never above a fixed column.
+ */
+export function agregarColumna(
+  borrador: Borrador,
+  despuesDe: string | null = null,
+  reglas: ReglasPlataforma | null = null,
+): { borrador: Borrador; id: string } {
+  if (reglas === null) {
+    const columna = columnaVacia();
+    return { borrador: insertarDespues(borrador, despuesDe, columna), id: columna.id };
+  }
+  const columna = columnaDePlataforma(reglas, 0);
+  const insertado = insertarDespues(borrador, despuesDe, columna, cantidadDeFijas(borrador.columnas, reglas));
+  const nombre = encabezadoPorPosicion(reglas, insertado.columnas.findIndex((c) => c.id === columna.id)) ?? '';
+  return { borrador: renumerar(borrador, conColumna(insertado, columna.id, (c) => ({ ...c, nombre })), reglas), id: columna.id };
+}
+
+/**
+ * Removes a column. `foco` is where focus belongs afterwards: the next one, else the previous. A
+ * column the platform fixes is not removed.
+ */
+export function quitarColumna(
+  borrador: Borrador,
+  id: string,
+  reglas: ReglasPlataforma | null = null,
+): { borrador: Borrador; foco: string | null } {
   const indice = indiceDe(borrador, id);
-  if (indice < 0) return { borrador, foco: null };
+  if (indice < 0 || indice < cantidadDeFijas(borrador.columnas, reglas)) return { borrador, foco: null };
   const columnas = borrador.columnas.filter((_, i) => i !== indice);
   const foco = columnas[indice]?.id ?? columnas[indice - 1]?.id ?? null;
-  return { borrador: { ...borrador, columnas }, foco };
+  return { borrador: renumerar(borrador, { ...borrador, columnas }, reglas), foco };
 }
 
-/** One step up (-1) or down (+1); at an end, or for an unknown id, the same draft. */
-export function moverColumna(borrador: Borrador, id: string, paso: -1 | 1): Borrador {
+/**
+ * One step up (-1) or down (+1); at an end, or for an unknown id, the same draft. A fixed column
+ * does not move, and nothing goes above one.
+ */
+export function moverColumna(
+  borrador: Borrador,
+  id: string,
+  paso: -1 | 1,
+  reglas: ReglasPlataforma | null = null,
+): Borrador {
   const indice = indiceDe(borrador, id);
   const destino = indice + paso;
   if (indice < 0 || destino < 0 || destino >= borrador.columnas.length) return borrador;
+  const fijas = cantidadDeFijas(borrador.columnas, reglas);
+  if (indice < fijas || destino < fijas) return borrador;
   const columnas = [...borrador.columnas];
   [columnas[indice], columnas[destino]] = [columnas[destino], columnas[indice]];
-  return { ...borrador, columnas };
+  return renumerar(borrador, { ...borrador, columnas }, reglas);
 }
 
 /**
@@ -232,17 +324,26 @@ export function duplicarColumna(
   borrador: Borrador,
   id: string,
   etiqueta = 'copia',
+  reglas: ReglasPlataforma | null = null,
 ): { borrador: Borrador; id: string | null } {
   const original = borrador.columnas.find((c) => c.id === id);
-  if (!original) return { borrador, id: null };
+  if (!original || indiceDe(borrador, id) < cantidadDeFijas(borrador.columnas, reglas)) return { borrador, id: null };
   const ocupados = new Set(borrador.columnas.map((c) => normalizarNombre(c.nombre)));
   const duplicada: Columna = { ...copia(original), id: nuevoId(), nombre: nombreDeCopia(original.nombre, etiqueta, ocupados) };
-  return { borrador: insertarDespues(borrador, id, duplicada), id: duplicada.id };
+  const insertado = insertarDespues(borrador, id, duplicada);
+  if (reglas === null || reglas.encabezado_por_posicion === null) return { borrador: insertado, id: duplicada.id };
+  // By position the copy is one more column of the rest, so it takes its position's header, not «(copia)».
+  const nombre = encabezadoPorPosicion(reglas, insertado.columnas.findIndex((c) => c.id === duplicada.id)) ?? duplicada.nombre;
+  return { borrador: renumerar(borrador, conColumna(insertado, duplicada.id, (c) => ({ ...c, nombre })), reglas), id: duplicada.id };
 }
 
 /** The analyst's text is kept as typed, edge spaces included: the backend decides what is valid. */
 export const renombrarColumna = (borrador: Borrador, id: string, nombre: string): Borrador =>
   conColumna(borrador, id, (c) => ({ ...c, nombre }));
+
+/** A label of spaces is no label. The analyst's text is kept as typed; the backend trims it and decides what is valid. */
+export const fijarEtiqueta = (borrador: Borrador, id: string, etiqueta: string): Borrador =>
+  conColumna(borrador, id, (c) => ({ ...c, etiqueta: etiqueta.trim() === '' ? null : etiqueta }));
 
 export const fijarExpresion = (borrador: Borrador, id: string, expresion: Expresion): Borrador =>
   conColumna(borrador, id, (c) => ({ ...c, expresion: copia(expresion) }));
@@ -322,6 +423,8 @@ function comparable(definicion: DefinicionGuardada): DefinicionGuardada {
     ...definicion,
     columnas: definicion.columnas.map((c) => ({
       ...c,
+      // No label and a null one are the same: the backend always sends the key, a draft may not have it.
+      etiqueta: c.etiqueta ?? null,
       expresion: expresion(c.expresion),
       // A segment's variant is identified by its segment, not by where it sits in the list: the
       // selector appends a variant that is set again, and the backend does not care about the order.
@@ -352,7 +455,7 @@ export type DefinicionRespuesta = components['schemas']['DefinicionRespuesta'];
  */
 export function guardadaDesdeRespuesta(respuesta: DefinicionRespuesta): DefinicionGuardada {
   const { proteger_formulas, segmentacion, columnas } = respuesta.version.contenido;
-  return copia({ nombre: respuesta.nombre, proteger_formulas, segmentacion, columnas });
+  return copia({ nombre: respuesta.nombre, plataforma: respuesta.plataforma, proteger_formulas, segmentacion, columnas });
 }
 
 /**

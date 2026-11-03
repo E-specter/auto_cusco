@@ -90,7 +90,22 @@ import '../styles/columnas.css';
             <p class="field__error" id="cl-nombre-error" data-nombre-error></p>
           </div>
 
+          <!-- RF-72: chosen when the definition is created, and only if some module registered a platform. -->
+          <div class="field" data-campo-plataforma hidden>
+            <label class="field__label" for="cl-plataforma" data-i18n="columnas.plataforma">Plataforma</label>
+            <select class="input" id="cl-plataforma" data-plataforma aria-describedby="cl-plataforma-hint"></select>
+            <p class="field__hint" id="cl-plataforma-hint" data-i18n="columnas.plataforma.hint">
+              Una plataforma fija algunas columnas y no se cambia después.
+            </p>
+          </div>
+
           <p class="cl-linea" data-version-linea></p>
+
+          <!-- What the platform fixes, in one sentence built from its registered rules: nothing hidden. -->
+          <p class="notice notice--info" data-reglas hidden>
+            <Icon name="info" size={20} />
+            <span data-reglas-texto></span>
+          </p>
 
           <!-- RF-55 / D-C3-1: a saved version is never reinterpreted; this one segments without the send-date adjustment. -->
           <p class="notice notice--info" data-sin-ajuste hidden>
@@ -304,6 +319,7 @@ import '../styles/columnas.css';
   <template data-icono-duplicar><Icon name="copy" size={16} /></template>
   <template data-icono-quitar><Icon name="trash-2" size={16} /></template>
   <template data-icono-abrir><Icon name="chevron-down" size={16} /></template>
+  <template data-icono-candado><Icon name="lock" size={16} /></template>
 
   <!-- The editor of the open row is cloned from here: one instance at a time, so the ids hold. -->
   <template data-plantilla-editor>
@@ -382,6 +398,7 @@ import '../styles/columnas.css';
   import {
     guardarBorrador,
     listarDefiniciones,
+    listarPlataformas,
     obtenerDefinicion,
     problemasDeError,
     renombrarDefinicionGuardada,
@@ -404,9 +421,11 @@ import '../styles/columnas.css';
     definicionNueva,
     desdeDefinicion,
     duplicarColumna,
+    fijarEtiqueta,
     fijarExpresion,
     fijarFormatoFecha,
     fijarFormatoFinanciero,
+    fijarPlataforma,
     fijarProteccion,
     fijarValorPorDefecto,
     fijarVariantes,
@@ -453,6 +472,15 @@ import '../styles/columnas.css';
     type ModoVista,
   } from '../lib/constructor-version';
   import { openWhenFree } from '../lib/dialogs';
+  import {
+    cantidadDeFijas,
+    encabezadoEditado,
+    encabezadoPorPosicion,
+    numeroPorPosicion,
+    reglasDe,
+    type ReglasPlataforma,
+  } from '../lib/plataformas';
+  import { fraseDeReglas, textoDeProblema } from '../lib/plataformas-texto';
   import { formatDate } from '../lib/format';
   import {
     clasificarErrorDeRenombrar,
@@ -477,6 +505,8 @@ import '../styles/columnas.css';
 
   const estado = {
     lista: [] as ResumenDefinicion[],
+    /** What each registered platform fixes (RF-72); empty until a module registers one. */
+    plataformas: [] as ReglasPlataforma[],
     /** What is on screen as saved; `null` is a definition not yet saved. */
     respuesta: null as DefinicionGuardadaRespuesta | null,
     guardada: null as DefinicionGuardada | null,
@@ -516,6 +546,10 @@ import '../styles/columnas.css';
     nombre: $<HTMLInputElement>('[data-nombre]'),
     nombreHint: $<HTMLElement>('[data-nombre-hint]'),
     nombreError: $<HTMLElement>('[data-nombre-error]'),
+    campoPlataforma: $<HTMLElement>('[data-campo-plataforma]'),
+    plataforma: $<HTMLSelectElement>('[data-plataforma]'),
+    reglas: $<HTMLElement>('[data-reglas]'),
+    reglasTexto: $<HTMLElement>('[data-reglas-texto]'),
     renombrar: $<HTMLButtonElement>('[data-renombrar]'),
     versionLinea: $<HTMLElement>('[data-version-linea]'),
     sinAjuste: $<HTMLElement>('[data-sin-ajuste]'),
@@ -577,13 +611,16 @@ import '../styles/columnas.css';
   }
 
   /** The dialog answers a yes/no; Escape and the backdrop are "no". */
-  function confirmar(opciones: { titulo: string; cuerpo: string; si: string; no: string }): Promise<boolean> {
+  function confirmar(opciones: { titulo: string; cuerpo: string; si: string; no: string; peligro?: boolean }): Promise<boolean> {
     return new Promise((resolver) => {
       $<HTMLElement>('[data-confirmar-titulo]').textContent = opciones.titulo;
       $<HTMLElement>('[data-confirmar-cuerpo]').textContent = opciones.cuerpo;
       const si = $<HTMLButtonElement>('[data-confirmar-si]');
       const no = $<HTMLButtonElement>('[data-confirmar-no]');
       si.textContent = opciones.si;
+      // A destructive yes is the red button, not the primary one; each call sets it again.
+      si.classList.toggle('btn--danger', Boolean(opciones.peligro));
+      si.classList.toggle('btn--primary', !opciones.peligro);
       no.textContent = opciones.no;
       let respuesta = false;
       const alSi = () => {
@@ -606,9 +643,13 @@ import '../styles/columnas.css';
     });
   }
 
+  /** The rules of the draft's platform; `null` for a free file and for a platform nobody registers. */
+  const reglasActuales = (): ReglasPlataforma | null => reglasDe(estado.plataformas, estado.borrador.plataforma);
+  const hayContenidoNuevo = (): boolean => hayContenido(estado.borrador, reglasActuales());
+
   const hayCambiosSinGuardar = (): boolean =>
     estado.modo === 'nueva'
-      ? hayContenido(estado.borrador)
+      ? hayContenidoNuevo()
       : estado.modo === 'lectura'
         ? false
         : estado.guardada !== null && hayCambios(estado.guardada, estado.borrador);
@@ -664,6 +705,18 @@ import '../styles/columnas.css';
   }
 
   const columnaAbierta = () => estado.borrador.columnas.find((c) => c.id === estado.abierta) ?? null;
+
+  /** A fixed column whose content the platform does not let the analyst change (`contenido_editable`, RF-72). */
+  function contenidoBloqueado(id: string): boolean {
+    const reglas = reglasActuales();
+    const indice = estado.borrador.columnas.findIndex((c) => c.id === id);
+    return (
+      reglas !== null &&
+      indice >= 0 &&
+      indice < cantidadDeFijas(estado.borrador.columnas, reglas) &&
+      !reglas.columnas_fijas[indice].contenido_editable
+    );
+  }
   const modoDeLaColumna = (id: string): 'variable' | 'texto' => {
     const columna = estado.borrador.columnas.find((c) => c.id === id);
     return columna && modoContenido(columna.expresion) === 'variable' ? 'variable' : 'texto';
@@ -726,7 +779,7 @@ import '../styles/columnas.css';
     applyTranslations(host);
     const raiz = host.querySelector<HTMLElement>('#columna-editor')!;
     const soloVariable = modoDeLaColumna(columna.id) === 'variable';
-    const soloLectura = !esEditable(estado.modo);
+    const soloLectura = !esEditable(estado.modo) || contenidoBloqueado(columna.id);
     const id = columna.id;
 
     if (estado.variar) {
@@ -953,6 +1006,45 @@ import '../styles/columnas.css';
     const cuerpo = document.createElement('div');
     cuerpo.className = 'cl-detalle';
     const editable = esEditable(estado.modo);
+    const editableContenido = editable && !contenidoBloqueado(columna.id);
+
+    // RF-49: a name to recognise the column. It does not go into the file.
+    const campoEtiqueta = document.createElement('div');
+    campoEtiqueta.className = 'field';
+    const idEtiqueta = `cl-etiqueta-${columna.id}`;
+    const rotuloEtiqueta = document.createElement('label');
+    rotuloEtiqueta.className = 'field__label';
+    rotuloEtiqueta.htmlFor = idEtiqueta;
+    rotuloEtiqueta.textContent = t('columnas.etiqueta');
+    const entradaEtiqueta = document.createElement('input');
+    entradaEtiqueta.className = 'input';
+    entradaEtiqueta.id = idEtiqueta;
+    entradaEtiqueta.type = 'text';
+    entradaEtiqueta.maxLength = 120;
+    entradaEtiqueta.autocomplete = 'off';
+    entradaEtiqueta.value = columna.etiqueta ?? '';
+    entradaEtiqueta.readOnly = !editable;
+    entradaEtiqueta.dataset.columna = columna.id;
+    entradaEtiqueta.dataset.campo = 'etiqueta';
+    const ayudaEtiqueta = document.createElement('p');
+    ayudaEtiqueta.className = 'field__hint';
+    ayudaEtiqueta.id = `${idEtiqueta}-hint`;
+    ayudaEtiqueta.textContent = t('columnas.etiqueta.hint');
+    const errorEtiqueta = document.createElement('p');
+    errorEtiqueta.className = 'field__error';
+    errorEtiqueta.id = `${idEtiqueta}-error`;
+    errorEtiqueta.textContent = (agruparProblemas(estado.problemas, estado.borrador).porColumna.get(columna.id) ?? [])
+      .filter((p) => p.campo === 'etiqueta')
+      .map(textoDeProblema)
+      .join(' ');
+    if (errorEtiqueta.textContent) entradaEtiqueta.setAttribute('aria-invalid', 'true');
+    entradaEtiqueta.setAttribute('aria-describedby', `${ayudaEtiqueta.id} ${errorEtiqueta.id}`);
+    entradaEtiqueta.addEventListener('input', () => {
+      estado.borrador = fijarEtiqueta(estado.borrador, columna.id, entradaEtiqueta.value);
+      actualizarFila(columna.id);
+      pintarEstado();
+    });
+    campoEtiqueta.append(rotuloEtiqueta, entradaEtiqueta, ayudaEtiqueta, errorEtiqueta);
 
     // What the column carries.
     const modo = document.createElement('fieldset');
@@ -968,7 +1060,7 @@ import '../styles/columnas.css';
       radio.type = 'radio';
       radio.name = `cl-modo-${columna.id}`;
       radio.value = valor;
-      radio.disabled = !editable;
+      radio.disabled = !editableContenido;
       radio.checked = modoDeLaColumna(columna.id) === valor;
       radio.dataset.modo = valor;
       radio.addEventListener('change', () => void cambiarModo(valor));
@@ -990,7 +1082,7 @@ import '../styles/columnas.css';
     casilla.type = 'checkbox';
     casilla.dataset.variar = '';
     casilla.checked = estado.variar;
-    casilla.disabled = !editable || estado.borrador.segmentacion === null;
+    casilla.disabled = !editableContenido || estado.borrador.segmentacion === null;
     casilla.addEventListener('change', () => void cambiarVariar(casilla.checked));
     const textoVariar = document.createElement('span');
     textoVariar.textContent = t('columnas.variar');
@@ -1014,7 +1106,7 @@ import '../styles/columnas.css';
     campoFormato.dataset.formato = '';
     formato.append(tituloFormato, campoFormato);
 
-    cuerpo.append(modo, host, variar, formato);
+    cuerpo.append(campoEtiqueta, modo, host, variar, formato);
     celda.append(cuerpo);
     fila.append(celda);
     return fila;
@@ -1184,7 +1276,8 @@ import '../styles/columnas.css';
     estado.guardada = respuesta ? guardadaDesdeRespuesta(respuesta) : null;
     estado.borrador = estado.guardada ? desdeDefinicion(estado.guardada) : definicionNueva();
     estado.modo = modoInicial(respuesta);
-    estado.problemas = [];
+    // What the platform's rules of today find in a saved version (RF-72): shown as any other problem.
+    estado.problemas = respuesta?.problemas ?? [];
     estado.nombreRepetido = false;
     estado.mensaje = '';
     estado.valoresExtra = [];
@@ -1277,6 +1370,7 @@ import '../styles/columnas.css';
           numero: estado.respuesta.version.numero,
         })
       : t('columnas.version.sinGuardar');
+    pintarPlataforma();
 
     const avisoVista = aviso(estado.modo, estado.respuesta);
     el.lectura.hidden = avisoVista.tipo !== 'lectura';
@@ -1298,6 +1392,38 @@ import '../styles/columnas.css';
     el.proteger.checked = estado.borrador.proteger_formulas;
     el.proteger.disabled = !esEditable(estado.modo);
     pintarSegmentacion();
+  }
+
+  /** RF-72: the choice while the definition is new, the tag once it is saved, and the rules in one sentence. */
+  function pintarPlataforma(): void {
+    const reglas = reglasActuales();
+    const clave = estado.borrador.plataforma;
+    el.campoPlataforma.hidden = estado.respuesta !== null || estado.plataformas.length === 0;
+    el.plataforma.replaceChildren();
+    const ninguna = document.createElement('option');
+    ninguna.value = '';
+    ninguna.textContent = t('columnas.plataforma.ninguna');
+    el.plataforma.append(ninguna);
+    for (const opcion of estado.plataformas) {
+      const nodo = document.createElement('option');
+      nodo.value = opcion.clave;
+      nodo.textContent = opcion.etiqueta;
+      el.plataforma.append(nodo);
+    }
+    el.plataforma.value = clave ?? '';
+    el.plataforma.disabled = estado.modo !== 'nueva';
+
+    el.reglas.hidden = reglas === null;
+    el.reglasTexto.textContent = reglas === null ? '' : fraseDeReglas(reglas);
+
+    // «Versión 3 · WhatsMKT»: the platform does not change after the definition is created.
+    if (estado.respuesta !== null && clave !== null) {
+      const marca = document.createElement('span');
+      marca.className = `tag ${reglas === null ? 'tag--advertencia' : 'tag--info'}`;
+      marca.dataset.plataformaTag = clave;
+      marca.textContent = reglas === null ? t('columnas.plataforma.desconocida', { clave }) : reglas.etiqueta;
+      el.versionLinea.append(' · ', marca);
+    }
   }
 
   function pintarSegmentacion(): void {
@@ -1441,7 +1567,7 @@ import '../styles/columnas.css';
     return b;
   }
 
-  function resumenDeFormato(columna: Borrador['columnas'][number]): string {
+  function formatoDeTipo(columna: Borrador['columnas'][number]): string {
     if (columna.tipo === 'fecha') {
       return columna.formato_fecha
         ? t('columnas.formato.fecha', { patron: columna.formato_fecha })
@@ -1451,6 +1577,14 @@ import '../styles/columnas.css';
       return t('columnas.formato.importe', { ejemplo: ejemploFinanciero(columna.formato_financiero) });
     }
     return t('columnas.formato.ninguno');
+  }
+
+  /** The type's format and, when the column is written as an Excel text cell (RF-73), that too. */
+  function resumenDeFormato(columna: Borrador['columnas'][number]): string {
+    const base = formatoDeTipo(columna);
+    if (!columna.celda_texto) return base;
+    const excel = t('columnas.formato.celdaTexto');
+    return base === t('columnas.formato.ninguno') ? excel : `${base} · ${excel}`;
   }
 
   const MAXIMO_RESUMEN = 60;
@@ -1508,6 +1642,34 @@ import '../styles/columnas.css';
     }
     const celdaFormato = fila.querySelector<HTMLElement>('[data-celda="formato"]');
     if (celdaFormato) celdaFormato.textContent = resumenDeFormato(columna);
+    // RF-49: the label, under the name, only when there is one.
+    const lineaEtiqueta = fila.querySelector<HTMLElement>('[data-linea-etiqueta]');
+    if (lineaEtiqueta) {
+      lineaEtiqueta.textContent = columna.etiqueta ?? '';
+      lineaEtiqueta.hidden = !columna.etiqueta;
+    }
+  }
+
+  /**
+   * «Restaurar» and the note that a platform reads the columns by order, in place (the name is typed
+   * in the row, so rebuilding it would take the focus away): shown while a header is not the one its
+   * position gives.
+   */
+  function marcarEncabezadosEditados(): void {
+    const reglas = reglasActuales();
+    if (reglas === null) return;
+    estado.borrador.columnas.forEach((columna, indice) => {
+      const editado = indice >= cantidadDeFijas(estado.borrador.columnas, reglas) && encabezadoEditado(reglas, indice, columna.nombre);
+      el.filas
+        .querySelectorAll<HTMLElement>(`[data-restaurar="${columna.id}"], [data-aviso-posicion="${columna.id}"]`)
+        .forEach((nodo) => {
+          nodo.hidden = !editado;
+          // The button names the position whose header it gives back, so typing a name does not make it stale.
+          if (nodo.dataset.restaurar) {
+            nodo.setAttribute('aria-label', t('columnas.plataforma.restaurarPara', { n: indice + 1 }));
+          }
+        });
+    });
   }
 
   /**
@@ -1540,6 +1702,11 @@ import '../styles/columnas.css';
     const columnas = estado.borrador.columnas;
     const repetidos = nombresRepetidos(estado.borrador);
     const grupos = agruparProblemas(estado.problemas, estado.borrador);
+    const reglas = reglasActuales();
+    // The columns the platform fixes hold the top: no lock, no arrows, no removing (RF-72).
+    const nFijas = cantidadDeFijas(columnas, reglas);
+    // A platform's rows carry hints and notes: its table gives the action buttons a fixed size so they never shrink.
+    el.filas.closest('table')?.classList.toggle('cl-tabla--plataforma', reglas !== null);
 
     // The open row's detail keeps its mounted editor: take it out and put it back.
     estado.detalle?.remove();
@@ -1553,11 +1720,16 @@ import '../styles/columnas.css';
       const fila = document.createElement('tr');
       fila.dataset.columna = columna.id;
       const propios = grupos.porColumna.get(columna.id) ?? [];
-      const detalleDe = (campo: string) =>
-        propios.find((p) => destinoDeProblema(p, estado.borrador).tipo === 'columna' && (p.campo ?? 'expresion') === campo)?.detalle ?? '';
+      const detalleDe = (campo: string) => {
+        const propio = propios.find(
+          (p) => destinoDeProblema(p, estado.borrador).tipo === 'columna' && (p.campo ?? 'expresion') === campo,
+        );
+        return propio ? textoDeProblema(propio) : '';
+      };
 
       celdaDe(fila, t('columnas.col.orden'), 'num mono').textContent = String(indice + 1);
 
+      const fija = indice < nFijas;
       const celdaNombre = celdaDe(fila, t('columnas.col.nombre'));
       const nombre = document.createElement('input');
       nombre.className = 'input';
@@ -1567,7 +1739,7 @@ import '../styles/columnas.css';
       nombre.autocomplete = 'off';
       nombre.dataset.columna = columna.id;
       nombre.dataset.campo = 'nombre';
-      nombre.readOnly = !editable;
+      nombre.readOnly = !editable || fija;
       nombre.setAttribute('aria-label', t('columnas.col.nombreDe', { numero: indice + 1 }));
       const error = repetidos.has(columna.id) ? t('columnas.repetido') : detalleDe('nombre');
       const mensaje = document.createElement('p');
@@ -1582,17 +1754,67 @@ import '../styles/columnas.css';
         estado.borrador = renombrarColumna(estado.borrador, columna.id, nombre.value);
         estado.foco = null;
         marcarNombresRepetidos();
+        marcarEncabezadosEditados();
         programarPrevia();
         pintarEstado();
       });
+      const porPosicion = reglas !== null && reglas.encabezado_por_posicion !== null && !fija;
+      // The order under the name: the field, its error, the label (RF-49), then «Restaurar» and its note.
       celdaNombre.append(nombre, mensaje);
+      const lineaEtiqueta = document.createElement('p');
+      lineaEtiqueta.className = 'field__hint';
+      lineaEtiqueta.dataset.lineaEtiqueta = '';
+      lineaEtiqueta.textContent = columna.etiqueta ?? '';
+      lineaEtiqueta.hidden = !columna.etiqueta;
+      celdaNombre.append(lineaEtiqueta);
+      if (porPosicion) {
+        // «Restaurar» gives the header of the position back; the note says why the name does not decide (RF-WM-11).
+        const restaurar = document.createElement('button');
+        restaurar.type = 'button';
+        restaurar.className = 'btn btn--sm btn--quiet';
+        restaurar.dataset.restaurar = columna.id;
+        restaurar.textContent = t('columnas.plataforma.restaurar');
+        restaurar.setAttribute('aria-label', t('columnas.plataforma.restaurarPara', { n: indice + 1 }));
+        restaurar.disabled = !editable;
+        // Shown only while the header is not the one the position gives: right from the first paint, not after a key.
+        const editado = encabezadoEditado(reglas, indice, columna.nombre);
+        restaurar.hidden = !editado;
+        restaurar.addEventListener('click', () => {
+          const porDefecto = encabezadoPorPosicion(reglas, indice) ?? '';
+          estado.borrador = renombrarColumna(estado.borrador, columna.id, porDefecto);
+          nombre.value = porDefecto;
+          marcarNombresRepetidos();
+          marcarEncabezadosEditados();
+          programarPrevia();
+          pintarEstado();
+          nombre.focus();
+        });
+        const aviso = document.createElement('p');
+        aviso.className = 'field__hint';
+        aviso.dataset.avisoPosicion = columna.id;
+        aviso.hidden = !editado;
+        aviso.textContent = t('columnas.plataforma.porPosicion', {
+          plataforma: reglas.etiqueta,
+          n: numeroPorPosicion(reglas, indice),
+        });
+        celdaNombre.append(restaurar, aviso);
+      }
+      // A problem of the platform (a fixed column missing, moved or of another type, a type of the rest).
+      const errorPlataforma = detalleDe('plataforma');
+      if (errorPlataforma) {
+        const p = document.createElement('p');
+        p.className = 'field__error';
+        p.textContent = errorPlataforma;
+        celdaNombre.append(p);
+      }
 
       const celdaTipo = celdaDe(fila, t('columnas.col.tipo'));
       const tipo = document.createElement('select');
       tipo.className = 'input';
       tipo.dataset.columna = columna.id;
       tipo.dataset.campo = 'tipo';
-      tipo.disabled = !editable;
+      // A fixed column keeps its type, and so does the rest when the platform sets one for it.
+      tipo.disabled = !editable || fija || (reglas !== null && reglas.tipo_resto !== null);
       tipo.setAttribute('aria-label', t('columnas.col.tipoDe', { nombre: nombreVisible(indice) }));
       for (const valor of TIPOS) {
         const opcion = document.createElement('option');
@@ -1609,6 +1831,14 @@ import '../styles/columnas.css';
         pintarEstado();
       });
       celdaTipo.append(tipo);
+      if (reglas !== null && reglas.tipo_resto !== null && !fija) {
+        const ayuda = document.createElement('p');
+        ayuda.className = 'field__hint';
+        ayuda.id = `cl-tipo-ayuda-${columna.id}`;
+        ayuda.textContent = t('columnas.plataforma.tipoFijo', { plataforma: reglas.etiqueta });
+        tipo.setAttribute('aria-describedby', ayuda.id);
+        celdaTipo.append(ayuda);
+      }
 
       const contenido = textoDeContenido(columna);
       const celdaContenido = celdaDe(
@@ -1638,7 +1868,7 @@ import '../styles/columnas.css';
       defecto.autocomplete = 'off';
       defecto.dataset.columna = columna.id;
       defecto.dataset.campo = 'valor_por_defecto';
-      defecto.readOnly = !editable;
+      defecto.readOnly = !editable || contenidoBloqueado(columna.id);
       defecto.setAttribute('aria-label', t('columnas.col.defectoDe', { nombre: nombreVisible(indice) }));
       defecto.addEventListener('input', () => {
         estado.borrador = fijarValorPorDefecto(estado.borrador, columna.id, defecto.value);
@@ -1663,12 +1893,12 @@ import '../styles/columnas.css';
       abrir.setAttribute('aria-controls', `cl-detalle-${columna.id}`);
       abrir.dataset.accion = `${columna.id}:abrir`;
       const mover = (paso: -1 | 1) => () => {
-        estado.borrador = moverColumna(estado.borrador, columna.id, paso);
+        estado.borrador = moverColumna(estado.borrador, columna.id, paso, reglas);
         estado.foco = `${columna.id}:${paso === -1 ? 'subir' : 'bajar'}`;
         programarPrevia();
         pintar();
       };
-      const subir = boton('data-icono-arriba', t('columnas.subir', { nombre: nombreFila }), mover(-1), !editable || indice === 0);
+      const subir = boton('data-icono-arriba', t('columnas.subir', { nombre: nombreFila }), mover(-1), !editable || indice <= nFijas);
       subir.dataset.accion = `${columna.id}:subir`;
       const bajar = boton(
         'data-icono-abajo',
@@ -1681,7 +1911,7 @@ import '../styles/columnas.css';
         'data-icono-duplicar',
         t('columnas.duplicar', { nombre: nombreFila }),
         () => {
-          const resultado = duplicarColumna(estado.borrador, columna.id, t('columnas.copia'));
+          const resultado = duplicarColumna(estado.borrador, columna.id, t('columnas.copia'), reglas);
           estado.borrador = resultado.borrador;
           estado.foco = resultado.id ? `${resultado.id}:nombre` : null;
           programarPrevia();
@@ -1704,7 +1934,7 @@ import '../styles/columnas.css';
             if (!si) return;
           }
           if (estado.abierta === columna.id) cerrarFila();
-          const resultado = quitarColumna(estado.borrador, columna.id);
+          const resultado = quitarColumna(estado.borrador, columna.id, reglas);
           estado.borrador = resultado.borrador;
           estado.foco = resultado.foco ? `${resultado.foco}:nombre` : 'agregar';
           programarPrevia();
@@ -1712,14 +1942,39 @@ import '../styles/columnas.css';
         },
         !editable,
       );
-      acciones.append(abrir, subir, bajar, duplicar, quitar);
+      if (fija && reglas !== null) {
+        // Instead of the arrows and «Quitar»: they are not offered, not shown as disabled (§11.2).
+        const candado = document.createElement('span');
+        candado.className = 'cl-candado';
+        candado.setAttribute('role', 'img');
+        const descripcion = t('columnas.plataforma.fija', { plataforma: reglas.etiqueta });
+        const idDescripcion = `cl-candado-${columna.id}`;
+        candado.setAttribute('aria-label', t('columnas.plataforma.fijaCorta'));
+        candado.setAttribute('aria-describedby', idDescripcion);
+        candado.title = descripcion;
+        const icono = document.querySelector<HTMLTemplateElement>('[data-icono-candado]');
+        if (icono) candado.append(icono.content.cloneNode(true));
+        const corto = document.createElement('span');
+        corto.className = 'cl-candado__texto';
+        corto.setAttribute('aria-hidden', 'true');
+        corto.textContent = t('columnas.plataforma.fijaCorta');
+        candado.append(corto);
+        // Read after the name, for who cannot hover: «Columna fija», «Columna fija de X: no se quita ni se mueve».
+        const detalleCandado = document.createElement('span');
+        detalleCandado.className = 'visually-hidden';
+        detalleCandado.id = idDescripcion;
+        detalleCandado.textContent = descripcion;
+        acciones.append(abrir, candado, detalleCandado);
+      } else {
+        acciones.append(abrir, subir, bajar, duplicar, quitar);
+      }
       celdaAcciones.append(acciones);
 
       el.filas.append(fila);
       if (estado.abierta === columna.id && estado.detalle) el.filas.append(estado.detalle);
     });
 
-    el.agregar.disabled = !editable;
+    el.agregar.disabled = !editable || (reglas !== null && !reglas.admite_mas_columnas);
   }
 
   function pintarResumen(): void {
@@ -1755,13 +2010,13 @@ import '../styles/columnas.css';
       agregarItem(t('columnas.problemas.enDefinicion'), t('columnas.error.nombreRepetido'), () => el.nombre.focus());
     }
     for (const problema of grupos.definicion) {
-      agregarItem(t('columnas.problemas.enDefinicion'), problema.detalle, () => el.nombre.focus());
+      agregarItem(t('columnas.problemas.enDefinicion'), textoDeProblema(problema), () => el.nombre.focus());
     }
     estado.borrador.columnas.forEach((columna, indice) => {
       for (const problema of grupos.porColumna.get(columna.id) ?? []) {
         agregarItem(
           t('columnas.problemas.enColumna', { numero: indice + 1, nombre: nombreVisible(indice) }),
-          problema.detalle,
+          textoDeProblema(problema),
           () => void irAlProblema(columna.id, problema),
         );
       }
@@ -1786,8 +2041,14 @@ import '../styles/columnas.css';
   /** From the save's summary: the field of the column, or its open row for its content. */
   async function irAlProblema(id: string, problema: ProblemaDefinicion): Promise<void> {
     const campo = problema.campo ?? 'expresion';
-    if (campo === 'nombre' || campo === 'valor_por_defecto') {
-      document.querySelector<HTMLElement>(`[data-columna="${id}"][data-campo="${campo}"]`)?.focus();
+    // A platform's problem is about the column as a whole: its name is where it starts.
+    if (campo === 'nombre' || campo === 'valor_por_defecto' || campo === 'plataforma') {
+      document.querySelector<HTMLElement>(`[data-columna="${id}"][data-campo="${campo === 'plataforma' ? 'nombre' : campo}"]`)?.focus();
+      return;
+    }
+    if (campo === 'etiqueta') {
+      if (estado.abierta !== id) await abrirFila(id);
+      document.querySelector<HTMLElement>(`[data-columna="${id}"][data-campo="etiqueta"]`)?.focus();
       return;
     }
     if (estado.abierta !== id) await abrirFila(id);
@@ -1799,7 +2060,7 @@ import '../styles/columnas.css';
 
   function pintarEstado(): void {
     const reglas = versionAlGuardar(estado.respuesta);
-    const cambios = estado.modo === 'nueva' ? hayContenido(estado.borrador) : hayCambiosSinGuardar();
+    const cambios = estado.modo === 'nueva' ? hayContenidoNuevo() : hayCambiosSinGuardar();
     const sePuedeGuardar = puedeGuardar(estado.modo, cambios, estado.guardando);
     el.guardar.disabled = !sePuedeGuardar;
     el.guardar.dataset.loading = estado.guardando ? 'true' : 'false';
@@ -2041,6 +2302,33 @@ import '../styles/columnas.css';
     pintarEstado();
   });
 
+  el.plataforma.addEventListener('change', async () => {
+    if (estado.modo !== 'nueva') return;
+    const elegida = reglasDe(estado.plataformas, el.plataforma.value === '' ? null : el.plataforma.value);
+    // Another platform starts again from what it fixes: what the analyst wrote is asked about first.
+    if (hayContenido({ ...estado.borrador, nombre: '' }, reglasActuales())) {
+      const si = await confirmar({
+        titulo: t('columnas.plataforma.cambiar.titulo'),
+        // To a platform, only its fixed columns remain; to a free file, one empty column.
+        cuerpo: elegida
+          ? t('columnas.plataforma.cambiar.cuerpo', { plataforma: elegida.etiqueta })
+          : t('columnas.plataforma.cambiar.cuerpoLibre'),
+        si: t('columnas.plataforma.cambiar.confirmar'),
+        no: t('common.cancel'),
+        peligro: true,
+      });
+      if (!si) {
+        pintarPlataforma();
+        return;
+      }
+    }
+    cerrarFila();
+    estado.borrador = fijarPlataforma(estado.borrador, elegida);
+    estado.problemas = [];
+    pintar();
+    programarPrevia();
+  });
+
   el.proteger.addEventListener('change', () => {
     estado.borrador = fijarProteccion(estado.borrador, el.proteger.checked);
     pintarEstado();
@@ -2125,7 +2413,9 @@ import '../styles/columnas.css';
   });
 
   el.agregar.addEventListener('click', () => {
-    const resultado = agregarColumna(estado.borrador);
+    const reglas = reglasActuales();
+    if (reglas !== null && !reglas.admite_mas_columnas) return;
+    const resultado = agregarColumna(estado.borrador, null, reglas);
     estado.borrador = resultado.borrador;
     estado.foco = `${resultado.id}:nombre`;
     programarPrevia();
@@ -2183,7 +2473,7 @@ import '../styles/columnas.css';
     estado.modo = descartar(estado.modo);
     const abierta = estado.abierta;
     cerrarFila();
-    estado.borrador = estado.guardada ? desdeDefinicion(estado.guardada) : definicionNueva();
+    estado.borrador = estado.guardada ? desdeDefinicion(estado.guardada) : definicionNueva(reglasActuales());
     estado.problemas = [];
     estado.nombreRepetido = false;
     estado.mensaje = '';
@@ -2194,7 +2484,7 @@ import '../styles/columnas.css';
   });
 
   async function guardar(): Promise<void> {
-    const cambios = estado.modo === 'nueva' ? hayContenido(estado.borrador) : hayCambiosSinGuardar();
+    const cambios = estado.modo === 'nueva' ? hayContenidoNuevo() : hayCambiosSinGuardar();
     if (!puedeGuardar(estado.modo, cambios, estado.guardando)) return;
     // The open editor decides first: a text it still has problems with is not sent (§4).
     if (estado.contenido && (estado.editorPendiente || !estado.editorValido)) {
@@ -2253,7 +2543,11 @@ import '../styles/columnas.css';
 
   async function arrancar(): Promise<void> {
     try {
-      [estado.lista, catalogo] = await Promise.all([listarDefiniciones(), obtenerCatalogo(CONTEXTO)]);
+      [estado.lista, catalogo, estado.plataformas] = await Promise.all([
+        listarDefiniciones(),
+        obtenerCatalogo(CONTEXTO),
+        listarPlataformas(),
+      ]);
     } catch (error) {
       if (error instanceof NetworkError) {
         sinConexion(true);

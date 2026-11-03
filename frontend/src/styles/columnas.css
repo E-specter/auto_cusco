@@ -125,6 +125,38 @@
   gap: var(--space-1);
 }
 
+/* A fixed column of a platform (RF-72): the lock stands where the arrows and «Quitar» would be. Its words show
+   when the table stacks (below 64rem, as `.table--apilable-ancha`); the icon alone says it on a wide row. */
+/* In a platform's table the rows carry hints and notes, and the columns that hold them take the room: the action
+   buttons keep one size, the same in every row (and the same as the fixed row's), instead of shrinking with the cell. */
+.cl-tabla--plataforma .cl-acciones .btn {
+  flex: none;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  padding: 0;
+  justify-content: center;
+}
+
+.cl-candado {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.cl-candado__texto {
+  display: none;
+  font-family: var(--font-secondary);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 63.99rem) {
+  .cl-candado__texto {
+    display: inline;
+  }
+}
+
 .cl-pie {
   display: flex;
   flex-wrap: wrap;

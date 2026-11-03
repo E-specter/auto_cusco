@@ -20,6 +20,7 @@ import type {
   ResumenDefinicion,
 } from '../src/lib/api-definiciones';
 import type { components } from '../src/lib/contrato-api';
+import type { ReglasPlataforma } from '../src/lib/plataformas';
 import type { Manejador } from './api-falsa';
 import { json, siguiente } from './apoyo';
 
@@ -44,10 +45,14 @@ export interface DefinicionFalsa {
   nombre: string;
   creado_en: string;
   versiones: VersionFalsa[];
+  /** RF-72: the key of a registered platform, fixed when it was created; unset is a free file. */
+  plataforma?: string | null;
 }
 
 export interface ApiFalsaDefiniciones {
   definiciones: DefinicionFalsa[];
+  /** The platforms a module registered (`GET /definiciones-columnas/plataformas`). Empty, as the backend is today. */
+  plataformas: ReglasPlataforma[];
   /** Scripted answers, in order; the last one repeats. Empty means "behave". */
   respuestas: { crear: Respuesta[]; guardarVersion: Respuesta[]; renombrar: Respuesta[] };
   /** When true, every call fails at the network level. */
@@ -57,7 +62,31 @@ export interface ApiFalsaDefiniciones {
 }
 
 export function apiDefiniciones(): ApiFalsaDefiniciones {
-  return { definiciones: [], respuestas: { crear: [], guardarVersion: [], renombrar: [] }, sinRed: false, pedidos: [] };
+  return {
+    definiciones: [],
+    plataformas: [],
+    respuestas: { crear: [], guardarVersion: [], renombrar: [] },
+    sinRed: false,
+    pedidos: [],
+  };
+}
+
+/**
+ * A synthetic platform: one fixed column that starts as a reference and goes out as Excel text,
+ * headers by position, and the rest as text. Invented: the real ones belong to their modules.
+ */
+export function plataformaSintetica(parcial: Partial<ReglasPlataforma> = {}): ReglasPlataforma {
+  return {
+    clave: 'sintetica',
+    etiqueta: 'Sintética',
+    columnas_fijas: [
+      { posicion: 1, nombre: 'destino', contenido_por_defecto: '51[@telefono]', tipo: 'texto', celda_texto: true, contenido_editable: true },
+    ],
+    encabezado_por_posicion: '[$VAR{n}$]',
+    tipo_resto: 'texto',
+    admite_mas_columnas: true,
+    ...parcial,
+  };
 }
 
 const FORMATO_FINANCIERO = { separador_miles: ',', separador_decimal: '.', decimales: 2 } as const;
@@ -140,8 +169,53 @@ const problema = (parcial: Partial<ProblemaDefinicion> & { detalle: string }): P
   ...parcial,
 });
 
-function problemasDe(entrada: Entrada, nombreExistente: string | null): ProblemaDefinicion[] {
+/** The backend's `problemas_de_plataforma`: the fixed columns are found by name; the rest follows `tipo_resto`. */
+function problemasDePlataforma(
+  columnas: ReadonlyArray<{ nombre: string; tipo?: string | null }>,
+  reglas: ReglasPlataforma,
+): ProblemaDefinicion[] {
+  const delaPlataforma = (codigo: ProblemaDefinicion['codigo'], columna: number | null, nombre: string) =>
+    problema({ codigo, campo: 'plataforma', columna, nombre, detalle: `${codigo}: ${nombre}` });
   const problemas: ProblemaDefinicion[] = [];
+  const fijas = new Set(reglas.columnas_fijas.map((f) => f.nombre));
+  for (const fija of reglas.columnas_fijas) {
+    const indice = fija.posicion - 1;
+    const donde = columnas.findIndex((c) => c.nombre === fija.nombre);
+    if (donde < 0) {
+      problemas.push(delaPlataforma('plataforma_columna_fija_ausente', indice < columnas.length ? indice : null, fija.nombre));
+    } else if (donde !== indice) {
+      problemas.push(delaPlataforma('plataforma_columna_fija_movida', donde, fija.nombre));
+    } else if ((columnas[donde].tipo ?? 'texto') !== fija.tipo) {
+      problemas.push(delaPlataforma('plataforma_tipo_de_columna_fija', donde, fija.nombre));
+    }
+  }
+  columnas.forEach((c, indice) => {
+    if (fijas.has(c.nombre)) return;
+    if (!reglas.admite_mas_columnas) problemas.push(delaPlataforma('plataforma_columnas_de_mas', indice, c.nombre));
+    else if (reglas.tipo_resto !== null && (c.tipo ?? 'texto') !== reglas.tipo_resto) {
+      problemas.push(delaPlataforma('plataforma_tipo_del_resto', indice, c.nombre));
+    }
+  });
+  return problemas;
+}
+
+const desconocida = (clave: string): ProblemaDefinicion =>
+  problema({
+    codigo: 'plataforma_desconocida',
+    campo: 'plataforma',
+    nombre: clave,
+    detalle: `La plataforma '${clave}' no esta registrada`,
+  });
+
+function problemasDe(
+  entrada: Entrada,
+  nombreExistente: string | null,
+  plataformas: readonly ReglasPlataforma[] = [],
+  clave: string | null = null,
+): ProblemaDefinicion[] {
+  const problemas: ProblemaDefinicion[] = [];
+  const reglas = plataformas.find((r) => r.clave === clave);
+  if (clave !== null && !reglas) return [desconocida(clave)];
   const nombre = entrada.nombre;
   if (nombreExistente === null) {
     if (typeof nombre !== 'string' || nombre.trim().length < 1 || nombre.trim().length > LARGO_MAXIMO_NOMBRE) {
@@ -159,7 +233,15 @@ function problemasDe(entrada: Entrada, nombreExistente: string | null): Problema
     if (!columna.nombre.trim()) {
       problemas.push(problema({ columna: indice, campo: 'nombre', detalle: `La columna ${indice + 1} necesita un nombre` }));
     }
+    const etiqueta = columna.etiqueta;
+    if (etiqueta !== undefined && etiqueta !== null && (etiqueta.trim().length < 1 || etiqueta.trim().length > 120)) {
+      problemas.push(problema({ columna: indice, campo: 'etiqueta', detalle: `La etiqueta de la columna ${indice + 1} debe tener entre 1 y 120 caracteres` }));
+    }
   });
+  if (reglas) {
+    const ordenadas = [...entrada.columnas].sort((a, b) => a.orden - b.orden);
+    problemas.push(...problemasDePlataforma(ordenadas, reglas));
+  }
   return problemas;
 }
 
@@ -235,11 +317,26 @@ function resumen(d: DefinicionFalsa): ResumenDefinicion {
     cantidad_versiones: d.versiones.length,
     actualizado_en: vigente(d).creado_en,
     vigente_usada: esUsada(vigente(d)),
-    plataforma: null,
+    plataforma: d.plataforma ?? null,
   };
 }
 
-function respuestaDe(d: DefinicionFalsa, version: VersionFalsa = vigente(d)): DefinicionGuardadaRespuesta {
+/** What today's rules of the definition's platform find in a version: a platform nobody registers is a problem too. */
+function problemasDeLaVersion(d: DefinicionFalsa, version: VersionFalsa, plataformas: readonly ReglasPlataforma[]): ProblemaDefinicion[] {
+  if (!d.plataforma) return [];
+  const reglas = plataformas.find((r) => r.clave === d.plataforma);
+  if (!reglas) return [desconocida(d.plataforma)];
+  return problemasDePlataforma(
+    [...version.contenido.columnas].sort((a, b) => a.orden - b.orden),
+    reglas,
+  );
+}
+
+function respuestaDe(
+  d: DefinicionFalsa,
+  version: VersionFalsa = vigente(d),
+  plataformas: readonly ReglasPlataforma[] = [],
+): DefinicionGuardadaRespuesta {
   return {
     id: d.id,
     nombre: d.nombre,
@@ -259,8 +356,8 @@ function respuestaDe(d: DefinicionFalsa, version: VersionFalsa = vigente(d)): De
       usada: esUsada(version),
       contenido: version.contenido,
     },
-    plataforma: null,
-    problemas: [],
+    plataforma: d.plataforma ?? null,
+    problemas: problemasDeLaVersion(d, version, plataformas),
   };
 }
 
@@ -294,6 +391,11 @@ export function manejadorDefiniciones(estado: ApiFalsaDefiniciones): Manejador {
       return respuesta ? json(route, respuesta.estado, respuesta.cuerpo ?? {}) : null;
     };
 
+    if (camino === `${RUTA}/plataformas` && metodo === 'GET') {
+      await json(route, 200, estado.plataformas);
+      return true;
+    }
+
     if (camino === RUTA && metodo === 'GET') {
       const ordenadas = [...estado.definiciones].sort(
         (a, b) => normalizar(a.nombre).localeCompare(normalizar(b.nombre)) || a.id - b.id,
@@ -309,7 +411,7 @@ export function manejadorDefiniciones(estado: ApiFalsaDefiniciones): Manejador {
         await respuesta;
         return true;
       }
-      const problemas = problemasDe(entrada, null);
+      const problemas = problemasDe(entrada, null, estado.plataformas, entrada.plataforma ?? null);
       if (problemas.length) {
         await invalida(route, problemas);
         return true;
@@ -324,10 +426,11 @@ export function manejadorDefiniciones(estado: ApiFalsaDefiniciones): Manejador {
         id: Math.max(0, ...estado.definiciones.map((d) => d.id)) + 1,
         nombre,
         creado_en: ahora,
+        plataforma: entrada.plataforma ?? null,
         versiones: [{ numero: 1, creado_en: ahora, usada_en: null, contenido: contenidoDe(entrada) }],
       };
       estado.definiciones.push(nueva);
-      await json(route, 201, respuestaDe(nueva));
+      await json(route, 201, respuestaDe(nueva, vigente(nueva), estado.plataformas));
       return true;
     }
 
@@ -345,7 +448,7 @@ export function manejadorDefiniciones(estado: ApiFalsaDefiniciones): Manejador {
       }
       const pedida = url.searchParams.get('version');
       if (pedida === null) {
-        await json(route, 200, respuestaDe(definicion));
+        await json(route, 200, respuestaDe(definicion, vigente(definicion), estado.plataformas));
         return true;
       }
       const version = definicion.versiones.find((v) => v.numero === Number(pedida));
@@ -353,7 +456,7 @@ export function manejadorDefiniciones(estado: ApiFalsaDefiniciones): Manejador {
         await noExiste(route, 'version_no_encontrada', `La definicion no tiene la version ${pedida}`);
         return true;
       }
-      await json(route, 200, respuestaDe(definicion, version));
+      await json(route, 200, respuestaDe(definicion, version, estado.plataformas));
       return true;
     }
 
@@ -400,7 +503,7 @@ export function manejadorDefiniciones(estado: ApiFalsaDefiniciones): Manejador {
         return true;
       }
       const entrada = cuerpo as Entrada;
-      const problemas = problemasDe(entrada, definicion.nombre);
+      const problemas = problemasDe(entrada, definicion.nombre, estado.plataformas, definicion.plataforma ?? null);
       if (problemas.length) {
         await invalida(route, problemas);
         return true;
@@ -411,7 +514,7 @@ export function manejadorDefiniciones(estado: ApiFalsaDefiniciones): Manejador {
         usada_en: null,
         contenido: contenidoDe(entrada),
       });
-      await json(route, 201, respuestaDe(definicion));
+      await json(route, 201, respuestaDe(definicion, vigente(definicion), estado.plataformas));
       return true;
     }
 

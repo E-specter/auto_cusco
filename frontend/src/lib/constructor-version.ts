@@ -11,7 +11,8 @@
  * is the screen's (i18n): this only says which case applies and with which numbers.
  */
 
-import type { Borrador, DefinicionRespuesta } from './constructor-columnas';
+import { aDefinicion, definicionNueva, type Borrador, type DefinicionRespuesta } from './constructor-columnas';
+import type { ReglasPlataforma } from './plataformas';
 import { estaVacia } from './variantes';
 
 /**
@@ -79,12 +80,19 @@ export function guardadoDeUnaVersionAntigua(
  * Whether a definition that has never been saved has anything written, so Guardar is not offered on
  * a blank form. A name of spaces does not count, and neither does the single empty column it opens with.
  */
-export function hayContenido(borrador: Borrador): boolean {
+export function hayContenido(borrador: Borrador, reglas: ReglasPlataforma | null = null): boolean {
+  if (reglas !== null) {
+    // The columns a platform starts with are not something the analyst wrote: only a change to them counts.
+    const comparables = (b: Borrador) =>
+      JSON.stringify(aDefinicion(b).columnas.map((c) => ({ ...c, etiqueta: c.etiqueta ?? null, celda_texto: c.celda_texto ?? false })));
+    return borrador.nombre.trim() !== '' || comparables(borrador) !== comparables(definicionNueva(reglas));
+  }
   const columnaConContenido = borrador.columnas.some(
     (c) =>
       c.nombre.trim() !== '' ||
       !estaVacia(c.expresion) ||
       c.valor_por_defecto !== null ||
+      (c.etiqueta ?? '') !== '' ||
       c.variantes.length > 0,
   );
   return borrador.nombre.trim() !== '' || columnaConContenido || borrador.columnas.length > 1;

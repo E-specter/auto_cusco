@@ -20,6 +20,7 @@ const columna = (nodos: Borrador['columnas'][number]['expresion']['nodos'], vari
 
 const borrador = (columnas: Borrador['columnas'], segmentacion: Borrador['segmentacion'] = null): Borrador => ({
   nombre: 'd',
+  plataforma: null,
   columnas,
   segmentacion,
   proteger_formulas: false,

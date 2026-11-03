@@ -9,6 +9,7 @@
 import { ApiError, conJson, request } from './api';
 import { aDefinicion, type Borrador } from './constructor-columnas';
 import type { components } from './contrato-api';
+import type { ReglasPlataforma } from './plataformas';
 
 type Esquemas = components['schemas'];
 
@@ -23,6 +24,11 @@ const RUTA = '/definiciones-columnas';
 /** Every saved definition with its latest version, newest activity first as the API sorts them. */
 export function listarDefiniciones(signal?: AbortSignal): Promise<ResumenDefinicion[]> {
   return request<ResumenDefinicion[]>(RUTA, { signal });
+}
+
+/** The platforms a definition can be made for, and what each fixes (RF-72). Empty until a module registers one. */
+export function listarPlataformas(signal?: AbortSignal): Promise<ReglasPlataforma[]> {
+  return request<ReglasPlataforma[]>(`${RUTA}/plataformas`, { signal });
 }
 
 /** A definition with its latest version, or with `version` when it is given. */
