@@ -43,10 +43,11 @@ test.describe('carga inicial', () => {
     await expect(topeDe(page, 'mensaje')).toHaveValue('4096');
     for (const campo of ['video', 'audio', 'pdf'] as const) await expect(topeDe(page, campo)).toHaveValue('16');
 
-    // The panels that wait for their endpoints (T-WM-F1b) are there, in the order of the interface rules, and say so.
+    // The eight panels, in the order of the interface rules (§5). Only the two of saved messages still wait (T-HI-F2b).
     await expect(page.locator('h2.panel__title')).toHaveText([
       'Segmentos y mensajes',
       'Mensajes globales',
+      'WhatsApp de contacto',
       'Horarios de envío',
       'Nombre de la campaña',
       'Definición por defecto',
@@ -54,9 +55,11 @@ test.describe('carga inicial', () => {
       'Biblioteca de adjuntos',
     ]);
     await expect(page.getByRole('region', { name: 'Mensajes globales' })).toContainText('Disponible pronto.');
-    await expect(page.getByRole('region', { name: 'Definición por defecto' })).toContainText('Disponible pronto.');
-    await expect(page.getByRole('region', { name: 'Biblioteca de adjuntos' })).toContainText('Disponible pronto.');
     await expect(page.getByRole('region', { name: 'Segmentos y mensajes' })).toContainText('Mensaje de cada segmento');
+    await expect(page.getByRole('region', { name: 'Segmentos y mensajes' })).toContainText('Disponible pronto.');
+    for (const titulo of ['WhatsApp de contacto', 'Definición por defecto', 'Biblioteca de adjuntos']) {
+      await expect(page.getByRole('region', { name: titulo })).not.toContainText('Disponible pronto.');
+    }
   });
 
   test('avisa que Columnas, Supervisores y Calendario tienen su propia pantalla, con sus enlaces', async ({ page }) => {

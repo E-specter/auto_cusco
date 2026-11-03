@@ -172,6 +172,64 @@
   overflow-wrap: anywhere;
 }
 
+/* ---- Attachment library -------------------------------------------------------------
+   The row's actions sit side by side and wrap at 360 px; a long file name wraps anywhere instead of widening the
+   table. The archived ones are a closed `<details>`, not a panel of their own. */
+
+.wm-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* The active and the archived table share their widths (the same `<colgroup>`, fixed layout), so their columns line up
+   and read as one list. Under 48rem the table stacks and these widths do not apply. */
+.wm-adjuntos {
+  table-layout: fixed;
+  inline-size: 100%;
+}
+
+.wm-adjuntos .wm-col-nombre {
+  inline-size: 30%;
+}
+
+.wm-adjuntos .wm-col-tipo {
+  inline-size: 14%;
+}
+
+.wm-adjuntos .wm-col-tamano {
+  inline-size: 11%;
+}
+
+.wm-adjuntos .wm-col-subido {
+  inline-size: 15%;
+}
+
+.wm-adjuntos .wm-col-accion {
+  inline-size: 30%;
+}
+
+.wm-adjuntos td.wm-adjunto__nombre,
+.wm-adjuntos th.wm-adjunto__nombre {
+  overflow-wrap: anywhere;
+  min-inline-size: 14ch;
+}
+
+.wm-archivados > summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding-block: var(--space-2);
+}
+
+.wm-archivados[open] > summary {
+  margin-block-end: var(--space-2);
+}
+
+.wm-restaurar-subido {
+  align-self: flex-start;
+}
+
 /* ---- Panels that wait for another cut ------------------------------------------- */
 
 .wm-pronto {

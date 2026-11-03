@@ -8,12 +8,15 @@
  */
 import type { Page } from '@playwright/test';
 
+import type { ResumenDefinicion } from '../src/lib/api-definiciones';
 import type {
+  AdjuntoWhatsmkt,
   CodigoWhatsmkt,
   ConfiguracionWhatsmkt,
   ErrorWhatsmkt,
   SegmentoWhatsmkt,
   SegmentoWhatsmktEntrada,
+  TipoAdjunto,
 } from '../src/lib/api-whatsmkt';
 import { json, siguiente } from './apoyo';
 
@@ -29,8 +32,12 @@ type Guion = { estado: number; cuerpo?: unknown };
 export interface ApiFalsaWhatsmkt {
   configuracion: ConfiguracionWhatsmkt;
   segmentos: SegmentoWhatsmkt[];
+  /** The library, active and archived together (`archivado_en` tells them apart). */
+  adjuntos: AdjuntoWhatsmkt[];
+  /** Every saved definition of any platform, as `/definiciones-columnas` lists them. */
+  definiciones: ResumenDefinicion[];
   /** Scripted answers, taken in order (the last repeats); an empty queue means the fake decides. */
-  respuestas: { guardarConfiguracion: Guion[]; guardarSegmentos: Guion[] };
+  respuestas: { guardarConfiguracion: Guion[]; guardarSegmentos: Guion[]; subirAdjunto: Guion[] };
   sinRed: boolean;
   /** Every call the screen made, with its JSON body. */
   pedidos: Array<{ metodo: string; ruta: string; cuerpo: unknown }>;
@@ -76,10 +83,48 @@ export function apiWhatsmkt(): ApiFalsaWhatsmkt {
       { clave: 'tramo_2', etiqueta: 'Tramo 2', desde: 1, hasta: 8, orden: 1, texto_guardado_id: null },
       { clave: 'mayores_2', etiqueta: 'Tramos mayores al 2', desde: 9, hasta: null, orden: 2, texto_guardado_id: null },
     ],
-    respuestas: { guardarConfiguracion: [], guardarSegmentos: [] },
+    adjuntos: [
+      adjuntoSintetico(1, 'imagen_jpeg', 'afiche-octubre.jpg', 240_000),
+      adjuntoSintetico(2, 'pdf', 'tarifario.pdf', 1_500_000),
+      { ...adjuntoSintetico(3, 'video', 'spot-anterior.mp4', 8_000_000), archivado_en: '2026-10-12T15:00:00-05:00' },
+    ],
+    definiciones: [
+      definicionSintetica(11, 'Contactos WhatsMKT', 'whatsmkt'),
+      definicionSintetica(12, 'Contactos WhatsMKT con apellido', 'whatsmkt'),
+      definicionSintetica(13, 'Carga SMS de MES', 'mowa_mes'),
+    ],
+    respuestas: { guardarConfiguracion: [], guardarSegmentos: [], subirAdjunto: [] },
     sinRed: false,
     pedidos: [],
   };
+}
+
+/** An attachment of the library; the fingerprint is the file name (the fake treats the same name as the same file). */
+export function adjuntoSintetico(id: number, tipo: TipoAdjunto, nombre: string, tamano: number): AdjuntoWhatsmkt {
+  return { id, tipo, nombre, tamano, huella: nombre.toLowerCase(), creado_en: '2026-10-10T09:30:00-05:00', archivado_en: null };
+}
+
+export function definicionSintetica(id: number, nombre: string, plataforma: string | null): ResumenDefinicion {
+  return {
+    id,
+    nombre,
+    version_vigente: 1,
+    cantidad_versiones: 1,
+    actualizado_en: '2026-10-09T10:00:00-05:00',
+    vigente_usada: false,
+    plataforma,
+  };
+}
+
+/** The type a file name has by its extension, or `null` for one WhatsMKT does not accept. */
+function tipoDe(nombre: string): TipoAdjunto | null {
+  const extension = nombre.split('.').pop()?.toLowerCase() ?? '';
+  if (extension === 'jpg' || extension === 'jpeg') return 'imagen_jpeg';
+  if (extension === 'png') return 'imagen_png';
+  if (extension === 'mp4' || extension === 'mov') return 'video';
+  if (extension === 'mp3' || extension === 'ogg') return 'audio';
+  if (extension === 'pdf') return 'pdf';
+  return null;
 }
 
 const horarioValido = (inicio: string, fin: string) => inicio < fin;
@@ -138,6 +183,17 @@ export async function montarApiWhatsmkt(page: Page, estado: ApiFalsaWhatsmkt): P
           return json(route, 422, invalido(campo));
         }
       }
+      if ('whatsapp_contacto' in entrada) {
+        // 9 digits that start with 9; empty or null clears it.
+        const recibido = entrada.whatsapp_contacto === null ? '' : String(entrada.whatsapp_contacto).trim();
+        if (recibido !== '' && !/^9\d{8}$/.test(recibido)) return json(route, 422, errorWhatsmkt('whatsapp_invalido'));
+        entrada.whatsapp_contacto = recibido === '' ? null : recibido;
+      }
+      if ('definicion_defecto_id' in entrada && entrada.definicion_defecto_id !== null) {
+        const definicion = estado.definiciones.find((d) => d.id === entrada.definicion_defecto_id);
+        if (!definicion) return json(route, 404, { detail: 'No existe la definicion de columnas' });
+        if (definicion.plataforma !== 'whatsmkt') return json(route, 422, errorWhatsmkt('definicion_no_whatsmkt'));
+      }
       const siguienteConfiguracion = { ...estado.configuracion, ...entrada } as ConfiguracionWhatsmkt;
       const malos = (['horario_1', 'horario_2'] as const).filter(
         (franja) => !horarioValido(siguienteConfiguracion[franja].inicio, siguienteConfiguracion[franja].fin),
@@ -170,6 +226,51 @@ export async function montarApiWhatsmkt(page: Page, estado: ApiFalsaWhatsmkt): P
             segmento.texto_guardado_id ?? estado.segmentos.find((s) => s.clave === segmento.clave)?.texto_guardado_id ?? null,
         }));
       return json(route, 200, estado.segmentos);
+    }
+
+    if (ruta === '/definiciones-columnas' && metodo === 'GET') return json(route, 200, estado.definiciones);
+
+    if (ruta === '/whatsmkt/adjuntos' && metodo === 'GET') {
+      const archivados = url.searchParams.get('archivados') === 'true';
+      return json(route, 200, estado.adjuntos.filter((a) => (a.archivado_en !== null) === archivados));
+    }
+    if (ruta === '/whatsmkt/adjuntos' && metodo === 'POST') {
+      const guion = siguiente(estado.respuestas.subirAdjunto);
+      if (guion) return json(route, guion.estado, guion.cuerpo ?? {});
+
+      // The file's name is read from the multipart body; the same name is the same file (same fingerprint).
+      const nombre = /filename="([^"]*)"/.exec(texto ?? '')?.[1] ?? 'archivo';
+      const tipo = tipoDe(nombre);
+      if (tipo === null) return json(route, 422, errorWhatsmkt('adjunto_tipo'));
+      const existente = estado.adjuntos.find((a) => a.huella === nombre.toLowerCase());
+      if (existente) return json(route, 201, { ...existente, ya_existia: true });
+      const nuevo = adjuntoSintetico(Math.max(0, ...estado.adjuntos.map((a) => a.id)) + 1, tipo, nombre, Math.max(1, (texto ?? '').length));
+      nuevo.creado_en = AHORA_WHATSMKT;
+      estado.adjuntos.push(nuevo);
+      return json(route, 201, { ...nuevo, ya_existia: false });
+    }
+    const deAdjunto = /^\/whatsmkt\/adjuntos\/(\d+)\/(contenido|archivar|desarchivar)$/.exec(ruta);
+    if (deAdjunto) {
+      const adjunto = estado.adjuntos.find((a) => a.id === Number(deAdjunto[1]));
+      if (!adjunto) return json(route, 404, { detail: 'No existe el adjunto' });
+      if (deAdjunto[2] === 'contenido' && metodo === 'GET') {
+        return route.fulfill({
+          status: 200,
+          headers: {
+            'content-type': 'application/octet-stream',
+            'content-disposition': `attachment; filename="${adjunto.nombre}"`,
+          },
+          body: `contenido sintetico de ${adjunto.nombre}`,
+        });
+      }
+      if (deAdjunto[2] === 'archivar' && metodo === 'POST') {
+        adjunto.archivado_en ??= AHORA_WHATSMKT;
+        return json(route, 200, adjunto);
+      }
+      if (deAdjunto[2] === 'desarchivar' && metodo === 'POST') {
+        adjunto.archivado_en = null;
+        return json(route, 200, adjunto);
+      }
     }
 
     return json(route, 404, { detail: `Sin fake para ${metodo} ${ruta}` });

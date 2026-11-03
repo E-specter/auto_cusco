@@ -9,6 +9,7 @@
 
 import { ApiError } from './api';
 import type { ErrorWhatsmkt, SegmentoWhatsmktEntrada } from './api-whatsmkt';
+import { formatNumber } from './format';
 import { t } from './i18n';
 
 // ---- Limits (RF-WM-26, RF-WM-31) ---------------------------------------------------------------
@@ -185,4 +186,57 @@ export function errorDeSegmentos(
     };
   }
   return { fila: null, texto: error.detail };
+}
+
+// ---- Contact WhatsApp (DU-WM-11) --------------------------------------------------------------------
+
+/** 9 digits that start with 9: the number `[whatsapp]` turns into a link with (the same field as MOWA MES, RF-MM-16). */
+const WHATSAPP = /^9\d{8}$/;
+
+/** The field holds a valid value if it is empty (the number is optional) or a 9-digit number that starts with 9. */
+export const whatsappValido = (texto: string): boolean => texto.trim() === '' || WHATSAPP.test(texto.trim());
+
+/** What to send for what was typed: the number, or `null` to clear it when the field is empty. */
+export const whatsappAEnviar = (texto: string): string | null => (texto.trim() === '' ? null : texto.trim());
+
+// ---- Default definition (RF-WM-04, RF-WM-09) --------------------------------------------------------
+
+/** The saved definitions of the WhatsMKT platform, in the order the API gives them (it lists every platform). */
+export function definicionesDeWhatsmkt<T extends { plataforma: string | null }>(definiciones: readonly T[]): T[] {
+  return definiciones.filter((definicion) => definicion.plataforma === 'whatsmkt');
+}
+
+// ---- Attachment library (RF-WM-30 to RF-WM-32) ------------------------------------------------------
+
+/** `240 KB`, `1.5 MB`: decimal base like the limits (1 MB = 1 000 000 bytes), never a figure the user did not type. */
+export function tamanoLegible(bytes: number): string {
+  if (bytes < 1_000) return `${formatNumber(bytes)} B`;
+  // 999 999 bytes rounds to 1 000 KB: that is already «1 MB».
+  const kilobytes = Math.round(bytes / 1_000);
+  if (kilobytes < 1_000) return `${formatNumber(kilobytes)} KB`;
+  return `${formatNumber(Math.round(bytes / (BYTES_POR_MB / 10)) / 10)} MB`;
+}
+
+export const esImagen = (tipo: string): boolean => tipo === 'imagen_jpeg' || tipo === 'imagen_png';
+
+/** The text of an attachment type under `prefijo`, or the type as the server wrote it if this build does not know it. */
+function textoDeTipo(prefijo: string, tipo: string): string {
+  const clave = `${prefijo}.${tipo}`;
+  const texto = t(clave);
+  return texto === clave ? tipo : texto;
+}
+
+/** «Imagen JPEG», «PDF»: the type for a table cell. */
+export const nombreDeTipo = (tipo: string): string => textoDeTipo('whatsmkt.biblioteca.tipo', tipo);
+
+/** The type inside a sentence («el máximo para video es …»). */
+export const tipoEnFrase = (tipo: string): string => textoDeTipo('whatsmkt.biblioteca.tipoFrase', tipo);
+
+/** The text of an attachment refusal, with the sizes and the type in the user's words and not in bytes. */
+export function textoDeErrorAdjunto(error: ErrorWhatsmkt): string {
+  return textoDeCodigo(error, {
+    peso: error.peso === null ? null : tamanoLegible(error.peso),
+    maximo: error.maximo === null ? null : tamanoLegible(error.maximo),
+    tipo: error.tipo === null ? null : tipoEnFrase(error.tipo),
+  });
 }

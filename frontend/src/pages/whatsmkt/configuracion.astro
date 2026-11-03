@@ -1,8 +1,8 @@
 ---
 /**
- * WhatsMKT configuration (T-WM-F1a): what every campaign starts from. The segment table, the send time
- * slots, the campaign-name template and the limits. The messages, the default definition and the
- * attachment library are panels that wait for their endpoints (T-WM-F1b) and say so.
+ * WhatsMKT configuration (T-WM-F1a, T-WM-F1b1): what every campaign starts from. The segment table, the
+ * contact WhatsApp, the send time slots, the campaign-name template, the default definition, the limits and the
+ * attachment library. The messages (the two panels of saved texts) wait for T-HI-F2b and say so.
  *
  * Every panel saves on its own: they are independent settings, and a failed save in one must not throw
  * away edits in another. The supervisors, the working-day calendar and the load columns are shared by every
@@ -85,7 +85,49 @@ import '../../styles/whatsmkt.css';
         </div>
       </section>
 
-      <!-- ---- 3. Send time slots ---------------------------------------------------- -->
+      <!-- ---- 3. Contact WhatsApp: what `[whatsapp]` in a message is replaced with (DU-WM-11) ---------- -->
+      <section class="panel" aria-labelledby="wm-whatsapp-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="wm-whatsapp-title" data-i18n="whatsmkt.configuracion.whatsapp">WhatsApp de contacto</h2>
+        </div>
+        <form class="panel__body wm-form" data-form-whatsapp novalidate>
+          <div class="field">
+            <!-- The panel's title already says «WhatsApp de contacto»: the field is only «Número». -->
+            <label class="field__label" for="wm-whatsapp" data-i18n="whatsmkt.configuracion.whatsapp.numero">Número</label>
+            <input
+              class="input mono"
+              id="wm-whatsapp"
+              type="text"
+              inputmode="numeric"
+              maxlength="9"
+              autocomplete="off"
+              aria-describedby="wm-whatsapp-hint wm-whatsapp-error"
+            />
+            <p class="field__hint" id="wm-whatsapp-hint" data-i18n="whatsmkt.configuracion.whatsapp.hint">
+              Número de 9 dígitos que empieza con 9. Donde un mensaje dice [whatsapp], se escribe https://wa.me/+51 y el número.
+            </p>
+            <p class="field__error" id="wm-whatsapp-error" data-whatsapp-error role="alert"></p>
+          </div>
+
+          <p class="notice notice--warning" data-sin-whatsapp hidden>
+            <Icon name="triangle-alert" size={20} />
+            <span data-i18n="whatsmkt.configuracion.sinWhatsapp">
+              Sin WhatsApp de contacto, los mensajes que usan [whatsapp] no se pueden enviar.
+            </span>
+          </p>
+
+          <p class="field__error" data-whatsapp-general role="alert"></p>
+          <div class="wm-form__foot">
+            <button type="submit" class="btn btn--primary" data-whatsapp-guardar>
+              <span class="btn__spinner" aria-hidden="true"></span>
+              <span class="btn__label" data-i18n="whatsmkt.configuracion.guardarWhatsapp">Guardar WhatsApp</span>
+            </button>
+            <p class="mono muted" data-whatsapp-estado role="status"></p>
+          </div>
+        </form>
+      </section>
+
+      <!-- ---- 4. Send time slots ---------------------------------------------------- -->
       <section class="panel" aria-labelledby="wm-horarios-title">
         <div class="panel__head">
           <h2 class="panel__title" id="wm-horarios-title" data-i18n="whatsmkt.configuracion.horarios">Horarios de envío</h2>
@@ -191,14 +233,39 @@ import '../../styles/whatsmkt.css';
         </form>
       </section>
 
-      <!-- ---- 5. Default definition: waits for the platform in the definitions (T-WM-F1b) -- -->
+      <!-- ---- 6. Default definition (RF-WM-04, RF-WM-09): the saved definitions of the WhatsMKT platform ------ -->
       <section class="panel" aria-labelledby="wm-definicion-title">
         <div class="panel__head">
           <h2 class="panel__title" id="wm-definicion-title" data-i18n="whatsmkt.configuracion.definicionDefecto">Definición por defecto</h2>
         </div>
-        <div class="panel__body wm-pronto">
-          <p class="field__hint" data-i18n="whatsmkt.configuracion.pronto">Disponible pronto.</p>
-        </div>
+        <form class="panel__body wm-form" data-form-definicion novalidate>
+          <div class="field">
+            <label class="field__label" for="wm-definicion" data-i18n="whatsmkt.archivo.definicion">Definición de columnas</label>
+            <select class="input" id="wm-definicion" aria-describedby="wm-definicion-hint wm-definicion-error"></select>
+            <p class="field__hint" id="wm-definicion-hint" data-i18n="whatsmkt.configuracion.definicion.hint">
+              Es la definición de plataforma WhatsMKT con la que parte cada campaña; en la campaña se puede elegir otra.
+            </p>
+            <p class="field__error" id="wm-definicion-error" data-definicion-error role="alert"></p>
+          </div>
+
+          <p class="notice notice--warning" data-sin-definiciones hidden>
+            <Icon name="triangle-alert" size={20} />
+            <span data-i18n="whatsmkt.archivo.crearAviso">Crea una definición de WhatsMKT en Columnas de carga para armar el archivo.</span>
+          </p>
+
+          <div class="wm-form__foot">
+            <button type="submit" class="btn btn--primary" data-definicion-guardar>
+              <span class="btn__spinner" aria-hidden="true"></span>
+              <span class="btn__label" data-i18n="whatsmkt.configuracion.guardarDefinicion">Guardar definición</span>
+            </button>
+            <!-- A plain link until the constructor can send the analyst back (T-HI-F3). -->
+            <a class="btn btn--sm" href="/columnas" data-columnas>
+              <Icon name="square-pen" size={16} />
+              <span data-columnas-texto data-i18n="whatsmkt.archivo.editar">Editar en Columnas de carga</span>
+            </a>
+            <p class="mono muted" data-definicion-estado role="status"></p>
+          </div>
+        </form>
       </section>
 
       <!-- ---- 6. Limits ------------------------------------------------------------------- -->
@@ -307,17 +374,66 @@ import '../../styles/whatsmkt.css';
         </form>
       </section>
 
-      <!-- ---- 7. Attachment library: waits for the attachment endpoints (T-WM-F1b) ----------- -->
+      <!-- ---- 8. Attachment library (RF-WM-30 to RF-WM-32), drawn by scripts/whatsmkt-biblioteca.ts ---------- -->
       <section class="panel" aria-labelledby="wm-biblioteca-title">
         <div class="panel__head">
           <h2 class="panel__title" id="wm-biblioteca-title" data-i18n="whatsmkt.biblioteca.titulo">Biblioteca de adjuntos</h2>
         </div>
-        <div class="panel__body wm-pronto">
-          <p class="field__hint" data-i18n="whatsmkt.configuracion.pronto">Disponible pronto.</p>
+        <div class="panel__body wm-form">
+          <div data-biblioteca-activos></div>
+
+          <form class="wm-form" data-form-subir novalidate>
+            <div class="field">
+              <span class="field__label" id="wm-adjunto-label" data-i18n="whatsmkt.biblioteca.archivo">Archivo a subir</span>
+              <div class="filepick">
+                <input
+                  class="filepick__input"
+                  id="wm-adjunto"
+                  name="archivo"
+                  type="file"
+                  accept="image/jpeg,image/png,video/*,audio/*,application/pdf"
+                  aria-labelledby="wm-adjunto-label"
+                  aria-describedby="wm-adjunto-hint wm-adjunto-error"
+                />
+                <label class="filepick__button" for="wm-adjunto" data-i18n="whatsmkt.biblioteca.elegir">Elegir archivo</label>
+                <span class="filepick__name mono" data-adjunto-nombre data-i18n="whatsmkt.biblioteca.sinArchivo">
+                  Ningún archivo elegido
+                </span>
+              </div>
+              <p class="field__hint" id="wm-adjunto-hint" data-i18n="whatsmkt.biblioteca.hint">
+                Imagen JPEG o PNG, video, audio o PDF. WhatsMKT no admite otros tipos.
+              </p>
+            </div>
+            <p class="field__error" id="wm-adjunto-error" data-adjunto-error role="alert"></p>
+            <div class="wm-form__foot">
+              <button type="submit" class="btn btn--primary" data-subir>
+                <span class="btn__spinner" aria-hidden="true"></span>
+                <Icon name="upload" size={16} />
+                <span class="btn__label" data-i18n="whatsmkt.biblioteca.subir">Subir un archivo</span>
+              </button>
+              <p class="mono muted" data-biblioteca-estado role="status"></p>
+              <button type="button" class="btn btn--sm wm-restaurar-subido" data-restaurar-subido hidden>
+                <Icon name="archive-restore" size={16} />
+                <span data-i18n="whatsmkt.biblioteca.restaurar">Restaurar</span>
+              </button>
+            </div>
+          </form>
+
+          <p class="field__error" data-biblioteca-error role="alert"></p>
+
+          <details class="wm-archivados" data-biblioteca-archivados hidden>
+            <summary data-biblioteca-archivados-titulo></summary>
+            <div data-biblioteca-archivados-tabla></div>
+          </details>
         </div>
       </section>
     </div>
   </div>
+
+  <!-- Icons for the rows of the library: rendered once here, cloned per row. -->
+  <template data-icono-descargar><Icon name="download" size={16} /></template>
+  <template data-icono-archivar><Icon name="archive" size={16} /></template>
+  <template data-icono-restaurar><Icon name="archive-restore" size={16} /></template>
 
   <!-- ---- Generic failure ---------------------------------------------- -->
   <dialog class="dialog" data-dialog="error" aria-labelledby="wm-error-title">
@@ -338,6 +454,8 @@ import '../../styles/whatsmkt.css';
 
 <script>
   import { NetworkError, mensajeDeError } from '../../lib/api';
+  import { listarDefiniciones, type ResumenDefinicion } from '../../lib/api-definiciones';
+  import { montarBiblioteca } from '../../scripts/whatsmkt-biblioteca';
   import { $, ocupado } from '../../lib/dom';
   import {
     guardarConfiguracion,
@@ -361,6 +479,7 @@ import '../../styles/whatsmkt.css';
     LARGO_MAXIMO_ETIQUETA,
     errorDeModulo,
     errorDeSegmentos,
+    definicionesDeWhatsmkt,
     horarioValido,
     leerSegmentos,
     leerTope,
@@ -369,6 +488,8 @@ import '../../styles/whatsmkt.css';
     textoDeHorarioInvalido,
     nombreDeFranja,
     textoDeTope,
+    whatsappAEnviar,
+    whatsappValido,
     type CampoTope,
     type FilaSegmentoTexto,
     type Franja,
@@ -377,6 +498,8 @@ import '../../styles/whatsmkt.css';
   const estado = {
     configuracion: null as ConfiguracionWhatsmkt | null,
     segmentos: [] as SegmentoWhatsmkt[],
+    /** Every saved definition, of any platform (the API lists them all); `null` when the list could not be read. */
+    definiciones: null as ResumenDefinicion[] | null,
   };
 
   const dialogoError = $<HTMLDialogElement>('[data-dialog="error"]');
@@ -872,6 +995,149 @@ import '../../styles/whatsmkt.css';
     );
   });
 
+  // ---- 3. Contact WhatsApp (DU-WM-11) -------------------------------------------------------------------
+
+  const formWhatsapp = $<HTMLFormElement>('[data-form-whatsapp]');
+  const inputWhatsapp = $<HTMLInputElement>('#wm-whatsapp');
+  const botonWhatsapp = $<HTMLButtonElement>('[data-whatsapp-guardar]');
+  const errorWhatsapp = $<HTMLElement>('[data-whatsapp-error]');
+
+  function errorDeWhatsapp(texto: string): void {
+    errorWhatsapp.textContent = texto;
+    marcar(inputWhatsapp, texto !== '');
+  }
+
+  /** The number is optional; one that is written has to be 9 digits that start with 9. */
+  function revisarWhatsapp(): boolean {
+    const valido = whatsappValido(inputWhatsapp.value);
+    errorDeWhatsapp(valido ? '' : t('whatsmkt.codigo.whatsapp_invalido'));
+    return valido;
+  }
+
+  function pintarWhatsapp(): void {
+    const guardado = estado.configuracion?.whatsapp_contacto ?? null;
+    inputWhatsapp.value = guardado ?? '';
+    // Without a number the messages that use [whatsapp] cannot be sent: the panel says so.
+    $<HTMLElement>('[data-sin-whatsapp]').hidden = guardado !== null;
+    errorDeWhatsapp('');
+  }
+
+  alSalir(inputWhatsapp, botonWhatsapp, revisarWhatsapp);
+  inputWhatsapp.addEventListener('input', () => {
+    $<HTMLElement>('[data-whatsapp-general]').textContent = '';
+    if (errorWhatsapp.textContent !== '') revisarWhatsapp();
+  });
+
+  formWhatsapp.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    const general = $<HTMLElement>('[data-whatsapp-general]');
+    general.textContent = '';
+    if (!revisarWhatsapp()) {
+      inputWhatsapp.focus();
+      return;
+    }
+
+    await guardar(
+      botonWhatsapp,
+      async () => {
+        // An empty field clears the number (`null`); a field left out would keep it.
+        estado.configuracion = await guardarConfiguracion({ whatsapp_contacto: whatsappAEnviar(inputWhatsapp.value) });
+        pintarWhatsapp();
+        avisarGuardado($<HTMLElement>('[data-whatsapp-estado]'));
+      },
+      (caido) => {
+        const fallo = errorDeModulo(caido);
+        if (fallo?.codigo === 'whatsapp_invalido') {
+          errorDeWhatsapp(textoDeCodigo(fallo));
+          inputWhatsapp.focus();
+          return;
+        }
+        general.textContent = mensajeDeError(caido);
+      },
+    );
+  });
+
+  // ---- 6. Default definition (RF-WM-04, RF-WM-09) -----------------------------------------------------
+
+  const formDefinicion = $<HTMLFormElement>('[data-form-definicion]');
+  const selectDefinicion = $<HTMLSelectElement>('#wm-definicion');
+  const botonDefinicion = $<HTMLButtonElement>('[data-definicion-guardar]');
+  const errorDefinicion = $<HTMLElement>('[data-definicion-error]');
+
+  function opcionDe(valor: string, texto: string): HTMLOptionElement {
+    const opcion = document.createElement('option');
+    opcion.value = valor;
+    opcion.textContent = texto;
+    return opcion;
+  }
+
+  /**
+   * The select offers «sin definición» and the saved definitions of the WhatsMKT platform. With none (or with the list
+   * unread) it is off and says why; the link then goes to create one. A saved id that is no longer on the list (the
+   * definition changed platform) stays on the select by its number, so the field never says another thing than what is saved.
+   */
+  function pintarDefinicion(): void {
+    const config = estado.configuracion;
+    if (!config) return;
+    const lista = definicionesDeWhatsmkt(estado.definiciones ?? []);
+    const sinLista = lista.length === 0;
+    const guardada = config.definicion_defecto_id;
+
+    selectDefinicion.replaceChildren();
+    if (sinLista) {
+      selectDefinicion.append(opcionDe('', t('whatsmkt.archivo.sinDefiniciones')));
+    } else {
+      selectDefinicion.append(opcionDe('', t('whatsmkt.configuracion.definicion.ninguna')));
+      lista.forEach((definicion) => selectDefinicion.append(opcionDe(String(definicion.id), definicion.nombre)));
+      if (guardada !== null && !lista.some((definicion) => definicion.id === guardada)) {
+        selectDefinicion.append(opcionDe(String(guardada), `#${guardada}`));
+      }
+    }
+    selectDefinicion.value = guardada === null || sinLista ? '' : String(guardada);
+    selectDefinicion.disabled = sinLista;
+    botonDefinicion.disabled = sinLista;
+    // With no definition of the platform the notice says to create one; the link goes to the same screen either way.
+    $<HTMLElement>('[data-sin-definiciones]').hidden = !sinLista || estado.definiciones === null;
+    const textoEnlace = $<HTMLElement>('[data-columnas-texto]');
+    const clave = sinLista ? 'whatsmkt.archivo.crear' : 'whatsmkt.archivo.editar';
+    textoEnlace.dataset.i18n = clave;
+    textoEnlace.textContent = t(clave);
+  }
+
+  selectDefinicion.addEventListener('change', () => {
+    errorDefinicion.textContent = '';
+    marcar(selectDefinicion, false);
+  });
+
+  formDefinicion.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    errorDefinicion.textContent = '';
+    marcar(selectDefinicion, false);
+
+    await guardar(
+      botonDefinicion,
+      async () => {
+        const elegida = selectDefinicion.value;
+        estado.configuracion = await guardarConfiguracion({ definicion_defecto_id: elegida === '' ? null : Number(elegida) });
+        pintarDefinicion();
+        avisarGuardado($<HTMLElement>('[data-definicion-estado]'));
+      },
+      (caido) => {
+        // The refusal of a definition that is not of the platform (422) and a definition that no longer exists (404)
+        // both belong to the select; any other failure is the panel's.
+        const fallo = errorDeModulo(caido);
+        errorDefinicion.textContent =
+          fallo?.codigo === 'definicion_no_whatsmkt' ? textoDeCodigo(fallo) : mensajeDeError(caido);
+        marcar(selectDefinicion, true);
+        selectDefinicion.focus();
+      },
+    );
+  });
+
+  // ---- 8. Attachment library ------------------------------------------------------------------------------
+
+  const biblioteca = montarBiblioteca();
+
   // ---- Boot ----------------------------------------------------------------------------------------
 
   function sinConexion(si: boolean): void {
@@ -891,6 +1157,18 @@ import '../../styles/whatsmkt.css';
       pintarHorarios();
       pintarNombre();
       pintarTopes();
+      pintarWhatsapp();
+
+      // Neither list may take the rest of the screen down: each says its own failure in its panel.
+      try {
+        estado.definiciones = await listarDefiniciones();
+        errorDefinicion.textContent = '';
+      } catch (caido) {
+        estado.definiciones = null;
+        errorDefinicion.textContent = mensajeDeError(caido);
+      }
+      pintarDefinicion();
+      void biblioteca.cargar();
     } catch (caido) {
       if (caido instanceof NetworkError) {
         sinConexion(true);
@@ -920,6 +1198,8 @@ import '../../styles/whatsmkt.css';
     });
     pintarMeta();
     revisarPlantilla();
+    pintarDefinicion();
+    biblioteca.repintar();
   });
 
   void arrancar();

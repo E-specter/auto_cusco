@@ -56,6 +56,24 @@ for (const tema of ['light', 'dark'] as const) {
         await sinViolaciones(page);
       });
 
+      test('configuración, con los archivados abiertos y los errores del WhatsApp y de la subida', async ({ page }) => {
+        await page.goto('/whatsmkt/configuracion');
+        await expect(page.getByLabel('Nombre del segmento Preventivo')).toBeVisible();
+        // The library fold open, with its table of archived attachments.
+        await page.locator('[data-biblioteca-archivados] summary').click();
+        await expect(page.getByRole('table', { name: 'Adjuntos archivados' })).toBeVisible();
+
+        await page.locator('#wm-whatsapp').fill('812345678');
+        await page.locator('#wm-whatsapp').blur();
+        await expect(page.locator('[data-whatsapp-error]')).not.toBeEmpty();
+
+        await page.locator('#wm-adjunto').setInputFiles({ name: 'datos.txt', mimeType: 'text/plain', buffer: Buffer.from('sintetico') });
+        await page.getByRole('button', { name: 'Subir un archivo' }).click();
+        await expect(page.locator('[data-adjunto-error]')).not.toBeEmpty();
+
+        await sinViolaciones(page);
+      });
+
       test('configuración, con el error de una fila, el de una franja, el del nombre y el de un tope', async ({ page }) => {
         await page.goto('/whatsmkt/configuracion');
         await expect(page.getByLabel('Nombre del segmento Preventivo')).toBeVisible();
