@@ -244,6 +244,8 @@ Los códigos los define el backend en su enum (`whatsmkt.codigo.*`, RF-WM-43) y 
 | `sin_telefono` | Exclusiones | Sin teléfono | No phone |
 | `telefono_invalido` | Exclusiones | Teléfono inválido | Invalid phone |
 | `macro_vacia` | Exclusiones | Macro vacía | Empty macro |
+| `sin_dias_atraso` | Exclusiones (solo por segmento) | Sin días de atraso | No days overdue |
+| `sin_supervisores` | Resumen de la previsualización y «Crear» | No hay supervisores configurados: sin ellos no se crea la campaña. | There are no supervisors set up: the campaign cannot be created without them. |
 | `mensaje_con_emoji` | Bajo el mensaje | No se admiten emojis: el primero es «{caracter}», en la posición {posicion}. | Emojis are not allowed: the first one is “{caracter}”, at position {posicion}. |
 | `macro_inexistente` | Bajo el mensaje | {macro} no existe en la definición elegida: tiene {n} macros. | {macro} does not exist in the chosen definition: it has {n} macros. |
 | `mensaje_largo` | Bajo el mensaje | El mensaje tiene {largo} caracteres: el máximo es {maximo}. | The message has {largo} characters: the maximum is {maximo}. |
@@ -269,8 +271,11 @@ Los códigos los define el backend en su enum (`whatsmkt.codigo.*`, RF-WM-43) y 
 | `campana_descartada` | Bajo el informe | La campaña está descartada. Restáurala primero. | The campaign is discarded. Restore it first. |
 | `campana_no_descartada` | (respaldo) | Solo se puede eliminar una campaña descartada. Descártala primero. | Only a discarded campaign can be deleted. Discard it first. |
 
-Las tres primeras son motivos de exclusión: además del texto corto, llevan un detalle para la columna Detalle, con su clave `whatsmkt.exclusiones.*`, como en MOWA:
+Las cuatro primeras son motivos de exclusión: además del texto corto, llevan un detalle para la columna Detalle, con su clave `whatsmkt.exclusiones.*`, como en MOWA:
 - `macro_vacia`: es «La macro {n} ({etiqueta}) queda vacía y su columna no tiene valor por defecto.» / en «Macro {n} ({etiqueta}) is empty and its column has no default value.»
+- `sin_dias_atraso`: es «No tiene días de atraso, así que no cae en ningún segmento. En el modo «Global» sí entraría.» / en «It has no days overdue, so it falls in no segment. In “Global” mode it would be included.» Es el caso de `sin_speech` de MOWA. En el modo global no se excluye.
+
+`sin_supervisores` se detecta en la previsualización, no recién al crear: va en el resumen de problemas, deja «Crear» inactivo, y en lugar de «Ir al campo» lleva «Configurar supervisores» (`whatsmkt.previa.irSupervisores`), que abre Supervisores con ir y volver (§2). Si aun así llega al crear (alguien los borró entretanto), va arriba en `role="alert"` con el mismo enlace.
 
 ## 8. Textos de la interfaz (es / en)
 
@@ -338,6 +343,7 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.previa.resumenVarias` | Se crearán {n} campañas · {filas} filas en total | {n} campaigns will be created · {filas} rows in total |
 | `whatsmkt.previa.resumenUna` | Se creará 1 campaña · {filas} filas | 1 campaign will be created · {filas} rows |
 | `whatsmkt.previa.irAlCampo` | Ir al campo | Go to the field |
+| `whatsmkt.previa.irSupervisores` | Configurar supervisores | Set up supervisors |
 | `whatsmkt.previa.sinExclusiones` | Ningún producto queda fuera. | No product is left out. |
 | `whatsmkt.crear.una` | Crear campaña | Create campaign |
 | `whatsmkt.crear.varias` | Crear {n} campañas | Create {n} campaigns |
@@ -384,6 +390,7 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.configuracion.horario.desde` | Desde | From |
 | `whatsmkt.configuracion.horario.hasta` | Hasta | To |
 | `whatsmkt.configuracion.pronto` | Disponible pronto. | Available soon. |
+| `whatsmkt.configuracion.nombre.variablesHint` | {fecha_corte}: la fecha de corte, como AAAA.MM.DD. {segmento}: el nombre del segmento; queda vacío en una campaña global. | {fecha_corte}: the cut-off date, as YYYY.MM.DD. {segmento}: the segment name; empty in a global campaign. |
 | `whatsmkt.configuracion.globalesHint` | Para las campañas especiales, con un solo mensaje para toda la selección. | For special campaigns, with a single message for the whole selection. |
 | `whatsmkt.configuracion.horarios` | Horarios de envío | Send time slots |
 | `whatsmkt.configuracion.definicionDefecto` | Definición por defecto | Default definition |
