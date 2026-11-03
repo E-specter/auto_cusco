@@ -73,6 +73,42 @@ test.describe('carga inicial', () => {
   });
 });
 
+test.describe('a 360 px', () => {
+  test('la tabla se apila y nada se sale de su panel ni de la página', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 780 });
+    await abrir(page, apiSupervisionCalendario());
+
+    const geometria = await page.evaluate(() => {
+      const panel = document.querySelector('.table-scroll')!.getBoundingClientRect();
+      const fuera = [...document.querySelectorAll('.calendario__tabla th, .calendario__tabla td, .calendario__tabla button')]
+        .filter((n) => {
+          const r = n.getBoundingClientRect();
+          return r.width > 0 && (r.left < panel.left - 0.5 || r.right > panel.right + 0.5);
+        })
+        .length;
+      return {
+        pagina: document.documentElement.scrollWidth,
+        vista: window.innerWidth,
+        fuera,
+        celdas: document.querySelectorAll('.calendario__tabla td[data-etiqueta]').length,
+        sinEtiqueta: document.querySelectorAll('.calendario__tabla td:not([data-etiqueta])').length,
+        // The text itself on one line (the cell's own height also holds the stacked label).
+        fechaEnUnaLinea: [...document.querySelectorAll('.calendario__tabla tbody th')].every((n) => {
+          const rango = document.createRange();
+          rango.selectNodeContents(n);
+          return new Set([...rango.getClientRects()].map((r) => Math.round(r.top))).size === 1;
+        }),
+      };
+    });
+
+    expect(geometria.pagina).toBeLessThanOrEqual(geometria.vista);
+    expect(geometria.fuera).toBe(0);
+    expect(geometria.celdas).toBeGreaterThan(0);
+    expect(geometria.sinEtiqueta).toBe(0);
+    expect(geometria.fechaEnUnaLinea).toBe(true);
+  });
+});
+
 test.describe('días no laborables', () => {
   test('un feriado de ley se retira con una excepción, nunca se borra', async ({ page }) => {
     const api = apiSupervisionCalendario();

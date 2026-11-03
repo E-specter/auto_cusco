@@ -51,9 +51,17 @@
   text-transform: capitalize;
 }
 
+/* The date ("01 ene. 2026") is one line, stacked or not. */
+.calendario__tabla tbody th {
+  white-space: nowrap;
+}
+
 /* A withdrawn holiday still reads, struck through, so the year's exception is
    visible where the holiday would have been. */
 .calendario__tabla tr[data-retirado='true'] .calendario__descripcion {
   color: var(--color-text-muted);
+}
+
+.calendario__tabla tr[data-retirado='true'] .calendario__descripcion > span {
   text-decoration: line-through;
 }

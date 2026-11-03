@@ -220,7 +220,7 @@ import '../styles/calendario.css';
     const scroll = document.createElement('div');
     scroll.className = 'table-scroll';
     const tabla = document.createElement('table');
-    tabla.className = 'table calendario__tabla';
+    tabla.className = 'table calendario__tabla table--apilable';
 
     const cabeza = document.createElement('thead');
     const filaCabeza = document.createElement('tr');
@@ -256,15 +256,22 @@ import '../styles/calendario.css';
     fecha.scope = 'row';
     fecha.className = 'mono';
     fecha.textContent = formatDate(dia.fecha);
+    fecha.dataset.etiqueta = t('calendario.col.fecha');
 
     const semana = document.createElement('td');
     semana.textContent = diaDeLaSemana(dia.fecha);
+    semana.dataset.etiqueta = t('calendario.col.dia');
 
     const descripcion = document.createElement('td');
     descripcion.className = 'calendario__descripcion';
-    descripcion.textContent = dia.descripcion;
+    // The strike-through goes on this span, so the stacked label (a ::before of the cell) keeps none.
+    const textoDescripcion = document.createElement('span');
+    textoDescripcion.textContent = dia.descripcion;
+    descripcion.append(textoDescripcion);
+    descripcion.dataset.etiqueta = t('calendario.col.descripcion');
 
     const origen = document.createElement('td');
+    origen.dataset.etiqueta = t('calendario.col.origen');
     const tag = document.createElement('span');
     if (dia.origen === 'agregado') {
       tag.className = 'tag tag--info';
@@ -279,6 +286,7 @@ import '../styles/calendario.css';
     origen.append(tag);
 
     const accion = document.createElement('td');
+    accion.dataset.etiqueta = t('calendario.col.accion');
     const tipo = accionDia(dia);
     const control = boton(
       `calendario.accion.${tipo}`,
