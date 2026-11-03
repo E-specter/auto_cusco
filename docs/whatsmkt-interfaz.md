@@ -221,7 +221,8 @@ Cada bloque se guarda por separado, como en MOWA. Los paneles van en este orden:
 6. **Archivo de carga** (RF-WM-09): el `select` de la definición por defecto, con las de plataforma WhatsMKT, y «Editar en Columnas de carga».
 7. **Topes** (RF-WM-26 y RF-WM-31): largo máximo del mensaje (caracteres) y tamaño máximo de video, audio y PDF (MB). La API los guarda en bytes; el panel los muestra y los recibe en MB, en base decimal (1 MB son un millón de bytes). Los `input` llevan `min="1"`, así que un tope de cero o negativo no llega a validarse. Cada uno con su hint del supuesto: «Valor inicial: el largo de un mensaje de WhatsApp (4096). No es un dato verificado de WhatsMKT».
 8. **Biblioteca de adjuntos** (RF-WM-30 a RF-WM-32):
-   - Una tabla apilable con Nombre, Tipo, Tamaño, Subido y Acción («Descargar» y «Archivar»), y «Subir un archivo».
+   - Una tabla apilable con Nombre, Tipo, Tamaño, Subido y Acciones («Descargar» y «Archivar»), y «Subir un archivo». El tamaño, en base decimal como los topes (240 KB, 1.5 MB), alineado a la derecha. La tabla de los archivados comparte los anchos de columna (`table-layout: fixed` y el mismo `<colgroup>`), para que las dos se lean como una lista.
+   - El estado de una subida queda hasta la siguiente acción: si el archivo ya estaba archivado, la subida no lo trae de vuelta y el estado ofrece «Restaurar».
    - Los archivados van en un `<details>` «Archivados (N)», con «Descargar» y «Restaurar». Un adjunto no se borra: se archiva.
    - Al subir una imagen, el estado dice «Se guardó sin metadatos (EXIF, ubicación)», porque el usuario lo pidió explícitamente (P-8).
 
@@ -430,6 +431,7 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.configuracion.nombre.variablesHint` | {fecha_corte}: la fecha de corte, como AAAA.MM.DD. {segmento}: el nombre del segmento; queda vacío en una campaña global. | {fecha_corte}: the cut-off date, as YYYY.MM.DD. {segmento}: the segment name; empty in a global campaign. |
 | `whatsmkt.configuracion.globalesHint` | Para las campañas especiales, con un solo mensaje para toda la selección. | For special campaigns, with a single message for the whole selection. |
 | `whatsmkt.configuracion.whatsapp` | WhatsApp de contacto | Contact WhatsApp |
+| `whatsmkt.configuracion.whatsapp.numero` | Número | Number |
 | `whatsmkt.configuracion.whatsapp.hint` | Número de 9 dígitos que empieza con 9. Donde un mensaje dice [whatsapp], se escribe https://wa.me/+51 y el número. | A 9-digit number that starts with 9. Where a message says [whatsapp], https://wa.me/+51 followed by the number is written. |
 | `whatsmkt.configuracion.sinWhatsapp` | Sin WhatsApp de contacto, los mensajes que usan [whatsapp] no se pueden enviar. | Without a contact WhatsApp, the messages that use [whatsapp] cannot be sent. |
 | `whatsmkt.configuracion.guardarWhatsapp` | Guardar WhatsApp | Save WhatsApp |
@@ -437,6 +439,9 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.configuracion.nombre.resultantes` | Nombres resultantes | Resulting names |
 | `whatsmkt.configuracion.tope.invalidoSinMaximo` | Escribe un número entero de 1 en adelante. | Enter a whole number from 1 up. |
 | `whatsmkt.configuracion.definicionDefecto` | Definición por defecto | Default definition |
+| `whatsmkt.configuracion.definicion.ninguna` | Sin definición por defecto | No default definition |
+| `whatsmkt.configuracion.definicion.hint` | La definición de columnas con la que parte cada campaña de WhatsMKT. En la campaña se puede elegir otra. | The column definition every WhatsMKT campaign starts from. Another one can be chosen in the campaign. |
+| `whatsmkt.configuracion.guardarDefinicion` | Guardar definición | Save definition |
 | `whatsmkt.configuracion.topes` | Topes | Limits |
 | `whatsmkt.configuracion.tope.mensaje` | Largo máximo del mensaje | Maximum message length |
 | `whatsmkt.configuracion.tope.mensajeHint` | Valor inicial: el largo de un mensaje de WhatsApp (4096). No es un dato verificado de WhatsMKT. | Initial value: the length of a WhatsApp message (4096). It is not a verified WhatsMKT figure. |
@@ -447,6 +452,36 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.biblioteca.restaurar` | Restaurar | Restore |
 | `whatsmkt.biblioteca.archivados` | Archivados ({n}) | Archived ({n}) |
 | `whatsmkt.biblioteca.sinMetadatos` | Se guardó sin metadatos (EXIF, ubicación). | It was saved without metadata (EXIF, location). |
+| `whatsmkt.biblioteca.col.nombre` | Nombre | Name |
+| `whatsmkt.biblioteca.col.tipo` | Tipo | Type |
+| `whatsmkt.biblioteca.col.tamano` | Tamaño | Size |
+| `whatsmkt.biblioteca.col.subido` | Subido | Uploaded |
+| `whatsmkt.biblioteca.col.accion` | Acciones | Actions |
+| `whatsmkt.biblioteca.descargar` | Descargar | Download |
+| `whatsmkt.biblioteca.vacia` | La biblioteca no tiene adjuntos. | The library has no attachments. |
+| `whatsmkt.biblioteca.tablaActivos` | Adjuntos activos | Active attachments |
+| `whatsmkt.biblioteca.tablaArchivados` | Adjuntos archivados | Archived attachments |
+| `whatsmkt.biblioteca.archivo` | Archivo a subir | File to upload |
+| `whatsmkt.biblioteca.elegir` | Elegir archivo | Choose file |
+| `whatsmkt.biblioteca.sinArchivo` | Ningún archivo elegido | No file chosen |
+| `whatsmkt.biblioteca.hint` | Imagen JPEG o PNG, video, audio o PDF. WhatsMKT no admite otros tipos. | JPEG or PNG image, video, audio or PDF. WhatsMKT does not accept other types. |
+| `whatsmkt.biblioteca.subir` | Subir un archivo | Upload a file |
+| `whatsmkt.biblioteca.sinArchivoError` | Elige un archivo para subir. | Choose a file to upload. |
+| `whatsmkt.biblioteca.subido` | Subido: {nombre}. | Uploaded: {nombre}. |
+| `whatsmkt.biblioteca.yaEstaba` | Ya estaba en la biblioteca: {nombre}. | It was already in the library: {nombre}. |
+| `whatsmkt.biblioteca.yaEstabaArchivado` | Ya estaba en la biblioteca, archivado: {nombre}. | It was already in the library, archived: {nombre}. |
+| `whatsmkt.biblioteca.archivado` | Archivado: {nombre}. | Archived: {nombre}. |
+| `whatsmkt.biblioteca.restaurado` | Restaurado: {nombre}. | Restored: {nombre}. |
+| `whatsmkt.biblioteca.tipo.imagen_jpeg` | Imagen JPEG | JPEG image |
+| `whatsmkt.biblioteca.tipo.imagen_png` | Imagen PNG | PNG image |
+| `whatsmkt.biblioteca.tipo.video` | Video | Video |
+| `whatsmkt.biblioteca.tipo.audio` | Audio | Audio |
+| `whatsmkt.biblioteca.tipo.pdf` | PDF | PDF |
+| `whatsmkt.biblioteca.tipoFrase.imagen_jpeg` | imágenes JPEG | JPEG images |
+| `whatsmkt.biblioteca.tipoFrase.imagen_png` | imágenes PNG | PNG images |
+| `whatsmkt.biblioteca.tipoFrase.video` | video | video |
+| `whatsmkt.biblioteca.tipoFrase.audio` | audio | audio |
+| `whatsmkt.biblioteca.tipoFrase.pdf` | PDF | PDF |
 
 - «Deseo que salga mi envío lo antes posible» y «¿Cuántos teléfonos tiene en su Lista de contactos?» quedan en español también en inglés: son el texto exacto del formulario de WhatsMKT, y el operador los busca así.
 - Las citas de nombres usan las comillas del idioma (`camposAdicionales.nombreCitado`).
