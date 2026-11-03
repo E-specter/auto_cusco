@@ -28,6 +28,7 @@ Responsable: `designer`. Un cambio a estas reglas se acuerda con `designer` ante
 - **Herramientas** (Columnas de carga, Supervisores y Calendario laboral) no se repiten en WhatsMKT. La campaña y la configuración enlazan a ellas con ir y volver, como «Editar en Cartera» ([mowa-mes-interfaz.md](mowa-mes-interfaz.md) §4.7):
   - al llegar, la herramienta muestra un `.notice--info` con «Volver a WhatsMKT sin guardar»;
   - al guardar, vuelve a la pantalla de WhatsMKT con lo guardado elegido.
+  - El detalle (parámetros, textos, Supervisores y Calendario, que no vuelven solos) está en [motor-texto-enriquecido-interfaz.md](motor-texto-enriquecido-interfaz.md) §12.
 - Cada pantalla usa `.page`, con la etiqueta «CANALES · WHATSMKT» sobre el título, como MOWA.
 
 ## 3. Campaña (`/whatsmkt/campana`)

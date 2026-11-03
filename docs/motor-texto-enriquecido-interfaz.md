@@ -611,3 +611,83 @@ textos.destruir();
   - eliminar con la casilla, y el motivo cuando no se puede;
   - la confirmación de cambios sin guardar;
   - axe en claro, oscuro y 360 px.
+
+## 12. Ir y volver desde un canal (T-HI-F3, 2026-11-03)
+
+Columnas de carga, Supervisores y Calendario laboral se abren desde un canal (MOWA MES o WhatsMKT) y devuelven al analista a donde estaba. Es la regla de «Editar en Cartera» ([mowa-mes-interfaz.md](mowa-mes-interfaz.md) §4.7), generalizada; [whatsmkt-interfaz.md](whatsmkt-interfaz.md) §2 la usa.
+
+### 12.1 `volver`
+
+- **Qué acepta:** la ruta de la pantalla de origen, con su consulta, validada con `volverValido` de `src/lib/volver.ts`. Los prefijos válidos pasan a ser `/mowa-mes/` y `/whatsmkt/`, y la validación sigue igual: mismo origen, ruta ya normalizada, nada que empiece con `//`. Un `volver` inválido se ignora como si no hubiera llegado: la herramienta se abre normal, sin aviso.
+- **El canal sale del prefijo,** con las claves de la barra que ya existen: `/mowa-mes/` es `nav.mowaMes` («MOWA MES») y `/whatsmkt/` es `nav.whatsmkt` («WhatsMKT»). No hay una clave nueva por canal: un canal nuevo agrega su prefijo y su clave de la barra.
+- **El estado de la pantalla de origen** viaja en su propio `volver` (su consulta), como hace la campaña de MOWA con Cartera. La herramienta no lo lee ni lo cambia: solo agrega lo suyo al volver.
+
+### 12.2 El aviso
+
+Un `.notice--info` bajo el encabezado de la página y antes de todo lo demás, con una línea y un enlace `.btn--sm` con `chevron-left`. Es el mismo marcado de `/cartera` (`data-volver`, `data-volver-enlace`).
+
+| Herramienta | Línea | Enlace |
+|---|---|---|
+| Columnas de carga, definición abierta | `herramientas.volver.columnas` | `herramientas.volver.sinGuardar` |
+| Columnas de carga, definición nueva con plataforma | `herramientas.volver.columnasNueva` | `herramientas.volver.sinGuardar` |
+| Supervisores | `herramientas.volver.alMomento` | `herramientas.volver.volver` |
+| Calendario laboral | `herramientas.volver.alMomento` | `herramientas.volver.volver` |
+
+- **Con cambios sin guardar,** «Volver a {canal} sin guardar» pasa por la confirmación de siempre del selector (`selector.descartar.*`, con «Seguir editando»). Nada se pierde sin aviso.
+- **«Volver sin guardar»** vuelve a `volver` tal como llegó, sin agregar nada.
+
+### 12.3 Al guardar
+
+- **Columnas de carga:** al guardar (una versión nueva o una definición nueva), vuelve sola a `volver` con `definicion=<id>&version=<n>`, que reemplazan a los que hubiera. El estado anuncia lo guardado antes de irse, como en Cartera. Renombrar no vuelve: no es el guardado de la definición.
+- **Supervisores y Calendario laboral:** no vuelven solos. Cada cambio se guarda al hacerlo (agregar, quitar, retirar o restaurar), así que no hay un «guardado» que devolver. Se vuelve solo con el enlace, y por eso dice «Volver a {canal}», sin «sin guardar». La pantalla de origen lee de nuevo supervisores y calendario al cargarse, así que ve los cambios.
+- **Los parámetros de Columnas** se arman con un ayudante en `volver.ts`, del estilo de `destinoConSeleccion`: `destinoConDefinicion(destino, id, version)` y `destinoSinDefinicion(destino)`. Se leen con `definicionDeLaUrl(busqueda)`, que devuelve `{id, version}` o `null` si falta alguno o no es un entero positivo.
+
+### 12.4 En la pantalla de origen
+
+- **Con `definicion` y `version` válidos,** el `select` de la definición queda en esa versión, y el estado lo anuncia: «Se eligió {nombre}, versión {n}».
+- **Si la definición ya no es de la plataforma del canal** (se abrió una libre, por ejemplo), el `select` queda sin elegir y va el error del canal bajo él; en WhatsMKT, `definicion_no_whatsmkt`.
+- **Si la definición o la versión ya no existen,** un `.notice--warning` bajo el `select`, como el de Cartera: `herramientas.volver.noExiste`. El `select` queda sin elegir y el aviso se va al elegir otra.
+- Después de leerlos, la pantalla quita `definicion` y `version` de la URL (`history.replaceState`), para que recargar no vuelva a aplicarlos.
+
+### 12.5 Columnas de carga con `?definicion=` o `?plataforma=`
+
+- **`?definicion=<id>`:** abre esa definición en su versión vigente. Si no existe, el constructor queda en «Sin guardar: definición nueva» con un `.notice--warning`: `herramientas.volver.definicionNoExiste`. Nunca un error.
+- **`?plataforma=<clave>`:** abre una definición nueva con esa plataforma ya elegida. El `select` de plataforma queda inactivo con el hint `columnas.plataforma.fijadaPor`. No sale el diálogo de cambiar de plataforma, porque no se puede cambiar. Una clave que no está registrada se ignora y el `select` queda libre.
+- Si llegan los dos, gana `definicion`.
+
+### 12.6 Textos (es / en)
+
+| Clave | es | en |
+|---|---|---|
+| `herramientas.volver.columnas` | Estás editando una definición de columnas desde {canal}. Al guardarla, vuelves a {canal}. | You are editing a column definition from {canal}. Once you save it, you go back to {canal}. |
+| `herramientas.volver.columnasNueva` | Estás creando una definición de {plataforma} desde {canal}. Al guardarla, vuelves a {canal}. | You are creating a {plataforma} definition from {canal}. Once you save it, you go back to {canal}. |
+| `herramientas.volver.alMomento` | Llegaste desde {canal}. Cada cambio se guarda al hacerlo; cuando termines, vuelve. | You came from {canal}. Each change is saved as you make it; when you are done, go back. |
+| `herramientas.volver.sinGuardar` | Volver a {canal} sin guardar | Back to {canal} without saving |
+| `herramientas.volver.volver` | Volver a {canal} | Back to {canal} |
+| `herramientas.volver.elegida` | Se eligió {nombre}, versión {n}. | {nombre}, version {n}, was chosen. |
+| `herramientas.volver.noExiste` | La definición que editaste ya no existe. Elige otra. | The definition you edited no longer exists. Choose another one. |
+| `herramientas.volver.definicionNoExiste` | La definición que abriste ya no existe. Arma una nueva o elige otra de la lista. | The definition you opened no longer exists. Build a new one or choose another from the list. |
+| `columnas.plataforma.fijadaPor` | La fija {canal}: se abrió desde allí. | Set by {canal}: it was opened from there. |
+
+- `{nombre}` va citado con `camposAdicionales.nombreCitado`.
+- `cartera.volver.*` no cambia: Cartera sigue con sus textos, porque solo la abre MOWA MES. Si otro canal la abre, pasa a estas claves.
+
+### 12.7 Pruebas mínimas
+
+- `volverValido` acepta `/whatsmkt/…` y sigue rechazando `//`, otro origen, `javascript:` y rutas que salen del prefijo al normalizarse.
+- Cada herramienta con un `volver` válido muestra su aviso y su enlace, y con uno inválido no muestra nada.
+- Columnas: guardar vuelve con `definicion` y `version`; «Volver sin guardar» con cambios pide confirmar; `?plataforma=` deja el `select` inactivo con su hint; `?definicion=` de una que no existe muestra su aviso.
+- Supervisores y Calendario: un cambio no navega; el enlace vuelve.
+- La pantalla de origen elige la definición que llega, avisa si ya no existe o no es del canal, y limpia la URL.
+- axe en claro, oscuro y 360 px, con el aviso a la vista en las tres herramientas.
+
+### 12.8 Capturas para `designer`
+
+En es y claro, salvo donde se indica:
+
+1. Columnas con `?volver=` y `?definicion=` (definición abierta, con el aviso), a 1280 y a 360.
+2. Columnas con `?volver=` y `?plataforma=whatsmkt` (definición nueva, con el `select` inactivo y su hint), a 1280.
+3. El diálogo de cambios sin guardar al pulsar «Volver sin guardar», a 1280.
+4. Supervisores con `?volver=`, a 360.
+5. Calendario laboral con `?volver=`, en inglés, a 1280.
+6. La configuración de WhatsMKT recién vuelta de Columnas, con la definición elegida y su anuncio, a 1280.
