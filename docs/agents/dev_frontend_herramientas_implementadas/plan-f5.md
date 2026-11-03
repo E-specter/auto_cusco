@@ -1,6 +1,6 @@
 # Plan de F5: pantalla «Generar carga» (`/generar-carga`)
 
-Propuesta del 2026-10-16 de `dev_frontend_motor_texto_enriquecido` para `designer` (aprobación) y `coordinador_motor_texto_enriquecido`. Hecha sobre `ba9de60`, **sin código de producto**: nada se programa hasta que `designer` apruebe este plan. Fuentes: `docs/generacion-cargas.md`, `backend/app/api/archivos_carga.py` (HEAD y el worktree de B12, solo lectura), `src/scripts/selector-seleccion.ts`, `src/lib/seleccion.ts`, `src/lib/descargas.ts`, `src/lib/api-definiciones.ts`, `plan.md` del coordinador §22.
+Propuesta del 2026-10-16 de `dev_frontend_herramientas_implementadas` para `designer` (aprobación) y `coordinador_herramientas_implementadas`. Hecha sobre `ba9de60`, **sin código de producto**: nada se programa hasta que `designer` apruebe este plan. Fuentes: `docs/generacion-cargas.md`, `backend/app/api/archivos_carga.py` (HEAD y el worktree de B12, solo lectura), `src/scripts/selector-seleccion.ts`, `src/lib/seleccion.ts`, `src/lib/descargas.ts`, `src/lib/api-definiciones.ts`, `plan.md` del coordinador §22.
 
 ## 0. Reglas de trabajo (sin cambios)
 

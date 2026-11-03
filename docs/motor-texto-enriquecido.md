@@ -245,7 +245,7 @@ Vuelta atrás: el camino v1 queda en el código hasta cerrar M2.
 |---|---|
 | Criterio de segmentación por defecto | Segmento financiero **calculado** desde los días de atraso, con etiquetas; el campo `segmento_financiero` de la sábana llega mal cargado. El campo crudo queda disponible como criterio categórico |
 | Inyección de fórmulas | XLSX como texto literal; CSV con apóstrofo por defecto, que cada definición puede apagar; JSON sin cambios |
-| Ejecución | Sesiones `coordinador_motor_texto_enriquecido`, `dev_backend_motor_texto_enriquecido` y `dev_frontend_motor_texto_enriquecido`, con `designer` como responsable de la experiencia y de los componentes compartidos |
+| Ejecución | Sesiones `coordinador_herramientas_implementadas`, `dev_backend_herramientas_implementadas` y `dev_frontend_herramientas_implementadas`, con `designer` como responsable de la experiencia y de los componentes compartidos |
 | Definiciones | Guardadas, versionadas e inmutables una vez usadas, compartidas |
 
 ## 14. Riesgos, decisiones técnicas y pendientes

@@ -1,10 +1,10 @@
-# Perfil de agente: dev_backend_motor_texto_enriquecido
+# Perfil de agente: dev_backend_herramientas_implementadas
 
-- **Proveedor:** Anthropic (sesión propia `dev_backend_motor_texto_enriquecido`, en segundo plano; recibe tareas de `coordinador_motor_texto_enriquecido`)
-- **Rol/especialización actual:** backend del motor de texto enriquecido y del constructor de columnas dinámicas; pruebas de extremo a extremo por HTTP y calidad de código
+- **Proveedor:** Anthropic (sesión propia `dev_backend_herramientas_implementadas`, en segundo plano; recibe tareas de `coordinador_herramientas_implementadas`)
+- **Rol/especialización actual:** backend de las herramientas compartidas (motor de texto enriquecido, constructor de columnas, generador de cargas, mapeador y exportadores); pruebas de extremo a extremo por HTTP y calidad de código
 - **Documentos que consulta habitualmente:** `docs/motor-texto-enriquecido.md`, `docs/atomics-requirements.md` (sección 11 y RF-12), `docs/mapeo-campos.md`, `docs/generacion-cargas.md`, `docs/mowa-mes.md`, `backend/AGENTS.md`, `docs/architecture.md`, `docs/testing.md`, `docs/contrato-api.md`
 - **Documentos que mantiene/actualiza:** `docs/motor-texto-enriquecido.md` (secciones de implementación), `docs/mapeo-campos.md`, `contratos/openapi.json`, sus filas en `docs/agents/tasks.md`, su `profile.md`
-- **Reporta a:** `coordinador_motor_texto_enriquecido`
+- **Reporta a:** `coordinador_herramientas_implementadas`
 - **Última sesión:** 2026-09-29
 
 ## Responsabilidades
@@ -24,3 +24,4 @@
 ## Nota de continuidad para la próxima sesión
 
 - 2026-09-29: perfil creado por `architec`. Tareas: T-MTE-B* en `docs/agents/tasks.md`.
+- 2026-11-02: sesión renombrada por decisión del usuario (antes `dev_backend_motor_texto_enriquecido`): «No utilices las denominaciones anteriores». El alcance pasa a ser las herramientas compartidas de todos los canales: motor de texto enriquecido, constructor de columnas, generador, mapeador y exportadores (propuesto en el plan WhatsMKT v2: también calendario laboral y supervisión). Los commits anteriores conservan el trailer `Agente:` viejo. Tareas nuevas: T-HI-* en `tasks.md`.

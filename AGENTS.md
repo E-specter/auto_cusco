@@ -18,6 +18,7 @@ auto_cusco/
 │       └── api/        # routers FastAPI (adaptador de entrada HTTP)
 ├── data/
 │   ├── sabanas/        # Entrada cruda (NO versionada, solo estructura)
+│   ├── whatsmkt/       # Ejemplos reales de WhatsMKT, carga e informe (NO versionada)
 │   └── output/
 │       ├── gestiones/  # Salida: casos generados (NO versionada)
 │       └── reportes/   # Salida: reportes generados (NO versionada)
@@ -37,7 +38,7 @@ El backend (Python) tiene ya un esqueleto real funcionando end-to-end (arquitect
 
 ## Reglas de datos (importante)
 
-- Nunca commitear contenido real de `data/sabanas/` ni `data/output/**` — son datos de cobranza (sensibles). El `.gitignore` ya bloquea el contenido y solo permite `.gitkeep` y la estructura de carpetas.
+- Nunca commitear contenido real de `data/sabanas/`, `data/whatsmkt/` ni `data/output/**` — son datos de cobranza (sensibles). El `.gitignore` ya bloquea el contenido y solo permite `.gitkeep` y la estructura de carpetas.
 - Si generas datos de prueba, usa datos sintéticos, nunca reales.
 - El esquema de la sábana (hojas, clave `Pagare`, columnas, reglas de normalización y preguntas abiertas) está en `docs/sabana-schema.md`. Consúltalo antes de tocar la ingesta, y nunca copies valores personales reales (nombres, documentos, teléfonos) a la documentación, tests o conversaciones.
 

@@ -1,6 +1,6 @@
 # Revisión de cierre de los campos adicionales (T-CA-C2)
 
-> **2026-10-28, `architec`.** Cierra RF-59 ampliado y RF-64 a RF-66 ([atomics-requirements.md](../../atomics-requirements.md)), pedidos por el usuario el 2026-10-27 al revisar `/cargas` en dos pasos. Plan: §28 del plan de `coordinador_motor_texto_enriquecido` (aprobado en `d999698`); MOWA MES: §7 y §8 del plan de `coordinador_modulo_mowa_mes` y su cierre [revision-c8.md](../coordinador_modulo_mowa_mes/revision-c8.md).
+> **2026-10-28, `architec`.** Cierra RF-59 ampliado y RF-64 a RF-66 ([atomics-requirements.md](../../atomics-requirements.md)), pedidos por el usuario el 2026-10-27 al revisar `/cargas` en dos pasos. Plan: §28 del plan de `coordinador_herramientas_implementadas` (aprobado en `d999698`); MOWA MES: §7 y §8 del plan de `coordinador_modulo_mowa_mes` y su cierre [revision-c8.md](../coordinador_modulo_mowa_mes/revision-c8.md).
 
 ## 1. Cortes
 

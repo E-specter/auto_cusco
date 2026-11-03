@@ -2,7 +2,7 @@
 
 Reglas vinculantes para el frontend del motor de texto enriquecido y del constructor de columnas (T-MTE-F1). Complementan el diseño técnico de [motor-texto-enriquecido.md](motor-texto-enriquecido.md) y los requerimientos RF-42 a RF-54 de [atomics-requirements.md](atomics-requirements.md), sección 11.
 
-Responsable: `designer`. Implementa: `dev_frontend_motor_texto_enriquecido`, bajo `coordinador_motor_texto_enriquecido`. Un cambio a estas reglas se acuerda con `designer` antes de escribirlo.
+Responsable: `designer`. Implementa: `dev_frontend_herramientas_implementadas`, bajo `coordinador_herramientas_implementadas`. Un cambio a estas reglas se acuerda con `designer` antes de escribirlo.
 
 ---
 
@@ -253,16 +253,16 @@ La versión, el nombre de la versión y el guardado conservan su forma actual. L
 | Fila expandida de tabla y marca de vacío | `src/styles/ui.css` (`.table__detalle`, `.marca-vacio`) | `designer` |
 | Textos `textoEnriquecido.*` | `src/i18n/*.json` | `designer`, con la prueba espejo del backend sobre todas sus claves |
 | Etiquetas de los campos de la cartera (`campo.<nombre>`) | `src/lib/campos.ts`, `src/i18n/*.json` | `designer`, con su prueba contra el catálogo de campos del backend (`tests/nucleo/i18n-campos.test.ts`). Las usan `/cartera`, el selector de variables y el constructor. Una variable con `clave_nombre` usa esa clave; un campo de la cartera, `campo.<nombre>` |
-| Cliente de `/definiciones-columnas` y su API falsa | `src/lib/api-definiciones.ts`, `e2e/api-falsa-definiciones.ts` | `dev_frontend_motor_texto_enriquecido` |
-| Pantalla del constructor de columnas, su vista previa y sus textos `columnas.*` | `src/pages/columnas.astro`, `src/styles/columnas.css` | `dev_frontend_motor_texto_enriquecido` |
-| Integración en el speech de MOWA MES (M2) y sus textos `mowaMes.speech.v2.*` | `src/pages/mowa-mes/configuracion.astro` | `dev_frontend_motor_texto_enriquecido` |
+| Cliente de `/definiciones-columnas` y su API falsa | `src/lib/api-definiciones.ts`, `e2e/api-falsa-definiciones.ts` | `dev_frontend_herramientas_implementadas` |
+| Pantalla del constructor de columnas, su vista previa y sus textos `columnas.*` | `src/pages/columnas.astro`, `src/styles/columnas.css` | `dev_frontend_herramientas_implementadas` |
+| Integración en el speech de MOWA MES (M2) y sus textos `mowaMes.speech.v2.*` | `src/pages/mowa-mes/configuracion.astro` | `dev_frontend_herramientas_implementadas` |
 | Entrada de navegación y claves `nav.*` | `src/lib/navegacion.ts`, `src/i18n/*.json` | `designer`, cuando la página exista en el árbol |
 
 El orden lo fija el coordinador. El editor empieza apenas el backend fije el contrato (B4a).
 
 ## 9. Contrato de montaje y decisiones de detalle
 
-Respuestas a las dudas de `dev_frontend_motor_texto_enriquecido` (`docs/agents/dev_frontend_motor_texto_enriquecido/dudas-designer.md`), 2026-10-02. Son vinculantes como el resto del documento.
+Respuestas a las dudas de `dev_frontend_herramientas_implementadas` (`docs/agents/dev_frontend_herramientas_implementadas/dudas-designer.md`), 2026-10-02. Son vinculantes como el resto del documento.
 
 ### 9.1 Variantes por segmento (D-1, D-4)
 
@@ -325,7 +325,7 @@ editor.destruir();                   // antes de sacarlo de la página
 
 Las dos piezas se prueban solas en `/pruebas/editor-texto`, una página que existe solo en el build de Playwright (`docs/testing.md`, sección 4).
 
-**Uso en el constructor** (confirmaciones a `dev_frontend_motor_texto_enriquecido`, 2026-10-14):
+**Uso en el constructor** (confirmaciones a `dev_frontend_herramientas_implementadas`, 2026-10-14):
 
 - **Filas armadas en ejecución:** `<VariantesSegmento id="columna-editor">` dentro de un `<template>` de la página, clonado a la `.table__detalle` al expandir la fila, es el patrón esperado; no hace falta un `crearEditorTexto()`. Tres condiciones: una sola instancia a la vez (los `id` internos se fijan al compilar con el `id` de la raíz); `applyTranslations(fila)` sobre el clon antes de montar, porque el contenido de un `<template>` no recibe la pasada de idioma y sus textos estáticos están en español; y `destruir()` antes de cerrar la fila o reemplazarla.
 - **Criterio «Valor de un campo»:** la lista de valores la mantiene la pantalla y la pasa con `fijarSegmentos`. `VariantesSegmento` no tiene «Agregar valor».
@@ -334,7 +334,7 @@ Las dos piezas se prueban solas en `/pruebas/editor-texto`, una página que exis
 ### 9.3 Clientes y APIs falsas (D-2)
 
 - **De `designer`:** `api-texto-enriquecido.ts` (catálogo, validación y previsualización) sobre `request` de `api.ts`, y `e2e/api-falsa-texto-enriquecido.ts`, tipada con el contrato.
-- **De `dev_frontend_motor_texto_enriquecido`:** el cliente de `/definiciones-columnas` en `api-definiciones.ts`.
+- **De `dev_frontend_herramientas_implementadas`:** el cliente de `/definiciones-columnas` en `api-definiciones.ts`.
 - **Cómo se componen las APIs falsas:** la mía exporta un manejador `manejarTextoEnriquecido(estado)` con la forma `(route, ruta, metodo, url) => Promise<boolean>`, que devuelve `true` si atendió la ruta. La suya hace lo mismo para sus rutas, y `montarApi` los encadena antes de responder 404.
 
 ### 9.4 Resumen de problemas (D-9)

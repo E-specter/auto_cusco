@@ -27,7 +27,7 @@ Nada de esto invalida el diseño. D1, D2, D5 y D6 cambian su texto o su redacci�
 
 ## 2. Cortes y orden
 
-`dev_backend_motor_texto_enriquecido` es una sola sesión, así que "en paralelo" solo aplica entre backend y experiencia (F1).
+`dev_backend_herramientas_implementadas` es una sola sesión, así que "en paralelo" solo aplica entre backend y experiencia (F1).
 
 | Orden | Corte | Depende de | Notas |
 |---|---|---|---|
@@ -77,7 +77,7 @@ Congelamiento acordado: nadie más toca `speech.py`, `segmentos.py` ni los rango
 
 ## 6. Reparto del frontend y lo que B4a tiene que traer (2026-09-29)
 
-Reparto según §8 de `motor-texto-enriquecido-interfaz.md` (F1, commit `05e5885`), aprobado por architec: F2 (componentes compartidos) es de `designer`; F3 (pantalla del constructor) y F4 (integración M2) son de `dev_frontend_motor_texto_enriquecido`. Orden: B4a → F2; F3 espera B4b y F2; F4 espera B6 y F2.
+Reparto según §8 de `motor-texto-enriquecido-interfaz.md` (F1, commit `05e5885`), aprobado por architec: F2 (componentes compartidos) es de `designer`; F3 (pantalla del constructor) y F4 (integración M2) son de `dev_frontend_herramientas_implementadas`. Orden: B4a → F2; F3 espera B4b y F2; F4 espera B6 y F2.
 
 B4a trae, además de §10 del diseño:
 
@@ -259,7 +259,7 @@ Todo corte que toque código, pruebas o documentación de MOWA MES pasa, **con s
 
 ## 14. Frontend en espera de B4a (2026-10-01)
 
-`dev_frontend_motor_texto_enriquecido` prepara sin código de producto:
+`dev_frontend_herramientas_implementadas` prepara sin código de producto:
 - lectura de `configuracion.astro`, `api-mowa-mes.ts`, la api falsa de e2e y `expresion.ts`;
 - un plan de F3 y F4 en su carpeta (`plan-f3-f4.md`), con pantallas, estados, Playwright, Vitest y axe;
 - dudas para designer, que pasan antes por el coordinador.
@@ -268,7 +268,7 @@ Puede adelantar el estado puro del constructor (`src/lib/constructor-columnas.ts
 
 Ruta propuesta: `/columnas` («Columnas de carga»). La navegación es de designer.
 
-## 15. Contrato de B4b y B6: respuestas a C-1 a C-10 de `dev_frontend_motor_texto_enriquecido` (2026-10-01)
+## 15. Contrato de B4b y B6: respuestas a C-1 a C-10 de `dev_frontend_herramientas_implementadas` (2026-10-01)
 
 Requisitos para los briefs de B4b y B6. Si el backend encuentra que alguno no se sostiene, lo plantea antes de forzarlo.
 
@@ -289,7 +289,7 @@ Requisitos para los briefs de B4b y B6. Si el backend encuentra que alguno no se
 - **B6, C-5:** una v2 creada a partir de una v1 produce **los mismos mensajes y largos** que esa v1. La prueba recorre el Speech original y las 12 versiones sintéticas del oro de B5, sobre la misma matriz. La v2 es una versión nueva con huella propia; la v1 queda intacta e inmutable.
 - **B4b, C-8:** si se registra cada carga generada con una definición guardada, solo se guardan metadatos (versión, fecha de corte, fecha y hora, cantidad de filas y formato). Nunca filas ni datos de la cartera. Si `usos` no aporta algo que la interfaz vaya a mostrar, alcanza con `usada_en`.
 
-**F3-a** (2026-10-02, sin commit): `frontend/src/lib/constructor-columnas.ts` y sus 64 pruebas de Vitest, en verde en el árbol principal. Tiene tipos provisionales con las respuestas C-1 a C-10, un id estable que nunca sale hacia el backend, y las variantes solo se transportan. Al revisar B4a, `dev_frontend_motor_texto_enriquecido` y designer revisan el OpenAPI y `contrato-api.d.ts` como consumidores antes de que vaya a architec.
+**F3-a** (2026-10-02, sin commit): `frontend/src/lib/constructor-columnas.ts` y sus 64 pruebas de Vitest, en verde en el árbol principal. Tiene tipos provisionales con las respuestas C-1 a C-10, un id estable que nunca sale hacia el backend, y las variantes solo se transportan. Al revisar B4a, `dev_frontend_herramientas_implementadas` y designer revisan el OpenAPI y `contrato-api.d.ts` como consumidores antes de que vaya a architec.
 
 **Respuestas de designer a D-1 a D-12** (`1f7dacd`, interfaz §8 y §9):
 - F2 suma `lib/variantes.ts` (la frontera de D-1), los selectores de variable y de patrón de fecha, la API falsa del motor, y `.table__detalle` y `.marca-vacio` en `ui.css`.

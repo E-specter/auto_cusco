@@ -3,7 +3,7 @@
 > **Cerrada el 2026-10-31; M-F8 cerrado el 2026-11-02** en `8873614` (backend) y `2583ee2` (frontend), con el dato del usuario que cerró S-MM-10 (el id es el «ID campaña» de MES, la columna `id` del reporte). Plan: [plan-c11.md](plan-c11.md), en `a4930dd`. Requerimientos en [requerimientos-mowa-mes.md](../../requerimientos-mowa-mes.md) (`1b0d9fe`): RF-MM-28 a RF-MM-36, RF-MM-17 modificado (solo v2) y RF-MM-01 y RF-MM-09 ampliados. Reglas de interfaz de `designer` en [mowa-mes-interfaz.md](../../mowa-mes-interfaz.md) (T-MM-D11). Los cortes están en `main`, de `154afee` (M-B1) a `1bcf2d8` (el arreglo de M-B4). El CI rojo de `5ebb9b3` (el reloj de las specs de MOWA) lo arregló `c3a6732`.
 
 Coordinador: `coordinador_modulo_mowa_mes`. Reporta a `architec`. Revisores:
-- `coordinador_motor_texto_enriquecido`: el §13 de todo corte que tocaba el motor, el selector, `/cartera` o el contrato compartido;
+- `coordinador_herramientas_implementadas`: el §13 de todo corte que tocaba el motor, el selector, `/cartera` o el contrato compartido;
 - `designer`: aprobó con capturas todo cambio visible.
 
 ## 1. Cortes

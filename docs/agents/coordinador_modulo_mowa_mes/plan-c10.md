@@ -27,7 +27,7 @@ Cada encargo va con `notify_when_idle`.
 - **Lo que cambia a propósito** se declara en su corte, con la prueba que lo fija: E1, E2, E3 y los casos que hoy no se alcanzan.
 - **Un corte es un commit,** y queda en verde por sí solo.
 - **Mutación a mano** sobre lo extraído, en una copia desechable y nunca en el árbol compartido.
-- **Motor.** Lo que toque `texto_enriquecido`, las selecciones, las definiciones, la segmentación o las API falsas del motor pasa por `coordinador_motor_texto_enriquecido` antes de llegar a `architec`, igual que su §13 conmigo.
+- **Motor.** Lo que toque `texto_enriquecido`, las selecciones, las definiciones, la segmentación o las API falsas del motor pasa por `coordinador_herramientas_implementadas` antes de llegar a `architec`, igual que su §13 conmigo.
 - **Las pantallas generales** que toque cada corte (Cartera, Cargas, Columnas y Generar carga) corren su spec en el turno del corte.
 - **Turnos de máquina:**
   - lo liviano va sin turno: ruff, pytest por archivos, Vitest, `astro check`, `npm run tipos` y `contrato:comprobar`;

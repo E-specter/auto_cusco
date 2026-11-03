@@ -1,6 +1,6 @@
 # Dudas para `designer` (borrador, a revisar por el coordinador antes de enviar)
 
-De `dev_frontend_motor_texto_enriquecido`, 2026-10-01. Contexto: preparo F3 (constructor de columnas) y F4 (speech v2 en `/mowa-mes/configuracion`) sobre `motor-texto-enriquecido-interfaz.md`. Aún no hay código de producto. Cada duda dice qué decide y qué hago si no hay respuesta.
+De `dev_frontend_herramientas_implementadas`, 2026-10-01. Contexto: preparo F3 (constructor de columnas) y F4 (speech v2 en `/mowa-mes/configuracion`) sobre `motor-texto-enriquecido-interfaz.md`. Aún no hay código de producto. Cada duda dice qué decide y qué hago si no hay respuesta.
 
 | # | Duda | Qué desbloquea | Si no hay respuesta, propongo |
 |---|---|---|---|

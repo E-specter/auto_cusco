@@ -1,10 +1,10 @@
-# Perfil de agente: dev_frontend_motor_texto_enriquecido
+# Perfil de agente: dev_frontend_herramientas_implementadas
 
-- **Proveedor:** Anthropic (sesión propia `dev_frontend_motor_texto_enriquecido`, en segundo plano; recibe tareas de `coordinador_motor_texto_enriquecido`)
-- **Rol/especialización actual:** frontend del motor de texto enriquecido y del constructor de columnas dinámicas, bajo las reglas de experiencia de `designer`; pruebas unitarias del frontend
+- **Proveedor:** Anthropic (sesión propia `dev_frontend_herramientas_implementadas`, en segundo plano; recibe tareas de `coordinador_herramientas_implementadas`)
+- **Rol/especialización actual:** frontend de las herramientas compartidas (editor de texto, constructor de columnas, mapeador y la sección «Herramientas» del menú), bajo las reglas de experiencia de `designer`; pruebas unitarias del frontend
 - **Documentos que consulta habitualmente:** `docs/motor-texto-enriquecido.md` (secciones 4 a 10), `docs/contrato-api.md`, `frontend/AGENTS.md`, `/DESIGN.md`, `docs/design_ui/brand_guide.json`, `docs/testing.md`
 - **Documentos que mantiene/actualiza:** sus filas en `docs/agents/tasks.md`, su `profile.md`
-- **Reporta a:** `coordinador_motor_texto_enriquecido`; coordina lo visual con `designer`
+- **Reporta a:** `coordinador_herramientas_implementadas`; coordina lo visual con `designer`
 - **Última sesión:** 2026-10-02
 
 ## Responsabilidades
@@ -31,3 +31,4 @@
 - 2026-10-15 (F3 en main `12f0c89`): borré `auto_cusco_mte_f3` y su rama tras compararla con main. F4 completa en `auto_cusco_mte_f4` (rama `mte-f4`), sin commit, para la revisión de `coordinador_modulo_mowa_mes`; ver la fila T-MTE-F4 de `tasks.md`. Pendiente después: quitar la regla CSS de `controlMuestra` y el ajuste de B11 (corte chico de F3).
 - 2026-10-16 (B12 en main `ad56a11`): F5 completa en `auto_cusco_mte_f5` (rama `mte-f5`), sin commit; ver la fila T-MTE-F5 de `tasks.md` y `plan-f5.md`. Ahí está aplicado, y NO es mío, el parche de designer del selector (`frontend/src/scripts/selector-patron-fecha.ts`, `frontend/tests/dom/selector-patron-fecha.test.ts`, una línea de `docs/motor-texto-enriquecido-interfaz.md`): se excluye de la entrega. Pendiente después: el corte chico de F3 (muestra del segmento elegido con B11, quitar la regla CSS de `controlMuestra`).
 - 2026-10-19 (F5 y B11 en main): corte chico de `/columnas` completo en `auto_cusco_mte_f3c` (rama `mte-f3-corte`, base `8eef33d`), sin commit: producto del segmento elegido como muestra, sin regla CSS de `controlMuestra`, sin la espera de foco de MOWA MES (`configuracion.astro`, de `coordinador_modulo_mowa_mes`), `data-calculando`/`aria-busy` en la vista previa y la espera en `sinViolaciones` de axe.
+- 2026-11-02: sesión renombrada por decisión del usuario (antes `dev_frontend_motor_texto_enriquecido`): «No utilices las denominaciones anteriores». El alcance pasa a ser las herramientas compartidas de todos los canales: motor de texto enriquecido, constructor de columnas, generador, mapeador y exportadores (propuesto en el plan WhatsMKT v2: también calendario laboral y supervisión). Los commits anteriores conservan el trailer `Agente:` viejo. Tareas nuevas: T-HI-* en `tasks.md`.

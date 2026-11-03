@@ -1,6 +1,6 @@
 # Revisión de cierre del filtro de valores y del orden de los filtros (T-FV-C2)
 
-> **2026-10-28, `architec`.** Cierra RF-67 y RF-68 ([atomics-requirements.md](../../atomics-requirements.md)), pedidos por el usuario el 2026-10-28 después de probar los campos adicionales. Plan: §29 del plan de `coordinador_motor_texto_enriquecido` (aprobado en `d4caeb3`). Reglas de interfaz: [filtro-valores-interfaz.md](../../filtro-valores-interfaz.md).
+> **2026-10-28, `architec`.** Cierra RF-67 y RF-68 ([atomics-requirements.md](../../atomics-requirements.md)), pedidos por el usuario el 2026-10-28 después de probar los campos adicionales. Plan: §29 del plan de `coordinador_herramientas_implementadas` (aprobado en `d4caeb3`). Reglas de interfaz: [filtro-valores-interfaz.md](../../filtro-valores-interfaz.md).
 
 ## 1. Cortes
 

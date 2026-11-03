@@ -23,7 +23,7 @@ Cada encargo va con `notify_when_idle`.
 - **Un corte es un commit,** y queda en verde por sí solo.
 - **Contratos y catálogos van con sus pruebas espejo.** Los cambios de contrato (`openapi.json` y `contrato-api.d.ts`), de códigos (`CodigoMowaMes`, `CodigoErrorCampana`) y de claves i18n.
 - **Las pruebas de oro no cambian,** salvo en M-B3, con la autorización de `architec`: solo para fijar que el v2 convertido da el mismo mensaje, byte a byte, que el v1 congelado. La regla de las huellas 17 y 92 fijas la levantó el usuario con RF-MM-17.
-- **§13 con `coordinador_motor_texto_enriquecido`** en lo que toque el motor, el editor, `/cartera` o las selecciones.
+- **§13 con `coordinador_herramientas_implementadas`** en lo que toque el motor, el editor, `/cartera` o las selecciones.
 - **`designer` aprueba con capturas** todo cambio visible: textos, lugar y variante.
 - **Turnos de máquina por la cola del motor:**
   - 5 GB para la cadena del frontend y 2 GB para pytest, con Playwright en 1 worker;
@@ -122,7 +122,7 @@ Cada encargo va con `notify_when_idle`.
 
 ### 3.6 «Editar en Cartera» (RF-MM-09 ampliado)
 
-**Acordado con `coordinador_motor_texto_enriquecido` el 2026-10-30.** El selector sigue siendo genérico: es el mismo componente de Cartera, Columnas, Generar carga y la campaña, y no sabe nada de `volver`.
+**Acordado con `coordinador_herramientas_implementadas` el 2026-10-30.** El selector sigue siendo genérico: es el mismo componente de Cartera, Columnas, Generar carga y la campaña, y no sabe nada de `volver`.
 - **El selector gana solo tres cosas:**
   - `ControladorSelector.cargarGuardada(id): boolean`: el `cargarGuardada` interno de `selector-seleccion.ts:379`, ahora expuesto. Devuelve `false` si el id no está en la lista;
   - un evento `seleccionguardada` con `{id}`, que se emite en `trasGuardar` (`:812`) al guardar la misma selección y al guardar como nueva;

@@ -203,7 +203,7 @@ Decisión del usuario del 2026-10-19 (b12d384). Plan para aprobación de `archit
 
 ### 6.2 Diseño propuesto (T-MM-B9)
 
-1. **Función del motor `a_gsm7` y función del núcleo `largo_gsm7(texto)`.** Lo acordé con `coordinador_motor_texto_enriquecido` y lo aceptó `architec`.
+1. **Función del motor `a_gsm7` y función del núcleo `largo_gsm7(texto)`.** Lo acordé con `coordinador_herramientas_implementadas` y lo aceptó `architec`.
    - `a_gsm7` es de la familia texto y vive en el registro, con su cota:
      - primero quita los diacríticos (NFD sin marcas combinantes), igual que la conciliación;
      - después translitera los signos con equivalente simple (decisión del usuario, 204b3dc): `“ ” « »`→`"`, `‘ ’`→`'`, `…`→`...`, `– —`→`-`, `° º`→`o`, `ª`→`a`. `N°` sale `No` y `don’t` sale `don't`;
@@ -237,7 +237,7 @@ Decisión del usuario del 2026-10-19 (b12d384). Plan para aprobación de `archit
    - mutaciones: no borrar fuera de GSM-7, borrar en vez de transliterar, transliterar antes de quitar diacríticos, contar el extendido como 1, normalizar después de medir.
 7. **Rendimiento:** el costo es lineal y chico por fila. La medición con 46 000 filas y `-ConBase` la corre `architec`.
 
-**Agregado a B9 (2026-10-22, hallazgo de designer, acordado con `coordinador_motor_texto_enriquecido`).**
+**Agregado a B9 (2026-10-22, hallazgo de designer, acordado con `coordinador_herramientas_implementadas`).**
 - El editor v2 muestra su propio largo, calculado por los endpoints genéricos del motor. Ahora el contexto `mowa_mes.speech` mide igual que la tabla.
 - `ContextoTexto` gana `medida` (por defecto `len`) y `salida` (por defecto la identidad). Son campos de comportamiento, fuera del catálogo y del contrato.
 - `contexto_speech()` declara `medida=largo_gsm7_normalizado` y `salida=a_gsm7`.
@@ -259,18 +259,18 @@ Decisión del usuario del 2026-10-19 (b12d384). Plan para aprobación de `archit
 - La experiencia está fijada por designer en `motor-texto-enriquecido-interfaz.md` §10.2 y §10.4 (2026-10-19):
   - un hint fijo de GSM-7, en v1 y en v2;
   - una línea por segmento, solo cuando hay borrados: «Al enviar se borran: …». Cada carácter va en mono, sin repetir, y los invisibles por su nombre. No bloquea guardar. En una v2 es un `.notice--warning` bajo el editor; en una v1 va en la celda «Estado». Quitar las tildes no se señala.
-  - El hint fijo de GSM-7 (`mowaMes.speech.gsm7`) entra en F7 y no en F8: hasta B9 la carga no normaliza, y la pantalla no puede prometerlo antes (acordado con `coordinador_motor_texto_enriquecido`, 2026-10-20).
+  - El hint fijo de GSM-7 (`mowaMes.speech.gsm7`) entra en F7 y no en F8: hasta B9 la carga no normaliza, y la pantalla no puede prometerlo antes (acordado con `coordinador_herramientas_implementadas`, 2026-10-20).
   - Entra también en F7, después de F8 (hallazgo de designer, 2026-10-20): por debajo de 64rem, la tarjeta apilada del speech la abre el segmento, seguido de «Largo máximo» y «Estado». Es `data-orden="1"` también en la celda del segmento, y se actualiza el comentario, porque la v1 ya no se escribe. Lleva una prueba Playwright del orden visual de la primera tarjeta.
   - Para B9: los caracteres borrados van por segmento, sin repetir, en el orden en que aparecen y sin contar los diacríticos. El nombre de un invisible lo pone el frontend (o el backend devuelve el punto de código, a acordar en B9).
 
 ### 6.4 Consultas
 
-- Con `coordinador_motor_texto_enriquecido`: resuelto (6.2, punto 1, y 6.5).
+- Con `coordinador_herramientas_implementadas`: resuelto (6.2, punto 1, y 6.5).
 - A `architec`, sobre los signos tipográficos: el usuario respondió «transliterar» (RF-MM-27, 204b3dc). Ver 6.2, punto 1. Plan §6 aprobado por `architec` el 2026-10-19.
 
 ### 6.5 Reparto y orden
 
-- **Corte del motor** (`dev_backend_motor_texto_enriquecido`, lo revisa su coordinador y pasa por §13 conmigo): `a_gsm7` en el registro, con su cota; `largo_gsm7`; las pruebas de la función; y el oro de B5 actualizado con el cambio declarado (RF-54), que es su prueba.
+- **Corte del motor** (`dev_backend_herramientas_implementadas`, lo revisa su coordinador y pasa por §13 conmigo): `a_gsm7` en el registro, con su cota; `largo_gsm7`; las pruebas de la función; y el oro de B5 actualizado con el cambio declarado (RF-54), que es su prueba.
 - **B9** (`dev_backend_modulo_mowa_mes`, sobre el corte del motor): `a_gsm7` como último paso en `expresion_de` y al compilar las v2; la medida en `campana.py`; los campos nuevos de la previsualización; el contrato; la regresión de conciliación; i18n de los códigos si los hay; y las mutaciones.
 - **Orden del motor** (un solo dev, acordado el 2026-10-19): B14 → B15 (M3, `speech.py` y la API) → **B16** (`a_gsm7`, `largo_gsm7`, la propiedad de la cota y el oro) → B13. B9 va encima de B16, que ya incluye B15, así que nadie rebasa contra un `speech.py` a medio cambiar. B16 arranca cuando `architec` apruebe este §6.
 - Después: F7 (frontend, con designer), C4 (mi revisión) y `architec`.
@@ -396,7 +396,7 @@ Decisiones del usuario del 2026-10-27, en `d999698`, en la §28 del plan del mot
 
 | Corte | Qué | Depende | Revisión |
 |---|---|---|---|
-| **T-MM-B12** | 7.2 a 7.6: variables v2, tope, exclusión, aviso, migración y contrato | T-CA-B2 en main | yo; `coordinador_motor_texto_enriquecido` mira el contexto y el uso de la cota; `architec` corre `-ConBase` y la migración de ida y vuelta |
+| **T-MM-B12** | 7.2 a 7.6: variables v2, tope, exclusión, aviso, migración y contrato | T-CA-B2 en main | yo; `coordinador_herramientas_implementadas` mira el contexto y el uso de la cota; `architec` corre `-ConBase` y la migración de ida y vuelta |
 | **T-MM-F11** | 7.7 | el contrato de B12; las etiquetas, T-CA-F1 | yo; designer los textos |
 | **T-MM-C8** | El cierre contra D-CA-0 a D-CA-2 y RF-64 a RF-66 en lo que toca a MOWA MES | B12 y F11 | `architec` |
 

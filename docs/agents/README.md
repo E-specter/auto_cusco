@@ -38,7 +38,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_...
 ```
 
-- **El valor es el nombre de la sesión**, el mismo con el que los agentes se llaman entre sí. Hoy en uso: `architec` (backend y arquitectura) y `designer` (frontend e interfaz).
+- **El valor es el nombre de la sesión**, el mismo con el que los agentes se llaman entre sí. Hoy en uso (2026-11-02): `architec` (orquesta e integra), `designer` (interfaz), `coordinador_modulo_mowa_mes`, `dev_backend_modulo_mowa_mes` y `dev_frontend_modulo_mowa_mes` (MOWA MES), `coordinador_modulo_whatsmkt`, `dev_backend_modulo_whatsmkt` y `dev_frontend_modulo_whatsmkt` (WhatsMKT), y `coordinador_herramientas_implementadas`, `dev_backend_herramientas_implementadas` y `dev_frontend_herramientas_implementadas` (herramientas compartidas). Estas tres se llamaban `*_motor_texto_enriquecido` hasta el 2026-11-02: los commits anteriores conservan ese trailer, y `git log --grep` necesita los dos nombres para ver toda su historia.
 - **Un trailer, no una etiqueta de git.** Las etiquetas de git marcan versiones, no autoría, y una por commit no serviría de nada. Un trailer viaja con el mensaje y se consulta directo:
 
   ```powershell

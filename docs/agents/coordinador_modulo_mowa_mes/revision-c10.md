@@ -3,7 +3,7 @@
 > **Cerrada el 2026-10-29.** Plan: [plan-c10.md](plan-c10.md), aprobado en `2833b04`. Partió de la decisión del usuario de corregir lo copiado y lo mal ubicado de [recapitulacion-c9.md](recapitulacion-c9.md) §C antes del pulido de experiencia, con las elecciones E1 a E4. Los 20 cortes están en `main`, de `616cd80` a `fff021d`, sin subir con `git push`.
 
 Coordinador: `coordinador_modulo_mowa_mes`. Reporta a `architec`. Revisores:
-- `coordinador_motor_texto_enriquecido` revisó todo corte que tocaba su código o sus pantallas, como en la §13 de MOWA MES pero al revés;
+- `coordinador_herramientas_implementadas` revisó todo corte que tocaba su código o sus pantallas, como en la §13 de MOWA MES pero al revés;
 - `designer` aprobó con capturas todo cambio visible.
 
 ## 1. Cortes

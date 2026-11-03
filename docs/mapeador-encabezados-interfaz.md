@@ -1,6 +1,6 @@
 # Mapeador de encabezados: reglas de interfaz
 
-Reglas vinculantes para el componente compartido `MapeadorEncabezados` (T-MAP-F1, de `designer`) y para la pantalla que lo usa en la carga de sábanas (T-MAP-F2, de `dev_frontend_motor_texto_enriquecido`). Complementan el diseño técnico de [mapeador-encabezados.md](mapeador-encabezados.md) y RF-57 a RF-63 de [atomics-requirements.md](atomics-requirements.md). Reemplazan la lista de experiencia de §7 de ese diseño.
+Reglas vinculantes para el componente compartido `MapeadorEncabezados` (T-MAP-F1, de `designer`) y para la pantalla que lo usa en la carga de sábanas (T-MAP-F2, de `dev_frontend_herramientas_implementadas`). Complementan el diseño técnico de [mapeador-encabezados.md](mapeador-encabezados.md) y RF-57 a RF-63 de [atomics-requirements.md](atomics-requirements.md). Reemplazan la lista de experiencia de §7 de ese diseño.
 
 Responsable: `designer`. Un cambio a estas reglas se acuerda con `designer` antes de escribirlo.
 

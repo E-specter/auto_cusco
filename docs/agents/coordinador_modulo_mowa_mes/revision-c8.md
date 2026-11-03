@@ -43,7 +43,7 @@ Coordinador: `coordinador_modulo_mowa_mes`. Reporta a `architec`. Requerimientos
 - **Pruebas que cambian a propósito:**
   - `test_api_mowa_mes_campanas.py`, una línea autorizada (`"campos": []`). Es la única prueba de oro del diff.
   - `test_codigos_mowa_mes.py`, el orden de evaluación.
-  - `test_campos_adicionales_variables.py`, del motor, con visto bueno de `coordinador_motor_texto_enriquecido`: afirmaba que el speech no tenía adicionales, que es justo lo que cambia D-CA-0.
+  - `test_campos_adicionales_variables.py`, del motor, con visto bueno de `coordinador_herramientas_implementadas`: afirmaba que el speech no tenía adicionales, que es justo lo que cambia D-CA-0.
 - **De `designer`:**
   - El detalle va en dos claves, una y varias, fuera de `mowaMes.codigo.*`, cuya prueba espejo compara el conjunto con el enum.
   - Las comillas son las del idioma y salen de una plantilla (`mowaMes.exclusiones.campo`), no de `avisoDeArchivados`, que pone «» siempre.

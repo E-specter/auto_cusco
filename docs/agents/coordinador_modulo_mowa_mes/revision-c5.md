@@ -8,7 +8,7 @@ Coordinador: `coordinador_modulo_mowa_mes`. Reporta a `architec`. Requerimiento:
 
 | Corte | Dónde | Contenido | Agente | Mi revisión |
 |---|---|---|---|---|
-| **T-MTE-B19** | `18b8b36` (desde el worktree `auto_cusco_mte_b19`); 22 archivos | `a_gsm7` translitera los extendidos y borra `^`; `CARACTERES_GSM7` queda solo con el alfabeto básico; `largo_gsm7_normalizado` = `len(a_gsm7(…))`; oro, conciliación, contrato (una descripción) y docs | dev_backend_motor_texto_enriquecido, coordinado por `coordinador_motor` | §13, dos pasadas |
+| **T-MTE-B19** | `18b8b36` (desde el worktree `auto_cusco_mte_b19`); 22 archivos | `a_gsm7` translitera los extendidos y borra `^`; `CARACTERES_GSM7` queda solo con el alfabeto básico; `largo_gsm7_normalizado` = `len(a_gsm7(…))`; oro, conciliación, contrato (una descripción) y docs | dev_backend_herramientas_implementadas, coordinado por `coordinador_motor` | §13, dos pasadas |
 | **T-MM-F8** | `auto_cusco_mowa_f8`, rama `mowa-f8-extendidos`, rebasado sobre `18b8b36`; 7 archivos (el contrato ya viene de B19) | API falsa de GSM-7 con la misma tabla; texto `mowaMes.speech.calculoUnidad` (es y en) con visto bueno de `designer`; Vitest y Playwright; el contrato de B19 aplicado con `git apply` | dev_frontend_modulo_mowa_mes | completa, dos pasadas |
 
 F8 se rebasó sobre `18b8b36`: el `openapi.json` y el `contrato-api.d.ts` que traía aplicados coinciden con los de B19 y salen de su diff.

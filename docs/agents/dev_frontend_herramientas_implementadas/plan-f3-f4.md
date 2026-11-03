@@ -1,6 +1,6 @@
 # Plan de F3 y F4 (frontend del motor de texto enriquecido)
 
-Propuesta del 2026-10-01 de `dev_frontend_motor_texto_enriquecido` para `coordinador_motor_texto_enriquecido`. Hecha sobre HEAD `2f0b3b3`, **sin código de producto**: nada de esto se implementa hasta que B4a, B4b, B6 y F2 estén entregados. Fuentes: `motor-texto-enriquecido-interfaz.md` (§2, §3, §4, §5, §5.6, §7, §8), `motor-texto-enriquecido.md` (§4 a §10, §20), `plan.md` del coordinador (§6, §7, §12, §13), `frontend/src/lib/expresion.ts` (designer, `5ffeddf`), las entidades `CampoSalida`, `DefinicionCarga` y `Segmentacion` del backend, y el código actual de `/mowa-mes/configuracion`.
+Propuesta del 2026-10-01 de `dev_frontend_herramientas_implementadas` para `coordinador_herramientas_implementadas`. Hecha sobre HEAD `2f0b3b3`, **sin código de producto**: nada de esto se implementa hasta que B4a, B4b, B6 y F2 estén entregados. Fuentes: `motor-texto-enriquecido-interfaz.md` (§2, §3, §4, §5, §5.6, §7, §8), `motor-texto-enriquecido.md` (§4 a §10, §20), `plan.md` del coordinador (§6, §7, §12, §13), `frontend/src/lib/expresion.ts` (designer, `5ffeddf`), las entidades `CampoSalida`, `DefinicionCarga` y `Segmentacion` del backend, y el código actual de `/mowa-mes/configuracion`.
 
 Las dudas para `designer` están aparte, en [dudas-designer.md](dudas-designer.md). Las preguntas de contrato para el coordinador y el backend están en la sección 6 de este documento.
 
