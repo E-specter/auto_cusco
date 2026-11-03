@@ -1169,6 +1169,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/whatsmkt/configuracion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Obtener Configuracion */
+        get: operations["obtener_configuracion_whatsmkt_configuracion_get"];
+        /**
+         * Actualizar la configuracion de WhatsMKT (parcial)
+         * @description Actualizacion parcial sobre PUT: un campo omitido conserva el guardado.
+         *
+         *     - `null` en un campo que no admite vacio responde 422 de validacion.
+         *     - `definicion_defecto_id: null` quita la definicion por defecto; una que no existe es 404.
+         *     - Un tope menor o igual a cero responde el 422 de validacion, sin codigo.
+         *     - Un horario con inicio igual o posterior al fin (`horarios` dice cuales franjas) o una
+         *       variable desconocida en la plantilla (`variable`) responden 422 con su `codigo`.
+         */
+        put: operations["guardar_configuracion_whatsmkt_configuracion_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsmkt/segmentos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar Segmentos */
+        get: operations["listar_segmentos_whatsmkt_segmentos_get"];
+        /**
+         * Editar los 3 segmentos (etiqueta y limites)
+         * @description Edita la etiqueta y los limites de los 3 segmentos fijos, en una transaccion (RF-WM-20).
+         *     El `orden` lo fija la API, de menor a mayor.
+         *
+         *     Otras claves, una repetida o una que falta responden el 422 de validacion, sin codigo.
+         *     Segmentos que se superponen o dejan huecos responden 422 con su `codigo` y sus parametros, y
+         *     la tabla anterior queda como estaba.
+         */
+        put: operations["reemplazar_segmentos_whatsmkt_segmentos_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1703,6 +1756,18 @@ export interface components {
          */
         CodigoTexto: "expresion_invalida" | "definicion_invalida" | "sintaxis_invalida" | "referencia_vacia" | "variable_desconocida" | "funcion_desconocida" | "parametro_invalido" | "tipo_incompatible" | "limite_excedido" | "no_se_puede_escribir_como_texto" | "sin_segmento" | "variable_obligatoria_vacia" | "argumento_vacio" | "division_por_cero" | "no_es_numero" | "no_es_fecha" | "telefono_invalido" | "resultado_fuera_de_rango" | "valor_no_convertible" | "sin_cota_variable" | "sin_cota_funcion" | "contexto_desconocido" | "producto_no_encontrado" | "sin_version_vigente" | "definicion_no_encontrada" | "version_no_encontrada" | "nombre_repetido" | "seleccion_no_encontrada" | "fecha_envio_anterior";
         /**
+         * CodigoWhatsmkt
+         * @description Codigos de error del modulo; el frontend los traduce como `whatsmkt.codigo.<codigo>`.
+         *
+         *     Los 27 de docs/whatsmkt-interfaz.md §7 mas `horario_invalido`, todos desde B1 para que la
+         *     prueba espejo de i18n no cambie en cada corte. Un codigo por linea, con la forma
+         *     `NOMBRE = "codigo"`: la prueba espejo lee esta clase. Un codigo nuevo se acuerda antes con
+         *     designer. B1 emite solo `horario_invalido`, `variable_inexistente`, `segmentos_superpuestos`
+         *     y `segmentos_con_hueco`; los demas los emiten B2 a B6.
+         * @enum {string}
+         */
+        CodigoWhatsmkt: "sin_telefono" | "telefono_invalido" | "macro_vacia" | "mensaje_con_emoji" | "macro_inexistente" | "mensaje_largo" | "mensaje_deshabilitado" | "nombre_largo" | "variable_inexistente" | "fecha_no_gestionable" | "sin_horario" | "sin_productos" | "definicion_no_whatsmkt" | "foto_formato" | "foto_medidas" | "foto_peso" | "adjunto_tipo" | "adjunto_peso" | "adjunto_danado" | "segmentos_superpuestos" | "segmentos_con_hueco" | "informe_sin_encabezados" | "informe_sin_filas" | "informe_ya_importado" | "campana_descartada" | "campana_no_descartada" | "horario_invalido";
+        /**
          * ColumnaAnalizadaRespuesta
          * @description Una columna del archivo. `indice` va en base 0 y es su posicion en el archivo (los
          *     encabezados vacios no se listan, pero el indice de las demas se conserva). `sugerido` es un
@@ -1884,6 +1949,72 @@ export interface components {
             procedencias: string[];
             /** Supervisores */
             supervisores: components["schemas"]["SupervisorRespuesta"][];
+        };
+        /**
+         * ConfiguracionWhatsmktEntrada
+         * @description Todos los campos son opcionales: uno omitido conserva el guardado y un `null` en uno que
+         *     no admite vacio responde 422 (como la configuracion de MOWA MES). Solo la definicion por
+         *     defecto admite `null`: quita la elegida.
+         */
+        ConfiguracionWhatsmktEntrada: {
+            /** @description Franja 1 (RF-WM-07) */
+            horario_1?: components["schemas"]["HorarioWhatsmktEntrada"];
+            /** @description Franja 2 (RF-WM-07) */
+            horario_2?: components["schemas"]["HorarioWhatsmktEntrada"];
+            /**
+             * Plantilla Nombre
+             * @description Plantilla del nombre de campana (RF-WM-33): texto fijo con {fecha_corte} y {segmento}. Vacia, vuelve la de por defecto
+             */
+            plantilla_nombre?: string;
+            /**
+             * Definicion Defecto Id
+             * @description Definicion de carga por defecto (RF-WM-04); null la quita
+             */
+            definicion_defecto_id?: number | null;
+            /**
+             * Tope Mensaje
+             * @description Caracteres, mayor que 0 (RF-WM-26)
+             */
+            tope_mensaje?: number;
+            /**
+             * Tope Video
+             * @description Bytes, mayor que 0 (RF-WM-31)
+             */
+            tope_video?: number;
+            /**
+             * Tope Audio
+             * @description Bytes, mayor que 0 (RF-WM-31)
+             */
+            tope_audio?: number;
+            /**
+             * Tope Pdf
+             * @description Bytes, mayor que 0 (RF-WM-31)
+             */
+            tope_pdf?: number;
+        };
+        /** ConfiguracionWhatsmktRespuesta */
+        ConfiguracionWhatsmktRespuesta: {
+            horario_1: components["schemas"]["HorarioWhatsmktRespuesta"];
+            horario_2: components["schemas"]["HorarioWhatsmktRespuesta"];
+            /** Plantilla Nombre */
+            plantilla_nombre: string;
+            /** Definicion Defecto Id */
+            definicion_defecto_id: number | null;
+            /** Tope Mensaje */
+            tope_mensaje: number;
+            /** Tope Video */
+            tope_video: number;
+            /** Tope Audio */
+            tope_audio: number;
+            /** Tope Pdf */
+            tope_pdf: number;
+            /** Actualizado En */
+            actualizado_en: string | null;
+            /**
+             * Variables Plantilla
+             * @description Las variables validas de la plantilla
+             */
+            variables_plantilla: string[];
         };
         /**
          * ConfirmacionEntrada
@@ -2325,6 +2456,46 @@ export interface components {
             campo: components["schemas"]["CampoConfiguracion"] | null;
         };
         /**
+         * ErrorWhatsmktRespuesta
+         * @description 422 de una regla de negocio: el motivo, el codigo que la interfaz traduce y los datos que
+         *     su texto nombra. Los parametros siempre viajan; los que el codigo no usa van nulos.
+         */
+        ErrorWhatsmktRespuesta: {
+            /** Detail */
+            detail: string;
+            codigo: components["schemas"]["CodigoWhatsmkt"];
+            /**
+             * Horarios
+             * @description horario_invalido: las franjas que fallan
+             */
+            horarios: string[] | null;
+            /**
+             * Variable
+             * @description variable_inexistente: la que no existe
+             */
+            variable: string | null;
+            /**
+             * Segmento
+             * @description segmentos_superpuestos: el segmento con el que se pisa
+             */
+            segmento: string | null;
+            /**
+             * Fila
+             * @description segmentos_superpuestos: la fila bajo la que se muestra
+             */
+            fila: string | null;
+            /**
+             * Desde
+             * @description segmentos_con_hueco: primer dia sin segmento (null: -inf)
+             */
+            desde: number | null;
+            /**
+             * Hasta
+             * @description segmentos_con_hueco: ultimo dia sin segmento (null: +inf)
+             */
+            hasta: number | null;
+        };
+        /**
          * EstadoCarga
          * @description Estado de procesamiento de una version (la ingesta corre en segundo plano).
          * @enum {string}
@@ -2643,6 +2814,26 @@ export interface components {
             blacklist_indecopi: boolean;
             /** Speech Optimizado */
             speech_optimizado: boolean;
+        };
+        /** HorarioWhatsmktEntrada */
+        HorarioWhatsmktEntrada: {
+            /**
+             * Inicio
+             * @description HH:MM, 24 horas
+             */
+            inicio: string;
+            /**
+             * Fin
+             * @description HH:MM, 24 horas; posterior al inicio
+             */
+            fin: string;
+        };
+        /** HorarioWhatsmktRespuesta */
+        HorarioWhatsmktRespuesta: {
+            /** Inicio */
+            inicio: string;
+            /** Fin */
+            fin: string;
         };
         /** IncidenciaRespuesta */
         IncidenciaRespuesta: {
@@ -3516,6 +3707,39 @@ export interface components {
             etiqueta: string;
             /** Cantidad */
             cantidad: number;
+        };
+        /** SegmentoWhatsmktEntrada */
+        SegmentoWhatsmktEntrada: {
+            /**
+             * Clave
+             * @description Una de las 3 fijas: preventivo, tramo_2 o mayores_2
+             */
+            clave: string;
+            /** Etiqueta */
+            etiqueta: string;
+            /**
+             * Desde
+             * @description null: sin piso
+             */
+            desde: number | null;
+            /**
+             * Hasta
+             * @description null: sin tope
+             */
+            hasta: number | null;
+        };
+        /** SegmentoWhatsmktRespuesta */
+        SegmentoWhatsmktRespuesta: {
+            /** Clave */
+            clave: string;
+            /** Etiqueta */
+            etiqueta: string;
+            /** Desde */
+            desde: number | null;
+            /** Hasta */
+            hasta: number | null;
+            /** Orden */
+            orden: number;
         };
         /** SeleccionEntrada */
         SeleccionEntrada: {
@@ -7025,6 +7249,121 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtener_configuracion_whatsmkt_configuracion_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfiguracionWhatsmktRespuesta"];
+                };
+            };
+        };
+    };
+    guardar_configuracion_whatsmkt_configuracion_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfiguracionWhatsmktEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfiguracionWhatsmktRespuesta"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Una regla del modulo no se cumple; `codigo` dice cual y `detail` el motivo */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorWhatsmktRespuesta"];
+                };
+            };
+        };
+    };
+    listar_segmentos_whatsmkt_segmentos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentoWhatsmktRespuesta"][];
+                };
+            };
+        };
+    };
+    reemplazar_segmentos_whatsmkt_segmentos_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentoWhatsmktEntrada"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentoWhatsmktRespuesta"][];
+                };
+            };
+            /** @description Una regla del modulo no se cumple; `codigo` dice cual y `detail` el motivo */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorWhatsmktRespuesta"];
                 };
             };
         };
