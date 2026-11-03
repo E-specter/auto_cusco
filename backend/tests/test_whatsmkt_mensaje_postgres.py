@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_whatsmkt_postgres import RepositorioWhatsmktPostgres
-from app.core.services.plataformas.whatsmkt.contexto import CONTEXTO_MENSAJE
+from app.core.services.plataformas.whatsmkt.contexto import contexto_mensaje
 from tests.test_whatsmkt_mensaje_migracion import MIGRACION, REVISION_ANTERIOR
 
 pytestmark = [
@@ -82,7 +82,7 @@ def test_los_mensajes_sembrados_los_acepta_el_validador_del_contexto(estado) -> 
     engine, _ = estado
 
     for _, _, _, contenido in _mensajes_de_los_segmentos(engine).values():
-        assert CONTEXTO_MENSAJE.validar(contenido) == ()
+        assert contexto_mensaje(lambda: 4096).validar(contenido) == ()
 
 
 def test_los_segmentos_se_leen_con_su_texto_guardado_id(estado) -> None:

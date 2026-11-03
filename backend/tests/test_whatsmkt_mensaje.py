@@ -5,9 +5,10 @@ Datos sinteticos (telefonos 900000xxx).
 
 import pytest
 
+from app.core.entities.texto_enriquecido import CodigoTexto
 from app.core.entities.whatsmkt import CodigoWhatsmkt, ErrorWhatsmkt
 from app.core.services.plataformas.whatsmkt import mensaje
-from app.core.services.plataformas.whatsmkt.contexto import CONTEXTO_MENSAJE
+from app.core.services.plataformas.whatsmkt.contexto import contexto_mensaje
 
 ZWJ, VS16, VS15, KEYCAP = "‍", "️", "︎", "⃣"
 FAMILIA = "👨" + ZWJ + "👩" + ZWJ + "👧"
@@ -271,16 +272,34 @@ def test_el_valor_de_una_macro_no_se_vuelve_a_interpretar() -> None:
 
 
 def test_el_contexto_es_de_texto_plano_con_su_clave() -> None:
-    assert CONTEXTO_MENSAJE.clave == "whatsmkt.mensaje"
-    assert CONTEXTO_MENSAJE.tipo.value == "texto_plano"
+    contexto = contexto_mensaje(lambda: 4096)
+
+    assert contexto.clave == "whatsmkt.mensaje"
+    assert contexto.tipo.value == "texto_plano"
 
 
-def test_el_validador_del_contexto_exige_un_texto_de_1_a_4096_caracteres() -> None:
-    validar = CONTEXTO_MENSAJE.validar
+def test_el_validador_del_contexto_aplica_las_reglas_del_mensaje_con_el_tope_que_se_le_da() -> None:
+    validar = contexto_mensaje(lambda: 4096).validar
 
     assert validar({"texto": "Hola [$MACRO1$]"}) == ()
     assert validar({"texto": "a" * 4096}) == ()
-    assert validar({"texto": "a" * 4097}) != ()
-    assert validar({"texto": "   "}) != ()
-    assert validar({"texto": 5}) != ()
-    assert validar({"otro": "x"}) != ()
+    [largo] = validar({"texto": "a" * 4097})
+    assert largo.codigo is CodigoTexto.REGLA_DEL_CONTEXTO
+    assert largo.codigo_contexto == "mensaje_largo"
+    assert dict(largo.parametros) == {"largo": 4097, "maximo": 4096}
+    [emoji] = validar({"texto": "Hola 😀"})
+    assert emoji.codigo_contexto == "mensaje_con_emoji"
+    assert dict(emoji.parametros) == {"caracter": "😀", "posicion": 6}
+    # Lo que no es del modulo sigue siendo el problema generico del contexto de texto plano.
+    for malo in ({"texto": "   "}, {"texto": 5}, {"otro": "x"}):
+        [problema] = validar(malo)
+        assert problema.codigo is CodigoTexto.TEXTO_GUARDADO_INVALIDO
+
+
+def test_el_tope_se_lee_en_cada_validacion() -> None:
+    tope = [10]
+    validar = contexto_mensaje(lambda: tope[0]).validar
+
+    assert validar({"texto": "a" * 20}) != ()
+    tope[0] = 20
+    assert validar({"texto": "a" * 20}) == ()

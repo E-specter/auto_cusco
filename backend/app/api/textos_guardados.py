@@ -30,6 +30,7 @@ from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_textos_guardados_postgres import (
     RepositorioTextosGuardadosPostgres,
 )
+from app.adapters.persistence.repositorio_whatsmkt_postgres import RepositorioWhatsmktPostgres
 from app.api.respuestas import ModeloRespuesta
 from app.api.texto_enriquecido import (
     DetalleErrorTexto,
@@ -48,7 +49,7 @@ from app.core.entities.textos_guardados import (
     VersionDeTextoNoEncontrada,
     VersionTexto,
 )
-from app.core.services.plataformas.whatsmkt.contexto import CONTEXTO_MENSAJE
+from app.core.services.plataformas.whatsmkt.contexto import contexto_mensaje
 from app.core.services.textos_guardados.contextos import (
     ContextoGuardado,
     ContextoGuardadoDesconocido,
@@ -62,9 +63,17 @@ from app.core.services.textos_guardados.servicio import (
 
 router = APIRouter(prefix="/textos-guardados", tags=["textos guardados"])
 
+
+def _tope_del_mensaje_de_whatsmkt() -> int:
+    """El largo maximo del mensaje de WhatsMKT, leido de su configuracion en CADA validacion
+    (RF-WM-26): un cambio en la configuracion vale en el siguiente pedido. Abre la conexion al
+    llamarse, no al importar."""
+    return RepositorioWhatsmktPostgres(get_engine()).obtener_configuracion().tope_mensaje
+
+
 # Los contextos que la aplicacion conoce: cada modulo agrega aqui el suyo (RF-69). El nucleo no
 # importa ninguno; los tests sustituyen la dependencia.
-_REGISTRO_CONTEXTOS = RegistroContextosGuardados([CONTEXTO_MENSAJE])
+_REGISTRO_CONTEXTOS = RegistroContextosGuardados([contexto_mensaje(_tope_del_mensaje_de_whatsmkt)])
 
 
 def obtener_registro_contextos_guardados() -> RegistroContextosGuardados:

@@ -81,10 +81,10 @@ def test_el_enlace_de_whatsapp_es_el_marcador_y_no_trae_ningun_numero() -> None:
 
 def test_los_mensajes_cumplen_el_validador_del_contexto_y_las_reglas_del_mensaje() -> None:
     from app.core.services.plataformas.whatsmkt import mensaje
-    from app.core.services.plataformas.whatsmkt.contexto import CONTEXTO_MENSAJE
+    from app.core.services.plataformas.whatsmkt.contexto import contexto_mensaje
 
     for _, _, texto in MIGRACION.MENSAJES:
-        assert CONTEXTO_MENSAJE.validar({"texto": texto}) == ()
+        assert contexto_mensaje(lambda: 4096).validar({"texto": texto}) == ()
         mensaje.validar_sin_emojis(texto)
         mensaje.validar_largo(texto, 4096)
     # El de «Tramos mayores al 2» usa tres macros; los otros dos, dos.
