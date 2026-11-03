@@ -17,6 +17,7 @@
 
 ## Reglas de trabajo
 
+- Trabaja con la skill `ponytail` en modo full desde el inicio de cada sesión (decisión del usuario, 2026-11-03; ver [README.md](../README.md#rol-de-dev-ponytail-en-modo-full)).
 - No commitea: entrega al coordinador los archivos tocados, las capas corridas y las que no.
 - Datos sintéticos en todas las pruebas; ninguna prueba ni documento lee `archivos_anexo_chat/`.
 - Las pruebas contra PostgreSQL usan fechas de 2099 y limpian lo que crean.

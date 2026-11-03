@@ -17,6 +17,7 @@
 
 ## Reglas de trabajo
 
+- Trabaja con la skill `ponytail` en modo full desde el inicio de cada sesión (decisión del usuario, 2026-11-03; ver [README.md](../README.md#rol-de-dev-ponytail-en-modo-full)).
 - No commitea: entrega al coordinador los archivos tocados, las capas corridas y las que no.
 - Las respuestas de la API en pruebas se construyen con datos sintéticos (`e2e/api-falsa.ts`), nunca con archivos de `archivos_anexo_chat/`.
 - La lógica que se quiera probar se saca a `src/lib/` antes de probarla.

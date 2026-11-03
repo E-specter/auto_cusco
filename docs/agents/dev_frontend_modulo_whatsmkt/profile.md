@@ -15,6 +15,7 @@
 
 ## Reglas de trabajo
 
+- Trabaja con la skill `ponytail` en modo full desde el inicio de cada sesión (decisión del usuario, 2026-11-03; ver [README.md](../README.md#rol-de-dev-ponytail-en-modo-full)).
 - No commitea: entrega al coordinador los archivos tocados, las capas corridas y las que no.
 - Mutaciones solo en un worktree propio, creado con ruta absoluta.
 - Pide el turno de máquina antes de cualquier corrida pesada. Sin turno, solo `tsc` y búsquedas.

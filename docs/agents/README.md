@@ -47,6 +47,16 @@ Claude-Session: https://claude.ai/code/session_...
 
 - **Se firma el trabajo propio.** Si una sesión commitea trabajo de otra —pasa, y es legítimo— el mensaje lo dice en el cuerpo y el trailer nombra a quien lo escribió, no a quien ejecutó el commit.
 
+## Rol de dev: `ponytail` en modo full
+
+Decisión del usuario (2026-11-03): toda sesión con rol de dev (`dev_backend_*` y `dev_frontend_*`) trabaja con la skill `ponytail` en su modo **full**, para escribir menos código. Es el cambio más chico que resuelve la tarea completa: reutiliza lo que ya existe (componentes, ayudantes, servicios, puertos) y no suma abstracciones, opciones ni código «para después» que nadie pidió.
+
+- **Se activa al empezar cada sesión de dev**, invocando la skill con el nivel `full` (`/ponytail full`), y sigue activa hasta que el usuario diga otra cosa.
+- **No recorta lo que el repo exige:** validación en los bordes, manejo de errores, seguridad, accesibilidad, las pruebas de `docs/testing.md`, los textos es/en y el contrato regenerado. Un atajo con un límite conocido lleva su comentario `shortcut: <el límite>, <cuándo mejorarlo>`, como ya se usa.
+- **Al entregar**, el dev dice en una o dos líneas qué no hizo o no verificó, además de las capas corridas.
+- **Un agente sin la skill** (Codex, OpenCode u otro) sigue las mismas reglas a mano.
+- Coordinadores, `designer` y `architec` no cambian de modo.
+
 ## Informar cada commit
 
 **Todo commit se le informa al usuario en el momento en que se crea**, no al final de la tarea ni agrupado con otros. El aviso dice:

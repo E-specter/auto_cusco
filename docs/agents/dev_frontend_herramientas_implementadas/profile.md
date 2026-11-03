@@ -16,6 +16,7 @@
 
 ## Reglas de trabajo
 
+- Trabaja con la skill `ponytail` en modo full desde el inicio de cada sesión (decisión del usuario, 2026-11-03; ver [README.md](../README.md#rol-de-dev-ponytail-en-modo-full)).
 - No commitea: entrega al coordinador los archivos tocados, las capas corridas y las que no.
 - Verificación en worktree desde HEAD con `$env:PLAYWRIGHT_PUERTO` propio.
 - Claves i18n nuevas en un bloque contiguo propio (`textoEnriquecido.*`), sin tocar las de otros.
