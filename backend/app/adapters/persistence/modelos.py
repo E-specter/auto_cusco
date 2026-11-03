@@ -1009,3 +1009,50 @@ class WhatsmktExclusion(Base):
         Index(None, "campana_id"),
         CheckConstraint("fila >= 1", name="fila_positiva"),
     )
+
+
+class WhatsmktReporte(Base):
+    """El informe vigente de una campana (RF-WM-37): lo que informa WhatsMKT y la huella del
+    archivo. `campana_id` es unico: reemplazarlo borra el anterior en la misma transaccion."""
+
+    __tablename__ = "whatsmkt_reporte"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    campana_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("whatsmkt_campana.id", ondelete="CASCADE")
+    )
+    archivo_nombre: Mapped[str] = mapped_column(Text)
+    huella: Mapped[str] = mapped_column(String(64))  # SHA-256 del archivo, en hexadecimal
+    fecha_informada: Mapped[date | None] = mapped_column(Date)
+    total_informado: Mapped[int | None] = mapped_column(Integer)
+    # Tal como los escribe WhatsMKT: solo se muestran, no sirven de clave.
+    campana_informada: Mapped[str | None] = mapped_column(Text)
+    tipo_envio_informado: Mapped[str | None] = mapped_column(Text)
+    importado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("campana_id"),
+        CheckConstraint("length(huella) = 64", name="huella_valida"),
+        CheckConstraint(
+            "total_informado IS NULL OR total_informado >= 0", name="total_no_negativo"
+        ),
+    )
+
+
+class WhatsmktReporteFila(Base):
+    """Un numero del informe, en su orden. Un numero repetido se conserva repetido."""
+
+    __tablename__ = "whatsmkt_reporte_fila"
+
+    reporte_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("whatsmkt_reporte.id", ondelete="CASCADE"), primary_key=True
+    )
+    posicion: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    numero: Mapped[str] = mapped_column(Text)
+
+    __table_args__ = (
+        CheckConstraint("posicion >= 1", name="posicion_positiva"),
+        CheckConstraint("numero ~ '^[0-9]+$'", name="numero_de_digitos"),
+    )

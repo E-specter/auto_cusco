@@ -1570,6 +1570,99 @@ export interface paths {
         get: operations["obtener_campana_whatsmkt_campanas__campana_id__get"];
         put?: never;
         post?: never;
+        /**
+         * Eliminar una campana descartada
+         * @description Borra del todo una campana DESCARTADA, con su archivo, filas cargadas, exclusiones e
+         *     informes (RF-WM-42). Si era la ultima de su lote, borra tambien el lote y sus exclusiones de
+         *     fuera del lote. No borra los adjuntos de la biblioteca ni las versiones del mensaje.
+         */
+        delete: operations["eliminar_campana_whatsmkt_campanas__campana_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsmkt/campanas/{campana_id}/reportes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Importar el informe de WhatsMKT
+         * @description Guarda el informe como el vigente de la campana y devuelve su conciliacion (RF-WM-37).
+         *
+         *     Un informe sin los encabezados CAMPAÑA, TIPO DE ENVIO y NUMERO, o sin numeros, responde 422 y
+         *     no guarda nada. Reemplazar uno ya importado exige `reemplazar=true`: sin el, responde 409.
+         */
+        post: operations["importar_informe_whatsmkt_campanas__campana_id__reportes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsmkt/campanas/{campana_id}/conciliacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Conciliacion de la campana con su informe
+         * @description Los productos y la supervision cargados contra los numeros del informe (RF-WM-39).
+         *
+         *     Una campana sin informe no es un error: responde 200 con `pendiente=true` y sin cifras. El 404
+         *     es solo para una campana que no existe.
+         */
+        get: operations["conciliacion_whatsmkt_campanas__campana_id__conciliacion_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsmkt/campanas/{campana_id}/descartar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Descartar una campana
+         * @description La saca de las activas sin borrar nada (RF-WM-41). Descartar una ya descartada no cambia
+         *     nada.
+         */
+        post: operations["descartar_campana_whatsmkt_campanas__campana_id__descartar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsmkt/campanas/{campana_id}/restaurar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restaurar una campana descartada
+         * @description La devuelve a las activas (RF-WM-42).
+         */
+        post: operations["restaurar_campana_whatsmkt_campanas__campana_id__restaurar_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1768,6 +1861,20 @@ export interface components {
              * @description La codificacion de un CSV
              */
             codificacion?: string | null;
+        };
+        /** Body_importar_informe_whatsmkt_campanas__campana_id__reportes_post */
+        Body_importar_informe_whatsmkt_campanas__campana_id__reportes_post: {
+            /**
+             * Archivo
+             * @description El informe que genera WhatsMKT al terminar el envio (hoja «Informe»), en cualquiera de los formatos de la sabana: .xlsx, .xlsb, .xls, .ods, .csv, .tsv, .txt o .json
+             */
+            archivo: string;
+            /**
+             * Reemplazar
+             * @description Reemplazar el informe que la campana ya tenia (RF-WM-38)
+             * @default false
+             */
+            reemplazar: boolean;
         };
         /** Body_importar_reporte_mowa_mes_campanas__campana_id__reportes_post */
         Body_importar_reporte_mowa_mes_campanas__campana_id__reportes_post: {
@@ -2155,6 +2262,15 @@ export interface components {
             marcas_fecha: components["schemas"]["MarcaFechaRespuesta"][];
             limites: components["schemas"]["LimitesRespuesta"];
         };
+        /** CifrasConciliacionWhatsmktRespuesta */
+        CifrasConciliacionWhatsmktRespuesta: {
+            /** Cargados */
+            cargados: number;
+            /** Enviados */
+            enviados: number;
+            /** No Enviados */
+            no_enviados: number;
+        };
         /** CifrasGrupoRespuesta */
         CifrasGrupoRespuesta: {
             /** Cargados */
@@ -2403,6 +2519,20 @@ export interface components {
             costo_real: string | null;
             /** @description `calculado`; `pendiente` si no hay reporte importado; `no_disponible` si la campana no tiene tarifa. Ni pendiente ni no disponible son cero */
             costo_real_estado: components["schemas"]["EstadoCosto"];
+        };
+        /** ConciliacionWhatsmktRespuesta */
+        ConciliacionWhatsmktRespuesta: {
+            productos: components["schemas"]["CifrasConciliacionWhatsmktRespuesta"];
+            /** @description Los registros de supervision, aparte de los productos (RF-41) */
+            supervision: components["schemas"]["CifrasConciliacionWhatsmktRespuesta"];
+            total: components["schemas"]["CifrasConciliacionWhatsmktRespuesta"];
+            /**
+             * Sin Correspondencia
+             * @description Numeros del informe que no estan en la carga, sin repetir
+             */
+            sin_correspondencia: string[];
+            /** Total Sin Correspondencia */
+            total_sin_correspondencia: number;
         };
         /** ConfiguracionEntrada */
         ConfiguracionEntrada: {
@@ -2964,9 +3094,14 @@ export interface components {
             creada_en: string;
             /**
              * Descartada En
-             * @description Nula hasta que se pueda descartar (B6)
+             * @description Cuando se descarto; nula en una activa (RF-WM-41)
              */
             descartada_en: string | null;
+            /**
+             * Con Informe
+             * @description Si tiene el informe de WhatsMKT importado; las activas sin el estan pendientes
+             */
+            con_informe: boolean;
             lote: components["schemas"]["LoteWhatsmktRespuesta"];
             /**
              * Fecha Corte
@@ -3137,6 +3272,15 @@ export interface components {
             origen: components["schemas"]["OrigenDia"];
             /** Retirado */
             retirado: boolean;
+        };
+        /**
+         * ErrorCampanaWhatsmktRespuesta
+         * @description 409: el estado de la campana o del informe impide la operacion; `codigo` dice cual.
+         */
+        ErrorCampanaWhatsmktRespuesta: {
+            /** Detail */
+            detail: string;
+            codigo: components["schemas"]["CodigoWhatsmkt"];
         };
         /**
          * ErrorConfiguracionRespuesta
@@ -3326,6 +3470,11 @@ export interface components {
             alto: number | null;
         };
         /**
+         * EstadoCampana
+         * @enum {string}
+         */
+        EstadoCampana: "activas" | "descartadas";
+        /**
          * EstadoCarga
          * @description Estado de procesamiento de una version (la ingesta corre en segundo plano).
          * @enum {string}
@@ -3355,6 +3504,20 @@ export interface components {
          * @enum {string}
          */
         EstadoEncabezado: "recordado" | "coincide" | "parecido" | "sin_coincidencia";
+        /** EstadoInformeWhatsmktRespuesta */
+        EstadoInformeWhatsmktRespuesta: {
+            /** Campana Id */
+            campana_id: number;
+            /**
+             * Pendiente
+             * @description Verdadero si la campana todavia no tiene informe
+             */
+            pendiente: boolean;
+            /** @description Nulo si esta pendiente */
+            informe: components["schemas"]["InformeWhatsmktRespuesta"] | null;
+            /** @description Nula si esta pendiente */
+            conciliacion: components["schemas"]["ConciliacionWhatsmktRespuesta"] | null;
+        };
         /** ExcepcionEntrada */
         ExcepcionEntrada: {
             /**
@@ -3785,6 +3948,46 @@ export interface components {
             incidencias: components["schemas"]["IncidenciaRespuesta"][];
         };
         /**
+         * InformeWhatsmktRespuesta
+         * @description Lo que informa WhatsMKT y el archivo del que salio.
+         */
+        InformeWhatsmktRespuesta: {
+            /** Archivo Nombre */
+            archivo_nombre: string;
+            /**
+             * Importado En
+             * Format: date-time
+             */
+            importado_en: string;
+            /**
+             * Fecha Informada
+             * @description La fila FECHA; nula si no se entendio
+             */
+            fecha_informada: string | null;
+            /**
+             * Total Informado
+             * @description La fila TOTAL DE ENVIO; nula si no se entendio
+             */
+            total_informado: number | null;
+            /**
+             * Filas
+             * @description Filas de detalle del informe (un numero cada una)
+             */
+            filas: number;
+            /**
+             * Coincide Total
+             * @description Si el total informado es `filas`; nulo si no se informo (DU-WM-7: no rechaza)
+             */
+            coincide_total: boolean | null;
+            /**
+             * Campana Informada
+             * @description El nombre que trae el informe: solo para leer, no se compara
+             */
+            campana_informada: string | null;
+            /** Tipo Envio Informado */
+            tipo_envio_informado: string | null;
+        };
+        /**
          * LargoSegmentoRespuesta
          * @description `largo_maximo` es nulo cuando la expresion de una v2 no tiene maximo calculable: `sin_maximo`
          *     dice por que (una variable cuyo largo depende del dato, o una funcion que no lo acota).
@@ -3862,6 +4065,21 @@ export interface components {
             desplazamiento: number;
             /** Campanas */
             campanas: components["schemas"]["ResumenCampanaWhatsmktRespuesta"][];
+            /**
+             * Total Activas
+             * @description De todas las campanas, sin los filtros
+             */
+            total_activas: number;
+            /**
+             * Total Descartadas
+             * @description De todas las campanas, sin los filtros
+             */
+            total_descartadas: number;
+            /**
+             * Total Pendientes
+             * @description De todas las activas, sin los filtros: las que no tienen informe (RF-WM-40)
+             */
+            total_pendientes: number;
         };
         /** ListaDescartadasRespuesta */
         ListaDescartadasRespuesta: {
@@ -4786,9 +5004,14 @@ export interface components {
             creada_en: string;
             /**
              * Descartada En
-             * @description Nula hasta que se pueda descartar (B6)
+             * @description Cuando se descarto; nula en una activa (RF-WM-41)
              */
             descartada_en: string | null;
+            /**
+             * Con Informe
+             * @description Si tiene el informe de WhatsMKT importado; las activas sin el estan pendientes
+             */
+            con_informe: boolean;
         };
         /** ResumenDefinicionRespuesta */
         ResumenDefinicionRespuesta: {
@@ -9409,6 +9632,8 @@ export interface operations {
                 lote_id?: number | null;
                 /** @description YYYY-MM: el mes de la fecha de envio */
                 mes?: string | null;
+                /** @description Las activas (por defecto) o las descartadas */
+                estado?: components["schemas"]["EstadoCampana"];
             };
             header?: never;
             path?: never;
@@ -9561,6 +9786,235 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DetalleErrorConCodigo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    eliminar_campana_whatsmkt_campanas__campana_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campana_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description La campana esta activa: solo se elimina una descartada */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorCampanaWhatsmktRespuesta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    importar_informe_whatsmkt_campanas__campana_id__reportes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campana_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_importar_informe_whatsmkt_campanas__campana_id__reportes_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoInformeWhatsmktRespuesta"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description La campana ya tiene un informe y no se pidio reemplazarlo (`informe_ya_importado`), o esta descartada y hay que restaurarla primero (`campana_descartada`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorCampanaWhatsmktRespuesta"];
+                };
+            };
+            /** @description El archivo supera el tamano maximo */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Una regla del modulo no se cumple; `codigo` dice cual y `detail` el motivo */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorWhatsmktRespuesta"];
+                };
+            };
+        };
+    };
+    conciliacion_whatsmkt_campanas__campana_id__conciliacion_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campana_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoInformeWhatsmktRespuesta"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    descartar_campana_whatsmkt_campanas__campana_id__descartar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campana_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumenCampanaWhatsmktRespuesta"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restaurar_campana_whatsmkt_campanas__campana_id__restaurar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campana_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumenCampanaWhatsmktRespuesta"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleError"];
                 };
             };
             /** @description Validation Error */

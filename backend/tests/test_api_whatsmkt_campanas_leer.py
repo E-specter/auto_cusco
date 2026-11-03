@@ -89,6 +89,7 @@ def test_cada_fila_de_la_lista_trae_sus_datos(cliente) -> None:
         "cantidad": 4,
         "creada_en": fila["creada_en"],
         "descartada_en": None,
+        "con_informe": False,
     }
     assert fila["creada_en"].startswith("2026-11-03T")
 
@@ -114,6 +115,9 @@ def test_sin_campanas_la_lista_viene_vacia(cliente) -> None:
         "limite": 50,
         "desplazamiento": 0,
         "campanas": [],
+        "total_activas": 0,
+        "total_descartadas": 0,
+        "total_pendientes": 0,
     }
 
 
@@ -448,6 +452,7 @@ def test_el_contrato_declara_la_lista_y_el_detalle() -> None:
         "desplazamiento",
         "lote_id",
         "mes",
+        "estado",
     }
     assert {p["name"] for p in detalle["parameters"]} == {
         "campana_id",

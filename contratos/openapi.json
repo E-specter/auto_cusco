@@ -5584,6 +5584,17 @@
               "title": "Mes"
             },
             "description": "YYYY-MM: el mes de la fecha de envio"
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/EstadoCampana",
+              "description": "Las activas (por defecto) o las descartadas",
+              "default": "activas"
+            },
+            "description": "Las activas (por defecto) o las descartadas"
           }
         ],
         "responses": {
@@ -5753,6 +5764,302 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DetalleErrorConCodigo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Eliminar una campana descartada",
+        "description": "Borra del todo una campana DESCARTADA, con su archivo, filas cargadas, exclusiones e\ninformes (RF-WM-42). Si era la ultima de su lote, borra tambien el lote y sus exclusiones de\nfuera del lote. No borra los adjuntos de la biblioteca ni las versiones del mensaje.",
+        "operationId": "eliminar_campana_whatsmkt_campanas__campana_id__delete",
+        "parameters": [
+          {
+            "name": "campana_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campana Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La campana esta activa: solo se elimina una descartada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorCampanaWhatsmktRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/whatsmkt/campanas/{campana_id}/reportes": {
+      "post": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Importar el informe de WhatsMKT",
+        "description": "Guarda el informe como el vigente de la campana y devuelve su conciliacion (RF-WM-37).\n\nUn informe sin los encabezados CAMPAÑA, TIPO DE ENVIO y NUMERO, o sin numeros, responde 422 y\nno guarda nada. Reemplazar uno ya importado exige `reemplazar=true`: sin el, responde 409.",
+        "operationId": "importar_informe_whatsmkt_campanas__campana_id__reportes_post",
+        "parameters": [
+          {
+            "name": "campana_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campana Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_importar_informe_whatsmkt_campanas__campana_id__reportes_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoInformeWhatsmktRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "El archivo supera el tamano maximo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La campana ya tiene un informe y no se pidio reemplazarlo (`informe_ya_importado`), o esta descartada y hay que restaurarla primero (`campana_descartada`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorCampanaWhatsmktRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Una regla del modulo no se cumple; `codigo` dice cual y `detail` el motivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorWhatsmktRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/whatsmkt/campanas/{campana_id}/conciliacion": {
+      "get": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Conciliacion de la campana con su informe",
+        "description": "Los productos y la supervision cargados contra los numeros del informe (RF-WM-39).\n\nUna campana sin informe no es un error: responde 200 con `pendiente=true` y sin cifras. El 404\nes solo para una campana que no existe.",
+        "operationId": "conciliacion_whatsmkt_campanas__campana_id__conciliacion_get",
+        "parameters": [
+          {
+            "name": "campana_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campana Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoInformeWhatsmktRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/whatsmkt/campanas/{campana_id}/descartar": {
+      "post": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Descartar una campana",
+        "description": "La saca de las activas sin borrar nada (RF-WM-41). Descartar una ya descartada no cambia\nnada.",
+        "operationId": "descartar_campana_whatsmkt_campanas__campana_id__descartar_post",
+        "parameters": [
+          {
+            "name": "campana_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campana Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumenCampanaWhatsmktRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/whatsmkt/campanas/{campana_id}/restaurar": {
+      "post": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Restaurar una campana descartada",
+        "description": "La devuelve a las activas (RF-WM-42).",
+        "operationId": "restaurar_campana_whatsmkt_campanas__campana_id__restaurar_post",
+        "parameters": [
+          {
+            "name": "campana_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campana Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumenCampanaWhatsmktRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
                 }
               }
             }
@@ -6253,6 +6560,27 @@
           "archivo"
         ],
         "title": "Body_crear_borrador_mapeador__catalogo_id__borradores_post"
+      },
+      "Body_importar_informe_whatsmkt_campanas__campana_id__reportes_post": {
+        "properties": {
+          "archivo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "description": "El informe que genera WhatsMKT al terminar el envio (hoja «Informe»), en cualquiera de los formatos de la sabana: .xlsx, .xlsb, .xls, .ods, .csv, .tsv, .txt o .json"
+          },
+          "reemplazar": {
+            "type": "boolean",
+            "title": "Reemplazar",
+            "description": "Reemplazar el informe que la campana ya tenia (RF-WM-38)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_importar_informe_whatsmkt_campanas__campana_id__reportes_post"
       },
       "Body_importar_reporte_mowa_mes_campanas__campana_id__reportes_post": {
         "properties": {
@@ -7170,6 +7498,29 @@
         ],
         "title": "CatalogoRespuesta"
       },
+      "CifrasConciliacionWhatsmktRespuesta": {
+        "properties": {
+          "cargados": {
+            "type": "integer",
+            "title": "Cargados"
+          },
+          "enviados": {
+            "type": "integer",
+            "title": "Enviados"
+          },
+          "no_enviados": {
+            "type": "integer",
+            "title": "No Enviados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cargados",
+          "enviados",
+          "no_enviados"
+        ],
+        "title": "CifrasConciliacionWhatsmktRespuesta"
+      },
       "CifrasGrupoRespuesta": {
         "properties": {
           "cargados": {
@@ -7884,6 +8235,41 @@
           "costo_real_estado"
         ],
         "title": "ConciliacionRespuesta"
+      },
+      "ConciliacionWhatsmktRespuesta": {
+        "properties": {
+          "productos": {
+            "$ref": "#/components/schemas/CifrasConciliacionWhatsmktRespuesta"
+          },
+          "supervision": {
+            "$ref": "#/components/schemas/CifrasConciliacionWhatsmktRespuesta",
+            "description": "Los registros de supervision, aparte de los productos (RF-41)"
+          },
+          "total": {
+            "$ref": "#/components/schemas/CifrasConciliacionWhatsmktRespuesta"
+          },
+          "sin_correspondencia": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sin Correspondencia",
+            "description": "Numeros del informe que no estan en la carga, sin repetir"
+          },
+          "total_sin_correspondencia": {
+            "type": "integer",
+            "title": "Total Sin Correspondencia"
+          }
+        },
+        "type": "object",
+        "required": [
+          "productos",
+          "supervision",
+          "total",
+          "sin_correspondencia",
+          "total_sin_correspondencia"
+        ],
+        "title": "ConciliacionWhatsmktRespuesta"
       },
       "ConfiguracionEntrada": {
         "properties": {
@@ -9198,7 +9584,12 @@
               }
             ],
             "title": "Descartada En",
-            "description": "Nula hasta que se pueda descartar (B6)"
+            "description": "Cuando se descarto; nula en una activa (RF-WM-41)"
+          },
+          "con_informe": {
+            "type": "boolean",
+            "title": "Con Informe",
+            "description": "Si tiene el informe de WhatsMKT importado; las activas sin el estan pendientes"
           },
           "lote": {
             "$ref": "#/components/schemas/LoteWhatsmktRespuesta"
@@ -9257,6 +9648,7 @@
           "cantidad",
           "creada_en",
           "descartada_en",
+          "con_informe",
           "lote",
           "fecha_corte",
           "productos",
@@ -9633,6 +10025,24 @@
           "retirado"
         ],
         "title": "DiaNoLaborableRespuesta"
+      },
+      "ErrorCampanaWhatsmktRespuesta": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoWhatsmkt"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "codigo"
+        ],
+        "title": "ErrorCampanaWhatsmktRespuesta",
+        "description": "409: el estado de la campana o del informe impide la operacion; `codigo` dice cual."
       },
       "ErrorConfiguracionRespuesta": {
         "properties": {
@@ -10079,6 +10489,14 @@
         "title": "ErrorWhatsmktRespuesta",
         "description": "422 de una regla de negocio: el motivo, el codigo que la interfaz traduce y los datos que\nsu texto nombra. Los parametros siempre viajan; los que el codigo no usa van nulos."
       },
+      "EstadoCampana": {
+        "type": "string",
+        "enum": [
+          "activas",
+          "descartadas"
+        ],
+        "title": "EstadoCampana"
+      },
       "EstadoCarga": {
         "type": "string",
         "enum": [
@@ -10136,6 +10554,49 @@
           "sin_coincidencia"
         ],
         "title": "EstadoEncabezado"
+      },
+      "EstadoInformeWhatsmktRespuesta": {
+        "properties": {
+          "campana_id": {
+            "type": "integer",
+            "title": "Campana Id"
+          },
+          "pendiente": {
+            "type": "boolean",
+            "title": "Pendiente",
+            "description": "Verdadero si la campana todavia no tiene informe"
+          },
+          "informe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InformeWhatsmktRespuesta"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nulo si esta pendiente"
+          },
+          "conciliacion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConciliacionWhatsmktRespuesta"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nula si esta pendiente"
+          }
+        },
+        "type": "object",
+        "required": [
+          "campana_id",
+          "pendiente",
+          "informe",
+          "conciliacion"
+        ],
+        "title": "EstadoInformeWhatsmktRespuesta"
       },
       "ExcepcionEntrada": {
         "properties": {
@@ -11243,6 +11704,97 @@
         ],
         "title": "IncidenciasRespuesta"
       },
+      "InformeWhatsmktRespuesta": {
+        "properties": {
+          "archivo_nombre": {
+            "type": "string",
+            "title": "Archivo Nombre"
+          },
+          "importado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Importado En"
+          },
+          "fecha_informada": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Informada",
+            "description": "La fila FECHA; nula si no se entendio"
+          },
+          "total_informado": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Informado",
+            "description": "La fila TOTAL DE ENVIO; nula si no se entendio"
+          },
+          "filas": {
+            "type": "integer",
+            "title": "Filas",
+            "description": "Filas de detalle del informe (un numero cada una)"
+          },
+          "coincide_total": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coincide Total",
+            "description": "Si el total informado es `filas`; nulo si no se informo (DU-WM-7: no rechaza)"
+          },
+          "campana_informada": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campana Informada",
+            "description": "El nombre que trae el informe: solo para leer, no se compara"
+          },
+          "tipo_envio_informado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Envio Informado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "archivo_nombre",
+          "importado_en",
+          "fecha_informada",
+          "total_informado",
+          "filas",
+          "coincide_total",
+          "campana_informada",
+          "tipo_envio_informado"
+        ],
+        "title": "InformeWhatsmktRespuesta",
+        "description": "Lo que informa WhatsMKT y el archivo del que salio."
+      },
       "LargoSegmentoRespuesta": {
         "properties": {
           "segmento": {
@@ -11428,6 +11980,21 @@
             },
             "type": "array",
             "title": "Campanas"
+          },
+          "total_activas": {
+            "type": "integer",
+            "title": "Total Activas",
+            "description": "De todas las campanas, sin los filtros"
+          },
+          "total_descartadas": {
+            "type": "integer",
+            "title": "Total Descartadas",
+            "description": "De todas las campanas, sin los filtros"
+          },
+          "total_pendientes": {
+            "type": "integer",
+            "title": "Total Pendientes",
+            "description": "De todas las activas, sin los filtros: las que no tienen informe (RF-WM-40)"
           }
         },
         "type": "object",
@@ -11435,7 +12002,10 @@
           "total",
           "limite",
           "desplazamiento",
-          "campanas"
+          "campanas",
+          "total_activas",
+          "total_descartadas",
+          "total_pendientes"
         ],
         "title": "ListaCampanasWhatsmktRespuesta"
       },
@@ -13793,7 +14363,12 @@
               }
             ],
             "title": "Descartada En",
-            "description": "Nula hasta que se pueda descartar (B6)"
+            "description": "Cuando se descarto; nula en una activa (RF-WM-41)"
+          },
+          "con_informe": {
+            "type": "boolean",
+            "title": "Con Informe",
+            "description": "Si tiene el informe de WhatsMKT importado; las activas sin el estan pendientes"
           }
         },
         "type": "object",
@@ -13807,7 +14382,8 @@
           "horarios",
           "cantidad",
           "creada_en",
-          "descartada_en"
+          "descartada_en",
+          "con_informe"
         ],
         "title": "ResumenCampanaWhatsmktRespuesta"
       },

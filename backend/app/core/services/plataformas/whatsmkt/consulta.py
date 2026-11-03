@@ -7,6 +7,7 @@ from app.core.entities.whatsmkt import ModoCampana
 from app.core.entities.whatsmkt_campana import (
     CampanaNoEncontrada,
     CampanaWhatsmkt,
+    EstadoCampana,
     PaginaCampanas,
     PaginaExclusiones,
 )
@@ -40,9 +41,15 @@ class ConsultaCampanasWhatsmktService:
         self._whatsmkt = whatsmkt
 
     def listar(
-        self, paginacion: Paginacion, lote_id: int | None = None, mes: date | None = None
+        self,
+        paginacion: Paginacion,
+        lote_id: int | None = None,
+        mes: date | None = None,
+        estado: EstadoCampana = EstadoCampana.ACTIVAS,
     ) -> PaginaCampanas:
-        return self._campanas.listar(paginacion.limite, paginacion.desplazamiento, lote_id, mes)
+        return self._campanas.listar(
+            paginacion.limite, paginacion.desplazamiento, lote_id, mes, estado
+        )
 
     def detalle(
         self, campana_id: int, exclusiones: Paginacion, fuera_del_lote: Paginacion

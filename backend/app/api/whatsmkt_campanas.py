@@ -58,6 +58,7 @@ from app.core.entities.whatsmkt import (
 from app.core.entities.whatsmkt_campana import (
     CampanaNoEncontrada,
     CampanaWhatsmkt,
+    EstadoCampana,
     PaginaExclusiones,
 )
 from app.core.services.definiciones_columnas.servicio import DefinicionesColumnasService
@@ -705,7 +706,12 @@ class ResumenCampanaWhatsmktRespuesta(ModeloRespuesta):
     horarios: list[HorarioCampanaWhatsmktRespuesta]
     cantidad: int = Field(description="Filas del archivo, supervisores incluidos")
     creada_en: datetime
-    descartada_en: datetime | None = Field(description="Nula hasta que se pueda descartar (B6)")
+    descartada_en: datetime | None = Field(
+        description="Cuando se descarto; nula en una activa (RF-WM-41)"
+    )
+    con_informe: bool = Field(
+        description="Si tiene el informe de WhatsMKT importado; las activas sin el estan pendientes"
+    )
 
 
 class ListaCampanasWhatsmktRespuesta(ModeloRespuesta):
@@ -713,6 +719,11 @@ class ListaCampanasWhatsmktRespuesta(ModeloRespuesta):
     limite: int
     desplazamiento: int
     campanas: list[ResumenCampanaWhatsmktRespuesta]
+    total_activas: int = Field(description="De todas las campanas, sin los filtros")
+    total_descartadas: int = Field(description="De todas las campanas, sin los filtros")
+    total_pendientes: int = Field(
+        description="De todas las activas, sin los filtros: las que no tienen informe (RF-WM-40)"
+    )
 
 
 class LoteWhatsmktRespuesta(ModeloRespuesta):
@@ -769,7 +780,12 @@ def _resumen(c: CampanaWhatsmkt) -> dict[str, Any]:
         "cantidad": c.cantidad,
         "creada_en": c.creado_en,
         "descartada_en": c.descartada_en,
+        "con_informe": c.con_informe,
     }
+
+
+def respuesta_resumen(c: CampanaWhatsmkt) -> ResumenCampanaWhatsmktRespuesta:
+    return ResumenCampanaWhatsmktRespuesta(**_resumen(c))
 
 
 def _pagina_de_exclusiones(
@@ -801,16 +817,22 @@ def listar_campanas(
     mes: str | None = Query(
         default=None, pattern=_MES, description="YYYY-MM: el mes de la fecha de envio"
     ),
+    estado: EstadoCampana = Query(
+        default=EstadoCampana.ACTIVAS, description="Las activas (por defecto) o las descartadas"
+    ),
     servicio: ConsultaCampanasWhatsmktService = Depends(obtener_servicio_consulta_whatsmkt),
 ) -> ListaCampanasWhatsmktRespuesta:
     """Las campanas, las mas recientes primero (las de un mismo lote quedan juntas), paginadas."""
     primero = None if mes is None else date(int(mes[:4]), int(mes[5:]), 1)
-    pagina = servicio.listar(Paginacion(limite, desplazamiento), lote_id, primero)
+    pagina = servicio.listar(Paginacion(limite, desplazamiento), lote_id, primero, estado)
     return ListaCampanasWhatsmktRespuesta(
         total=pagina.total,
         limite=limite,
         desplazamiento=desplazamiento,
-        campanas=[ResumenCampanaWhatsmktRespuesta(**_resumen(c)) for c in pagina.campanas],
+        campanas=[respuesta_resumen(c) for c in pagina.campanas],
+        total_activas=pagina.total_activas,
+        total_descartadas=pagina.total_descartadas,
+        total_pendientes=pagina.total_pendientes,
     )
 
 

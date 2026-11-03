@@ -9,7 +9,7 @@ from collections.abc import Iterable, Sequence
 from datetime import date, time, timedelta
 from typing import Any
 
-from sqlalchemy import Connection, Engine, func, insert, select, update
+from sqlalchemy import Connection, Engine, delete, exists, func, insert, select, update
 from sqlalchemy.engine import Row
 
 from app.adapters.persistence.modelos import (
@@ -20,17 +20,26 @@ from app.adapters.persistence.modelos import (
     WhatsmktExclusion,
     WhatsmktFilaCargada,
     WhatsmktLote,
+    WhatsmktReporte,
+    WhatsmktReporteFila,
 )
 from app.core.entities.whatsmkt import CodigoWhatsmkt, ModoCampana, TipoEnvio
 from app.core.entities.whatsmkt_campana import (
     ArchivoGuardado,
     CampanaNueva,
     CampanaWhatsmkt,
+    EstadoCampana,
     HorarioElegido,
     LoteCreado,
     LoteNuevo,
     PaginaCampanas,
     PaginaExclusiones,
+)
+from app.core.entities.whatsmkt_informe import (
+    FilaCargadaWhatsmkt,
+    InformeWhatsmkt,
+    ReporteGuardado,
+    ReporteNuevo,
 )
 from app.core.ports.repositorio_campanas_whatsmkt_port import RepositorioCampanasWhatsmktPort
 from app.core.services.plataformas.whatsmkt.archivo_contactos import ExclusionContacto
@@ -40,6 +49,8 @@ _CAMPANA = WhatsmktCampana.__table__
 _ARCHIVO = WhatsmktArchivo.__table__
 _FILA = WhatsmktFilaCargada.__table__
 _EXCLUSION = WhatsmktExclusion.__table__
+_REPORTE = WhatsmktReporte.__table__
+_REPORTE_FILA = WhatsmktReporteFila.__table__
 _TEXTO_VERSION = TextoGuardadoVersion.__table__
 _DEFINICION_VERSION = DefinicionCargaVersion.__table__
 _TAMANO_DE_LOTE = 1_000  # filas por INSERT
@@ -148,6 +159,7 @@ def _campana(fila: Row) -> CampanaWhatsmkt:
         descartada_en=fila.descartada_en,
         archivo_nombre=fila.archivo_nombre,
         archivo_tamano=fila.archivo_tamano,
+        con_informe=fila.con_informe,
     )
 
 
@@ -161,6 +173,7 @@ def consulta_de_campanas():
         *_CAMPANA.c,
         _ARCHIVO.c.nombre.label("archivo_nombre"),
         _ARCHIVO.c.tamano.label("archivo_tamano"),
+        exists().where(_REPORTE.c.campana_id == _CAMPANA.c.id).label("con_informe"),
     ).join(_ARCHIVO, _ARCHIVO.c.campana_id == _CAMPANA.c.id)
 
 
@@ -253,8 +266,10 @@ class RepositorioCampanasWhatsmktPostgres(RepositorioCampanasWhatsmktPort):
         desplazamiento: int,
         lote_id: int | None = None,
         mes: date | None = None,
+        estado: EstadoCampana = EstadoCampana.ACTIVAS,
     ) -> PaginaCampanas:
-        filtros = []
+        descartada = _CAMPANA.c.descartada_en.is_not(None)
+        filtros = [descartada if estado is EstadoCampana.DESCARTADAS else ~descartada]
         if lote_id is not None:
             filtros.append(_CAMPANA.c.lote_id == lote_id)
         if mes is not None:
@@ -267,6 +282,14 @@ class RepositorioCampanasWhatsmktPostgres(RepositorioCampanasWhatsmktPort):
             total = cx.execute(
                 select(func.count()).select_from(_CAMPANA).where(*filtros)
             ).scalar_one()
+            sin_informe = ~exists().where(_REPORTE.c.campana_id == _CAMPANA.c.id)
+            activas, descartadas, pendientes = cx.execute(
+                select(
+                    func.count().filter(~descartada),
+                    func.count().filter(descartada),
+                    func.count().filter(~descartada & sin_informe),
+                ).select_from(_CAMPANA)
+            ).one()
             filas = cx.execute(
                 consulta_de_campanas()
                 .where(*filtros)
@@ -274,7 +297,9 @@ class RepositorioCampanasWhatsmktPostgres(RepositorioCampanasWhatsmktPort):
                 .limit(limite)
                 .offset(desplazamiento)
             ).all()
-        return PaginaCampanas(total, tuple(_campana(f) for f in filas))
+        return PaginaCampanas(
+            total, tuple(_campana(f) for f in filas), activas, descartadas, pendientes
+        )
 
     def obtener(self, campana_id: int) -> CampanaWhatsmkt | None:
         with self._engine.connect() as cx:
@@ -323,3 +348,107 @@ class RepositorioCampanasWhatsmktPostgres(RepositorioCampanasWhatsmktPort):
                 for f in filas
             ),
         )
+
+    def descartar(self, campana_id: int) -> CampanaWhatsmkt | None:
+        return self._cambiar_descarte(campana_id, func.now(), _CAMPANA.c.descartada_en.is_(None))
+
+    def restaurar(self, campana_id: int) -> CampanaWhatsmkt | None:
+        return self._cambiar_descarte(campana_id, None, _CAMPANA.c.descartada_en.is_not(None))
+
+    def _cambiar_descarte(self, campana_id: int, valor, solo_si) -> CampanaWhatsmkt | None:
+        with self._engine.begin() as cx:
+            cx.execute(
+                update(_CAMPANA)
+                .where(_CAMPANA.c.id == campana_id, solo_si)
+                .values(descartada_en=valor)
+            )
+            fila = cx.execute(
+                consulta_de_campanas().where(_CAMPANA.c.id == campana_id)
+            ).one_or_none()
+        return None if fila is None else _campana(fila)
+
+    def eliminar_descartada(self, campana_id: int) -> bool:
+        with self._engine.begin() as cx:
+            lote_id = cx.execute(
+                select(_CAMPANA.c.lote_id)
+                .where(_CAMPANA.c.id == campana_id, _CAMPANA.c.descartada_en.is_not(None))
+                .with_for_update()
+            ).scalar_one_or_none()
+            if lote_id is None:
+                return False
+            # Dos eliminaciones del mismo lote a la vez se turnan: la ultima ve que no queda nadie.
+            cx.execute(select(_LOTE.c.id).where(_LOTE.c.id == lote_id).with_for_update())
+            cx.execute(delete(_CAMPANA).where(_CAMPANA.c.id == campana_id))
+            quedan = cx.execute(
+                select(func.count()).select_from(_CAMPANA).where(_CAMPANA.c.lote_id == lote_id)
+            ).scalar_one()
+            if quedan == 0:
+                cx.execute(delete(_LOTE).where(_LOTE.c.id == lote_id))
+        return True
+
+    def obtener_reporte(self, campana_id: int) -> ReporteGuardado | None:
+        with self._engine.connect() as cx:
+            fila = cx.execute(
+                select(*_REPORTE.c).where(_REPORTE.c.campana_id == campana_id)
+            ).one_or_none()
+            if fila is None:
+                return None
+            numeros = cx.execute(
+                select(_REPORTE_FILA.c.numero)
+                .where(_REPORTE_FILA.c.reporte_id == fila.id)
+                .order_by(_REPORTE_FILA.c.posicion)
+            ).scalars()
+            return _reporte(fila, tuple(numeros))
+
+    def reemplazar_reporte(self, campana_id: int, reporte: ReporteNuevo) -> ReporteGuardado:
+        informe = reporte.informe
+        with self._engine.begin() as cx:
+            cx.execute(delete(_REPORTE).where(_REPORTE.c.campana_id == campana_id))
+            fila = cx.execute(
+                insert(_REPORTE)
+                .values(
+                    campana_id=campana_id,
+                    archivo_nombre=reporte.archivo_nombre,
+                    huella=reporte.huella,
+                    fecha_informada=informe.fecha_informada,
+                    total_informado=informe.total_informado,
+                    campana_informada=informe.campana,
+                    tipo_envio_informado=informe.tipo_envio,
+                )
+                .returning(*_REPORTE.c)
+            ).one()
+            _insertar(
+                cx,
+                _REPORTE_FILA,
+                [
+                    {"reporte_id": fila.id, "posicion": i, "numero": n}
+                    for i, n in enumerate(informe.numeros, 1)
+                ],
+            )
+        return _reporte(fila, informe.numeros)
+
+    def filas_cargadas(self, campana_id: int) -> tuple[FilaCargadaWhatsmkt, ...]:
+        with self._engine.connect() as cx:
+            filas = cx.execute(
+                select(_FILA.c.numero, _FILA.c.pagare, _FILA.c.supervision)
+                .where(_FILA.c.campana_id == campana_id)
+                .order_by(_FILA.c.posicion)
+            ).all()
+        return tuple(FilaCargadaWhatsmkt(f.numero, f.pagare, f.supervision) for f in filas)
+
+
+def _reporte(fila: Row, numeros: tuple[str, ...]) -> ReporteGuardado:
+    return ReporteGuardado(
+        id=fila.id,
+        campana_id=fila.campana_id,
+        archivo_nombre=fila.archivo_nombre,
+        huella=fila.huella,
+        importado_en=fila.importado_en,
+        informe=InformeWhatsmkt(
+            fecha_informada=fila.fecha_informada,
+            total_informado=fila.total_informado,
+            campana=fila.campana_informada,
+            tipo_envio=fila.tipo_envio_informado,
+            numeros=numeros,
+        ),
+    )

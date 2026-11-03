@@ -6,6 +6,7 @@ mensaje no la toca. `CampanaNueva` es lo que se inserta; `CampanaWhatsmkt`, lo q
 
 from dataclasses import dataclass
 from datetime import date, datetime, time
+from enum import StrEnum
 
 from app.core.entities.whatsmkt import ModoCampana, TipoEnvio
 from app.core.services.plataformas.whatsmkt.archivo_contactos import ExclusionContacto
@@ -105,6 +106,8 @@ class CampanaWhatsmkt:
     descartada_en: datetime | None
     archivo_nombre: str
     archivo_tamano: int
+    # Si ya tiene el informe de WhatsMKT importado (RF-WM-40: las otras estan pendientes).
+    con_informe: bool = False
 
 
 @dataclass(frozen=True)
@@ -114,10 +117,20 @@ class LoteCreado:
     campanas: tuple[CampanaWhatsmkt, ...]
 
 
+class EstadoCampana(StrEnum):
+    ACTIVAS = "activas"
+    DESCARTADAS = "descartadas"
+
+
 @dataclass(frozen=True)
 class PaginaCampanas:
     total: int  # de todas las que cumplen los filtros, no solo de esta pagina
     campanas: tuple[CampanaWhatsmkt, ...]
+    # De TODAS las campanas, sin los filtros: para los contadores de las dos vistas y la
+    # linea de pendientes (las activas que no tienen informe).
+    total_activas: int = 0
+    total_descartadas: int = 0
+    total_pendientes: int = 0
 
 
 @dataclass(frozen=True)
@@ -135,4 +148,28 @@ class ArchivoGuardado:
 class CampanaNoEncontrada(Exception):
     def __init__(self, campana_id: int) -> None:
         super().__init__(f"No existe la campana {campana_id}")
+        self.campana_id = campana_id
+
+
+class CampanaDescartada(Exception):
+    """RF-WM-37: no se importa un informe en una campana descartada; hay que restaurarla."""
+
+    def __init__(self, campana_id: int) -> None:
+        super().__init__(f"La campana {campana_id} esta descartada: restaurala primero")
+        self.campana_id = campana_id
+
+
+class CampanaNoDescartada(Exception):
+    """RF-WM-42: solo se elimina del todo una campana descartada."""
+
+    def __init__(self, campana_id: int) -> None:
+        super().__init__(f"La campana {campana_id} esta activa: descartala antes de eliminarla")
+        self.campana_id = campana_id
+
+
+class InformeYaImportado(Exception):
+    """RF-WM-38: la campana ya tiene un informe y no se pidio reemplazarlo."""
+
+    def __init__(self, campana_id: int) -> None:
+        super().__init__(f"La campana {campana_id} ya tiene un informe; confirma para reemplazarlo")
         self.campana_id = campana_id

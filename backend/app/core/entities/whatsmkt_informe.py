@@ -1,7 +1,7 @@
 """Entidades del informe de WhatsMKT y de su conciliacion (RF-WM-37 y RF-WM-39, T-WM-B6a)."""
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 
 @dataclass(frozen=True)
@@ -66,3 +66,24 @@ class ConciliacionWhatsmkt:
     @property
     def total_sin_correspondencia(self) -> int:
         return len(self.sin_correspondencia)
+
+
+@dataclass(frozen=True)
+class ReporteNuevo:
+    """El informe que se va a guardar: lo leido y el archivo del que salio."""
+
+    archivo_nombre: str
+    huella: str  # SHA-256 del archivo, en hexadecimal
+    informe: InformeWhatsmkt
+
+
+@dataclass(frozen=True)
+class ReporteGuardado:
+    """El informe vigente de una campana tal como esta guardado."""
+
+    id: int
+    campana_id: int
+    archivo_nombre: str
+    huella: str
+    importado_en: datetime
+    informe: InformeWhatsmkt

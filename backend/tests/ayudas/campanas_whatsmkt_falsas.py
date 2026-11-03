@@ -4,6 +4,7 @@ Un repositorio de campanas que imita lo que importa del de PostgreSQL: el lote s
 no se guarda (aqui, al final), el archivo conserva sus bytes y las versiones usadas se marcan.
 """
 
+from dataclasses import replace
 from datetime import date, datetime, timedelta
 
 from app.adapters.output.plataformas.whatsmkt.exportador_contactos import exportar_contactos
@@ -12,10 +13,16 @@ from app.core.entities.whatsmkt_campana import (
     ArchivoGuardado,
     CampanaNueva,
     CampanaWhatsmkt,
+    EstadoCampana,
     LoteCreado,
     LoteNuevo,
     PaginaCampanas,
     PaginaExclusiones,
+)
+from app.core.entities.whatsmkt_informe import (
+    FilaCargadaWhatsmkt,
+    ReporteGuardado,
+    ReporteNuevo,
 )
 from app.core.services.generacion_cargas.servicio import GeneracionCargasService
 from app.core.services.plataformas.whatsmkt.archivo_contactos import (
@@ -36,6 +43,7 @@ from tests.ayudas.repositorio_whatsmkt_falso import RepositorioAdjuntosFalso
 from tests.test_whatsmkt_contactos import SUPERVISORES, RepositorioCartera, definicion
 
 CREADA_EN = datetime(2026, 11, 3, 10, 0)
+DESCARTADA_EN = datetime(2026, 11, 4, 9, 0)
 
 
 def registrada(
@@ -85,6 +93,9 @@ class RepositorioCampanasFalso:
         self.modos: dict[int, ModoCampana] = {}
         # (lote, campana o None, exclusion), en el orden en que se guardaron
         self.exclusiones: list[tuple[int, int | None, ExclusionContacto]] = []
+        self.filas: dict[int, tuple[FilaCargadaWhatsmkt, ...]] = {}
+        self.reportes: dict[int, ReporteGuardado] = {}  # por campana: uno vigente
+        self.ahora = DESCARTADA_EN  # el instante que pone descartar e importar; se puede mover
         self.falla: Exception | None = None
 
     def crear_lote(self, lote: LoteNuevo) -> LoteCreado:
@@ -102,6 +113,9 @@ class RepositorioCampanasFalso:
             self.campanas[c.id] = c
             self.archivos[c.id] = ArchivoGuardado(nueva.archivo_nombre, nueva.archivo_contenido)
             self.exclusiones += [(lote_id, c.id, e) for e in nueva.exclusiones]
+            self.filas[c.id] = tuple(
+                FilaCargadaWhatsmkt(f.numero, f.pagare, f.supervision) for f in nueva.filas
+            )
         self.exclusiones += [(lote_id, None, e) for e in lote.exclusiones_sin_campana]
         self.modos[lote_id] = lote.modo
         return LoteCreado(lote_id, lote.modo, tuple(creadas))
@@ -109,19 +123,26 @@ class RepositorioCampanasFalso:
     def obtener_archivo(self, campana_id: int):
         return self.archivos.get(campana_id)
 
+    def _vista(self, c: CampanaWhatsmkt) -> CampanaWhatsmkt:
+        return replace(c, con_informe=c.id in self.reportes)
+
     def listar(
         self,
         limite: int,
         desplazamiento: int,
         lote_id: int | None = None,
         mes: date | None = None,
+        estado: EstadoCampana = EstadoCampana.ACTIVAS,
     ) -> PaginaCampanas:
+        todas = [self._vista(c) for c in self.campanas.values()]
+        descartadas = estado is EstadoCampana.DESCARTADAS
         # Como PostgreSQL: las mas recientes primero y, a igual instante, el id mayor primero.
         cumplen = sorted(
             (
                 c
-                for c in self.campanas.values()
-                if (lote_id is None or c.lote_id == lote_id)
+                for c in todas
+                if (c.descartada_en is not None) == descartadas
+                and (lote_id is None or c.lote_id == lote_id)
                 and (
                     mes is None
                     or (c.fecha_envio.year, c.fecha_envio.month) == (mes.year, mes.month)
@@ -130,12 +151,18 @@ class RepositorioCampanasFalso:
             key=lambda c: (c.creado_en, c.id),
             reverse=True,
         )
+        activas = [c for c in todas if c.descartada_en is None]
         return PaginaCampanas(
-            len(cumplen), tuple(cumplen[desplazamiento : desplazamiento + limite])
+            len(cumplen),
+            tuple(cumplen[desplazamiento : desplazamiento + limite]),
+            len(activas),
+            len(todas) - len(activas),
+            sum(1 for c in activas if not c.con_informe),
         )
 
     def obtener(self, campana_id: int) -> CampanaWhatsmkt | None:
-        return self.campanas.get(campana_id)
+        c = self.campanas.get(campana_id)
+        return None if c is None else self._vista(c)
 
     def modo_del_lote(self, lote_id: int) -> ModoCampana:
         return self.modos[lote_id]
@@ -154,6 +181,51 @@ class RepositorioCampanasFalso:
         return PaginaExclusiones(
             len(propias), tuple(propias[desplazamiento : desplazamiento + limite])
         )
+
+    def descartar(self, campana_id: int) -> CampanaWhatsmkt | None:
+        c = self.campanas.get(campana_id)
+        if c is None:
+            return None
+        if c.descartada_en is None:
+            self.campanas[campana_id] = replace(c, descartada_en=self.ahora)
+        return self.obtener(campana_id)
+
+    def restaurar(self, campana_id: int) -> CampanaWhatsmkt | None:
+        c = self.campanas.get(campana_id)
+        if c is None:
+            return None
+        self.campanas[campana_id] = replace(c, descartada_en=None)
+        return self.obtener(campana_id)
+
+    def eliminar_descartada(self, campana_id: int) -> bool:
+        c = self.campanas.get(campana_id)
+        if c is None or c.descartada_en is None:
+            return False
+        del self.campanas[campana_id]
+        for tabla in (self.archivos, self.filas, self.reportes):
+            tabla.pop(campana_id, None)
+        self.exclusiones = [x for x in self.exclusiones if x[1] != campana_id]
+        if not any(o.lote_id == c.lote_id for o in self.campanas.values()):
+            self.exclusiones = [x for x in self.exclusiones if x[0] != c.lote_id]
+            self.modos.pop(c.lote_id, None)
+        return True
+
+    def obtener_reporte(self, campana_id: int) -> ReporteGuardado | None:
+        return self.reportes.get(campana_id)
+
+    def reemplazar_reporte(self, campana_id: int, reporte: ReporteNuevo) -> ReporteGuardado:
+        self.reportes[campana_id] = ReporteGuardado(
+            id=len(self.reportes) + 1,
+            campana_id=campana_id,
+            archivo_nombre=reporte.archivo_nombre,
+            huella=reporte.huella,
+            importado_en=self.ahora,
+            informe=reporte.informe,
+        )
+        return self.reportes[campana_id]
+
+    def filas_cargadas(self, campana_id: int) -> tuple[FilaCargadaWhatsmkt, ...]:
+        return self.filas.get(campana_id, ())
 
 
 class Entorno:
