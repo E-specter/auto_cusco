@@ -96,10 +96,16 @@ Al crear, la página reemplaza la previsualización por las fichas «Para subir 
 
 - **«Tipo de envío»:** un `fieldset` con tres radios: «Solo texto» (por defecto), «Texto + archivo» y «Texto + vCard».
 - **Campos condicionales:** van justo debajo del radio que los muestra, con `hidden` en los otros. Cambiar de tipo conserva lo elegido en los demás, pero solo se manda lo del tipo elegido.
-  - **Texto + archivo:** un `select` «Archivo», con los adjuntos activos de la biblioteca (imagen, video, audio o PDF), cada uno con su tipo y su tamaño: «Afiche octubre.jpg · imagen · 240 KB». Sin adjuntos, el `select` queda inactivo con «Elige un archivo», y al lado va el enlace «Subir en la configuración» (ir y volver, §2).
+  - **Texto + archivo:** un `select` «Archivo», con los adjuntos activos de la biblioteca (imagen, video, audio o PDF), cada uno con su tipo y su tamaño: «Afiche octubre.jpg · imagen · 240 KB». Al lado, «Subir un archivo» (`upload`, `.btn--sm`), que lo agrega a la biblioteca y lo deja elegido. Sin adjuntos, el `select` queda inactivo con «Elige un archivo», y «Subir un archivo» sigue al lado.
   - **Texto + vCard:** un `input` «Etiqueta del contacto» (DU-WM-4, provisional: solo la etiqueta).
-- **«Foto de perfil»:** un `select` con las fotos de la biblioteca y «Sin foto» (DU-WM-5, provisional: opcional). Hint: «JPEG de 200 × 200 píxeles, hasta 1 MB».
-- **La campaña no sube archivos** (decisión de `coordinador_modulo_whatsmkt`, 2026-11-03): se suben en la biblioteca de la configuración (§5, punto 8), y la campaña elige. Si el usuario pide subir desde la campaña, se suma después; las claves `envio.subir`, `envio.subirFoto` y `envio.repetido` quedan reservadas para eso.
+- **«Foto de perfil»:** un `select` con las fotos de la biblioteca y «Sin foto» (DU-WM-5, provisional: opcional), y al lado «Subir una foto». Hint: «JPEG de 200 × 200 píxeles, hasta 1 MB».
+- **Subir desde la campaña** (decisión del usuario, 2026-11-03; entra en T-WM-F2a2). Usa la misma biblioteca de la configuración (§5, punto 8), con sus mismas reglas:
+  - el selector de archivo propio del sitio, con el tipo y el tope del hint. El archivo se valida al elegirlo, con los topes de la configuración, y el error va bajo su `select`, por su código (`adjunto_tipo`, `adjunto_peso`, `adjunto_danado`, `foto_formato`, `foto_medidas` o `foto_peso`). Mientras sube, el botón queda con `data-loading`;
+  - al terminar, el archivo queda en la biblioteca y elegido en su `select`, y el estado lo anuncia en `role="status"`. Para una imagen se suma «Se guardó sin metadatos (EXIF, ubicación)», como en la biblioteca;
+  - **archivo repetido:** si ya estaba en la biblioteca (misma huella SHA-256), se elige el existente y el estado dice «Ya estaba en la biblioteca: se usa el mismo archivo»;
+  - **repetido y archivado:** si el que ya estaba está archivado, no se restaura solo. El estado dice «Ya estaba en la biblioteca, archivado: {nombre}», con el botón «Restaurar y usar», que lo restaura y lo deja elegido;
+  - el enlace «Subir en la configuración» de F2a1 se va: subir ahí mismo lo reemplaza, y su clave `envio.subirEnConfiguracion` se borra en F2a2.
+- Antes de esta decisión, `coordinador_modulo_whatsmkt` había dejado la campaña solo con elegir (2026-11-03, mismo día). El usuario pidió subir también desde la campaña, como lo había descrito: «se suben en cada carga».
 
 ### 3.7 Nombre de la campaña (RF-WM-33)
 
@@ -372,6 +378,9 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.envio.sinAdjunto` | Elige el archivo que se envía. | Choose the file to send. |
 | `whatsmkt.envio.sinEtiqueta` | Escribe la etiqueta del contacto. | Enter the contact label. |
 | `whatsmkt.envio.subirEnConfiguracion` | Subir en la configuración | Upload in the settings |
+| `whatsmkt.envio.repetidoArchivado` | Ya estaba en la biblioteca, archivado: {nombre}. | It was already in the library, archived: {nombre}. |
+| `whatsmkt.envio.restaurarYUsar` | Restaurar y usar | Restore and use |
+| `whatsmkt.envio.subido` | Subido y elegido: {nombre}. | Uploaded and chosen: {nombre}. |
 | `whatsmkt.nombre.segmentoAlFinal` | Se agrega el segmento al final para que los nombres no se repitan. | The segment is added at the end so the names do not repeat. |
 | `whatsmkt.nombre.resultante` | Nombre de la campaña {segmento}: | Campaign name {segmento}: |
 | `whatsmkt.previa.resumenVarias` | Se crearán {n} campañas · {filas} filas en total | {n} campaigns will be created · {filas} rows in total |
@@ -557,6 +566,7 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
   - sin horarios, el error en el `fieldset`;
   - los tipos de envío con sus campos condicionales, que conservan lo escrito y mandan solo lo del elegido;
   - la foto con sus tres errores;
+  - subir desde la campaña (F2a2): el archivo queda en la biblioteca y elegido, el repetido elige el existente, el repetido archivado ofrece «Restaurar y usar», y los errores de tipo y peso van bajo su `select`;
   - el nombre con su contador y el nombre resultante por campaña;
   - la previsualización del lote, con el `.segmented`, las cifras, el mensaje de ejemplo, la muestra con sus `cabeceras` y etiquetas, y las exclusiones paginadas con su detalle;
   - los productos fuera de las campañas: la sección con su total, el enlace del resumen, el aviso de lista recortada, y que no aparece con cero ni en el modo global;
