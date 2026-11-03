@@ -664,7 +664,7 @@ Un `.notice--info` bajo el encabezado de la página y antes de todo lo demás, c
 | Clave | es | en |
 |---|---|---|
 | `herramientas.volver.columnas` | Estás editando una definición de columnas desde {canal}. Al guardarla, vuelves a {canal}. | You are editing a column definition from {canal}. Once you save it, you go back to {canal}. |
-| `herramientas.volver.columnasNueva` | Estás creando una definición de {plataforma} desde {canal}. Al guardarla, vuelves a {canal}. | You are creating a {plataforma} definition from {canal}. Once you save it, you go back to {canal}. |
+| `herramientas.volver.columnasNueva` | Estás creando una definición de {plataforma}. Al guardarla, vuelves a {canal}. | You are creating a {plataforma} definition. Once you save it, you go back to {canal}. |
 | `herramientas.volver.alMomento` | Llegaste desde {canal}. Cada cambio se guarda al hacerlo; cuando termines, vuelve. | You came from {canal}. Each change is saved as you make it; when you are done, go back. |
 | `herramientas.volver.supervisores` | Llegaste desde {canal}. Guarda los supervisores antes de volver: lo que no guardes se pierde. | You came from {canal}. Save the supervisors before going back: anything you do not save is lost. |
 | `herramientas.volver.sinGuardar` | Volver a {canal} sin guardar | Back to {canal} without saving |
@@ -672,9 +672,13 @@ Un `.notice--info` bajo el encabezado de la página y antes de todo lo demás, c
 | `herramientas.volver.elegida` | Se eligió {nombre}, versión {n}. | {nombre}, version {n}, was chosen. |
 | `herramientas.volver.noExiste` | La definición que editaste ya no existe. Elige otra. | The definition you edited no longer exists. Choose another one. |
 | `herramientas.volver.definicionNoExiste` | La definición que abriste ya no existe. Arma una nueva o elige otra de la lista. | The definition you opened no longer exists. Build a new one or choose another from the list. |
+| `supervisores.intro` | Los supervisores que se asignan por defecto a cada campaña, en todos los canales. | The supervisors assigned by default to each campaign, in every channel. |
 | `columnas.plataforma.fijadaPor` | La fija {canal}: se abrió desde allí. | Set by {canal}: it was opened from there. |
 
 - `{nombre}` va citado con `camposAdicionales.nombreCitado`.
+- `columnasNueva` no repite «desde {canal}»: con la plataforma del mismo canal se leería «una definición de WhatsMKT desde WhatsMKT».
+- `supervisores.intro` deja de nombrar solo a MOWA MES, como pide [modules.md](modules.md): WhatsMKT usa los mismos supervisores.
+- **El aviso a 360 px:** el icono queda a la izquierda, y el texto con su enlace van juntos en la columna del cuerpo, como en el aviso de lectura de `TextosGuardados`. El enlace no es hermano del icono.
 - **`/cartera` también recibe `volver` de los dos canales** (WhatsMKT la usa desde su campaña, T-WM-F2a1). Su aviso conserva sus claves, `cartera.volver.*`, pero el texto lleva `{canal}`, que sale del prefijo con las mismas claves de la barra que §12.1. Los textos están en [mowa-mes-interfaz.md](mowa-mes-interfaz.md) §5. El enlace sigue diciendo «Volver a la campaña sin guardar»: en los dos canales vuelve a una campaña.
 
 ### 12.7 Pruebas mínimas
