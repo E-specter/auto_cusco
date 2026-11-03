@@ -1526,5 +1526,6 @@
   "whatsmkt.previa.irSupervisores": "Configurar supervisores",
   "whatsmkt.codigo.whatsapp_invalido": "El WhatsApp debe tener 9 dígitos y empezar con 9.",
   "whatsmkt.codigo.sin_whatsapp": "El mensaje usa [whatsapp] y no hay WhatsApp de contacto configurado.",
-  "whatsmkt.previa.irWhatsapp": "Configurar el WhatsApp de contacto"
+  "whatsmkt.previa.irWhatsapp": "Configurar el WhatsApp de contacto",
+  "whatsmkt.codigo.sin_mensaje": "No tiene mensaje: elige uno, o configura el del segmento."
 }

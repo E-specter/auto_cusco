@@ -14,12 +14,17 @@ los problemas del mensaje. Todavia sin la validacion de la fecha de envio ni las
 """
 
 from datetime import date
-from typing import Any
+from typing import Any, Literal, Self
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field, field_validator
+from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.adapters.output.exportadores.comunes import disposicion_de_descarga
+from app.adapters.output.plataformas.whatsmkt.exportador_contactos import exportar_contactos
 from app.adapters.persistence.db import get_engine
+from app.adapters.persistence.repositorio_campanas_whatsmkt_postgres import (
+    RepositorioCampanasWhatsmktPostgres,
+)
 from app.adapters.persistence.repositorio_textos_guardados_postgres import (
     RepositorioTextosGuardadosPostgres,
 )
@@ -28,16 +33,25 @@ from app.api.archivos_carga import RESPUESTAS_ERROR, obtener_servicio_generacion
 from app.api.cartera import obtener_catalogo_cartera
 from app.api.consultas import parsear_filtro, parsear_orden
 from app.api.definiciones_columnas import obtener_servicio_definiciones
-from app.api.errores import ErrorConCodigo
+from app.api.errores import ErrorConCodigo, respuestas_de_error
 from app.api.fecha_envio import error_de_fecha_envio
 from app.api.respuestas import ModeloRespuesta
 from app.api.supervisores import obtener_servicio_supervision
+from app.api.whatsmkt import PARAMETROS, ErrorWhatsmktRespuesta
 from app.core.entities.cartera import ConsultaInvalida, SinVersionVigente
 from app.core.entities.definiciones_columnas import DefinicionNoEncontrada, VersionNoEncontrada
+from app.core.entities.exportacion import TIPOS_MIME, FormatoArchivo
 from app.core.entities.mapeo import PlantillaInvalida
 from app.core.entities.texto_enriquecido import CodigoTexto
 from app.core.entities.textos_guardados import TextoNoEncontrado, VersionDeTextoNoEncontrada
-from app.core.entities.whatsmkt import CLAVES_SEGMENTOS, CodigoWhatsmkt, ModoCampana
+from app.core.entities.whatsmkt import (
+    CLAVES_SEGMENTOS,
+    AdjuntoNoEncontrado,
+    CodigoWhatsmkt,
+    ModoCampana,
+    TipoEnvio,
+)
+from app.core.entities.whatsmkt_campana import CampanaNoEncontrada, CampanaWhatsmkt
 from app.core.services.definiciones_columnas.servicio import DefinicionesColumnasService
 from app.core.services.fecha_envio import FechaEnvioAnterior
 from app.core.services.generacion_cargas.servicio import (
@@ -50,6 +64,13 @@ from app.core.services.plataformas.whatsmkt.archivo_contactos import (
     ExclusionContacto,
     SeleccionCampana,
 )
+from app.core.services.plataformas.whatsmkt.biblioteca import BibliotecaWhatsmktService
+from app.core.services.plataformas.whatsmkt.crear import (
+    CreacionCampanasWhatsmktService,
+    CreacionInvalida,
+    PeticionCreacion,
+)
+from app.core.services.plataformas.whatsmkt.ficha import ficha_de
 from app.core.services.plataformas.whatsmkt.previa import (
     CampanaPrevista,
     MensajePedido,
@@ -138,6 +159,16 @@ class PrevisualizacionCampanasWhatsmktEntrada(BaseModel):
         if desconocidas:
             raise ValueError(f"Segmentos desconocidos: {', '.join(desconocidas)}")
         return mensajes
+
+    def a_peticion_previa(self, catalogo: CatalogoCartera) -> PeticionPrevia:
+        return PeticionPrevia(
+            seleccion=self.seleccion(catalogo),
+            definicion_id=self.definicion.id,
+            version=self.definicion.version,
+            modo=self.modo,
+            mensaje=None if self.mensaje is None else self.mensaje.pedido(),
+            mensajes_por_segmento={clave: m.pedido() for clave, m in (self.mensajes or {}).items()},
+        )
 
     def seleccion(self, catalogo: CatalogoCartera) -> SeleccionCampana:
         return SeleccionCampana(
@@ -308,6 +339,8 @@ def _error(exc: Exception) -> ErrorConCodigo:
         return ErrorConCodigo(404, str(exc), CodigoTexto.TEXTO_GUARDADO_NO_ENCONTRADO)
     if isinstance(exc, VersionDeTextoNoEncontrada):
         return ErrorConCodigo(404, str(exc), CodigoTexto.VERSION_NO_ENCONTRADA)
+    if isinstance(exc, AdjuntoNoEncontrado):
+        return ErrorConCodigo(404, str(exc), None)
     if isinstance(exc, SinVersionVigente):
         return ErrorConCodigo(404, str(exc), CodigoTexto.SIN_VERSION_VIGENTE)
     if isinstance(exc, FechaEnvioAnterior):
@@ -335,18 +368,7 @@ def previsualizar_campanas(
     impiden crear. Un mensaje elegido que no existe, o no es de WhatsMKT, responde 404.
     """
     try:
-        previa = servicio.previsualizar(
-            PeticionPrevia(
-                seleccion=entrada.seleccion(catalogo),
-                definicion_id=entrada.definicion.id,
-                version=entrada.definicion.version,
-                modo=entrada.modo,
-                mensaje=None if entrada.mensaje is None else entrada.mensaje.pedido(),
-                mensajes_por_segmento={
-                    clave: m.pedido() for clave, m in (entrada.mensajes or {}).items()
-                },
-            )
-        )
+        previa = servicio.previsualizar(entrada.a_peticion_previa(catalogo))
     except (
         ConsultaInvalida,
         PlantillaInvalida,
@@ -359,3 +381,279 @@ def previsualizar_campanas(
     ) as exc:
         raise _error(exc) from exc
     return _respuesta(previa)
+
+
+# --- Crear el lote (B4b1, parte 2) ------------------------------------------------------------
+
+
+class CreacionCampanasWhatsmktEntrada(PrevisualizacionCampanasWhatsmktEntrada):
+    """La previsualizacion mas lo que se agrega para crear. `fecha_envio` llega SIN validar contra
+    los dias de envio (RF-70); la validacion llega con B4c."""
+
+    horarios: list[Literal["horario_1", "horario_2"]] = Field(
+        default=[],
+        description=(
+            "Los horarios de envio elegidos (RF-WM-07). Vacio responde 422 con `sin_horario`"
+        ),
+    )
+    lo_antes_posible: bool = Field(
+        default=False, description="Solo se guarda y se copia en la ficha (RF-WM-08)"
+    )
+    tipo_envio: TipoEnvio = TipoEnvio.SOLO_TEXTO
+    foto_id: int | None = Field(
+        default=None,
+        description="Un adjunto de la biblioteca que sirva de foto de perfil (RF-WM-29); opcional",
+    )
+    adjunto_id: int | None = Field(
+        default=None, description="Con `tipo_envio=archivo`: el adjunto de la biblioteca"
+    )
+    etiqueta_vcard: str | None = Field(
+        default=None, max_length=100, description="Con `tipo_envio=vcard`: la etiqueta del contacto"
+    )
+    nombre: str | None = Field(
+        default=None,
+        max_length=500,
+        description="El nombre de la campana global; sin el, sale de la plantilla (RF-WM-33)",
+    )
+    nombres: dict[str, str] | None = Field(
+        default=None,
+        description="El nombre de cada campana por clave de segmento; sin el, sale de la plantilla",
+    )
+
+    @model_validator(mode="after")
+    def _los_campos_del_tipo(self) -> Self:
+        if self.tipo_envio is TipoEnvio.ARCHIVO and self.adjunto_id is None:
+            raise ValueError("`adjunto_id` es obligatorio con `tipo_envio=archivo`")
+        if self.tipo_envio is TipoEnvio.VCARD and not (self.etiqueta_vcard or "").strip():
+            raise ValueError("`etiqueta_vcard` es obligatoria con `tipo_envio=vcard`")
+        return self
+
+    def a_peticion_de_creacion(self, catalogo: CatalogoCartera) -> PeticionCreacion:
+        # Solo se manda lo del tipo elegido: lo escrito en los otros se descarta.
+        archivo = self.tipo_envio is TipoEnvio.ARCHIVO
+        vcard = self.tipo_envio is TipoEnvio.VCARD
+        return PeticionCreacion(
+            previa=self.a_peticion_previa(catalogo),
+            filtros=tuple(self.filtros),
+            orden=self.orden,
+            horarios=tuple(self.horarios),
+            lo_antes_posible=self.lo_antes_posible,
+            tipo_envio=self.tipo_envio,
+            foto_id=self.foto_id,
+            adjunto_id=self.adjunto_id if archivo else None,
+            etiqueta_vcard=(self.etiqueta_vcard or "").strip() if vcard else None,
+            nombres={
+                **({None: self.nombre.strip()} if self.nombre and self.nombre.strip() else {}),
+                **{k: v.strip() for k, v in (self.nombres or {}).items() if v.strip()},
+            },
+        )
+
+
+class HorarioWhatsmktRespuesta(ModeloRespuesta):
+    nombre: str = Field(description="horario_1 u horario_2")
+    inicio: str = Field(description="HH:MM")
+    fin: str = Field(description="HH:MM")
+
+
+class ArchivoCampanaWhatsmktRespuesta(ModeloRespuesta):
+    nombre: str = Field(description="El nombre de la campana mas .xlsx")
+    tamano: int = Field(description="Bytes")
+    filas: int = Field(description="Filas del archivo, supervisores incluidos (S-WM-4)")
+
+
+class FichaWhatsmktRespuesta(ModeloRespuesta):
+    """Cada dato del formulario de WhatsMKT, listo para copiar (RF-WM-36)."""
+
+    nombre: str
+    fecha_envio: date
+    horarios: list[HorarioWhatsmktRespuesta]
+    lo_antes_posible: bool
+    pais: str
+    foto_id: int | None = Field(description="La foto de perfil, para descargar de la biblioteca")
+    cantidad: int = Field(description="¿Cuantos telefonos tiene su Lista de contactos?")
+    tipo_envio: TipoEnvio
+    adjunto_id: int | None
+    etiqueta_vcard: str | None
+    mensaje: str = Field(
+        description="Texto para copiar: [whatsapp] ya es el enlace y las [$MACROn$] quedan tal cual"
+    )
+
+
+class CampanaCreadaWhatsmktRespuesta(ModeloRespuesta):
+    id: int
+    lote_id: int
+    nombre: str
+    segmento: str | None
+    archivo: ArchivoCampanaWhatsmktRespuesta
+    ficha: FichaWhatsmktRespuesta
+
+
+class ErrorCreacionWhatsmktRespuesta(ErrorWhatsmktRespuesta):
+    """422 al crear: `codigo` y sus parametros son los del PRIMER problema; `problemas` los trae
+    todos (la campana no se crea mientras haya alguno)."""
+
+    problemas: list[ProblemaWhatsmktRespuesta]
+
+
+def _ficha(c: CampanaWhatsmkt) -> FichaWhatsmktRespuesta:
+    f = ficha_de(c)
+    return FichaWhatsmktRespuesta(
+        nombre=f.nombre,
+        fecha_envio=f.fecha_envio,
+        horarios=[
+            HorarioWhatsmktRespuesta(
+                nombre=h.nombre, inicio=h.inicio.strftime("%H:%M"), fin=h.fin.strftime("%H:%M")
+            )
+            for h in f.horarios
+        ],
+        lo_antes_posible=f.lo_antes_posible,
+        pais=f.pais,
+        foto_id=f.foto_id,
+        cantidad=f.cantidad,
+        tipo_envio=f.tipo_envio,
+        adjunto_id=f.adjunto_id,
+        etiqueta_vcard=f.etiqueta_vcard,
+        mensaje=f.mensaje,
+    )
+
+
+def _campana_creada(c: CampanaWhatsmkt) -> CampanaCreadaWhatsmktRespuesta:
+    return CampanaCreadaWhatsmktRespuesta(
+        id=c.id,
+        lote_id=c.lote_id,
+        nombre=c.nombre,
+        segmento=c.segmento,
+        archivo=ArchivoCampanaWhatsmktRespuesta(
+            nombre=c.archivo_nombre, tamano=c.archivo_tamano, filas=c.cantidad
+        ),
+        ficha=_ficha(c),
+    )
+
+
+def _creacion_invalida(exc: CreacionInvalida) -> ErrorConCodigo:
+    primero = exc.problemas[0]
+    parametros = {campo: None for campo in PARAMETROS} | dict(primero.parametros)
+    return ErrorConCodigo(
+        422,
+        str(exc),
+        primero.codigo,
+        {
+            **parametros,
+            "problemas": [
+                {
+                    "codigo": p.codigo.value,
+                    "detalle": p.detalle,
+                    "segmento": p.segmento,
+                    "parametros": dict(p.parametros),
+                }
+                for p in exc.problemas
+            ],
+        },
+    )
+
+
+def obtener_servicio_creacion_whatsmkt(
+    previa: PrevisualizacionWhatsmktService = Depends(obtener_servicio_previa_whatsmkt),
+) -> CreacionCampanasWhatsmktService:
+    """Dependencia de FastAPI; los tests la sustituyen por un doble de prueba."""
+    repositorio = RepositorioWhatsmktPostgres(get_engine())
+    return CreacionCampanasWhatsmktService(
+        previa,
+        repositorio,
+        RepositorioCampanasWhatsmktPostgres(get_engine()),
+        BibliotecaWhatsmktService(repositorio),
+        exportar_contactos,
+    )
+
+
+def obtener_repositorio_campanas_whatsmkt() -> RepositorioCampanasWhatsmktPostgres:
+    """Dependencia de FastAPI; los tests la sustituyen por un doble de prueba."""
+    return RepositorioCampanasWhatsmktPostgres(get_engine())
+
+
+@router.post(
+    "",
+    status_code=201,
+    summary="Crear el lote de campanas",
+    response_model=list[CampanaCreadaWhatsmktRespuesta],
+    responses={
+        **RESPUESTAS_ERROR,
+        422: {
+            "model": ErrorCreacionWhatsmktRespuesta,
+            "description": (
+                "Algo impide crear (nada se guarda): `codigo` es el del primero y `problemas` los "
+                "trae todos"
+            ),
+        },
+    },
+)
+def crear_campanas(
+    entrada: CreacionCampanasWhatsmktEntrada,
+    servicio: CreacionCampanasWhatsmktService = Depends(obtener_servicio_creacion_whatsmkt),
+    catalogo: CatalogoCartera = Depends(obtener_catalogo_cartera),
+) -> list[CampanaCreadaWhatsmktRespuesta]:
+    """Crea el LOTE completo o nada, en una sola transaccion (RF-WM-23): una campana en modo
+    `global`, o una por segmento con productos. Cada una congela la version exacta del mensaje y de
+    la definicion (la pedida o, sin ella, la vigente), el archivo, los horarios y los supervisores.
+
+    Responde 201 con cada campana (id, nombre, archivo y la ficha de RF-WM-36). Si algo impide
+    crear (sin horario, sin supervisores, sin mensaje, un problema del mensaje, la foto, un nombre
+    de mas de 75 caracteres...) responde 422 con todos los problemas y no guarda nada.
+    """
+    try:
+        lote = servicio.crear(entrada.a_peticion_de_creacion(catalogo))
+    except CreacionInvalida as exc:
+        raise _creacion_invalida(exc) from exc
+    except AdjuntoNoEncontrado as exc:
+        raise ErrorConCodigo(404, str(exc), None) from exc
+    except (
+        ConsultaInvalida,
+        PlantillaInvalida,
+        SinVersionVigente,
+        DefinicionNoEncontrada,
+        VersionNoEncontrada,
+        TextoNoEncontrado,
+        VersionDeTextoNoEncontrada,
+        FechaEnvioAnterior,
+    ) as exc:
+        raise _error(exc) from exc
+    return [_campana_creada(c) for c in lote.campanas]
+
+
+@router.get(
+    "/{campana_id}/archivo",
+    summary="Descargar el archivo de contactos de la campana",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "Los bytes guardados al crear la campana, siempre los mismos",
+            "content": {
+                TIPOS_MIME[FormatoArchivo.XLSX]: {"schema": {"type": "string", "format": "binary"}}
+            },
+            "headers": {
+                "Content-Disposition": {
+                    "description": (
+                        'attachment; filename="<nombre en ASCII>"; '
+                        "filename*=UTF-8''<nombre exacto> (RFC 5987)"
+                    ),
+                    "schema": {"type": "string"},
+                }
+            },
+        },
+        **respuestas_de_error(404),
+    },
+)
+def descargar_archivo_de_la_campana(
+    campana_id: int,
+    repositorio: RepositorioCampanasWhatsmktPostgres = Depends(
+        obtener_repositorio_campanas_whatsmkt
+    ),
+) -> Response:
+    archivo = repositorio.obtener_archivo(campana_id)
+    if archivo is None:
+        raise HTTPException(404, str(CampanaNoEncontrada(campana_id)))
+    return Response(
+        content=archivo.contenido,
+        media_type=TIPOS_MIME[FormatoArchivo.XLSX],
+        headers={"Content-Disposition": disposicion_de_descarga(archivo.nombre)},
+    )

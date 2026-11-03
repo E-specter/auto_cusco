@@ -126,6 +126,11 @@ class PreviaCampanas:
     disponibles: int
     solicitados: int
     fecha_envio: date | None
+    # Lo que la creacion congela de la definicion y de la configuracion (B4b1, parte 2).
+    definicion_id: int = 0
+    definicion_nombre: str = ""
+    definicion_version: int = 0
+    whatsapp_contacto: str | None = None
 
     @property
     def total_exclusiones(self) -> int:
@@ -226,6 +231,10 @@ class PrevisualizacionWhatsmktService:
             disponibles=armado.disponibles,
             solicitados=armado.solicitados,
             fecha_envio=armado.fecha_envio,
+            definicion_id=cargada.id,
+            definicion_nombre=cargada.nombre,
+            definicion_version=cargada.numero,
+            whatsapp_contacto=configuracion.whatsapp_contacto,
         )
 
     @staticmethod
@@ -249,7 +258,15 @@ class PrevisualizacionWhatsmktService:
         configuracion: ConfiguracionWhatsmkt,
     ) -> tuple[MensajeDeCampana | None, list[ProblemaCampana]]:
         if pedido is None:
-            return None, []
+            # WhatsMKT exige el texto: una campana sin mensaje no se crea, y ningun otro
+            # problema del mensaje se emite para ella.
+            return None, [
+                ProblemaCampana(
+                    CodigoWhatsmkt.SIN_MENSAJE,
+                    "La campana no tiene mensaje: elige uno o configura el del segmento",
+                    archivo.segmento,
+                )
+            ]
         texto, version = self._texto(pedido)
         contenido = version.contenido.get("texto")
         contenido = contenido if isinstance(contenido, str) else ""

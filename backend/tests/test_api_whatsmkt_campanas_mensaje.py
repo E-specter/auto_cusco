@@ -95,14 +95,15 @@ def test_la_version_pedida_y_la_vigente(cliente) -> None:
     assert primera.json()["campanas"][0]["mensaje_ejemplo"] == "Uno"
 
 
-def test_sin_mensaje_la_campana_trae_mensaje_nulo_y_el_pedido_de_antes_sigue_valiendo(
+def test_sin_mensaje_la_campana_trae_mensaje_nulo_y_el_problema_sin_mensaje(
     cliente,
 ) -> None:
     respuesta = pedir(cliente, [producto(1)])
 
     [campana] = respuesta.json()["campanas"]
     assert campana["mensaje"] is None and campana["mensaje_ejemplo"] is None
-    assert respuesta.json()["problemas"] == []
+    [problema] = respuesta.json()["problemas"]
+    assert (problema["codigo"], problema["segmento"]) == ("sin_mensaje", None)
 
 
 # --- Los problemas del mensaje ----------------------------------------------------------------

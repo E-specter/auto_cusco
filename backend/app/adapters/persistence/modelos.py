@@ -43,7 +43,7 @@ from app.core.entities.carga import EstadoCarga, EventoAuditoria
 from app.core.entities.mowa_mes import Programacion
 from app.core.entities.mowa_mes_campana import Salida, TipoCarga
 from app.core.entities.sabana import Severidad, TipoDocumento
-from app.core.entities.whatsmkt import TipoAdjunto
+from app.core.entities.whatsmkt import ModoCampana, TipoAdjunto, TipoEnvio
 
 # Nombres de restricciones estables: Alembic los necesita para migraciones reproducibles.
 CONVENCION_NOMBRES = {
@@ -848,4 +848,164 @@ class WhatsmktAdjunto(Base):
         CheckConstraint(f"tipo IN ({_en(TipoAdjunto)})", name="tipo_valido"),
         CheckConstraint("tamano >= 0", name="tamano_no_negativo"),
         CheckConstraint("huella ~ '^[0-9a-f]{64}$'", name="huella_valida"),
+    )
+
+
+class WhatsmktLote(Base):
+    """El lote que crea una vez la campana (RF-WM-23): una campana en modo global, o una por
+    segmento. Se crean todas o ninguna. Las exclusiones de los productos que quedan fuera de las
+    campanas cuelgan del lote (`campana_id` nulo), por eso el lote es una tabla."""
+
+    __tablename__ = "whatsmkt_lote"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    modo: Mapped[str] = mapped_column(String(16))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (CheckConstraint(f"modo IN ({_en(ModoCampana)})", name="modo_valido"),)
+
+
+class WhatsmktCampana(Base):
+    """Una campana de WhatsMKT con TODO lo que uso congelado (RF-WM-19, RF-WM-35, RF-WM-36): la
+    version de la definicion, el texto guardado con su version y una COPIA del texto, la fecha de
+    envio, los horarios con sus horas, el tipo de envio, la foto, el adjunto y los supervisores.
+    Cambiar despues la configuracion o el mensaje no la toca."""
+
+    __tablename__ = "whatsmkt_campana"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    lote_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("whatsmkt_lote.id"))
+    nombre: Mapped[str] = mapped_column(Text)
+    # La clave y la etiqueta del segmento al crearse (nulas en una campana global).
+    segmento: Mapped[str | None] = mapped_column(String(40))
+    segmento_etiqueta: Mapped[str | None] = mapped_column(Text)
+    # La definicion de columnas: su id (nulo si la borran), su nombre y la version exacta.
+    definicion_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("definicion_carga.id", ondelete="SET NULL")
+    )
+    definicion_nombre: Mapped[str] = mapped_column(Text)
+    definicion_version: Mapped[int] = mapped_column(Integer)
+    # El mensaje: el texto guardado (nulo si lo borran), su version y la copia del texto.
+    texto_guardado_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("texto_guardado.id", ondelete="SET NULL")
+    )
+    texto_version: Mapped[int] = mapped_column(Integer)
+    mensaje_texto: Mapped[str] = mapped_column(Text)
+    whatsapp_contacto: Mapped[str | None] = mapped_column(String(9))
+    # La seleccion con la que se armo.
+    fecha_corte: Mapped[date] = mapped_column(Date)
+    filtros: Mapped[list[str]] = mapped_column(JSONB(none_as_null=True))
+    orden: Mapped[str | None] = mapped_column(Text)
+    cantidad_pedida: Mapped[int] = mapped_column(Integer)
+    # El envio.
+    fecha_envio: Mapped[date] = mapped_column(Date)
+    horarios: Mapped[list[dict[str, str]]] = mapped_column(JSONB(none_as_null=True))
+    lo_antes_posible: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    tipo_envio: Mapped[str] = mapped_column(String(16))
+    foto_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("whatsmkt_adjunto.id"))
+    adjunto_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("whatsmkt_adjunto.id"))
+    etiqueta_vcard: Mapped[str | None] = mapped_column(Text)
+    # Las cifras del archivo: `cantidad` son sus filas, con los supervisores (S-WM-4).
+    cantidad: Mapped[int] = mapped_column(Integer)
+    productos: Mapped[int] = mapped_column(Integer)
+    supervisores: Mapped[list[str]] = mapped_column(JSONB(none_as_null=True))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    descartada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        Index(None, "lote_id"),
+        Index(None, "fecha_envio"),
+        CheckConstraint("length(btrim(nombre)) BETWEEN 1 AND 75", name="nombre_valido"),
+        CheckConstraint(f"tipo_envio IN ({_en(TipoEnvio)})", name="tipo_envio_valido"),
+        CheckConstraint(
+            "(tipo_envio = 'archivo') = (adjunto_id IS NOT NULL)", name="adjunto_segun_tipo"
+        ),
+        CheckConstraint(
+            "(tipo_envio = 'vcard') = (etiqueta_vcard IS NOT NULL)", name="vcard_segun_tipo"
+        ),
+        CheckConstraint("jsonb_typeof(filtros) = 'array'", name="filtros_es_una_lista"),
+        CheckConstraint(
+            "jsonb_typeof(horarios) = 'array' AND jsonb_array_length(horarios) >= 1",
+            name="horarios_con_al_menos_uno",
+        ),
+        CheckConstraint("jsonb_typeof(supervisores) = 'array'", name="supervisores_es_una_lista"),
+        CheckConstraint(
+            "cantidad = productos + jsonb_array_length(supervisores)", name="cantidad_es_la_suma"
+        ),
+        CheckConstraint("fecha_envio >= fecha_corte", name="envio_no_anterior_al_corte"),
+        CheckConstraint("definicion_version >= 1 AND texto_version >= 1", name="versiones_validas"),
+        CheckConstraint(
+            f"whatsapp_contacto IS NULL OR whatsapp_contacto ~ {_TELEFONO_RF02}",
+            name="whatsapp_valido",
+        ),
+    )
+
+
+class WhatsmktArchivo(Base):
+    """El .xlsx de la campana tal como se genero: la descarga posterior da exactamente estos
+    bytes, aunque cambien la cartera, la definicion, la configuracion o el mensaje (RF-WM-16)."""
+
+    __tablename__ = "whatsmkt_archivo"
+
+    campana_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("whatsmkt_campana.id", ondelete="CASCADE"), primary_key=True
+    )
+    nombre: Mapped[str] = mapped_column(Text)
+    contenido: Mapped[bytes] = mapped_column(LargeBinary)
+    tamano: Mapped[int] = mapped_column(Integer)
+    filas: Mapped[int] = mapped_column(Integer)
+
+    __table_args__ = (CheckConstraint("tamano >= 0 AND filas >= 0", name="cifras_validas"),)
+
+
+class WhatsmktFilaCargada(Base):
+    """Una fila del archivo, en su orden: los supervisores primero y luego los productos. Es lo
+    que conciliara el informe (RF-WM-39): `numero` es la clave y `pagare` es nulo en un
+    supervisor."""
+
+    __tablename__ = "whatsmkt_fila_cargada"
+
+    campana_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("whatsmkt_campana.id", ondelete="CASCADE"), primary_key=True
+    )
+    posicion: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    numero: Mapped[str] = mapped_column(Text)
+    pagare: Mapped[str | None] = mapped_column(Text)
+    supervision: Mapped[bool] = mapped_column(Boolean)
+    # Las macros de la fila, en orden: texto o nulo. `none_as_null`: un None de Python es NULL de
+    # SQL (que NOT NULL rechaza), no el JSON `null`; el CHECK exige una lista.
+    macros: Mapped[list[str | None]] = mapped_column(JSONB(none_as_null=True))
+
+    __table_args__ = (
+        CheckConstraint("posicion >= 1", name="posicion_positiva"),
+        CheckConstraint("supervision = (pagare IS NULL)", name="pagare_segun_supervision"),
+        CheckConstraint("jsonb_typeof(macros) = 'array'", name="macros_es_una_lista"),
+    )
+
+
+class WhatsmktExclusion(Base):
+    """Un producto excluido con su unico motivo (RF-WM-15). Cuelga del lote; `campana_id` es nulo
+    en los que quedan fuera de todas las campanas (sin dias de atraso, o de un segmento sin
+    productos)."""
+
+    __tablename__ = "whatsmkt_exclusion"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    lote_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("whatsmkt_lote.id", ondelete="CASCADE")
+    )
+    campana_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("whatsmkt_campana.id", ondelete="CASCADE")
+    )
+    fila: Mapped[int] = mapped_column(Integer)
+    pagare: Mapped[str | None] = mapped_column(Text)
+    codigo: Mapped[str] = mapped_column(String(40))
+    detalle: Mapped[str] = mapped_column(Text)
+    macro: Mapped[int | None] = mapped_column(Integer)
+    etiqueta: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (
+        Index(None, "lote_id"),
+        Index(None, "campana_id"),
+        CheckConstraint("fila >= 1", name="fila_positiva"),
     )

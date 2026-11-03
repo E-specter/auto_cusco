@@ -12,8 +12,13 @@ from app.api.whatsmkt_campanas import (
     FILAS_DE_MUESTRA,
     obtener_servicio_previa_whatsmkt,
 )
+from app.core.entities.whatsmkt import CLAVES_SEGMENTOS
 from app.main import app
-from tests.ayudas.previa_whatsmkt_falsos import DEFINICION_ID, servicio_de_previa
+from tests.ayudas.previa_whatsmkt_falsos import (
+    DEFINICION_ID,
+    TextosFalsos,
+    servicio_de_previa,
+)
 from tests.test_whatsmkt_contactos import SUPERVISORES, definicion, producto
 
 RUTA = "/whatsmkt/campanas/previsualizacion"
@@ -21,12 +26,20 @@ RUTA = "/whatsmkt/campanas/previsualizacion"
 
 @pytest.fixture
 def cliente():
-    estado = {"productos": [], "plataforma": "whatsmkt", "supervisores": SUPERVISORES}
+    textos = TextosFalsos()
+    textos.agregar(10, "Hola")  # sin macros ni [whatsapp]: ningun problema del mensaje
+    estado = {
+        "productos": [],
+        "plataforma": "whatsmkt",
+        "supervisores": SUPERVISORES,
+        "textos": textos,
+    }
     app.dependency_overrides[obtener_servicio_previa_whatsmkt] = lambda: servicio_de_previa(
         estado["productos"],
         definicion(),
         plataforma=estado["plataforma"],
         supervisores=estado["supervisores"],
+        textos=estado["textos"],
     )
     try:
         yield TestClient(app), estado
@@ -41,6 +54,9 @@ def cuerpo(**cambios) -> dict:
         "cantidad": 1000,
         "definicion": {"id": DEFINICION_ID},
         "modo": "global",
+        # La B4a no prueba el mensaje: elige uno valido para toda campana.
+        "mensaje": {"texto_guardado_id": 10},
+        "mensajes": dict.fromkeys(CLAVES_SEGMENTOS, {"texto_guardado_id": 10}),
     }
     return {**base, **cambios}
 

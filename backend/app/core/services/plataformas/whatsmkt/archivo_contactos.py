@@ -101,6 +101,9 @@ class ArchivoContactos:
     productos: int
     supervisores: int
     columnas_texto: frozenset[str]
+    # El pagare de cada producto, en el orden de las filas de productos (las que vienen despues
+    # de los supervisores): lo que concilia el informe (RF-WM-39).
+    pagares: tuple[str | None, ...] = ()
 
     @property
     def cantidad(self) -> int:
@@ -163,6 +166,7 @@ class ArchivoContactosService:
         exclusiones: list[ExclusionContacto] = []
         sin_segmento: list[SinSegmento] = []
         por_clave: dict[str | None, list[dict[str, Any]]] = {}
+        pagares: dict[str | None, list[str | None]] = {}
         for posicion, fila in enumerate(generado.tabla.filas, 1):
             pagare = None if vacia(fila[_PAGARE]) else str(fila[_PAGARE])
             segmento = segmento_de(_dias(fila[_DIAS]), segmentos) if por_segmento else None
@@ -175,9 +179,12 @@ class ArchivoContactosService:
                 sin_segmento.append(SinSegmento(posicion, pagare))
                 continue
             por_clave.setdefault(clave, []).append({c: fila[c] for c in cabeceras})
+            pagares.setdefault(clave, []).append(pagare)
         return ResultadoContactos(
             archivos=tuple(
-                self._archivo(clave, por_clave[clave], definicion, supervisores, procedencias)
+                self._archivo(
+                    clave, por_clave[clave], pagares[clave], definicion, supervisores, procedencias
+                )
                 for clave in _en_orden(por_clave, segmentos)
             ),
             exclusiones=tuple(exclusiones),
@@ -193,6 +200,7 @@ class ArchivoContactosService:
     def _archivo(
         clave: str | None,
         productos: list[dict[str, Any]],
+        pagares: list[str | None],
         definicion: DefinicionCarga,
         supervisores: Sequence[Supervisor],
         procedencias: Sequence[str],
@@ -216,6 +224,7 @@ class ArchivoContactosService:
             # RF-73: `número` va SIEMPRE en celda de texto, diga lo que diga la definicion guardada
             # (una definicion guardada por la API podria venir sin `celda_texto`).
             columnas_texto=definicion.columnas_texto | {columna_numero},
+            pagares=tuple(pagares),
         )
 
 

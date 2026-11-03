@@ -1,0 +1,242 @@
+"""Campanas de WhatsMKT sobre PostgreSQL (T-WM-B4b1).
+
+El lote se crea entero en una sola transaccion: el lote, cada campana con su archivo, sus filas y
+sus exclusiones, y las exclusiones que quedan fuera de todas. Al terminar, la version del texto y
+la de la definicion que se usaron quedan marcadas como usadas (ya no se modifican).
+"""
+
+from collections.abc import Iterable, Sequence
+from datetime import time
+from typing import Any
+
+from sqlalchemy import Connection, Engine, func, insert, select, update
+from sqlalchemy.engine import Row
+
+from app.adapters.persistence.modelos import (
+    DefinicionCargaVersion,
+    TextoGuardadoVersion,
+    WhatsmktArchivo,
+    WhatsmktCampana,
+    WhatsmktExclusion,
+    WhatsmktFilaCargada,
+    WhatsmktLote,
+)
+from app.core.entities.whatsmkt import ModoCampana, TipoEnvio
+from app.core.entities.whatsmkt_campana import (
+    ArchivoGuardado,
+    CampanaNueva,
+    CampanaWhatsmkt,
+    HorarioElegido,
+    LoteCreado,
+    LoteNuevo,
+)
+from app.core.ports.repositorio_campanas_whatsmkt_port import RepositorioCampanasWhatsmktPort
+from app.core.services.plataformas.whatsmkt.archivo_contactos import ExclusionContacto
+
+_LOTE = WhatsmktLote.__table__
+_CAMPANA = WhatsmktCampana.__table__
+_ARCHIVO = WhatsmktArchivo.__table__
+_FILA = WhatsmktFilaCargada.__table__
+_EXCLUSION = WhatsmktExclusion.__table__
+_TEXTO_VERSION = TextoGuardadoVersion.__table__
+_DEFINICION_VERSION = DefinicionCargaVersion.__table__
+_TAMANO_DE_LOTE = 1_000  # filas por INSERT
+
+
+def _en_lotes(valores: Sequence[dict[str, Any]]) -> Iterable[Sequence[dict[str, Any]]]:
+    for desde in range(0, len(valores), _TAMANO_DE_LOTE):
+        yield valores[desde : desde + _TAMANO_DE_LOTE]
+
+
+def _insertar(cx: Connection, tabla, valores: Sequence[dict[str, Any]]) -> None:
+    for lote in _en_lotes(valores):
+        cx.execute(insert(tabla), list(lote))
+
+
+def _horario(h: HorarioElegido) -> dict[str, str]:
+    return {
+        "nombre": h.nombre,
+        "inicio": h.inicio.strftime("%H:%M"),
+        "fin": h.fin.strftime("%H:%M"),
+    }
+
+
+def _valores_campana(lote_id: int, c: CampanaNueva) -> dict[str, Any]:
+    return {
+        "lote_id": lote_id,
+        "nombre": c.nombre,
+        "segmento": c.segmento,
+        "segmento_etiqueta": c.segmento_etiqueta,
+        "definicion_id": c.definicion_id,
+        "definicion_nombre": c.definicion_nombre,
+        "definicion_version": c.definicion_version,
+        "texto_guardado_id": c.texto_guardado_id,
+        "texto_version": c.texto_version,
+        "mensaje_texto": c.mensaje_texto,
+        "whatsapp_contacto": c.whatsapp_contacto,
+        "fecha_corte": c.fecha_corte,
+        "filtros": list(c.filtros),
+        "orden": c.orden,
+        "cantidad_pedida": c.cantidad_pedida,
+        "fecha_envio": c.fecha_envio,
+        "horarios": [_horario(h) for h in c.horarios],
+        "lo_antes_posible": c.lo_antes_posible,
+        "tipo_envio": c.tipo_envio.value,
+        "foto_id": c.foto_id,
+        "adjunto_id": c.adjunto_id,
+        "etiqueta_vcard": c.etiqueta_vcard,
+        "cantidad": c.cantidad,
+        "productos": c.productos,
+        "supervisores": list(c.supervisores),
+    }
+
+
+def _valores_exclusion(
+    lote_id: int, campana_id: int | None, exclusiones: Iterable[ExclusionContacto]
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "lote_id": lote_id,
+            "campana_id": campana_id,
+            "fila": e.fila,
+            "pagare": e.pagare,
+            "codigo": e.codigo.value,
+            "detalle": e.detalle,
+            "macro": e.macro,
+            "etiqueta": e.etiqueta,
+        }
+        for e in exclusiones
+    ]
+
+
+def _campana(fila: Row) -> CampanaWhatsmkt:
+    return CampanaWhatsmkt(
+        id=fila.id,
+        lote_id=fila.lote_id,
+        nombre=fila.nombre,
+        segmento=fila.segmento,
+        segmento_etiqueta=fila.segmento_etiqueta,
+        definicion_id=fila.definicion_id,
+        definicion_nombre=fila.definicion_nombre,
+        definicion_version=fila.definicion_version,
+        texto_guardado_id=fila.texto_guardado_id,
+        texto_version=fila.texto_version,
+        mensaje_texto=fila.mensaje_texto,
+        whatsapp_contacto=fila.whatsapp_contacto,
+        fecha_corte=fila.fecha_corte,
+        filtros=tuple(fila.filtros),
+        orden=fila.orden,
+        cantidad_pedida=fila.cantidad_pedida,
+        fecha_envio=fila.fecha_envio,
+        horarios=tuple(
+            HorarioElegido(
+                h["nombre"], time.fromisoformat(h["inicio"]), time.fromisoformat(h["fin"])
+            )
+            for h in fila.horarios
+        ),
+        lo_antes_posible=fila.lo_antes_posible,
+        tipo_envio=TipoEnvio(fila.tipo_envio),
+        foto_id=fila.foto_id,
+        adjunto_id=fila.adjunto_id,
+        etiqueta_vcard=fila.etiqueta_vcard,
+        cantidad=fila.cantidad,
+        productos=fila.productos,
+        supervisores=tuple(fila.supervisores),
+        creado_en=fila.creado_en,
+        descartada_en=fila.descartada_en,
+        archivo_nombre=fila.archivo_nombre,
+        archivo_tamano=fila.archivo_tamano,
+    )
+
+
+def consulta_de_campanas():
+    """Las campanas con el nombre y el tamano de su archivo (sin sus bytes)."""
+    return select(
+        *_CAMPANA.c,
+        _ARCHIVO.c.nombre.label("archivo_nombre"),
+        _ARCHIVO.c.tamano.label("archivo_tamano"),
+    ).join(_ARCHIVO, _ARCHIVO.c.campana_id == _CAMPANA.c.id)
+
+
+class RepositorioCampanasWhatsmktPostgres(RepositorioCampanasWhatsmktPort):
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
+
+    def crear_lote(self, lote: LoteNuevo) -> LoteCreado:
+        with self._engine.begin() as cx:
+            lote_id = cx.execute(
+                insert(_LOTE).values(modo=lote.modo.value).returning(_LOTE.c.id)
+            ).scalar_one()
+            ids = [self._crear_campana(cx, lote_id, c) for c in lote.campanas]
+            _insertar(
+                cx, _EXCLUSION, _valores_exclusion(lote_id, None, lote.exclusiones_sin_campana)
+            )
+            for c in lote.campanas:
+                self._marcar_usadas(cx, c)
+            filas = cx.execute(
+                consulta_de_campanas().where(_CAMPANA.c.id.in_(ids)).order_by(_CAMPANA.c.id)
+            ).all()
+        return LoteCreado(lote_id, ModoCampana(lote.modo), tuple(_campana(f) for f in filas))
+
+    @staticmethod
+    def _crear_campana(cx: Connection, lote_id: int, c: CampanaNueva) -> int:
+        campana_id = cx.execute(
+            insert(_CAMPANA).values(**_valores_campana(lote_id, c)).returning(_CAMPANA.c.id)
+        ).scalar_one()
+        cx.execute(
+            insert(_ARCHIVO).values(
+                campana_id=campana_id,
+                nombre=c.archivo_nombre,
+                contenido=c.archivo_contenido,
+                tamano=len(c.archivo_contenido),
+                filas=c.cantidad,
+            )
+        )
+        _insertar(
+            cx,
+            _FILA,
+            [
+                {
+                    "campana_id": campana_id,
+                    "posicion": f.posicion,
+                    "numero": f.numero,
+                    "pagare": f.pagare,
+                    "supervision": f.supervision,
+                    "macros": list(f.macros),
+                }
+                for f in c.filas
+            ],
+        )
+        _insertar(cx, _EXCLUSION, _valores_exclusion(lote_id, campana_id, c.exclusiones))
+        return campana_id
+
+    @staticmethod
+    def _marcar_usadas(cx: Connection, c: CampanaNueva) -> None:
+        """La version del texto y la de la definicion que se usaron ya no se modifican."""
+        cx.execute(
+            update(_TEXTO_VERSION)
+            .where(
+                _TEXTO_VERSION.c.texto_id == c.texto_guardado_id,
+                _TEXTO_VERSION.c.numero == c.texto_version,
+                _TEXTO_VERSION.c.usada_en.is_(None),
+            )
+            .values(usada_en=func.clock_timestamp())
+        )
+        cx.execute(
+            update(_DEFINICION_VERSION)
+            .where(
+                _DEFINICION_VERSION.c.definicion_id == c.definicion_id,
+                _DEFINICION_VERSION.c.numero == c.definicion_version,
+                _DEFINICION_VERSION.c.usada_en.is_(None),
+            )
+            .values(usada_en=func.clock_timestamp())
+        )
+
+    def obtener_archivo(self, campana_id: int) -> ArchivoGuardado | None:
+        with self._engine.connect() as cx:
+            fila = cx.execute(
+                select(_ARCHIVO.c.nombre, _ARCHIVO.c.contenido).where(
+                    _ARCHIVO.c.campana_id == campana_id
+                )
+            ).one_or_none()
+        return None if fila is None else ArchivoGuardado(fila.nombre, bytes(fila.contenido))

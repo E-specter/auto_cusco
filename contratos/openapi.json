@@ -5380,6 +5380,133 @@
           }
         }
       }
+    },
+    "/whatsmkt/campanas": {
+      "post": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Crear el lote de campanas",
+        "description": "Crea el LOTE completo o nada, en una sola transaccion (RF-WM-23): una campana en modo\n`global`, o una por segmento con productos. Cada una congela la version exacta del mensaje y de\nla definicion (la pedida o, sin ella, la vigente), el archivo, los horarios y los supervisores.\n\nResponde 201 con cada campana (id, nombre, archivo y la ficha de RF-WM-36). Si algo impide\ncrear (sin horario, sin supervisores, sin mensaje, un problema del mensaje, la foto, un nombre\nde mas de 75 caracteres...) responde 422 con todos los problemas y no guarda nada.",
+        "operationId": "crear_campanas_whatsmkt_campanas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreacionCampanasWhatsmktEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CampanaCreadaWhatsmktRespuesta"
+                  },
+                  "type": "array",
+                  "title": "Response Crear Campanas Whatsmkt Campanas Post"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorConCodigo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail. Con el codigo fecha_envio_anterior trae ademas fecha_envio y fecha_corte",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorFechaEnvio"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Algo impide crear (nada se guarda): `codigo` es el del primero y `problemas` los trae todos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorCreacionWhatsmktRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/whatsmkt/campanas/{campana_id}/archivo": {
+      "get": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Descargar el archivo de contactos de la campana",
+        "operationId": "descargar_archivo_de_la_campana_whatsmkt_campanas__campana_id__archivo_get",
+        "parameters": [
+          {
+            "name": "campana_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campana Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Los bytes guardados al crear la campana, siempre los mismos",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Content-Disposition": {
+                "description": "attachment; filename=\"<nombre en ASCII>\"; filename*=UTF-8''<nombre exacto> (RFC 5987)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5643,6 +5770,32 @@
         ],
         "title": "AnalisisRespuesta",
         "description": "El borrador con su analisis y lo que se detecto al leer el archivo.\n\n`hojas` y `hoja` son de una hoja de calculo; `separador` y `codificacion`, de un CSV (nulos y\nvacios en los demas). `filas` son las de datos. `problemas` son los del mapeo sugerido tal como\nllega (RF-60). `detectados` son las opciones de lectura que el lector detecto porque no se\neligieron (`hoja`, `separador`, `codificacion`): la pantalla las marca «(detectado)»."
+      },
+      "ArchivoCampanaWhatsmktRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre",
+            "description": "El nombre de la campana mas .xlsx"
+          },
+          "tamano": {
+            "type": "integer",
+            "title": "Tamano",
+            "description": "Bytes"
+          },
+          "filas": {
+            "type": "integer",
+            "title": "Filas",
+            "description": "Filas del archivo, supervisores incluidos (S-WM-4)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "tamano",
+          "filas"
+        ],
+        "title": "ArchivoCampanaWhatsmktRespuesta"
       },
       "ArchivoPrevistoRespuesta": {
         "properties": {
@@ -5969,6 +6122,49 @@
         "type": "object",
         "title": "CambioCampoAdicionalEntrada",
         "description": "Renombrar, archivar o reactivar: lo que no viene no cambia. El nombre tecnico no cambia."
+      },
+      "CampanaCreadaWhatsmktRespuesta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "lote_id": {
+            "type": "integer",
+            "title": "Lote Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "segmento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segmento"
+          },
+          "archivo": {
+            "$ref": "#/components/schemas/ArchivoCampanaWhatsmktRespuesta"
+          },
+          "ficha": {
+            "$ref": "#/components/schemas/FichaWhatsmktRespuesta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "lote_id",
+          "nombre",
+          "segmento",
+          "archivo",
+          "ficha"
+        ],
+        "title": "CampanaCreadaWhatsmktRespuesta"
       },
       "CampanaPrevistaWhatsmktRespuesta": {
         "properties": {
@@ -6955,7 +7151,8 @@
           "sin_dias_atraso",
           "sin_supervisores",
           "whatsapp_invalido",
-          "sin_whatsapp"
+          "sin_whatsapp",
+          "sin_mensaje"
         ],
         "title": "CodigoWhatsmkt",
         "description": "Codigos de error del modulo; el frontend los traduce como `whatsmkt.codigo.<codigo>`.\n\nLos de docs/whatsmkt-interfaz.md §7 (con `horario_invalido`, `sin_dias_atraso` y\n`sin_supervisores`), todos desde B1 para que la\nprueba espejo de i18n no cambie en cada corte. Un codigo por linea, con la forma\n`NOMBRE = \"codigo\"`: la prueba espejo lee esta clase. Un codigo nuevo se acuerda antes con\ndesigner. B1 emite solo `horario_invalido`, `variable_inexistente`, `segmentos_superpuestos`\ny `segmentos_con_hueco`; los demas los emiten B2 a B6."
@@ -7674,10 +7871,10 @@
       "ConfiguracionWhatsmktRespuesta": {
         "properties": {
           "horario_1": {
-            "$ref": "#/components/schemas/HorarioWhatsmktRespuesta"
+            "$ref": "#/components/schemas/app__api__whatsmkt__HorarioWhatsmktRespuesta"
           },
           "horario_2": {
-            "$ref": "#/components/schemas/HorarioWhatsmktRespuesta"
+            "$ref": "#/components/schemas/app__api__whatsmkt__HorarioWhatsmktRespuesta"
           },
           "plantilla_nombre": {
             "type": "string",
@@ -8180,6 +8377,194 @@
           "speech_huella"
         ],
         "title": "CreacionCampanaEntrada"
+      },
+      "CreacionCampanasWhatsmktEntrada": {
+        "properties": {
+          "fecha_corte": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Corte"
+          },
+          "filtros": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Filtros",
+            "default": []
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          },
+          "cantidad": {
+            "type": "integer",
+            "maximum": 120000.0,
+            "minimum": 1.0,
+            "title": "Cantidad"
+          },
+          "seleccion_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seleccion Id",
+            "description": "Referencia informativa a la seleccion guardada de origen"
+          },
+          "definicion": {
+            "$ref": "#/components/schemas/DefinicionWhatsmktEntrada"
+          },
+          "modo": {
+            "$ref": "#/components/schemas/ModoCampana",
+            "default": "global"
+          },
+          "fecha_envio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Envio",
+            "description": "Fecha de envio, solo para los dias de atraso ajustados (RF-55); sin ella, hoy en America/Lima. Todavia SIN validar contra los dias de envio (RF-70): eso llega con el mensaje"
+          },
+          "mensaje": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MensajeWhatsmktEntrada"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "El mensaje de la unica campana en modo `global`. Sin el, la campana va sin mensaje; en modo `por_segmento` no se usa"
+          },
+          "mensajes": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MensajeWhatsmktEntrada"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mensajes",
+            "description": "En modo `por_segmento`, el mensaje de cada segmento por su clave. El segmento que no se nombra usa el de la configuracion (RF-WM-22); sin ese tampoco, va sin mensaje"
+          },
+          "horarios": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "horario_1",
+                "horario_2"
+              ]
+            },
+            "type": "array",
+            "title": "Horarios",
+            "description": "Los horarios de envio elegidos (RF-WM-07). Vacio responde 422 con `sin_horario`",
+            "default": []
+          },
+          "lo_antes_posible": {
+            "type": "boolean",
+            "title": "Lo Antes Posible",
+            "description": "Solo se guarda y se copia en la ficha (RF-WM-08)",
+            "default": false
+          },
+          "tipo_envio": {
+            "$ref": "#/components/schemas/TipoEnvio",
+            "default": "solo_texto"
+          },
+          "foto_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foto Id",
+            "description": "Un adjunto de la biblioteca que sirva de foto de perfil (RF-WM-29); opcional"
+          },
+          "adjunto_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adjunto Id",
+            "description": "Con `tipo_envio=archivo`: el adjunto de la biblioteca"
+          },
+          "etiqueta_vcard": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etiqueta Vcard",
+            "description": "Con `tipo_envio=vcard`: la etiqueta del contacto"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre",
+            "description": "El nombre de la campana global; sin el, sale de la plantilla (RF-WM-33)"
+          },
+          "nombres": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombres",
+            "description": "El nombre de cada campana por clave de segmento; sin el, sale de la plantilla"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fecha_corte",
+          "cantidad",
+          "definicion"
+        ],
+        "title": "CreacionCampanasWhatsmktEntrada",
+        "description": "La previsualizacion mas lo que se agrega para crear. `fecha_envio` llega SIN validar contra\nlos dias de envio (RF-70); la validacion llega con B4c."
       },
       "CriterioCalculadoGuardadoRespuesta": {
         "properties": {
@@ -8832,6 +9217,178 @@
         "title": "ErrorCreacionCampanaRespuesta",
         "description": "409 de las campanas con `codigo` propio: distingue la causa sin que el cliente tenga que\nadivinarla (al crear: huella primero, limite despues; ver `docs/mowa-mes.md`; al eliminar\nuna activa: `campana_no_descartada`)."
       },
+      "ErrorCreacionWhatsmktRespuesta": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoWhatsmkt"
+          },
+          "horarios": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horarios",
+            "description": "horario_invalido: las franjas que fallan"
+          },
+          "variable": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variable",
+            "description": "variable_inexistente: la que no existe"
+          },
+          "segmento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segmento",
+            "description": "segmentos_superpuestos: el segmento con el que se pisa"
+          },
+          "fila": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fila",
+            "description": "segmentos_superpuestos: la fila bajo la que se muestra"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde",
+            "description": "segmentos_con_hueco: primer dia sin segmento (null: -inf)"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta",
+            "description": "segmentos_con_hueco: ultimo dia sin segmento (null: +inf)"
+          },
+          "peso": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peso",
+            "description": "adjunto_peso y foto_peso: bytes del archivo"
+          },
+          "maximo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximo",
+            "description": "adjunto_peso: bytes que admite ese tipo"
+          },
+          "tipo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo",
+            "description": "adjunto_peso: el tipo (video, audio, pdf, imagen_jpeg...)"
+          },
+          "ancho": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ancho",
+            "description": "foto_medidas: ancho leido del archivo, en pixeles"
+          },
+          "alto": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alto",
+            "description": "foto_medidas: alto leido del archivo, en pixeles"
+          },
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaWhatsmktRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "codigo",
+          "horarios",
+          "variable",
+          "segmento",
+          "fila",
+          "desde",
+          "hasta",
+          "peso",
+          "maximo",
+          "tipo",
+          "ancho",
+          "alto",
+          "problemas"
+        ],
+        "title": "ErrorCreacionWhatsmktRespuesta",
+        "description": "422 al crear: `codigo` y sus parametros son los del PRIMER problema; `problemas` los trae\ntodos (la campana no se crea mientras haya alguno)."
+      },
       "ErrorGeneracionRespuesta": {
         "properties": {
           "fila": {
@@ -9466,6 +10023,97 @@
         ],
         "title": "FeriadosRespuesta"
       },
+      "FichaWhatsmktRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "fecha_envio": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Envio"
+          },
+          "horarios": {
+            "items": {
+              "$ref": "#/components/schemas/app__api__whatsmkt_campanas__HorarioWhatsmktRespuesta"
+            },
+            "type": "array",
+            "title": "Horarios"
+          },
+          "lo_antes_posible": {
+            "type": "boolean",
+            "title": "Lo Antes Posible"
+          },
+          "pais": {
+            "type": "string",
+            "title": "Pais"
+          },
+          "foto_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foto Id",
+            "description": "La foto de perfil, para descargar de la biblioteca"
+          },
+          "cantidad": {
+            "type": "integer",
+            "title": "Cantidad",
+            "description": "¿Cuantos telefonos tiene su Lista de contactos?"
+          },
+          "tipo_envio": {
+            "$ref": "#/components/schemas/TipoEnvio"
+          },
+          "adjunto_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adjunto Id"
+          },
+          "etiqueta_vcard": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etiqueta Vcard"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje",
+            "description": "Texto para copiar: [whatsapp] ya es el enlace y las [$MACROn$] quedan tal cual"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "fecha_envio",
+          "horarios",
+          "lo_antes_posible",
+          "pais",
+          "foto_id",
+          "cantidad",
+          "tipo_envio",
+          "adjunto_id",
+          "etiqueta_vcard",
+          "mensaje"
+        ],
+        "title": "FichaWhatsmktRespuesta",
+        "description": "Cada dato del formulario de WhatsMKT, listo para copiar (RF-WM-36)."
+      },
       "FilaMuestraRespuesta": {
         "properties": {
           "numero": {
@@ -10009,24 +10657,6 @@
           "fin"
         ],
         "title": "HorarioWhatsmktEntrada"
-      },
-      "HorarioWhatsmktRespuesta": {
-        "properties": {
-          "inicio": {
-            "type": "string",
-            "title": "Inicio"
-          },
-          "fin": {
-            "type": "string",
-            "title": "Fin"
-          }
-        },
-        "type": "object",
-        "required": [
-          "inicio",
-          "fin"
-        ],
-        "title": "HorarioWhatsmktRespuesta"
       },
       "IncidenciaRespuesta": {
         "properties": {
@@ -13444,6 +14074,16 @@
         ],
         "title": "TipoCodigo"
       },
+      "TipoEnvio": {
+        "type": "string",
+        "enum": [
+          "solo_texto",
+          "archivo",
+          "vcard"
+        ],
+        "title": "TipoEnvio",
+        "description": "Lo que lleva el mensaje (RF-WM-28): solo texto, un archivo de la biblioteca o una vCard."
+      },
       "TipoExcepcion": {
         "type": "string",
         "enum": [
@@ -14328,6 +14968,50 @@
           "campos_archivados"
         ],
         "title": "PrevisualizacionRespuesta"
+      },
+      "app__api__whatsmkt__HorarioWhatsmktRespuesta": {
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "title": "Inicio"
+          },
+          "fin": {
+            "type": "string",
+            "title": "Fin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inicio",
+          "fin"
+        ],
+        "title": "HorarioWhatsmktRespuesta"
+      },
+      "app__api__whatsmkt_campanas__HorarioWhatsmktRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre",
+            "description": "horario_1 u horario_2"
+          },
+          "inicio": {
+            "type": "string",
+            "title": "Inicio",
+            "description": "HH:MM"
+          },
+          "fin": {
+            "type": "string",
+            "title": "Fin",
+            "description": "HH:MM"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "inicio",
+          "fin"
+        ],
+        "title": "HorarioWhatsmktRespuesta"
       }
     }
   }

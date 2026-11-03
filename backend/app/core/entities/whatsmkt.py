@@ -58,6 +58,7 @@ class CodigoWhatsmkt(StrEnum):
     SIN_SUPERVISORES = "sin_supervisores"
     WHATSAPP_INVALIDO = "whatsapp_invalido"
     SIN_WHATSAPP = "sin_whatsapp"
+    SIN_MENSAJE = "sin_mensaje"
 
 
 class ModoCampana(StrEnum):
@@ -157,6 +158,14 @@ SEGMENTOS_POR_DEFECTO = (
     SegmentoWhatsmkt("mayores_2", "Tramos mayores al 2", 9, None, 2),
 )
 CLAVES_SEGMENTOS = frozenset(s.clave for s in SEGMENTOS_POR_DEFECTO)
+
+
+class TipoEnvio(StrEnum):
+    """Lo que lleva el mensaje (RF-WM-28): solo texto, un archivo de la biblioteca o una vCard."""
+
+    SOLO_TEXTO = "solo_texto"
+    ARCHIVO = "archivo"
+    VCARD = "vcard"
 
 
 class TipoAdjunto(StrEnum):

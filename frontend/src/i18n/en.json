@@ -1526,5 +1526,6 @@
   "whatsmkt.previa.irSupervisores": "Set up supervisors",
   "whatsmkt.codigo.whatsapp_invalido": "WhatsApp must have 9 digits and start with 9.",
   "whatsmkt.codigo.sin_whatsapp": "The message uses [whatsapp] and no contact WhatsApp is set up.",
-  "whatsmkt.previa.irWhatsapp": "Set up the contact WhatsApp"
+  "whatsmkt.previa.irWhatsapp": "Set up the contact WhatsApp",
+  "whatsmkt.codigo.sin_mensaje": "It has no message: choose one, or set up the segment's message."
 }

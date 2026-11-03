@@ -9,13 +9,18 @@ from datetime import date
 import pytest
 
 from app.core.entities.definiciones_columnas import DefinicionNoEncontrada, VersionNoEncontrada
-from app.core.entities.whatsmkt import CodigoWhatsmkt, ModoCampana
+from app.core.entities.whatsmkt import CLAVES_SEGMENTOS, CodigoWhatsmkt, ModoCampana
 from app.core.services.plataformas.whatsmkt.archivo_contactos import SeleccionCampana
-from app.core.services.plataformas.whatsmkt.previa import PeticionPrevia
-from tests.ayudas.previa_whatsmkt_falsos import DEFINICION_ID, servicio_de_previa
+from app.core.services.plataformas.whatsmkt.previa import MensajePedido, PeticionPrevia
+from tests.ayudas.previa_whatsmkt_falsos import (
+    DEFINICION_ID,
+    TextosFalsos,
+    servicio_de_previa,
+)
 from tests.test_whatsmkt_contactos import CORTE, definicion, producto
 
 GLOBAL, POR_SEGMENTO = ModoCampana.GLOBAL, ModoCampana.POR_SEGMENTO
+MENSAJE = MensajePedido(10)
 
 
 def previa(productos, modo=GLOBAL, *, fecha_envio=CORTE, version=None, **servicio):
@@ -24,8 +29,14 @@ def previa(productos, modo=GLOBAL, *, fecha_envio=CORTE, version=None, **servici
         DEFINICION_ID,
         version,
         modo,
+        mensaje=MENSAJE,
+        mensajes_por_segmento=dict.fromkeys(CLAVES_SEGMENTOS, MENSAJE),
     )
-    return servicio_de_previa(productos, definicion(), **servicio).previsualizar(peticion)
+    textos = TextosFalsos()
+    textos.agregar(10, "Hola")  # sin macros ni [whatsapp]: ningun problema del mensaje
+    return servicio_de_previa(productos, definicion(), textos=textos, **servicio).previsualizar(
+        peticion
+    )
 
 
 def codigos(problemas) -> list[CodigoWhatsmkt]:

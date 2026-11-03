@@ -17,11 +17,12 @@ def test_cada_codigo_tiene_su_traduccion() -> None:
     )
 
 
-def test_son_31_codigos_y_los_nuevos_de_la_previsualizacion_y_el_whatsapp_estan_entre_ellos() -> (
+def test_son_32_codigos_y_los_nuevos_de_la_previsualizacion_y_el_whatsapp_estan_entre_ellos() -> (
     None
 ):
-    assert len(CodigoWhatsmkt) == 31
+    assert len(CodigoWhatsmkt) == 32
     nuevos = {"sin_dias_atraso", "sin_supervisores", "whatsapp_invalido", "sin_whatsapp"}
+    nuevos |= {"sin_mensaje"}
     assert nuevos <= {c.value for c in CodigoWhatsmkt}
 
 

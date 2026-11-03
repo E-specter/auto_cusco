@@ -108,11 +108,12 @@ def test_sin_whatsapp_de_contacto_el_marcador_queda_tal_cual() -> None:
     assert resultado.campanas[0].mensaje.ejemplo == "Hola. INFO por [whatsapp]"
 
 
-def test_sin_mensaje_la_campana_va_sin_mensaje_y_sin_problemas_del_mensaje() -> None:
+def test_sin_mensaje_la_campana_va_sin_mensaje_y_es_el_problema_sin_mensaje() -> None:
     resultado = previa([producto(1)])
 
     assert resultado.campanas[0].mensaje is None
-    assert resultado.problemas == ()
+    [problema] = resultado.problemas
+    assert (problema.codigo, problema.segmento) == (CodigoWhatsmkt.SIN_MENSAJE, None)
 
 
 # --- La version y el texto elegido ------------------------------------------------------------
@@ -327,7 +328,9 @@ def test_un_segmento_sin_mensaje_pedido_ni_configurado_va_sin_mensaje() -> None:
         ("tramo_2", False),
         ("mayores_2", True),
     ]
-    assert resultado.problemas == ()
+    assert [(p.codigo, p.segmento) for p in resultado.problemas] == [
+        (CodigoWhatsmkt.SIN_MENSAJE, "mayores_2")
+    ]
 
 
 def test_los_problemas_del_mensaje_dicen_a_que_segmento_se_refieren() -> None:
