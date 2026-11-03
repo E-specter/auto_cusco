@@ -72,7 +72,7 @@ test.describe('secciones', () => {
 
     await expect(nav.getByRole('list', { name: 'Flujo diario' })).toBeVisible();
     await expect(nav.getByRole('list', { name: 'Canales' })).toBeVisible();
-    await expect(nav.getByRole('list', { name: 'Configuración' })).toBeVisible();
+    await expect(nav.getByRole('list', { name: 'Herramientas' })).toBeVisible();
     await expect(nav.locator('.nav__divisor')).toHaveText(['|', '|']);
     await expect(nav.locator('.nav__punto').first()).toHaveText('·');
     await expect(nav.getByRole('link', { name: 'Cartera' })).toHaveAttribute('aria-current', 'page');
@@ -84,8 +84,8 @@ test.describe('secciones', () => {
   });
 });
 
-test.describe('configuración: pantallas compartidas por todos los conectores (T-MM-C10, L-F7)', () => {
-  const seccion = (page: Page) => page.getByRole('navigation', { name: 'Secciones' }).getByRole('list', { name: 'Configuración' });
+test.describe('herramientas: pantallas compartidas por todos los conectores (T-MM-C10, L-F7)', () => {
+  const seccion = (page: Page) => page.getByRole('navigation', { name: 'Secciones' }).getByRole('list', { name: 'Herramientas' });
 
   test('muestra las tres entradas en su orden, con la ruta de cada una', async ({ page }) => {
     await abrirCartera(page);
@@ -121,7 +121,7 @@ test.describe('configuración: pantallas compartidas por todos los conectores (T
     await montarApiSupervisionCalendario(page, apiSupervisionCalendario());
     await page.goto('/supervisores');
 
-    const enlaces = page.getByRole('navigation', { name: 'Sections' }).getByRole('list', { name: 'Configuration' }).getByRole('link');
+    const enlaces = page.getByRole('navigation', { name: 'Sections' }).getByRole('list', { name: 'Tools' }).getByRole('link');
     await expect(enlaces).toHaveText(['Load columns', 'Supervisors', 'Working calendar']);
   });
 });

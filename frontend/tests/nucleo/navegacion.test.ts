@@ -41,13 +41,13 @@ const MOWA = NAVEGACION.flatMap((s) => s.entradas).find(
 )!.modulo;
 
 describe('estructura de la navegación', () => {
-  it('agrupa el flujo diario, los canales y la configuración en secciones separadas', () => {
-    expect(NAVEGACION.map((s) => s.id)).toEqual(['flujo', 'canales', 'configuracion']);
+  it('agrupa el flujo diario, los canales y las herramientas en secciones separadas', () => {
+    expect(NAVEGACION.map((s) => s.id)).toEqual(['flujo', 'canales', 'herramientas']);
   });
 
-  it('la configuración lista las columnas, los supervisores y el calendario, en ese orden (L-F7)', () => {
-    const configuracion = NAVEGACION.find((s) => s.id === 'configuracion')!;
-    expect(configuracion.entradas.map((e) => (e.tipo === 'enlace' ? e.enlace.ruta : e.modulo.prefijo))).toEqual([
+  it('las herramientas listan las columnas, los supervisores y el calendario, en ese orden (L-F7)', () => {
+    const herramientas = NAVEGACION.find((s) => s.id === 'herramientas')!;
+    expect(herramientas.entradas.map((e) => (e.tipo === 'enlace' ? e.enlace.ruta : e.modulo.prefijo))).toEqual([
       '/columnas',
       '/supervisores',
       '/calendario',

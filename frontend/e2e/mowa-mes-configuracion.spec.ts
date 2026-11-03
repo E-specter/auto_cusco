@@ -44,7 +44,7 @@ test.describe('carga inicial', () => {
     // The whole text, with the space between the colon and the first link (Astro drops the whitespace
     // between a span and a link unless the markup says it).
     await expect(aviso).toHaveText(
-      'Los supervisores y el calendario laboral ahora tienen su propia pantalla, en Configuración: Supervisores · Calendario laboral.',
+      'Los supervisores y el calendario laboral ahora tienen su propia pantalla: Supervisores · Calendario laboral.',
     );
     await expect(aviso.getByRole('link', { name: 'Supervisores' })).toHaveAttribute('href', '/supervisores');
     await expect(aviso.getByRole('link', { name: 'Calendario laboral' })).toHaveAttribute('href', '/calendario');
@@ -292,7 +292,7 @@ test.describe('idioma', () => {
     await page.goto(RUTA);
 
     await expect(page.locator('[data-pantallas-nuevas]')).toHaveText(
-      'Supervisors and the working calendar now have their own screens, under Configuration: Supervisors · Working calendar.',
+      'Supervisors and the working calendar now have their own screens: Supervisors · Working calendar.',
     );
   });
 });

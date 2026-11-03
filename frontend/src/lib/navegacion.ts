@@ -94,9 +94,9 @@ export const NAVEGACION: SeccionNav[] = [
   {
     // What is set up once and every load uses, not a step of the daily flow
     // (interface rules of the text engine, §9.7).
-    id: 'configuracion',
-    i18n: 'nav.seccion.configuracion',
-    texto: 'Configuración',
+    id: 'herramientas',
+    i18n: 'nav.seccion.herramientas',
+    texto: 'Herramientas',
     entradas: [
       { tipo: 'enlace', enlace: { ruta: '/columnas', i18n: 'nav.columnas', texto: 'Columnas de carga' } },
       { tipo: 'enlace', enlace: { ruta: '/supervisores', i18n: 'nav.supervisores', texto: 'Supervisores' } },
