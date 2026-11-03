@@ -1247,22 +1247,30 @@ import '../../styles/mowa-mes.css';
       host.append(aviso);
     });
 
-    const grupos = tabla('mm-conciliacion__tabla', [
-      [t('mowaMes.seguimiento.conciliacion.col.grupo'), false],
-      [t('mowaMes.seguimiento.conciliacion.col.cargados'), true],
-      [t('mowaMes.seguimiento.conciliacion.col.enviados'), true],
-      [t('mowaMes.seguimiento.conciliacion.col.noEnviados'), true],
-      [t('mowaMes.seguimiento.conciliacion.col.estados'), false],
-    ]);
+    // Each header text is also the label of its cell when the table stacks (below 48rem).
+    const [colGrupo, colCargados, colEnviados, colNoEnviados, colEstados] = (
+      ['grupo', 'cargados', 'enviados', 'noEnviados', 'estados'] as const
+    ).map((c) => t(`mowaMes.seguimiento.conciliacion.col.${c}`));
+    const grupos = tabla(
+      'mm-conciliacion__tabla',
+      [
+        [colGrupo, false],
+        [colCargados, true],
+        [colEnviados, true],
+        [colNoEnviados, true],
+        [colEstados, false],
+      ],
+      { apilable: true },
+    );
     filasConciliacion(conciliacion).forEach(({ grupo, cifras }) => {
       const fila = document.createElement('tr');
       fila.dataset.grupo = grupo;
       fila.append(
-        celdaDeFila(t(`mowaMes.seguimiento.conciliacion.grupo.${grupo}`)),
-        celda('td', formatNumber(cifras.cargados), 'num'),
-        celda('td', formatNumber(cifras.enviados), 'num'),
-        celda('td', formatNumber(cifras.no_enviados), 'num'),
-        celda('td', textoEstados(cifras.por_estado), 'mono mm-estados'),
+        celdaDeFila(t(`mowaMes.seguimiento.conciliacion.grupo.${grupo}`), '', colGrupo),
+        celda('td', formatNumber(cifras.cargados), 'num', colCargados),
+        celda('td', formatNumber(cifras.enviados), 'num', colEnviados),
+        celda('td', formatNumber(cifras.no_enviados), 'num', colNoEnviados),
+        celda('td', textoEstados(cifras.por_estado), 'mono mm-estados', colEstados),
       );
       grupos.cuerpo.append(fila);
     });
@@ -1299,17 +1307,24 @@ import '../../styles/mowa-mes.css';
         : t('mowaMes.seguimiento.conciliacion.costoRealSin', { motivo: textoDeCosto(real) });
     host.append(costo);
 
-    const ids = tabla('mm-ids__tabla', [
-      [t('mowaMes.seguimiento.conciliacion.col.mesId'), false],
-      [t('mowaMes.seguimiento.conciliacion.col.filas'), true],
-      [t('mowaMes.seguimiento.conciliacion.col.coinciden'), true],
-    ]);
+    const [colMesId, colFilas, colCoinciden] = (['mesId', 'filas', 'coinciden'] as const).map((c) =>
+      t(`mowaMes.seguimiento.conciliacion.col.${c}`),
+    );
+    const ids = tabla(
+      'mm-ids__tabla',
+      [
+        [colMesId, false],
+        [colFilas, true],
+        [colCoinciden, true],
+      ],
+      { apilable: true },
+    );
     conciliacion.por_id.forEach((porId) => {
       const fila = document.createElement('tr');
       fila.append(
-        celda('td', String(porId.mes_id), 'mono'),
-        celda('td', formatNumber(porId.filas), 'num'),
-        celda('td', formatNumber(porId.con_correspondencia), 'num'),
+        celda('td', String(porId.mes_id), 'mono', colMesId),
+        celda('td', formatNumber(porId.filas), 'num', colFilas),
+        celda('td', formatNumber(porId.con_correspondencia), 'num', colCoinciden),
       );
       ids.cuerpo.append(fila);
     });

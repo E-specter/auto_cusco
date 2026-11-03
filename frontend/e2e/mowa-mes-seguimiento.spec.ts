@@ -226,6 +226,71 @@ test.describe('S4: reimportar un id ya importado', () => {
   });
 });
 
+test.describe('T-MM-F13: las tablas de la conciliación se apilan a 360 px', () => {
+  for (const idioma of ['es', 'en'] as const) {
+    test(`en ${idioma === 'es' ? 'español' : 'inglés'} nada se sale de su caja ni de la página, y cada celda lleva el texto de su cabecera`, async ({ page }) => {
+      await page.addInitScript((elegido) => {
+        localStorage.setItem('app:appearance', JSON.stringify({ language: elegido }));
+      }, idioma);
+      await page.setViewportSize({ width: 360, height: 780 });
+      const api = apiMowaMes();
+      api.conciliaciones.set(
+        1,
+        conciliacionSintetica(1, {
+          por_id: [
+            { mes_id: 990000001, filas: 985, con_correspondencia: 977 },
+            { mes_id: 990000777, filas: 12, con_correspondencia: 0 },
+          ],
+        }),
+      );
+      await montarApiMowaMes(page, api);
+      await page.goto(RUTA);
+      await expect(page.locator('.mm-ids__tabla tbody tr')).toHaveCount(2);
+
+      const geometria = await page.evaluate(() => {
+        const tablas = [...document.querySelectorAll<HTMLTableElement>('.mm-conciliacion__tabla, .mm-ids__tabla')];
+        const fuera = tablas.flatMap((tabla) => {
+          const caja = tabla.closest('.table-scroll')!.getBoundingClientRect();
+          return [...tabla.querySelectorAll('th, td')].filter((n) => {
+            const r = n.getBoundingClientRect();
+            return r.width > 0 && (r.left < caja.left - 0.5 || r.right > caja.right + 0.5);
+          });
+        });
+        // The text of a column's header, by position: what each cell of that column must carry as its label.
+        const cabeceras = (tabla: HTMLTableElement) => [...tabla.querySelectorAll('thead th')].map((th) => th.textContent);
+        const celdas = tablas.flatMap((tabla) =>
+          [...tabla.querySelectorAll('tbody tr')].flatMap((fila) =>
+            [...fila.children].map((celda, i) => ({ etiqueta: (celda as HTMLElement).dataset.etiqueta ?? null, cabecera: cabeceras(tabla)[i] })),
+          ),
+        );
+        const coinciden = document.querySelector<HTMLElement>('.mm-ids__tabla td:nth-child(3)')!;
+        const cajaCoinciden = coinciden.closest('.table-scroll')!;
+        return {
+          pagina: document.documentElement.scrollWidth,
+          vista: window.innerWidth,
+          tablas: tablas.length,
+          fuera: fuera.length,
+          celdas: celdas.length,
+          sinEtiqueta: celdas.filter((c) => c.etiqueta === null || c.etiqueta !== c.cabecera).length,
+          // The label is drawn (the `::before` of the cell), not only an attribute.
+          etiquetaDibujada: getComputedStyle(coinciden, '::before').content,
+          cabeceraCoinciden: cabeceras(coinciden.closest('table') as HTMLTableElement)[2],
+          sinDesplazar: cajaCoinciden.scrollWidth <= cajaCoinciden.clientWidth,
+        };
+      });
+
+      expect(geometria.pagina).toBeLessThanOrEqual(geometria.vista);
+      expect(geometria.tablas).toBe(2);
+      expect(geometria.fuera).toBe(0);
+      expect(geometria.celdas).toBeGreaterThan(0);
+      expect(geometria.sinEtiqueta).toBe(0);
+      expect(geometria.etiquetaDibujada).toBe(`"${geometria.cabeceraCoinciden}"`);
+      expect(geometria.cabeceraCoinciden).toBe(idioma === 'es' ? 'Coinciden con la campaña (cualquier estado)' : 'Match the campaign (any status)');
+      expect(geometria.sinDesplazar).toBe(true);
+    });
+  }
+});
+
 test.describe('S5: id sin correspondencia', () => {
   test('advierte con el ID campaña que no es de esta campaña', async ({ page }) => {
     const api = apiMowaMes();
