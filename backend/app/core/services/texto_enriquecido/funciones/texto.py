@@ -92,6 +92,19 @@ def _cota_reemplazar(entrada: int | None, args: tuple) -> int | None:
     return entrada + apariciones * max(0, len(reemplazo) - len(buscar))
 
 
+def _apellidos(valor: str) -> str:
+    """Lo anterior a la PRIMERA coma, sin espacios en los extremos. Sin coma no hay apellidos."""
+    antes, coma, _ = valor.partition(",")
+    return antes.strip() if coma else ""
+
+
+def _nombres(valor: str) -> str:
+    """Lo posterior a la PRIMERA coma, sin espacios en los extremos. Sin coma, todo el texto
+    recortado: es el supuesto de RF-44 (un titular que no trae coma se trata como nombres)."""
+    _, coma, despues = valor.partition(",")
+    return (despues if coma else valor).strip()
+
+
 def _rellenar_izquierda(valor: str, largo: int, relleno: str) -> str:
     return valor.rjust(largo, relleno)
 
@@ -109,6 +122,9 @@ FUNCIONES = (
     Funcion("minusculas", "texto", (T,), T, _minusculas, cota=_conservar_largo),
     Funcion("capitalizar", "texto", (T,), T, _capitalizar, cota=_conservar_largo),
     Funcion("recortar", "texto", (T,), T, _recortar, cota=_conservar_largo),
+    # Parten un `APELLIDOS,NOMBRES` (el titular de la sabana); ninguna alarga el texto.
+    Funcion("nombres", "texto", (T,), T, _nombres, cota=_conservar_largo),
+    Funcion("apellidos", "texto", (T,), T, _apellidos, cota=_conservar_largo),
     Funcion("sin_tildes", "texto", (T,), T, _sin_tildes, cota=_conservar_largo),
     Funcion("a_gsm7", "texto", (T,), T, a_gsm7, cota=_cota_gsm7),
     Funcion(

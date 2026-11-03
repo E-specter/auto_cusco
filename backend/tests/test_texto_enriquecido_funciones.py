@@ -376,7 +376,7 @@ def test_enlace_whatsapp_con_telefono_vacio_queda_vacio_sin_problema() -> None:
 
 
 def test_cada_funcion_declara_sus_metadatos_completos() -> None:
-    assert len(REGISTRO) == 24
+    assert len(REGISTRO) == 26  # + nombres y apellidos (T-HI-B1)
     for nombre, funcion in REGISTRO.items():
         assert funcion.nombre == nombre
         assert funcion.familia

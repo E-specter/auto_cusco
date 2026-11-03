@@ -136,6 +136,7 @@ Cada función tiene nombre estable, clave i18n para su nombre y descripción, ti
 | | `mayusculas`, `minusculas`, `capitalizar` | texto → texto | — | |
 | | `recortar` | texto → texto | — | Quita espacios de los extremos y colapsa los repetidos |
 | | `sin_tildes` | texto → texto | — | Normalización NFD, igual que la conciliación de MOWA MES |
+| | `nombres`, `apellidos` | texto → texto | — | Parten por la **primera coma** un `APELLIDOS,NOMBRES` y recortan los extremos de cada parte; la `/` entre apellidos se conserva (RF-44). Sin coma, `nombres` devuelve el texto completo y `apellidos` vacío. Cota: la de la entrada |
 | | `a_gsm7` | texto → texto | — | Deja el texto en el alfabeto de un SMS (GSM-7, §24). Cota: el triple de la de entrada (el peor caso es `…`, que pasa de 1 a 3 caracteres) |
 | | `reemplazar(a, b)` | texto → texto | textos | Literal, no expresión regular |
 | | `rellenar_izquierda(n, c)` | texto → texto | n, un carácter | Por ejemplo, DNI con ceros |
