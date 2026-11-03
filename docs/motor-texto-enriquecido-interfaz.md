@@ -442,3 +442,136 @@ Pantalla de MOWA MES (`/mowa-mes/configuracion`): la revisa también `coordinado
 - **F7:** abrir el diálogo, renombrar y ver el nombre nuevo en el campo y en la lista; el 409 bajo el campo, con el diálogo abierto; «Renombrar» inactivo sin cambios; el cuerpo enviado no crea una versión; renombrar desde una versión antigua; axe con el diálogo abierto, en claro y oscuro.
 - **F8:** el aviso nuevo del segmento. (La v1 en solo lectura y «Convertir a v2» se probaron hasta que M-F1 los quitó.) En T-MM-F7: el hint de GSM-7 bajo el editor, y la línea de caracteres borrados, que aparece solo con borrados, sin repetir, y no bloquea guardar.
 - **F6:** la fecha por defecto, con el reloj fijado en la noche de Lima, cuando UTC ya es el día siguiente; `min` sigue a la fecha de corte; el 400 bajo el campo con las dos fechas; la fecha de envío en la vista previa y en la línea del botón; la nota de «hoy» en `/columnas`; axe en `/generar-carga` con el error de fecha.
+
+## 11. Etiqueta, plataforma y textos guardados (T-HI-F1 y T-HI-F2, 2026-11-02)
+
+Reglas de `designer` para las herramientas compartidas del plan WhatsMKT v2: RF-49 ampliado (etiqueta), RF-72 (definiciones con plataforma), RF-73 (celda de texto) y RF-69 (textos guardados). Las implementa `dev_frontend_herramientas_implementadas` y las aprueba `designer` con capturas a 1280 y 360 px, en es y en.
+
+Lo propio de cada plataforma (qué columnas fija y cómo se llaman) lo declara su módulo, y llega en `GET /definiciones-columnas/plataformas`. La pantalla lo lee de ahí y no lo escribe en el código.
+
+### 11.1 Etiqueta de la columna (RF-49)
+
+- **En la fila expandida,** debajo de «Nombre», un `input` opcional «Etiqueta», de hasta 120 caracteres. Hint: «Un nombre para reconocer la columna, por ejemplo «Nombres del titular». No sale en el archivo».
+- **En la lista de columnas,** si la columna tiene etiqueta, va debajo del nombre, en una segunda línea `.field__hint` sin `mono`. Sin etiqueta no se agrega nada. La columna «Nombre» de la tabla sigue mostrando el encabezado del archivo, que es lo que importa al leerla.
+- **En los editores que ofrecen la columna,** como el editor del mensaje de WhatsMKT (RF-WM-27): «MACRO2 · Vencimiento de la cuota». Sin etiqueta, solo el nombre.
+- Una versión guardada sin etiquetas se lee igual, sin aviso ni marca.
+
+### 11.2 Definición con plataforma (RF-72)
+
+- **Al crear,** «Nueva definición» pide, además del nombre, la **Plataforma**: un `select` con «Ninguna (archivo libre)», que es la opción por defecto, y una opción por plataforma registrada, por su etiqueta («WhatsMKT», «MOWA MES»). Hint: «Una plataforma fija algunas columnas y no se cambia después».
+  - Una definición que se crea desde un canal con ir y volver (por ejemplo, desde la campaña de WhatsMKT) llega con la plataforma ya elegida, y el `select` queda inactivo con su valor.
+- **Después de crear,** la plataforma se muestra en la línea de versión, como un `.tag tag--info` con su etiqueta: «Versión 3 · WhatsMKT». No se edita (supuesto de RF-72).
+- **Las reglas, a la vista.** Con plataforma, bajo el encabezado de la definición, va un `.notice--info` de una sola frase, que la pantalla arma desde las reglas registradas:
+  - «WhatsMKT: la 1.ª columna, «número», es fija; las siguientes se llaman por su posición, [$MARCRO1$], [$MARCRO2$]…, y son de texto». Las partes salen de `columnas_fijas`, `encabezado_por_posicion` y `tipo_resto`.
+  - Si `admite_mas_columnas` es falso, se agrega «… y no se agregan más columnas».
+  - No hay reglas escondidas: lo que la pantalla no deja hacer, lo dice esta frase.
+- **Columna fija** (`columnas_fijas`):
+  - En su fila, en lugar de «Quitar» y de las flechas de orden, va un icono `lock`, con `title` y nombre accesible: «Columna fija de WhatsMKT: no se quita ni se mueve». Esos botones no se muestran inactivos: no se ofrecen.
+  - El nombre es de solo lectura (`.input[readonly]`).
+  - El tipo queda fijo: el `select`, inactivo, con su valor.
+  - El contenido se edita si `contenido_editable` es verdadero, y arranca en `contenido_por_defecto` (por ejemplo, `51[@telefono]`).
+  - Con `celda_texto`, el resumen del formato dice «Texto de Excel» (RF-73).
+  - Ninguna columna puede ponerse delante de una fija: «Subir» queda inactivo en la primera fila que no es fija.
+- **Encabezado por posición** (`encabezado_por_posicion`, por ejemplo `[$MARCRO{n}$]`):
+  - Una columna nueva nace con el encabezado de su posición.
+  - **Al mover una columna,** las que todavía tienen su encabezado por defecto se renumeran según su nueva posición. Las que el analista renombró conservan su nombre.
+  - **Si un encabezado editado ya no coincide con su posición,** un `.field__hint` en la fila lo dice: «WhatsMKT toma las columnas por su orden, no por su nombre: esta es la macro 3». La macro sale de la posición, no del nombre (RF-WM-11). Es un aviso, no un problema: el patrón es solo el valor por defecto, y la definición se guarda igual.
+  - Junto al nombre, «Restaurar» (`.btn--sm .btn--quiet`) le devuelve el encabezado de su posición. Solo aparece si el nombre es distinto del de su posición.
+- **Tipo del resto** (`tipo_resto`): el `select` de tipo queda inactivo con ese tipo, y el hint de la fila dice «En WhatsMKT las macros son siempre texto: el valor sale ya formateado».
+- **Problemas de la plataforma:** la validación los devuelve con su columna y su regla (B2), y se muestran bajo la columna como cualquier otro problema (§4), con el texto de su código. Con un problema de plataforma no se guarda.
+- **Plataforma que ya no existe:** si la definición guardada declara una plataforma que no está registrada, el tag dice «Plataforma desconocida: {clave}», en `tag--advertencia`, y el problema de la validación va arriba, en el resumen (§9.4). La definición se lee y se genera como está.
+- **A 360 px** la tabla se apila (`.table--apilable-ancha`), y el candado de una columna fija ocupa el lugar de las acciones, con su texto visible: «Columna fija».
+
+### 11.3 Textos guardados (RF-69)
+
+Un componente reutilizable, `TextosGuardados`, para administrar los textos de un contexto. El primero en usarlo es WhatsMKT, con `whatsmkt.mensaje` ([whatsmkt-interfaz.md](whatsmkt-interfaz.md)). Sigue el patrón de la administración del speech de MOWA MES ([mowa-mes-interfaz.md](mowa-mes-interfaz.md) §4.5), que no migra a esta capacidad.
+
+```ts
+const textos = montarTextosGuardados(raiz, {
+  contexto: 'whatsmkt.mensaje',
+  editor,            // cómo se edita el contenido: lo pone el módulo (un textarea, un EditorTexto…)
+  titulo,            // por ejemplo, «Mensajes globales»
+});
+textos.destruir();
+```
+
+- **Estructura,** dentro de un `.panel`:
+  - Un `select` «Texto», con los habilitados por su nombre. Si el contexto agrega algo propio, como el segmento, se muestra con el nombre: «Preventivo · versión 2».
+  - Al lado, «Nuevo» (`plus`) y las acciones del elegido: «Renombrar» (`pencil`), «Deshabilitar» (`power-off`) y «Eliminar» (`trash-2`, rojo). «Eliminar» solo aparece si ninguna versión se usó. Si alguna se usó, en su lugar va el motivo: «No se puede eliminar: lo usaron campañas. Puedes deshabilitarlo».
+  - La línea de versión, «Versión 3» o «Versión 3 · usada en 2 campañas», con un `select` de las versiones anteriores para verlas en solo lectura, como en §5.1.
+  - El editor, que pone el módulo.
+  - El pie, con «Guardar» (`save`, `.btn--primary`) y «Descartar cambios». Las versiones no tienen nombre propio. Bajo «Guardar» va el hint de siempre: «Al guardar se crea la versión 4; la 3 no cambia».
+- **Nuevo:** abre el editor vacío, con un campo «Nombre» arriba. Al guardar se crea el texto con su versión 1.
+- **Renombrar:** el diálogo de §10.1, con «Nombre nuevo» y el error de nombre repetido bajo el campo. No crea una versión.
+- **Deshabilitados:** bajo el panel, un `<details>` cerrado, «Deshabilitados (N)», que con cero no se muestra. Cada uno lleva su nombre, un `.tag tag--neutral` «Deshabilitado» (`power-off`), «Ver» (en solo lectura), «Habilitar» (`power`) y, si se puede, «Eliminar». Es el patrón de MOWA MES §4.5.
+- **Cambios sin guardar:** cambiar de texto o de versión, o salir, pide confirmar con el diálogo de siempre del selector: «Hay cambios sin guardar», «Los cambios que no guardaste se pierden» y «Descartar cambios».
+- **Problemas del contenido:** los devuelve el validador del contexto y van bajo el editor, por su código, con los textos del módulo dueño del contexto.
+- **Accesibilidad:**
+  - El `select` y los botones llevan nombres con el texto elegido: «Renombrar «Preventivo»».
+  - Cada resultado (guardado, renombrado, deshabilitado, habilitado o eliminado) se anuncia en la región `role="status"` del panel.
+  - El foco vuelve al control que pidió la acción o, si desapareció, al `select`.
+
+### 11.4 Textos (es / en)
+
+| Clave | es | en |
+|---|---|---|
+| `columnas.etiqueta` | Etiqueta | Label |
+| `columnas.etiqueta.hint` | Un nombre para reconocer la columna, por ejemplo «Nombres del titular». No sale en el archivo. | A name to recognise the column, for example “Holder's first names”. It does not go into the file. |
+| `columnas.plataforma` | Plataforma | Platform |
+| `columnas.plataforma.ninguna` | Ninguna (archivo libre) | None (free file) |
+| `columnas.plataforma.hint` | Una plataforma fija algunas columnas y no se cambia después. | A platform fixes some columns and cannot be changed later. |
+| `columnas.plataforma.desconocida` | Plataforma desconocida: {clave} | Unknown platform: {clave} |
+| `columnas.plataforma.fija` | Columna fija de {plataforma}: no se quita ni se mueve. | Fixed {plataforma} column: it cannot be removed or moved. |
+| `columnas.plataforma.fijaCorta` | Columna fija | Fixed column |
+| `columnas.plataforma.reglas.fijas` | la {posicion}.ª columna, «{nombre}», es fija | column {posicion}, “{nombre}”, is fixed |
+| `columnas.plataforma.reglas.posicion` | las siguientes se llaman por su posición, {ejemplo}… | the next ones are named by position, {ejemplo}… |
+| `columnas.plataforma.reglas.tipo` | y son de {tipo} | and are {tipo} |
+| `columnas.plataforma.reglas.sinMas` | y no se agregan más columnas | and no more columns can be added |
+| `columnas.plataforma.porPosicion` | {plataforma} toma las columnas por su orden, no por su nombre: esta es la macro {n}. | {plataforma} takes the columns by order, not by name: this is macro {n}. |
+| `columnas.plataforma.restaurar` | Restaurar | Restore |
+| `columnas.plataforma.tipoFijo` | En {plataforma} las macros son siempre texto: el valor sale ya formateado. | In {plataforma} macros are always text: the value goes out already formatted. |
+| `columnas.formato.celdaTexto` | Texto de Excel | Excel text |
+| `textosGuardados.texto` | Texto | Text |
+| `textosGuardados.nuevo` | Nuevo | New |
+| `textosGuardados.nombre` | Nombre | Name |
+| `textosGuardados.version` | Versión {n} | Version {n} |
+| `textosGuardados.versionUsada` | Versión {n} · usada en {usos} campañas | Version {n} · used in {usos} campaigns |
+| `textosGuardados.versionUsadaUna` | Versión {n} · usada en 1 campaña | Version {n} · used in 1 campaign |
+| `textosGuardados.guardarHint` | Al guardar se crea la versión {nueva}; la {actual} no cambia. | Saving creates version {nueva}; version {actual} does not change. |
+| `textosGuardados.guardarHintPrimera` | Al guardar se crea la versión 1. | Saving creates version 1. |
+| `textosGuardados.renombrarPara` | Renombrar «{nombre}» | Rename “{nombre}” |
+| `textosGuardados.deshabilitarPara` | Deshabilitar «{nombre}» | Disable “{nombre}” |
+| `textosGuardados.habilitarPara` | Habilitar «{nombre}» | Enable “{nombre}” |
+| `textosGuardados.eliminarPara` | Eliminar «{nombre}» | Delete “{nombre}” |
+| `textosGuardados.noEliminable` | No se puede eliminar: lo usaron campañas. Puedes deshabilitarlo. | It cannot be deleted: campaigns used it. You can disable it. |
+| `textosGuardados.deshabilitados` | Deshabilitados ({n}) | Disabled ({n}) |
+| `textosGuardados.deshabilitado` | Deshabilitado | Disabled |
+| `textosGuardados.guardado` | Se guardó la versión {n} de «{nombre}». | Version {n} of “{nombre}” was saved. |
+| `textosGuardados.creado` | Se creó «{nombre}». | “{nombre}” was created. |
+| `textosGuardados.renombrado` | Renombrado a «{nombre}». | Renamed to “{nombre}”. |
+| `textosGuardados.deshabilitadoAviso` | Se deshabilitó «{nombre}». Ya no se ofrece para lo nuevo. | “{nombre}” was disabled. It is no longer offered for new items. |
+| `textosGuardados.habilitado` | Se habilitó «{nombre}». | “{nombre}” was enabled. |
+| `textosGuardados.eliminado` | Se eliminó «{nombre}». | “{nombre}” was deleted. |
+| `textosGuardados.nombreRepetido` | Ya existe un texto con ese nombre. Elige otro. | A text with that name already exists. Choose another one. |
+
+- Los nombres de citas usan las comillas del idioma, con `camposAdicionales.nombreCitado`.
+- «campañas» en `versionUsada` es lo que usa WhatsMKT, el primer contexto. Si otro contexto cuenta otra cosa, el contexto pasa su propio texto.
+- La confirmación de eliminar usa §4.6 de [mowa-mes-interfaz.md](mowa-mes-interfaz.md), con la casilla obligatoria. El título y el cuerpo los pone cada contexto: los de WhatsMKT están en su documento.
+
+### 11.5 Pruebas mínimas
+
+- **T-HI-F1:**
+  - la etiqueta se guarda, se ve bajo el nombre y en el editor que ofrece la columna, y una versión sin etiquetas se lee igual;
+  - la plataforma se elige al crear, aparece como tag en la línea de versión, y la frase de reglas se arma desde `GET /definiciones-columnas/plataformas`;
+  - una columna fija no se quita ni se mueve, lleva su candado, y tiene el nombre de solo lectura y el tipo fijo;
+  - los encabezados por posición se renumeran al mover, uno editado se conserva con su hint, y «Restaurar» lo devuelve a su posición;
+  - un problema de plataforma va bajo su columna y bloquea guardar, y una plataforma desconocida se lee y se marca;
+  - sin plataforma, todo igual que hoy;
+  - axe en claro, oscuro y 360 px, con una definición WhatsMKT abierta.
+- **T-HI-F2:**
+  - crear, guardar una versión y ver una anterior en solo lectura;
+  - renombrar, con el error de nombre repetido;
+  - deshabilitar y habilitar;
+  - eliminar con la casilla, y el motivo cuando no se puede;
+  - la confirmación de cambios sin guardar;
+  - axe en claro, oscuro y 360 px.
