@@ -457,7 +457,7 @@ import '../styles/columnas.css';
     agruparProblemas,
     destinoDeProblema,
     ejemploFinanciero,
-    resumenDeContenido,
+    textoDeContenido,
   } from '../lib/constructor-pantalla';
   import {
     activarSegmentacion,
@@ -1626,8 +1626,6 @@ import '../styles/columnas.css';
     return base === t('columnas.formato.ninguno') ? excel : `${base} · ${excel}`;
   }
 
-  const MAXIMO_RESUMEN = 60;
-
   /**
    * What the backend's preview says this column gives for the example record, when the preview is
    * up to date: the screen evaluates nothing itself. `null` when there is none to read.
@@ -1640,27 +1638,9 @@ import '../styles/columnas.css';
     return texto === undefined || texto === '' ? null : texto.replace(/\s+/g, ' ');
   }
 
-  function textoDeContenido(columna: Borrador['columnas'][number]): { texto: string; vacio: boolean } {
-    const resumen = resumenDeContenido(columna.expresion, etiquetaDe, MAXIMO_RESUMEN);
-    let texto: string;
-    if (resumen.modo === 'vacio') texto = t('columnas.contenido.vacio');
-    else if (resumen.modo === 'variable') {
-      texto = resumen.funciones
-        ? t('columnas.contenido.variableConFunciones', { variable: resumen.variable, n: resumen.funciones })
-        : t('columnas.contenido.variable', { variable: resumen.variable });
-    } else {
-      const resultado = resultadoDeEjemplo(columna.id);
-      const fuente = resultado ?? resumen.fragmento;
-      const recortado = resultado !== null ? resultado.length > MAXIMO_RESUMEN : resumen.recortado;
-      texto = t(recortado ? 'columnas.contenido.textoRecortado' : 'columnas.contenido.texto', {
-        fragmento: fuente.length > MAXIMO_RESUMEN ? fuente.slice(0, MAXIMO_RESUMEN) : fuente,
-      });
-    }
-    if (columna.variantes.length) {
-      texto += ` · ${t(columna.variantes.length === 1 ? 'columnas.variantes.uno' : 'columnas.variantes.otras', { n: columna.variantes.length })}`;
-    }
-    return { texto, vacio: resumen.modo === 'vacio' };
-  }
+  /** The sentence of the column's content in its row: the shared one (`lib/constructor-pantalla.ts`), with the preview's result in hand. */
+  const resumenDeLaColumna = (columna: Borrador['columnas'][number]) =>
+    textoDeContenido(columna, etiquetaDe, resultadoDeEjemplo(columna.id));
 
   function refrescarResumenes(): void {
     for (const columna of estado.borrador.columnas) actualizarFila(columna.id);
@@ -1673,7 +1653,7 @@ import '../styles/columnas.css';
     const columna = estado.borrador.columnas.find((c) => c.id === id);
     const fila = el.filas.querySelector<HTMLTableRowElement>(`tr[data-columna="${id}"]`);
     if (!columna || !fila) return;
-    const contenido = textoDeContenido(columna);
+    const contenido = resumenDeLaColumna(columna);
     const celdaContenido = fila.querySelector<HTMLElement>('[data-celda="contenido"]');
     if (celdaContenido) {
       if (celdaContenido.firstChild) celdaContenido.firstChild.textContent = contenido.texto;
@@ -1879,7 +1859,7 @@ import '../styles/columnas.css';
         celdaTipo.append(ayuda);
       }
 
-      const contenido = textoDeContenido(columna);
+      const contenido = resumenDeLaColumna(columna);
       const celdaContenido = celdaDe(
         fila,
         t('columnas.col.contenido'),

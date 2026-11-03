@@ -9,6 +9,7 @@
 
 import type { ProblemaDefinicion } from './api-definiciones';
 import type { Borrador, Expresion, FormatoFinanciero } from './constructor-columnas';
+import { t } from './i18n';
 import { estaVacia } from './variantes';
 
 // ---- Where a problem belongs --------------------------------------------------------------
@@ -104,6 +105,45 @@ export function resumenDeContenido(
   texto = texto.replace(/\s+/g, ' ');
   const recortado = texto.length > maximo;
   return { modo: 'texto', fragmento: recortado ? texto.slice(0, maximo) : texto, variables, recortado };
+}
+
+/** How many characters of a text the summary of a column shows before it cuts it. */
+export const MAXIMO_RESUMEN = 60;
+
+/**
+ * The sentence a list says of a column's content (`columnas.contenido.*`): «Variable: Teléfono», «Texto: Hola…», «Sin contenido»,
+ * with « · 2 variantes» after it when the column varies by segment. It is what the column-builder shows in each row, and a
+ * screen that lists the same columns (the campaign of a channel) says it the same way. Pure: the screen hands in how a variable is
+ * called (`etiquetaDe`) and, if it has it, `resultado`.
+ *
+ * `resultado` is what the backend's preview gives for this column with the example record, when it is up to date: for a composed text
+ * the summary shows it instead of the raw start of the text, because what the analyst reads is what goes out. Nothing here evaluates:
+ * `null` (the default) is the start of the text itself. A direct variable and an empty column ignore it.
+ */
+export function textoDeContenido(
+  columna: { expresion: Expresion; variantes: readonly unknown[] },
+  etiquetaDe: (nombre: string) => string,
+  resultado: string | null = null,
+  maximo: number = MAXIMO_RESUMEN,
+): { texto: string; vacio: boolean } {
+  const resumen = resumenDeContenido(columna.expresion, etiquetaDe, maximo);
+  let texto: string;
+  if (resumen.modo === 'vacio') texto = t('columnas.contenido.vacio');
+  else if (resumen.modo === 'variable') {
+    texto = resumen.funciones
+      ? t('columnas.contenido.variableConFunciones', { variable: resumen.variable, n: resumen.funciones })
+      : t('columnas.contenido.variable', { variable: resumen.variable });
+  } else {
+    const fuente = resultado ?? resumen.fragmento;
+    const recortado = resultado !== null ? resultado.length > maximo : resumen.recortado;
+    texto = t(recortado ? 'columnas.contenido.textoRecortado' : 'columnas.contenido.texto', {
+      fragmento: fuente.length > maximo ? fuente.slice(0, maximo) : fuente,
+    });
+  }
+  if (columna.variantes.length) {
+    texto += ` · ${t(columna.variantes.length === 1 ? 'columnas.variantes.uno' : 'columnas.variantes.otras', { n: columna.variantes.length })}`;
+  }
+  return { texto, vacio: resumen.modo === 'vacio' };
 }
 
 // ---- Format example ---------------------------------------------------------------------------
