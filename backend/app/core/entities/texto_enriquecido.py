@@ -89,6 +89,8 @@ class CodigoTexto(StrEnum):
     # Una regla propia del contexto de un texto guardado (RF-69). El texto de respaldo es generico;
     # el real lo pone el modulo en su clave `<modulo>.codigo.<codigo_contexto>`.
     REGLA_DEL_CONTEXTO = "regla_del_contexto"
+    # Los proximos dias gestionables (RF-71)
+    PROXIMOS_FUERA_DE_RANGO = "proximos_fuera_de_rango"  # N no esta entre 1 y el tope
 
 
 @dataclass(frozen=True)

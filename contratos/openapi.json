@@ -2282,7 +2282,7 @@
           "calendario"
         ],
         "summary": "Siguiente Dia Gestionable",
-        "description": "Primer dia de lunes a viernes, posterior a `desde`, que no es feriado ni decretado.",
+        "description": "Primer dia de lunes a sabado, posterior a `desde`, que no es feriado ni decretado.",
         "operationId": "siguiente_dia_gestionable_calendario_siguiente_dia_gestionable_get",
         "parameters": [
           {
@@ -2310,6 +2310,76 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SiguienteDiaRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calendario/proximos": {
+      "get": {
+        "tags": [
+          "calendario"
+        ],
+        "summary": "Proximos Dias Gestionables",
+        "description": "Los `n` siguientes dias gestionables (de lunes a sabado, sin feriados ni dias no laborables\nregistrados) posteriores a `desde`, que por defecto es hoy en Lima (RF-71). `n` va de 1 al tope\nconfigurado; fuera de ese rango, `400` con `codigo = proximos_fuera_de_rango` y el rango.",
+        "operationId": "proximos_dias_gestionables_calendario_proximos_get",
+        "parameters": [
+          {
+            "name": "n",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "N"
+            }
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProximosRespuesta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`n` fuera de rango: el codigo es proximos_fuera_de_rango y trae `minimo` y `maximo`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorProximos"
                 }
               }
             }
@@ -7305,7 +7375,8 @@
           "texto_guardado_usado",
           "texto_guardado_deshabilitado",
           "contexto_guardado_desconocido",
-          "regla_del_contexto"
+          "regla_del_contexto",
+          "proximos_fuera_de_rango"
         ],
         "title": "CodigoTexto",
         "description": "Catalogo de codigos que el frontend traducira como `textoEnriquecido.codigo.<codigo>`.\n\nUn codigo por linea, con la forma `NOMBRE = \"codigo\"`: la prueba espejo del\nfrontend lee esta clase. Los primeros se detectan al compilar (una expresion\ninvalida no procesa ninguna fila); los siguientes, al evaluar una fila concreta; al final,\nlos que solo informa la API del motor (B4a): lo que no se puede leer, el contexto o el\nproducto que no existen, y por que una expresion no tiene largo maximo."
@@ -9403,6 +9474,53 @@
         ],
         "title": "DetalleErrorMapeo",
         "description": "Un `422` al confirmar: el motivo, el `codigo` (`mapeo_con_problemas`) y todos los problemas\nde las asignaciones (RF-60)."
+      },
+      "DetalleErrorProximos": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "codigo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodigoTexto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "minimo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimo"
+          },
+          "maximo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "codigo"
+        ],
+        "title": "DetalleErrorProximos",
+        "description": "Un `400` por un `n` fuera de rango: `minimo` y `maximo` viajan como campos propios."
       },
       "DetalleErrorSpeech": {
         "properties": {
@@ -13378,6 +13496,34 @@
         ],
         "title": "Programacion",
         "description": "Modalidades de envio de RF-MM-07."
+      },
+      "ProximosRespuesta": {
+        "properties": {
+          "desde": {
+            "type": "string",
+            "format": "date",
+            "title": "Desde"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N"
+          },
+          "fechas": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Fechas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "desde",
+          "n",
+          "fechas"
+        ],
+        "title": "ProximosRespuesta"
       },
       "RangoEntrada": {
         "properties": {

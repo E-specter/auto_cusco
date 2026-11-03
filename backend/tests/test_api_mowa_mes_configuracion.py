@@ -94,7 +94,7 @@ def test_siguiente_dia_gestionable_desde_hoy_y_desde_una_fecha(cliente) -> None:
     ).json()
 
     assert hoy == {"desde": "2026-09-13", "fecha": "2026-09-15"}  # el 14 esta decretado
-    assert semana_santa == {"desde": "2026-04-01", "fecha": "2026-04-06"}
+    assert semana_santa == {"desde": "2026-04-01", "fecha": "2026-04-04"}  # el sabado se envia
 
 
 def test_ciclo_de_excepciones(cliente) -> None:

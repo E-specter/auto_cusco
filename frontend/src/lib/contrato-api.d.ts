@@ -628,9 +628,31 @@ export interface paths {
         };
         /**
          * Siguiente Dia Gestionable
-         * @description Primer dia de lunes a viernes, posterior a `desde`, que no es feriado ni decretado.
+         * @description Primer dia de lunes a sabado, posterior a `desde`, que no es feriado ni decretado.
          */
         get: operations["siguiente_dia_gestionable_calendario_siguiente_dia_gestionable_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendario/proximos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Proximos Dias Gestionables
+         * @description Los `n` siguientes dias gestionables (de lunes a sabado, sin feriados ni dias no laborables
+         *     registrados) posteriores a `desde`, que por defecto es hoy en Lima (RF-71). `n` va de 1 al tope
+         *     configurado; fuera de ese rango, `400` con `codigo = proximos_fuera_de_rango` y el rango.
+         */
+        get: operations["proximos_dias_gestionables_calendario_proximos_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2225,7 +2247,7 @@ export interface components {
          *     producto que no existen, y por que una expresion no tiene largo maximo.
          * @enum {string}
          */
-        CodigoTexto: "expresion_invalida" | "definicion_invalida" | "sintaxis_invalida" | "referencia_vacia" | "variable_desconocida" | "funcion_desconocida" | "parametro_invalido" | "tipo_incompatible" | "limite_excedido" | "no_se_puede_escribir_como_texto" | "sin_segmento" | "variable_obligatoria_vacia" | "argumento_vacio" | "division_por_cero" | "no_es_numero" | "no_es_fecha" | "telefono_invalido" | "resultado_fuera_de_rango" | "valor_no_convertible" | "sin_cota_variable" | "sin_cota_funcion" | "contexto_desconocido" | "producto_no_encontrado" | "sin_version_vigente" | "definicion_no_encontrada" | "version_no_encontrada" | "nombre_repetido" | "seleccion_no_encontrada" | "fecha_envio_anterior" | "plataforma_desconocida" | "plataforma_columna_fija_ausente" | "plataforma_columna_fija_movida" | "plataforma_tipo_de_columna_fija" | "plataforma_tipo_del_resto" | "plataforma_columnas_de_mas" | "texto_guardado_invalido" | "texto_guardado_no_encontrado" | "texto_guardado_usado" | "texto_guardado_deshabilitado" | "contexto_guardado_desconocido" | "regla_del_contexto";
+        CodigoTexto: "expresion_invalida" | "definicion_invalida" | "sintaxis_invalida" | "referencia_vacia" | "variable_desconocida" | "funcion_desconocida" | "parametro_invalido" | "tipo_incompatible" | "limite_excedido" | "no_se_puede_escribir_como_texto" | "sin_segmento" | "variable_obligatoria_vacia" | "argumento_vacio" | "division_por_cero" | "no_es_numero" | "no_es_fecha" | "telefono_invalido" | "resultado_fuera_de_rango" | "valor_no_convertible" | "sin_cota_variable" | "sin_cota_funcion" | "contexto_desconocido" | "producto_no_encontrado" | "sin_version_vigente" | "definicion_no_encontrada" | "version_no_encontrada" | "nombre_repetido" | "seleccion_no_encontrada" | "fecha_envio_anterior" | "plataforma_desconocida" | "plataforma_columna_fija_ausente" | "plataforma_columna_fija_movida" | "plataforma_tipo_de_columna_fija" | "plataforma_tipo_del_resto" | "plataforma_columnas_de_mas" | "texto_guardado_invalido" | "texto_guardado_no_encontrado" | "texto_guardado_usado" | "texto_guardado_deshabilitado" | "contexto_guardado_desconocido" | "regla_del_contexto" | "proximos_fuera_de_rango";
         /**
          * CodigoWhatsmkt
          * @description Codigos de error del modulo; el frontend los traduce como `whatsmkt.codigo.<codigo>`.
@@ -3050,6 +3072,19 @@ export interface components {
             codigo: components["schemas"]["CodigoErrorMapeador"];
             /** Problemas */
             problemas: components["schemas"]["ProblemaMapeoRespuesta"][];
+        };
+        /**
+         * DetalleErrorProximos
+         * @description Un `400` por un `n` fuera de rango: `minimo` y `maximo` viajan como campos propios.
+         */
+        DetalleErrorProximos: {
+            /** Detail */
+            detail: string;
+            codigo: components["schemas"]["CodigoTexto"] | null;
+            /** Minimo */
+            minimo?: number | null;
+            /** Maximo */
+            maximo?: number | null;
         };
         /**
          * DetalleErrorSpeech
@@ -4633,6 +4668,18 @@ export interface components {
          * @enum {string}
          */
         Programacion: "enviar_ahora" | "hora_determinada" | "diferentes_horas";
+        /** ProximosRespuesta */
+        ProximosRespuesta: {
+            /**
+             * Desde
+             * Format: date
+             */
+            desde: string;
+            /** N */
+            n: number;
+            /** Fechas */
+            fechas: string[];
+        };
         /** RangoEntrada */
         RangoEntrada: {
             /** Clave */
@@ -7010,6 +7057,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SiguienteDiaRespuesta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    proximos_dias_gestionables_calendario_proximos_get: {
+        parameters: {
+            query: {
+                n: number;
+                desde?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProximosRespuesta"];
+                };
+            };
+            /** @description `n` fuera de rango: el codigo es proximos_fuera_de_rango y trae `minimo` y `maximo` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorProximos"];
                 };
             };
             /** @description Validation Error */

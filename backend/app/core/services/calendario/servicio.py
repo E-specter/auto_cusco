@@ -1,49 +1,67 @@
-"""Caso de uso: siguiente dia gestionable y excepciones del calendario (RF-MM-08).
+"""Caso de uso: dias gestionables y excepciones del calendario (RF-MM-08, RF-70, RF-71).
 
-Un dia es gestionable si cae de lunes a viernes y no es un dia no laborable:
-feriado de ley no retirado o dia agregado por decreto. "Siguiente" es
-estrictamente posterior a la fecha de partida, que por defecto es hoy en
+Un dia es gestionable si cae de lunes a sabado y no es un dia no laborable: feriado de ley no
+retirado o dia agregado por decreto. Solo el domingo no se envia gestion (decision del usuario,
+2026-11-02); un feriado o un dia registrado que cae en sabado tampoco es gestionable. "Siguiente" y
+"proximos" son estrictamente posteriores a la fecha de partida, que por defecto es hoy en
 America/Lima.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from app.core.entities.calendario import (
     LARGO_MAXIMO_DESCRIPCION,
+    MAXIMO_PROXIMOS_POR_DEFECTO,
     ZONA_HORARIA,
     DiaNoLaborable,
     ExcepcionCalendario,
     ExcepcionInvalida,
     ExcepcionNoEncontrada,
     OrigenDia,
+    ProximosFueraDeRango,
     TipoExcepcion,
 )
 from app.core.ports.repositorio_calendario_port import RepositorioCalendarioPort
 from app.core.services.calendario.reglas import feriados_de_ley
 
 ZONA = ZoneInfo(ZONA_HORARIA)
-_SABADO = 5
+_DOMINGO = 6
+MINIMO_PROXIMOS = 1
 
 
 def ahora_en_lima() -> datetime:
     return datetime.now(ZONA)
 
 
-def siguiente_dia_gestionable(desde: date, no_laborables: Callable[[int], set[date]]) -> date:
-    """Primer dia de lunes a viernes, posterior a `desde`, que no es no laborable.
+def dias_gestionables(desde: date, no_laborables: Callable[[int], set[date]]) -> Iterator[date]:
+    """Los dias gestionables posteriores a `desde`, en orden y sin fin: de lunes a sabado, menos
+    los no laborables.
 
-    `no_laborables(anio)` devuelve las fechas no laborables de ese ano.
+    `no_laborables(anio)` devuelve las fechas no laborables de ese ano; se pide una vez por ano.
     """
     por_anio: dict[int, set[date]] = {}
     dia = desde + timedelta(days=1)
     while True:
         if dia.year not in por_anio:
             por_anio[dia.year] = no_laborables(dia.year)
-        if dia.weekday() < _SABADO and dia not in por_anio[dia.year]:
-            return dia
+        if dia.weekday() != _DOMINGO and dia not in por_anio[dia.year]:
+            yield dia
         dia += timedelta(days=1)
+
+
+def siguiente_dia_gestionable(desde: date, no_laborables: Callable[[int], set[date]]) -> date:
+    """Primer dia de lunes a sabado, posterior a `desde`, que no es no laborable."""
+    return next(dias_gestionables(desde, no_laborables))
+
+
+def proximos_dias_gestionables(
+    desde: date, n: int, no_laborables: Callable[[int], set[date]]
+) -> list[date]:
+    """Los `n` primeros dias gestionables posteriores a `desde` (el primero es el siguiente)."""
+    dias = dias_gestionables(desde, no_laborables)
+    return [next(dias) for _ in range(n)]
 
 
 class CalendarioService:
@@ -51,9 +69,11 @@ class CalendarioService:
         self,
         repositorio: RepositorioCalendarioPort,
         reloj: Callable[[], datetime] = ahora_en_lima,
+        maximo_proximos: int = MAXIMO_PROXIMOS_POR_DEFECTO,
     ) -> None:
         self._repositorio = repositorio
         self._reloj = reloj
+        self._maximo_proximos = maximo_proximos
 
     def hoy(self) -> date:
         """Fecha actual en America/Lima, aunque el servidor corra en otra zona."""
@@ -86,6 +106,15 @@ class CalendarioService:
 
     def siguiente_dia_gestionable(self, desde: date | None = None) -> date:
         return siguiente_dia_gestionable(desde or self.hoy(), self.fechas_no_laborables)
+
+    def proximos_dias_gestionables(self, n: int, desde: date | None = None) -> list[date]:
+        """Los `n` siguientes dias gestionables posteriores a `desde` (por defecto, hoy en Lima).
+
+        `n` va de 1 al tope configurado (RF-71); fuera de ese rango lanza `ProximosFueraDeRango`.
+        """
+        if not MINIMO_PROXIMOS <= n <= self._maximo_proximos:
+            raise ProximosFueraDeRango(n, MINIMO_PROXIMOS, self._maximo_proximos)
+        return proximos_dias_gestionables(desde or self.hoy(), n, self.fechas_no_laborables)
 
     def listar_excepciones(self) -> list[ExcepcionCalendario]:
         return self._repositorio.listar_excepciones()

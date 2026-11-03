@@ -12,6 +12,9 @@ from enum import StrEnum
 
 ZONA_HORARIA = "America/Lima"
 LARGO_MAXIMO_DESCRIPCION = 200
+# Cuantos dias gestionables se ofrecen como maximo al programar un envio (RF-71, RF-32). La unica
+# fuente del numero: `Settings` lo valida y el servicio lo usa.
+MAXIMO_PROXIMOS_POR_DEFECTO = 31
 
 
 class TipoExcepcion(StrEnum):
@@ -52,6 +55,16 @@ class DiaNoLaborable:
     descripcion: str
     origen: OrigenDia
     retirado: bool = False
+
+
+class ProximosFueraDeRango(Exception):
+    """El N de los proximos dias gestionables no esta entre 1 y el tope (RF-71)."""
+
+    def __init__(self, pedido: int, minimo: int, maximo: int) -> None:
+        super().__init__(f"Se pidieron {pedido} dias; N va de {minimo} a {maximo}")
+        self.pedido = pedido
+        self.minimo = minimo
+        self.maximo = maximo
 
 
 class ExcepcionInvalida(Exception):

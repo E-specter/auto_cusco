@@ -1,24 +1,27 @@
-"""Adaptador de entrada HTTP del calendario laboral (RF-MM-08).
+"""Adaptador de entrada HTTP del calendario laboral (RF-MM-08, RF-70, RF-71).
 
     GET    /calendario/feriados?anio=           dias no laborables del ano (ley y agregados)
     GET    /calendario/excepciones              excepciones guardadas
     POST   /calendario/excepciones              agregar un dia decretado o retirar un feriado
     DELETE /calendario/excepciones/{fecha}      quitar una excepcion
     GET    /calendario/siguiente-dia-gestionable?desde=
+    GET    /calendario/proximos?desde=&n=       los n siguientes dias gestionables (RF-71)
 
-Los feriados de ley se calculan para cualquier ano; solo las excepciones se
-guardan. Sin `anio` ni `desde`, se usa la fecha actual en America/Lima.
+Un dia es gestionable de lunes a sabado, salvo feriados y dias no laborables registrados: solo el
+domingo no se envia gestion. Los feriados de ley se calculan para cualquier ano; solo las
+excepciones se guardan. Sin `anio` ni `desde`, se usa la fecha actual en America/Lima.
 """
 
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.adapters.persistence.db import get_engine
 from app.adapters.persistence.repositorio_calendario_postgres import RepositorioCalendarioPostgres
-from app.api.errores import respuestas_de_error
+from app.api.errores import DetalleErrorConCodigo, ErrorConCodigo, respuestas_de_error
 from app.api.respuestas import ModeloRespuesta
+from app.core.config import get_settings
 from app.core.entities.calendario import (
     LARGO_MAXIMO_DESCRIPCION,
     ExcepcionCalendario,
@@ -26,8 +29,10 @@ from app.core.entities.calendario import (
     ExcepcionNoEncontrada,
     ExcepcionRepetida,
     OrigenDia,
+    ProximosFueraDeRango,
     TipoExcepcion,
 )
+from app.core.entities.texto_enriquecido import CodigoTexto
 from app.core.services.calendario.servicio import CalendarioService
 
 router = APIRouter(prefix="/calendario", tags=["calendario"])
@@ -38,7 +43,10 @@ ANIO_MAXIMO = 2999
 
 def obtener_servicio_calendario() -> CalendarioService:
     """Dependencia de FastAPI; los tests la sustituyen por un doble de prueba."""
-    return CalendarioService(RepositorioCalendarioPostgres(get_engine()))
+    return CalendarioService(
+        RepositorioCalendarioPostgres(get_engine()),
+        maximo_proximos=get_settings().maximo_proximos_dias,
+    )
 
 
 class DiaNoLaborableRespuesta(ModeloRespuesta):
@@ -69,6 +77,21 @@ class ExcepcionRespuesta(ModeloRespuesta):
 class SiguienteDiaRespuesta(ModeloRespuesta):
     desde: date
     fecha: date
+
+
+class ProximosRespuesta(ModeloRespuesta):
+    desde: date
+    n: int
+    fechas: list[date]  # en orden estricto; la primera es el siguiente dia gestionable
+
+
+class DetalleErrorProximos(DetalleErrorConCodigo):
+    """Un `400` por un `n` fuera de rango: `minimo` y `maximo` viajan como campos propios."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=False)
+
+    minimo: int | None = None
+    maximo: int | None = None
 
 
 def _excepcion(excepcion: ExcepcionCalendario) -> ExcepcionRespuesta:
@@ -148,6 +171,40 @@ def siguiente_dia_gestionable(
     desde: date | None = None,
     servicio: CalendarioService = Depends(obtener_servicio_calendario),
 ) -> SiguienteDiaRespuesta:
-    """Primer dia de lunes a viernes, posterior a `desde`, que no es feriado ni decretado."""
+    """Primer dia de lunes a sabado, posterior a `desde`, que no es feriado ni decretado."""
     desde = desde or servicio.hoy()
     return SiguienteDiaRespuesta(desde=desde, fecha=servicio.siguiente_dia_gestionable(desde))
+
+
+@router.get(
+    "/proximos",
+    response_model=ProximosRespuesta,
+    responses={
+        400: {
+            "model": DetalleErrorProximos,
+            "description": (
+                "`n` fuera de rango: el codigo es proximos_fuera_de_rango y trae `minimo` y "
+                "`maximo`"
+            ),
+        }
+    },
+)
+def proximos_dias_gestionables(
+    n: int,
+    desde: date | None = None,
+    servicio: CalendarioService = Depends(obtener_servicio_calendario),
+) -> ProximosRespuesta:
+    """Los `n` siguientes dias gestionables (de lunes a sabado, sin feriados ni dias no laborables
+    registrados) posteriores a `desde`, que por defecto es hoy en Lima (RF-71). `n` va de 1 al tope
+    configurado; fuera de ese rango, `400` con `codigo = proximos_fuera_de_rango` y el rango."""
+    desde = desde or servicio.hoy()
+    try:
+        fechas = servicio.proximos_dias_gestionables(n, desde)
+    except ProximosFueraDeRango as error:
+        raise ErrorConCodigo(
+            400,
+            str(error),
+            CodigoTexto.PROXIMOS_FUERA_DE_RANGO,
+            {"minimo": error.minimo, "maximo": error.maximo},
+        ) from error
+    return ProximosRespuesta(desde=desde, n=n, fechas=fechas)

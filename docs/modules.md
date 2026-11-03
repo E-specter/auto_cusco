@@ -53,7 +53,7 @@ El esqueleto real de este enfoque ya existe en `backend/app/` (`core/{entities,p
 
   | Pieza | Ruta prevista | Qué hace |
   |---|---|---|
-  | Calendario laboral | `app/core/services/calendario/` | Siguiente día gestionable (lunes a viernes sin feriados de Perú); feriados configurables. Transversal, no propio de MOWA |
+  | Calendario laboral | `app/core/services/calendario/` | Día gestionable de lunes a sábado, sin feriados de Perú ni días no laborables registrados (RF-70): el siguiente y los próximos N (RF-71); feriados configurables. Transversal, no propio de MOWA |
   | Supervisión digital | `app/core/services/gestiones_digitales/` | RF-37 a RF-41, reutilizable por WhatsApp y correo |
   | Núcleo del conector | `app/core/entities/mowa_mes.py`, `app/core/services/plataformas/mowa_mes/` | Días ajustados y segmento, speech versionado sobre el motor de mapeo (RF-12), exclusiones, división por límites, conciliación |
   | Puertos | `app/core/ports/` | Repositorio de campañas, speech y supervisores; lector del reporte de enviados; escritor del archivo de carga |

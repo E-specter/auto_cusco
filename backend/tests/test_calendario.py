@@ -111,12 +111,13 @@ def test_la_regla_da_los_16_feriados_nacionales_de_2026_en_orden() -> None:
     ("desde", "esperado"),
     [
         (date(2026, 9, 13), date(2026, 9, 14)),  # domingo -> lunes
-        (date(2026, 9, 11), date(2026, 9, 14)),  # viernes -> lunes
+        (date(2026, 9, 11), date(2026, 9, 12)),  # viernes -> sabado (RF-70: el sabado se envia)
+        (date(2026, 9, 12), date(2026, 9, 14)),  # sabado -> lunes: el domingo no
         (date(2026, 9, 14), date(2026, 9, 15)),  # es estrictamente posterior
-        (date(2026, 4, 1), date(2026, 4, 6)),  # Jueves y Viernes Santo, y fin de semana
+        (date(2026, 4, 1), date(2026, 4, 4)),  # Jueves y Viernes Santo; el sabado si
         (date(2026, 7, 27), date(2026, 7, 30)),  # Fiestas Patrias
-        (date(2026, 12, 24), date(2026, 12, 28)),  # Navidad en viernes
-        (date(2026, 12, 31), date(2027, 1, 4)),  # cruza el ano: Ano Nuevo 2027 es viernes
+        (date(2026, 12, 24), date(2026, 12, 26)),  # Navidad en viernes; el sabado 26 si
+        (date(2026, 12, 31), date(2027, 1, 2)),  # cruza el ano: Ano Nuevo 2027 es viernes
     ],
 )
 def test_siguiente_dia_gestionable(desde, esperado) -> None:

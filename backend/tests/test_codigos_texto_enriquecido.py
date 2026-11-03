@@ -13,6 +13,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from app.api.calendario import obtener_servicio_calendario
 from app.api.cartera import obtener_servicio_cartera
 from app.api.definiciones_columnas import obtener_servicio_definiciones
 from app.api.selecciones import obtener_servicio_selecciones
@@ -32,6 +33,7 @@ from app.core.entities.texto_enriquecido import (
     Problema,
     TipoValor,
 )
+from app.core.services.calendario.servicio import CalendarioService
 from app.core.services.contextos_texto import contexto_cartera
 from app.core.services.definiciones_columnas.plataformas import RegistroPlataformas
 from app.core.services.definiciones_columnas.servicio import (
@@ -49,6 +51,7 @@ from app.core.services.textos_guardados.contextos import (
 from app.core.services.textos_guardados.servicio import TextosGuardadosService
 from app.main import app
 from tests.definiciones_memoria import RepositorioEnMemoria
+from tests.test_calendario import RepositorioCalendarioFalso
 from tests.textos_memoria import RepositorioTextosEnMemoria
 
 VARIABLES = {
@@ -229,6 +232,17 @@ def _emitidos_por_los_textos_guardados() -> set[CodigoTexto]:
     return emitidos
 
 
+def _emitidos_por_el_calendario() -> set[CodigoTexto]:
+    """El N fuera de rango de los proximos dias gestionables (RF-71), pedido por HTTP."""
+    servicio = CalendarioService(RepositorioCalendarioFalso())
+    app.dependency_overrides[obtener_servicio_calendario] = lambda: servicio
+    try:
+        respuesta = TestClient(app).get("/calendario/proximos", params={"n": 0})
+    finally:
+        app.dependency_overrides.pop(obtener_servicio_calendario, None)
+    return {CodigoTexto(respuesta.json()["codigo"])}
+
+
 def _pedir_a_la_api(cliente: TestClient, cartera: _CarteraVacia) -> set[CodigoTexto]:
     emitidos: set[CodigoTexto] = set()
     nodo = {"tipo": "variable", "nombre": "titular", "funciones": []}
@@ -359,6 +373,7 @@ def _emitidos() -> set[CodigoTexto]:
     emitidos.update(_emitidos_por_la_api())
     emitidos.update(_emitidos_por_las_plataformas())
     emitidos.update(_emitidos_por_los_textos_guardados())
+    emitidos.update(_emitidos_por_el_calendario())
     return emitidos
 
 

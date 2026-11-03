@@ -10,6 +10,8 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.entities.calendario import MAXIMO_PROXIMOS_POR_DEFECTO
+
 # backend/app/core/config.py -> sube 3 niveles hasta la raiz del repo,
 # independiente del directorio de trabajo desde el que se ejecute el proceso.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -39,6 +41,9 @@ class Settings(BaseSettings):
     # Un campo de texto con mas valores distintos que esto (en la fecha entera) no ofrece lista de
     # valores: el filtro sigue siendo un cuadro de texto. De 2 a 1000.
     umbral_valores_filtro: int = Field(default=UMBRAL_VALORES_FILTRO_POR_DEFECTO, ge=2, le=1000)
+
+    # El mayor N que admite `GET /calendario/proximos` (RF-71, RF-32). De 1 a 366.
+    maximo_proximos_dias: int = Field(default=MAXIMO_PROXIMOS_POR_DEFECTO, ge=1, le=366)
 
     # Origenes del frontend permitidos por CORS, separados por coma. Vacio = sin CORS.
     cors_origenes: str = ""
