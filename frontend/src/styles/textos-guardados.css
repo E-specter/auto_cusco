@@ -1,0 +1,223 @@
+/* ---- Saved texts (RF-69, docs/motor-texto-enriquecido-interfaz.md §11.3) --------------------------------------
+   One panel: the text to choose with the gestures on it, the version line, the module's editor and the foot with
+   «Guardar». The disabled ones fold under it, closed. Tokens only; no colour of its own. */
+
+.textos {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.textos__cuerpo {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* The select takes what is left; the gestures sit beside it and drop under it on a phone. */
+.textos__error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.textos__error:has(> [data-textos-error]:empty):not(:has(> button:not([hidden]))) {
+  display: none;
+}
+
+.textos__elegir {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.textos__texto {
+  flex: 1 1 16rem;
+  min-inline-size: 0;
+}
+
+.textos__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.textos__motivo {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.textos__version {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.textos__linea {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--font-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.textos__versiones {
+  flex: 0 1 16rem;
+}
+
+/* The notice's icon stays on the left; its text and its buttons share one column that wraps under the text when narrow. */
+.textos__aviso-cuerpo {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-inline-size: 0;
+}
+
+.textos__aviso-texto {
+  flex: 1 1 14rem;
+}
+
+.textos__aviso-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.textos__editor:empty {
+  display: none;
+}
+
+.textos__problemas {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.textos__pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.textos__hint {
+  flex-basis: 100%;
+  margin: 0;
+  font-family: var(--font-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* ---- The disabled texts: a folded list under the panel ---------------------------------------------------------- */
+
+.textos__deshab {
+  border: var(--color-border-hairline) solid var(--color-border);
+  padding: var(--space-3) var(--space-4);
+}
+
+.textos__deshab > summary {
+  cursor: pointer;
+  font-family: var(--font-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.textos__deshab-lista {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A compact row (the list of §4.5 of mowa-mes-interfaz.md): the name with its tag, the actions beside it, and on a
+   phone the actions under the name; the reason of a text that cannot be deleted, as a hint, under the row. */
+.textos__deshab-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+.textos__deshab-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+.textos__deshab-nombre {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.textos__deshab-motivo {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+/* ---- The delete dialog ---------------------------------------------------------------------------------------------
+   The body leaves a field's gap between the notice and the checkbox, and the checkbox is the one of the delete dialog of
+   MOWA MES (§4.6 of mowa-mes-interfaz.md): same markup, and its box, its gap to the label and its states here, scoped
+   to this component because the sheet that defines `.choice` (console.css) is the console's. */
+
+.textos__dialogo-cuerpo {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* shortcut: copia de .choice de console.css, que solo carga /cargas; mover a un estilo común cuando lo use un tercer componente */
+.textos .choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: var(--color-border-hairline) solid var(--color-border-subtle);
+  cursor: pointer;
+}
+
+.textos .choice:hover {
+  border-color: var(--color-border);
+}
+
+.textos .choice:has(input:checked) {
+  border-color: var(--color-text);
+  background-color: var(--color-surface);
+}
+
+.textos .choice:has(input:focus-visible) {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.textos .choice input {
+  margin-block-start: 0.25em;
+}
+
+.textos .choice__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.textos .choice__title {
+  font-weight: 600;
+}
+
+.textos [hidden] {
+  display: none;
+}

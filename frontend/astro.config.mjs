@@ -29,6 +29,10 @@ const rutasDePrueba = {
         pattern: '/pruebas/mapeador',
         entrypoint: './src/pruebas/mapeador.astro',
       });
+      injectRoute({
+        pattern: '/pruebas/textos-guardados',
+        entrypoint: './src/pruebas/textos-guardados.astro',
+      });
     },
   },
 };

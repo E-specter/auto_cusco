@@ -1,0 +1,205 @@
+---
+/**
+ * Markup of the saved-texts component (RF-69, docs/motor-texto-enriquecido-interfaz.md §11.3): a panel to manage
+ * the texts of one context, with their versions. Behaviour lives in `scripts/textos-guardados.ts`
+ * (`montarTextosGuardados`); the module that uses it renders this, hands the script its root and the editor of
+ * the content, and owns what the content means. The rows of the disabled texts are drawn there.
+ *
+ * Every `id` is derived from `id`, so a page may carry two.
+ */
+import Icon from './Icon.astro';
+import '../styles/textos-guardados.css';
+
+interface Props {
+  id: string;
+}
+
+const { id } = Astro.props;
+---
+
+<div class="textos" id={id} data-textos>
+  <section class="panel" aria-labelledby={`${id}-titulo`}>
+    <div class="panel__head">
+      <h2 class="panel__title" id={`${id}-titulo`} data-textos-titulo></h2>
+    </div>
+    <div class="panel__body textos__cuerpo">
+      <div class="textos__error">
+        <p class="field__error" data-textos-error role="alert"></p>
+        <button type="button" class="btn btn--sm" data-textos-reintentar hidden data-i18n="selector.valores.reintentar">
+          Reintentar
+        </button>
+      </div>
+
+      <div class="textos__elegir">
+        <div class="field textos__texto">
+          <label class="field__label" for={`${id}-texto`} data-i18n="textosGuardados.texto">Texto</label>
+          <select class="input" id={`${id}-texto`} data-textos-select></select>
+        </div>
+        <div class="textos__acciones" data-textos-acciones>
+          <button type="button" class="btn btn--sm" data-textos-nuevo>
+            <Icon name="plus" size={16} />
+            <span data-i18n="textosGuardados.nuevo">Nuevo</span>
+          </button>
+          <button type="button" class="btn btn--sm" data-textos-renombrar hidden>
+            <Icon name="pencil" size={16} />
+            <span data-i18n="textosGuardados.renombrar">Renombrar</span>
+          </button>
+          <button type="button" class="btn btn--sm" data-textos-deshabilitar hidden>
+            <Icon name="power-off" size={16} />
+            <span data-i18n="textosGuardados.deshabilitar">Deshabilitar</span>
+          </button>
+          <button type="button" class="btn btn--sm btn--danger" data-textos-eliminar hidden>
+            <Icon name="trash-2" size={16} />
+            <span data-i18n="textosGuardados.eliminar">Eliminar</span>
+          </button>
+        </div>
+        <p class="field__hint textos__motivo" data-textos-motivo hidden></p>
+      </div>
+
+      <!-- Only a text that is not saved yet has its name written here: after that it is renamed with «Renombrar». -->
+      <div class="field" data-textos-campo-nombre hidden>
+        <label class="field__label" for={`${id}-nombre`} data-i18n="textosGuardados.nombre">Nombre</label>
+        <input
+          class="input"
+          id={`${id}-nombre`}
+          data-textos-nombre
+          type="text"
+          autocomplete="off"
+          aria-describedby={`${id}-nombre-error`}
+        />
+        <p class="field__error" id={`${id}-nombre-error`} data-textos-nombre-error></p>
+      </div>
+
+      <div class="textos__version" data-textos-version-fila>
+        <p class="textos__linea">
+          <span data-textos-version></span>
+          <span class="tag tag--neutral" data-textos-tag-deshabilitado hidden>
+            <Icon name="power-off" size={16} />
+            <span data-i18n="textosGuardados.deshabilitado">Deshabilitado</span>
+          </span>
+        </p>
+        <div class="field textos__versiones" data-textos-campo-versiones hidden>
+          <label class="field__label" for={`${id}-versiones`} data-i18n="textosGuardados.versionVer">Ver otra versión</label>
+          <select class="input" id={`${id}-versiones`} data-textos-versiones></select>
+        </div>
+      </div>
+
+      <div class="notice notice--info textos__aviso" data-textos-aviso hidden>
+        <Icon name="info" size={20} />
+        <div class="textos__aviso-cuerpo">
+          <span class="textos__aviso-texto" data-textos-aviso-texto></span>
+          <span class="textos__aviso-acciones">
+            <button type="button" class="btn btn--primary btn--sm" data-textos-ir-vigente hidden data-i18n="textosGuardados.irVigente">
+              Ir a la vigente
+            </button>
+            <button type="button" class="btn btn--sm" data-textos-usar-base hidden data-i18n="textosGuardados.usarBase">
+              Usar como base
+            </button>
+          </span>
+        </div>
+      </div>
+
+      <!-- The module's editor goes here. -->
+      <div class="textos__editor" data-textos-editor></div>
+      <ul class="textos__problemas" data-textos-problemas role="alert" hidden></ul>
+
+      <div class="textos__pie" data-textos-pie>
+        <button type="button" class="btn btn--primary" data-textos-guardar disabled>
+          <span class="btn__spinner" aria-hidden="true"></span>
+          <Icon name="save" size={16} />
+          <span class="btn__label" data-i18n="textosGuardados.guardar">Guardar</span>
+        </button>
+        <button type="button" class="btn" data-textos-descartar disabled data-i18n="textosGuardados.descartar">Descartar cambios</button>
+        <p class="textos__hint" data-textos-hint></p>
+      </div>
+
+      <p class="visually-hidden" role="status" data-textos-anuncio></p>
+    </div>
+  </section>
+
+  <!-- Disabled texts: folded, closed, and not shown with none (the pattern of §4.5 of mowa-mes-interfaz.md). -->
+  <details class="textos__deshab" data-textos-deshab hidden>
+    <summary data-textos-deshab-titulo></summary>
+    <ul class="textos__deshab-lista" data-textos-deshab-lista></ul>
+  </details>
+
+  <!-- Rename a text (§10.1): the dialog of the saved definitions. -->
+  <dialog class="dialog" data-textos-dialogo="renombrar" aria-labelledby={`${id}-renombrar-titulo`}>
+    <form method="dialog" data-textos-renombrar-form novalidate>
+      <div class="dialog__head">
+        <h2 id={`${id}-renombrar-titulo`} data-textos-renombrar-titulo></h2>
+      </div>
+      <div class="dialog__body">
+        <div class="field">
+          <label class="field__label" for={`${id}-renombrar-nombre`} data-i18n="textosGuardados.renombrarCampo">Nombre nuevo</label>
+          <input
+            class="input"
+            id={`${id}-renombrar-nombre`}
+            data-textos-renombrar-nombre
+            type="text"
+            autocomplete="off"
+            aria-describedby={`${id}-renombrar-error`}
+          />
+          <p class="field__error" id={`${id}-renombrar-error`} data-textos-renombrar-error role="alert"></p>
+        </div>
+      </div>
+      <div class="dialog__foot">
+        <button type="button" class="btn" data-textos-cerrar data-i18n="common.cancel">Cancelar</button>
+        <button type="submit" class="btn btn--primary" data-textos-renombrar-confirmar>
+          <span class="btn__spinner" aria-hidden="true"></span>
+          <span class="btn__label" data-i18n="textosGuardados.renombrarConfirmar">Renombrar</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Delete for good (§4.6 of mowa-mes-interfaz.md): the danger notice and the mandatory checkbox. -->
+  <dialog class="dialog" data-textos-dialogo="eliminar" aria-labelledby={`${id}-eliminar-titulo`}>
+    <div class="dialog__head">
+      <h2 id={`${id}-eliminar-titulo`} data-textos-eliminar-titulo></h2>
+    </div>
+    <div class="dialog__body textos__dialogo-cuerpo">
+      <p class="notice notice--danger">
+        <Icon name="triangle-alert" size={20} />
+        <span data-textos-eliminar-cuerpo></span>
+      </p>
+      <label class="choice choice--check">
+        <input type="checkbox" data-textos-eliminar-casilla />
+        <span class="choice__body">
+          <span class="choice__title" data-i18n="textosGuardados.eliminarCasilla">Entiendo que no se puede deshacer</span>
+        </span>
+      </label>
+      <p class="field__error" data-textos-eliminar-error role="alert"></p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn" data-textos-cerrar data-textos-eliminar-cancelar data-i18n="common.cancel">Cancelar</button>
+      <button type="button" class="btn btn--danger" data-textos-eliminar-aceptar>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <Icon name="trash-2" size={16} />
+        <span class="btn__label" data-i18n="textosGuardados.eliminarBoton">Eliminar definitivamente</span>
+      </button>
+    </div>
+  </dialog>
+
+  <!-- Unsaved changes: the dialog of the selector. -->
+  <dialog class="dialog" data-textos-dialogo="cambios" aria-labelledby={`${id}-cambios-titulo`}>
+    <div class="dialog__head">
+      <h2 id={`${id}-cambios-titulo`} data-i18n="selector.descartar.titulo">Hay cambios sin guardar</h2>
+    </div>
+    <div class="dialog__body">
+      <p data-i18n="selector.descartar.cuerpo">Los cambios que no guardaste se pierden.</p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn" data-textos-cambios-no data-i18n="selector.descartar.mantener">Seguir editando</button>
+      <button type="button" class="btn btn--primary" data-textos-cambios-si data-i18n="selector.descartar.confirmar">
+        Descartar cambios
+      </button>
+    </div>
+  </dialog>
+
+  <!-- Icons for the rows the script draws: rendered once here, cloned per row. -->
+  <template data-textos-icono="ver"><Icon name="eye" size={16} /></template>
+  <template data-textos-icono="habilitar"><Icon name="power" size={16} /></template>
+  <template data-textos-icono="eliminar"><Icon name="trash-2" size={16} /></template>
+  <template data-textos-icono="deshabilitado"><Icon name="power-off" size={16} /></template>
+</div>

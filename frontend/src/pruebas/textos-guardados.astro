@@ -1,0 +1,97 @@
+---
+/**
+ * Test-only page: mounts TextosGuardados on its own so the e2e suite can exercise it before any screen uses it
+ * (WhatsMKT mounts it in its configuration). It is injected by astro.config.mjs only when
+ * AUTO_CUSCO_RUTAS_PRUEBA=1 (Playwright's build, written to dist-pruebas/); the deployable build never has it, and
+ * `herramientas/comprobar-build-produccion.mjs` fails if it ever does.
+ *
+ * The component knows nothing about this page. The editor is a plain textarea, the simplest thing a module can
+ * hand over. The query string sets up a case, always with synthetic data:
+ *   ?contexto=<clave>   the context of the texts (`sintetico.texto` by default)
+ *   &usos=1             tell the component how many times a used version was used (3), as a module that counts would
+ *   &etiqueta=1         the option of each text carries «· versión N», as a module that adds its own data would
+ *
+ * The mounted controller is left on `window.controladorPrueba`, so a test can call what a screen would
+ * (`hayCambios`, `confirmarSalida`, `recargar`, `destruir`); the last event, on `[data-ultimo-evento]`.
+ */
+import Shell from '../layouts/Shell.astro';
+import TextosGuardados from '../components/TextosGuardados.astro';
+---
+
+<Shell title="Prueba de textos guardados — auto_cusco" noindex>
+  <div class="prueba" data-ruta-prueba>
+    <h1>Prueba de textos guardados</h1>
+    <TextosGuardados id="textos-prueba" />
+    <details class="prueba__evento">
+      <summary>Último evento</summary>
+      <pre class="mono" data-ultimo-evento></pre>
+    </details>
+  </div>
+</Shell>
+
+<style>
+  .prueba {
+    display: grid;
+    gap: var(--space-5);
+    padding: var(--space-5) var(--shell-gutter);
+  }
+  .prueba h1 {
+    margin: 0;
+    font-size: var(--text-xl);
+  }
+  .prueba__evento pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: var(--text-xs);
+  }
+</style>
+
+<script>
+  import { EVENTO_TEXTOS, montarTextosGuardados, type FabricaEditor } from '../scripts/textos-guardados';
+
+  const parametros = new URLSearchParams(location.search);
+  const expuesta = window as unknown as { controladorPrueba?: unknown };
+
+  /** A textarea: `{texto}` for a plain-text context and an engine expression of one text node for the other. */
+  const editor: FabricaEditor = (anfitrion, { tipo, alCambiar }) => {
+    const rotulo = document.createElement('label');
+    rotulo.className = 'field__label';
+    rotulo.htmlFor = 'prueba-contenido';
+    rotulo.textContent = 'Contenido';
+    const area = document.createElement('textarea');
+    area.className = 'input';
+    area.id = 'prueba-contenido';
+    area.rows = 4;
+    area.addEventListener('input', alCambiar);
+    anfitrion.append(rotulo, area);
+    const plano = tipo === 'texto_plano';
+    return {
+      fijar(contenido, soloLectura) {
+        const expresion = contenido?.expresion as { nodos?: Array<{ valor?: string }> } | undefined;
+        area.value = contenido === null ? '' : plano ? String(contenido.texto ?? '') : (expresion?.nodos?.[0]?.valor ?? '');
+        area.readOnly = soloLectura;
+      },
+      leer: () => (plano ? { texto: area.value } : { expresion: { nodos: area.value ? [{ tipo: 'texto', valor: area.value }] : [] } }),
+      destruir: () => anfitrion.replaceChildren(),
+      enfocar: () => area.focus(),
+    };
+  };
+
+  const ultimo = document.querySelector<HTMLElement>('[data-ultimo-evento]')!;
+  const raiz = document.getElementById('textos-prueba')!;
+  raiz.addEventListener(EVENTO_TEXTOS, (evento) => {
+    ultimo.textContent = JSON.stringify((evento as CustomEvent).detail);
+    document.body.dataset.eventos = String(Number(document.body.dataset.eventos ?? 0) + 1);
+  });
+
+  void montarTextosGuardados(raiz, {
+    contexto: parametros.get('contexto') ?? 'sintetico.texto',
+    editor,
+    titulo: 'Mensajes de prueba',
+    etiquetaDe: parametros.get('etiqueta') === '1' ? (texto) => `${texto.nombre} · versión ${texto.version_vigente}` : undefined,
+    usos: parametros.get('usos') === '1' ? () => 3 : undefined,
+  }).then((controlador) => {
+    expuesta.controladorPrueba = controlador;
+    document.body.dataset.montado = 'true';
+  });
+</script>
