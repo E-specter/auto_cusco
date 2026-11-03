@@ -5,6 +5,7 @@
  * holidays that a year does not observe. Shared by every connector, so it lives outside `/mowa-mes`.
  */
 import Shell from '../layouts/Shell.astro';
+import AvisoVolver from '../components/AvisoVolver.astro';
 import Icon from '../components/Icon.astro';
 import '../styles/calendario.css';
 ---
@@ -20,6 +21,12 @@ import '../styles/calendario.css';
         Días gestionables: de lunes a sábado, sin feriados. Los feriados de ley se calculan solos; aquí registras los días no laborables decretados y los feriados que un año no aplican.
       </p>
     </header>
+
+    <!-- Sent here by a channel (T-HI-F3): the way back, only with a valid `volver`. -->
+    <AvisoVolver />
+    <script>
+      import '../scripts/aviso-volver-al-momento';
+    </script>
 
     <section class="standIn" data-offline hidden aria-labelledby="ca-offline-title">
       <h2 class="standIn__title" id="ca-offline-title" data-i18n="console.offline.title">Sin conexión con la API</h2>

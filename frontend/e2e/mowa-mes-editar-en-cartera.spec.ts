@@ -141,6 +141,20 @@ test.describe('cartera, llegando desde una campaña', () => {
     await expect(seleccion(page)).toHaveValue('1');
   });
 
+  test('cambiar de idioma con el aviso ya abierto lo traduce, con el canal: no depende solo de data-i18n', async ({ page }) => {
+    await montarAmbas(page, mundo());
+    await page.goto('/cartera?seleccion=1&volver=%2Fwhatsmkt%2Fcampana');
+    await expect(avisoVolver(page)).toContainText('Estás editando la selección de una campaña de WhatsMKT. Al guardarla, vuelves a la campaña.');
+
+    await page.locator('[data-lang="en"]').click();
+
+    await expect(avisoVolver(page)).toContainText('You are editing the selection of a WhatsMKT campaign. When you save it, you go back to the campaign.');
+    await expect(avisoVolver(page)).not.toContainText('{canal}');
+    // Y de vuelta, igual: el idioma cambia el texto, no el canal.
+    await page.locator('[data-lang="es"]').click();
+    await expect(avisoVolver(page)).toContainText('Estás editando la selección de una campaña de WhatsMKT. Al guardarla, vuelves a la campaña.');
+  });
+
   test('sin parámetros, Cartera es la de siempre: ni aviso ni selección cargada', async ({ page }) => {
     await montarAmbas(page, mundo());
     await page.goto('/cartera');
@@ -186,6 +200,23 @@ test.describe('cartera, llegando desde una campaña', () => {
 
     await expect(avisoNoExiste(page)).toBeVisible();
     await expect(page.locator('[data-disponibles]')).toHaveText('3,200');
+  });
+
+  test('con volver de WhatsMKT el aviso dice WhatsMKT y guardar vuelve a su pantalla con la selección', async ({ page }) => {
+    await montarAmbas(page, mundo());
+    await page.route(/\/whatsmkt\/campana/, (ruta) =>
+      ruta.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>canal</title><p>canal</p>' }),
+    );
+    await page.goto('/cartera?seleccion=1&volver=%2Fwhatsmkt%2Fcampana');
+
+    await expect(avisoVolver(page)).toBeVisible();
+    await expect(avisoVolver(page)).toContainText('Estás editando la selección de una campaña de WhatsMKT. Al guardarla, vuelves a la campaña.');
+    await expect(enlaceVolver(page)).toHaveAttribute('href', '/whatsmkt/campana');
+    await expect(seleccion(page)).toHaveValue('1');
+
+    await cantidad(page).fill('250');
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+    await page.waitForURL(/\/whatsmkt\/campana\?seleccion=1$/);
   });
 
   for (const invalido of ['//evil.com', 'https://evil.com/mowa-mes/', '/mowa-mes/../cartera', 'javascript:alert(1)', '/cartera', '/\\evil.com']) {

@@ -14,6 +14,7 @@
  */
 import Shell from '../layouts/Shell.astro';
 import EditorTexto from '../components/EditorTexto.astro';
+import AvisoVolver from '../components/AvisoVolver.astro';
 import Icon from '../components/Icon.astro';
 import SelectorSeleccion from '../components/SelectorSeleccion.astro';
 import VariantesSegmento from '../components/VariantesSegmento.astro';
@@ -31,6 +32,17 @@ import '../styles/columnas.css';
         Define qué columnas lleva cada archivo de carga y cómo se llena cada una. Cada guardado crea una versión nueva; las anteriores no cambian.
       </p>
     </header>
+
+    <!-- Sent here by a channel (T-HI-F3, §12): the way back, only with a valid `volver` (src/lib/volver.ts). -->
+    <AvisoVolver />
+
+    <!-- `?definicion=` names one that is gone: the builder opens a new definition, with this notice and no error. -->
+    <p class="notice notice--warning" data-definicion-no-existe role="status" hidden>
+      <Icon name="triangle-alert" size={20} />
+      <span data-i18n="herramientas.volver.definicionNoExiste">
+        La definición que abriste ya no existe. Arma una nueva o elige otra de la lista.
+      </span>
+    </p>
 
     <section class="standIn" data-offline hidden aria-labelledby="cl-offline-title">
       <h2 class="standIn__title" id="cl-offline-title" data-i18n="console.offline.title">Sin conexión con la API</h2>
@@ -94,9 +106,7 @@ import '../styles/columnas.css';
           <div class="field" data-campo-plataforma hidden>
             <label class="field__label" for="cl-plataforma" data-i18n="columnas.plataforma">Plataforma</label>
             <select class="input" id="cl-plataforma" data-plataforma aria-describedby="cl-plataforma-hint"></select>
-            <p class="field__hint" id="cl-plataforma-hint" data-i18n="columnas.plataforma.hint">
-              Una plataforma fija algunas columnas y no se cambia después.
-            </p>
+            <p class="field__hint" id="cl-plataforma-hint" data-plataforma-hint></p>
           </div>
 
           <p class="cl-linea" data-version-linea></p>
@@ -489,6 +499,8 @@ import '../styles/columnas.css';
     listaConNombre,
   } from '../lib/renombrar-definicion';
   import { aVariableDirecta } from '../lib/editor-texto';
+  import { definicionPedidaDeLaUrl, destinoConDefinicion, plataformaDeLaUrl, volverValido } from '../lib/volver';
+  import { canalDeVolver, montarAvisoVolver, type AvisoVolver } from '../scripts/aviso-volver';
   import { applyTranslations, t } from '../lib/i18n';
   import { EVENTO_EXPRESION, mensajeProblema, montarEditor, type ControladorEditor, type EstadoEditor } from '../scripts/editor-texto';
   import { crearSelectorPatronFecha } from '../scripts/selector-patron-fecha';
@@ -534,7 +546,17 @@ import '../styles/columnas.css';
     previaVigente: false,
     seleccion: null as EstadoSeleccion | null,
     selectorMontado: false,
+    /** `?plataforma=`: the platform a channel asked the new definition to be for (RF-72); `null` when none or unknown. */
+    plataformaPedida: null as string | null,
+    /** `?definicion=` named a definition that is gone: the notice stays until another one is opened. */
+    definicionNoExiste: false,
   };
+
+  /** Where a channel sent the analyst from (T-HI-F3); `null` unless it is a screen of a channel of this very site. */
+  const volver = volverValido(new URLSearchParams(window.location.search).get('volver'), window.location.origin);
+  /** Set when the page is on its way out by its own doing (saved, or discarded and gone back), so the browser does not ask again. */
+  let saliendo = false;
+  let avisoVolver: AvisoVolver | null = null;
 
   const el = {
     offline: $<HTMLElement>('[data-offline]'),
@@ -546,6 +568,8 @@ import '../styles/columnas.css';
     nombre: $<HTMLInputElement>('[data-nombre]'),
     nombreHint: $<HTMLElement>('[data-nombre-hint]'),
     nombreError: $<HTMLElement>('[data-nombre-error]'),
+    definicionNoExiste: $<HTMLElement>('[data-definicion-no-existe]'),
+    plataformaHint: $<HTMLElement>('[data-plataforma-hint]'),
     campoPlataforma: $<HTMLElement>('[data-campo-plataforma]'),
     plataforma: $<HTMLSelectElement>('[data-plataforma]'),
     reglas: $<HTMLElement>('[data-reglas]'),
@@ -630,16 +654,20 @@ import '../styles/columnas.css';
       const alNo = () => dialogos.confirmar.close();
       si.addEventListener('click', alSi, { once: true });
       no.addEventListener('click', alNo, { once: true });
-      dialogos.confirmar.addEventListener(
-        'close',
-        () => {
-          si.removeEventListener('click', alSi);
-          no.removeEventListener('click', alNo);
-          resolver(respuesta);
-        },
-        { once: true },
-      );
-      void openWhenFree(dialogos.confirmar);
+      // The dialog may wait its turn behind another one: until it is shown, and while it is open, a `close` is not this answer's
+      // (it is the previous one's, still on its way), and taking it would leave the dialog open with nobody listening.
+      let listo = false;
+      const alCerrar = () => {
+        if (!listo || dialogos.confirmar.open) return;
+        si.removeEventListener('click', alSi);
+        no.removeEventListener('click', alNo);
+        dialogos.confirmar.removeEventListener('close', alCerrar);
+        resolver(respuesta);
+      };
+      dialogos.confirmar.addEventListener('close', alCerrar);
+      void openWhenFree(dialogos.confirmar).then(() => {
+        listo = true;
+      });
     });
   }
 
@@ -1274,8 +1302,12 @@ import '../styles/columnas.css';
     cerrarFila();
     estado.respuesta = respuesta;
     estado.guardada = respuesta ? guardadaDesdeRespuesta(respuesta) : null;
-    estado.borrador = estado.guardada ? desdeDefinicion(estado.guardada) : definicionNueva();
+    // A new definition starts from the platform a channel asked for, if one did.
+    estado.borrador = estado.guardada
+      ? desdeDefinicion(estado.guardada)
+      : definicionNueva(reglasDe(estado.plataformas, estado.plataformaPedida));
     estado.modo = modoInicial(respuesta);
+    estado.definicionNoExiste = false;
     // What the platform's rules of today find in a saved version (RF-72): shown as any other problem.
     estado.problemas = respuesta?.problemas ?? [];
     estado.nombreRepetido = false;
@@ -1371,6 +1403,8 @@ import '../styles/columnas.css';
         })
       : t('columnas.version.sinGuardar');
     pintarPlataforma();
+    el.definicionNoExiste.hidden = !estado.definicionNoExiste;
+    avisoVolver?.pintar();
 
     const avisoVista = aviso(estado.modo, estado.respuesta);
     el.lectura.hidden = avisoVista.tipo !== 'lectura';
@@ -1398,6 +1432,8 @@ import '../styles/columnas.css';
   function pintarPlataforma(): void {
     const reglas = reglasActuales();
     const clave = estado.borrador.plataforma;
+    // Asked for by a channel with a way back, it is not the analyst's to change: there is no dialog to change it (§12.5).
+    const fijada = estado.plataformaPedida !== null && volver !== null;
     el.campoPlataforma.hidden = estado.respuesta !== null || estado.plataformas.length === 0;
     el.plataforma.replaceChildren();
     const ninguna = document.createElement('option');
@@ -1411,7 +1447,10 @@ import '../styles/columnas.css';
       el.plataforma.append(nodo);
     }
     el.plataforma.value = clave ?? '';
-    el.plataforma.disabled = estado.modo !== 'nueva';
+    el.plataforma.disabled = estado.modo !== 'nueva' || fijada;
+    const canalFijo = fijada && volver !== null ? canalDeVolver(volver) : null;
+    el.plataformaHint.textContent =
+      canalFijo !== null ? t('columnas.plataforma.fijadaPor', { canal: canalFijo }) : t('columnas.plataforma.hint');
 
     el.reglas.hidden = reglas === null;
     el.reglasTexto.textContent = reglas === null ? '' : fraseDeReglas(reglas);
@@ -2509,6 +2548,11 @@ import '../styles/columnas.css';
       poner(respuesta);
       estado.mensaje = t('columnas.guardada', { numero: respuesta.version.numero });
       pintar();
+      // A save is what the channel is waiting for: back to it with the definition and the version just saved.
+      if (volver) {
+        saliendo = true;
+        window.location.assign(destinoConDefinicion(volver, respuesta.id, respuesta.version.numero));
+      }
     } catch (error) {
       estado.guardando = false;
       if (error instanceof ApiError && error.status === 400) {
@@ -2557,9 +2601,31 @@ import '../styles/columnas.css';
       return;
     }
     sinConexion(false);
+    // `?definicion=` wins over `?plataforma=` (§12.5); a platform nobody registered is ignored, as if it had not come.
+    const pedida = definicionPedidaDeLaUrl(window.location.search);
+    estado.plataformaPedida =
+      pedida === null ? plataformaDeLaUrl(window.location.search, estado.plataformas) : null;
+    if (pedida !== null) {
+      try {
+        poner(await obtenerDefinicion(pedida));
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 404)) {
+          mostrarError(error);
+          return;
+        }
+        // Gone: a new definition and a notice, never an error.
+        poner(null);
+        estado.definicionNoExiste = true;
+      }
+      pintar();
+      pintarPrevia();
+      programarPrevia(0);
+      return;
+    }
     poner(null);
     pintar();
     pintarPrevia();
+    if (estado.plataformaPedida !== null) programarPrevia(0);
   }
 
   document.querySelector<HTMLButtonElement>('[data-reintentar]')?.addEventListener('click', () => void arrancar());
@@ -2572,7 +2638,31 @@ import '../styles/columnas.css';
   });
 
   window.addEventListener('beforeunload', (evento) => {
-    if (hayCambiosSinGuardar()) evento.preventDefault();
+    if (!saliendo && hayCambiosSinGuardar()) evento.preventDefault();
+  });
+
+  // The way back, from a channel (§12.2): «Volver a {canal} sin guardar» goes to `volver` as it came, and with changes it asks first,
+  // with the selector's own dialog («Seguir editando» stays here).
+  avisoVolver = montarAvisoVolver(document, {
+    volver,
+    destino: volver ?? '/',
+    linea: () =>
+      estado.respuesta === null && reglasActuales() !== null
+        ? { clave: 'herramientas.volver.columnasNueva', valores: { plataforma: reglasActuales()!.etiqueta } }
+        : { clave: 'herramientas.volver.columnas' },
+    enlace: 'sinGuardar',
+    antesDeVolver: async () => {
+      const seguir =
+        !hayCambiosSinGuardar() ||
+        (await confirmar({
+          titulo: t('selector.descartar.titulo'),
+          cuerpo: t('selector.descartar.cuerpo'),
+          si: t('selector.descartar.confirmar'),
+          no: t('selector.descartar.mantener'),
+        }));
+      if (seguir) saliendo = true;
+      return seguir;
+    },
   });
 
   void arrancar();

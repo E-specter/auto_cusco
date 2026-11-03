@@ -1,0 +1,22 @@
+---
+/**
+ * The notice of the tools that a channel sends the analyst to (Columnas de carga, Supervisores, Calendario laboral;
+ * T-HI-F3, docs/motor-texto-enriquecido-interfaz.md §12.2): one line and a link back. The same markup as the one of
+ * `/cartera` (which uses this very component: `data-volver`, `data-volver-enlace`), hidden until `montarAvisoVolver`
+ * (`scripts/aviso-volver.ts`) has a valid `volver` to show. It goes under the page's header and before everything else. The icon
+ * stays on the left and the line with its link go together in the body, so on a phone the link is never a sibling of the icon.
+ */
+import Icon from './Icon.astro';
+import '../styles/aviso-volver.css';
+---
+
+<div class="notice notice--info herramienta__volver" data-volver hidden>
+  <Icon name="info" size={20} />
+  <div class="herramienta__volver-cuerpo">
+    <span data-volver-linea data-volver-aviso></span>
+    <a class="btn btn--sm" href="/" data-volver-enlace>
+      <Icon name="chevron-left" size={16} />
+      <span data-volver-enlace-texto></span>
+    </a>
+  </div>
+</div>

@@ -8,6 +8,7 @@
  */
 import Shell from '../layouts/Shell.astro';
 import Icon from '../components/Icon.astro';
+import AvisoVolver from '../components/AvisoVolver.astro';
 import '../styles/supervisores.css';
 ---
 
@@ -19,9 +20,12 @@ import '../styles/supervisores.css';
     <header class="page__head">
       <h1 class="page__title" data-i18n="nav.supervisores">Supervisores</h1>
       <p class="page__intro" data-i18n="supervisores.intro">
-        Los supervisores que se asignan por defecto a cada campaña de MOWA MES.
+        Los supervisores que se asignan por defecto a cada campaña, en todos los canales.
       </p>
     </header>
+
+    <!-- Sent here by a channel (T-HI-F3): the way back, only with a valid `volver`. -->
+    <AvisoVolver />
 
     <section class="standIn" data-offline hidden aria-labelledby="sv-offline-title">
       <h2 class="standIn__title" id="sv-offline-title" data-i18n="console.offline.title">Sin conexión con la API</h2>
@@ -94,6 +98,20 @@ import '../styles/supervisores.css';
   <template data-icono-arriba><Icon name="arrow-up" size={16} /></template>
   <template data-icono-abajo><Icon name="arrow-down" size={16} /></template>
 
+  <!-- Going back from a channel with a draft not saved (T-HI-F3, §12.2): the selector's own question. -->
+  <dialog class="dialog" data-dialog="descartar" aria-labelledby="sv-descartar-title">
+    <div class="dialog__head">
+      <h2 id="sv-descartar-title" data-i18n="selector.descartar.titulo">Hay cambios sin guardar</h2>
+    </div>
+    <div class="dialog__body">
+      <p data-i18n="selector.descartar.cuerpo">Los cambios que no guardaste se pierden.</p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn" data-descartar-no data-i18n="selector.descartar.mantener">Seguir editando</button>
+      <button type="button" class="btn btn--primary" data-descartar-si data-i18n="selector.descartar.confirmar">Descartar cambios</button>
+    </div>
+  </dialog>
+
   <!-- ---- Generic failure ---------------------------------------------- -->
   <dialog class="dialog" data-dialog="error" aria-labelledby="sv-error-title">
     <div class="dialog__head">
@@ -118,6 +136,9 @@ import '../styles/supervisores.css';
   import { vacio } from '../lib/tabla-dom';
   import { openWhenFree } from '../lib/dialogs';
   import { applyTranslations, t } from '../lib/i18n';
+  import { volverValido } from '../lib/volver';
+  import { montarAvisoVolver } from '../scripts/aviso-volver';
+  import { confirmarDescartar } from '../scripts/confirmar-descartar';
   import {
     borradorDeSupervision,
     entradaSupervision,
@@ -138,6 +159,7 @@ import '../styles/supervisores.css';
 
   const dialogos = {
     error: $<HTMLDialogElement>('[data-dialog="error"]'),
+    descartar: $<HTMLDialogElement>('[data-dialog="descartar"]'),
   };
 
   document.querySelectorAll<HTMLElement>('[data-close]').forEach((boton) => {
@@ -547,6 +569,19 @@ import '../styles/supervisores.css';
   document.addEventListener('languagechange', () => {
     applyTranslations();
     pintarSupervision();
+  });
+
+  // The way back, from a channel (T-HI-F3, §12.2): saving does not go back on its own, and the analyst may keep adjusting. With a draft
+  // not saved the link asks first; without one it goes straight.
+  const volver = volverValido(new URLSearchParams(window.location.search).get('volver'), window.location.origin);
+  montarAvisoVolver(document, {
+    volver,
+    destino: volver ?? '/',
+    linea: () => ({ clave: 'herramientas.volver.supervisores' }),
+    enlace: 'volver',
+    antesDeVolver: async () =>
+      !(estado.supervisionGuardada !== null && supervisionCambio(estado.supervisionGuardada, estado.supervision)) ||
+      confirmarDescartar(dialogos.descartar),
   });
 
   void arrancar();

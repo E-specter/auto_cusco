@@ -1,0 +1,18 @@
+/* The notice of a tool a channel sent the analyst to (T-HI-F3, docs/motor-texto-enriquecido-interfaz.md §12.2): the line and
+   its way back, the same as the one of `/cartera`: the link goes under the text when there is no room, never off the screen. */
+.herramienta__volver-cuerpo {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-inline-size: 0;
+}
+
+.herramienta__volver-cuerpo > span {
+  flex: 1 1 16rem;
+}
+
+.herramienta__volver-cuerpo .btn {
+  margin-inline-start: auto;
+}

@@ -32,7 +32,7 @@ test.describe('carga inicial', () => {
     const api = apiSupervisionCalendario();
     await abrir(page, api);
 
-    await expect(page.getByText('Los supervisores que se asignan por defecto a cada campaña de MOWA MES.')).toBeVisible();
+    await expect(page.getByText('Los supervisores que se asignan por defecto a cada campaña, en todos los canales.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Supervisores por defecto' })).toBeVisible();
     await expect(page.getByLabel('Número del supervisor 1')).toHaveValue('900000101');
     await expect(page.getByRole('cell', { name: '00000002' })).toBeVisible();
@@ -56,7 +56,7 @@ test.describe('carga inicial', () => {
     await page.goto(RUTA);
 
     await expect(page.getByRole('heading', { name: 'Supervisors', level: 1 })).toBeVisible();
-    await expect(page.getByText('The supervisors assigned by default to each MOWA MES campaign.')).toBeVisible();
+    await expect(page.getByText('The supervisors assigned by default to each campaign, in every channel.')).toBeVisible();
   });
 });
 

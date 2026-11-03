@@ -268,6 +268,14 @@ describe('los textos de «Editar en Cartera» están en español y en inglés', 
     expect((en as Record<string, string>)[clave], `en ${clave}`).toBeTruthy();
   });
 
+  it('el aviso de volver lleva el canal: {canal} en los dos idiomas, y con MOWA MES se lee como antes', () => {
+    const aviso = (idioma: Record<string, unknown>) => idioma['cartera.volver.aviso'] as string;
+    expect(aviso(es)).toContain('{canal}');
+    expect(aviso(en)).toContain('{canal}');
+    expect(aviso(es).replace('{canal}', 'MOWA MES')).toBe('Estás editando la selección de una campaña de MOWA MES. Al guardarla, vuelves a la campaña.');
+    expect(aviso(en).replace('{canal}', 'MOWA MES')).toBe('You are editing the selection of a MOWA MES campaign. When you save it, you go back to the campaign.');
+  });
+
   it('el aviso de la selección que no existe es el que aprobó designer', () => {
     expect((es as Record<string, string>)['cartera.volver.noExiste']).toBe('La selección que abriste ya no existe. Arma una nueva o elige otra de la lista.');
     expect((en as Record<string, string>)['cartera.volver.noExiste']).toBe('The selection you opened no longer exists. Build a new one or choose another from the list.');
