@@ -6,6 +6,8 @@ data/output/**
 !data/output/.gitkeep
 !data/output/**/.gitkeep
 !data/output/**/
+# Ejemplos reales de WhatsMKT (carga e informe): datos de cobranza, nunca al repositorio
+data/whatsmkt/**
 data/*.db
 data/*.db-journal
 data/*.sqlite3
