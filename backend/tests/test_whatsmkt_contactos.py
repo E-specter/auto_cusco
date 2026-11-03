@@ -387,3 +387,26 @@ def test_una_definicion_con_nombres_reservados_se_rechaza() -> None:
 
     with pytest.raises(ValueError, match="reservados"):
         armar([producto(1)], definicion_=reservada)
+
+
+def test_cada_exclusion_sabe_su_segmento_en_un_lote_por_segmento() -> None:
+    productos = [
+        producto(1, 20, telefono=None),
+        producto(2, 5, titular=None),
+        producto(3, None, telefono=None),
+        producto(4, 5),
+    ]
+
+    resultado = armar(productos, por_segmento=True, supervisores=())
+
+    assert [(e.fila, e.segmento) for e in resultado.exclusiones] == [
+        (1, "mayores_2"),
+        (2, "tramo_2"),
+        (3, None),
+    ]
+
+
+def test_en_modo_global_las_exclusiones_no_llevan_segmento() -> None:
+    resultado = armar([producto(1, 20, telefono=None)], supervisores=())
+
+    assert resultado.exclusiones[0].segmento is None

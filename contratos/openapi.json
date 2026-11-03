@@ -4717,6 +4717,68 @@
           }
         }
       }
+    },
+    "/whatsmkt/campanas/previsualizacion": {
+      "post": {
+        "tags": [
+          "whatsmkt"
+        ],
+        "summary": "Previsualizar los archivos de la campana",
+        "description": "Los archivos que resultarian de la seleccion, sin guardar nada (RF-WM-35).\n\nEn modo `por_segmento` sale una campana por cada segmento con productos (RF-WM-23); en\n`global`, una. Los problemas (`definicion_no_whatsmkt`, `sin_supervisores`, `sin_productos`)\nse listan con un 200: no impiden previsualizar, impiden crear.",
+        "operationId": "previsualizar_campanas_whatsmkt_campanas_previsualizacion_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrevisualizacionCampanasWhatsmktEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrevisualizacionCampanasWhatsmktRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe lo pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorConCodigo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La peticion no se puede atender tal como viene; el motivo esta en detail. Con el codigo fecha_envio_anterior trae ademas fecha_envio y fecha_corte",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleErrorFechaEnvio"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5249,6 +5311,33 @@
         ],
         "title": "Body_subir_sabana_cargas_post"
       },
+      "CabeceraWhatsmktRespuesta": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre",
+            "description": "El encabezado del archivo"
+          },
+          "etiqueta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etiqueta",
+            "description": "La etiqueta de la columna; no sale en el archivo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "etiqueta"
+        ],
+        "title": "CabeceraWhatsmktRespuesta"
+      },
       "CambioCampoAdicionalEntrada": {
         "properties": {
           "nombre_legible": {
@@ -5279,6 +5368,86 @@
         "type": "object",
         "title": "CambioCampoAdicionalEntrada",
         "description": "Renombrar, archivar o reactivar: lo que no viene no cambia. El nombre tecnico no cambia."
+      },
+      "CampanaPrevistaWhatsmktRespuesta": {
+        "properties": {
+          "segmento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segmento",
+            "description": "La clave del segmento; null en una campana global"
+          },
+          "etiqueta_segmento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etiqueta Segmento"
+          },
+          "cantidad": {
+            "type": "integer",
+            "title": "Cantidad",
+            "description": "Filas del archivo, supervisores incluidos (S-WM-4)"
+          },
+          "productos": {
+            "type": "integer",
+            "title": "Productos"
+          },
+          "supervisores": {
+            "type": "integer",
+            "title": "Supervisores"
+          },
+          "cabeceras": {
+            "items": {
+              "$ref": "#/components/schemas/CabeceraWhatsmktRespuesta"
+            },
+            "type": "array",
+            "title": "Cabeceras"
+          },
+          "total_exclusiones": {
+            "type": "integer",
+            "title": "Total Exclusiones"
+          },
+          "exclusiones": {
+            "items": {
+              "$ref": "#/components/schemas/ExclusionWhatsmktRespuesta"
+            },
+            "type": "array",
+            "title": "Exclusiones",
+            "description": "Las primeras 100; el total esta en `total_exclusiones`"
+          },
+          "muestra": {
+            "items": {
+              "$ref": "#/components/schemas/FilaMuestraWhatsmktRespuesta"
+            },
+            "type": "array",
+            "title": "Muestra",
+            "description": "Las primeras 20 filas del archivo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "segmento",
+          "etiqueta_segmento",
+          "cantidad",
+          "productos",
+          "supervisores",
+          "cabeceras",
+          "total_exclusiones",
+          "exclusiones",
+          "muestra"
+        ],
+        "title": "CampanaPrevistaWhatsmktRespuesta"
       },
       "CampanaRespuesta": {
         "properties": {
@@ -6150,10 +6319,12 @@
           "informe_ya_importado",
           "campana_descartada",
           "campana_no_descartada",
-          "horario_invalido"
+          "horario_invalido",
+          "sin_dias_atraso",
+          "sin_supervisores"
         ],
         "title": "CodigoWhatsmkt",
-        "description": "Codigos de error del modulo; el frontend los traduce como `whatsmkt.codigo.<codigo>`.\n\nLos 27 de docs/whatsmkt-interfaz.md §7 mas `horario_invalido`, todos desde B1 para que la\nprueba espejo de i18n no cambie en cada corte. Un codigo por linea, con la forma\n`NOMBRE = \"codigo\"`: la prueba espejo lee esta clase. Un codigo nuevo se acuerda antes con\ndesigner. B1 emite solo `horario_invalido`, `variable_inexistente`, `segmentos_superpuestos`\ny `segmentos_con_hueco`; los demas los emiten B2 a B6."
+        "description": "Codigos de error del modulo; el frontend los traduce como `whatsmkt.codigo.<codigo>`.\n\nLos de docs/whatsmkt-interfaz.md §7 (con `horario_invalido`, `sin_dias_atraso` y\n`sin_supervisores`), todos desde B1 para que la\nprueba espejo de i18n no cambie en cada corte. Un codigo por linea, con la forma\n`NOMBRE = \"codigo\"`: la prueba espejo lee esta clase. Un codigo nuevo se acuerda antes con\ndesigner. B1 emite solo `horario_invalido`, `variable_inexistente`, `segmentos_superpuestos`\ny `segmentos_con_hueco`; los demas los emiten B2 a B6."
       },
       "ColumnaAnalizadaRespuesta": {
         "properties": {
@@ -7588,6 +7759,32 @@
         "title": "DefinicionRespuesta",
         "description": "La definicion, todas sus versiones (sin contenido) y la pedida (la vigente por defecto)."
       },
+      "DefinicionWhatsmktEntrada": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "DefinicionWhatsmktEntrada",
+        "description": "Una definicion de `/definiciones-columnas`: la version pedida o, sin ella, la vigente."
+      },
       "DetalleError": {
         "properties": {
           "detail": {
@@ -8348,6 +8545,67 @@
         ],
         "title": "ExclusionRespuesta"
       },
+      "ExclusionWhatsmktRespuesta": {
+        "properties": {
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoWhatsmkt"
+          },
+          "fila": {
+            "type": "integer",
+            "title": "Fila",
+            "description": "Posicion del producto entre los que genero la seleccion"
+          },
+          "pagare": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagare"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          },
+          "macro": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Macro",
+            "description": "macro_vacia: el numero de la macro (1 es la segunda)"
+          },
+          "etiqueta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etiqueta",
+            "description": "macro_vacia: la etiqueta de la columna"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "fila",
+          "pagare",
+          "detalle",
+          "macro",
+          "etiqueta"
+        ],
+        "title": "ExclusionWhatsmktRespuesta"
+      },
       "ExpresionEntrada": {
         "properties": {
           "nodos": {
@@ -8550,6 +8808,36 @@
           "advertencias"
         ],
         "title": "FilaMuestraRespuesta"
+      },
+      "FilaMuestraWhatsmktRespuesta": {
+        "properties": {
+          "supervision": {
+            "type": "boolean",
+            "title": "Supervision",
+            "description": "Una fila de supervision (van antes de los productos)"
+          },
+          "celdas": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Celdas",
+            "description": "Un valor por cabecera, en el mismo orden"
+          }
+        },
+        "type": "object",
+        "required": [
+          "supervision",
+          "celdas"
+        ],
+        "title": "FilaMuestraWhatsmktRespuesta"
       },
       "FilaRespuesta": {
         "properties": {
@@ -9406,6 +9694,15 @@
           "adicionales"
         ],
         "title": "MetricasRespuesta"
+      },
+      "ModoCampana": {
+        "type": "string",
+        "enum": [
+          "global",
+          "por_segmento"
+        ],
+        "title": "ModoCampana",
+        "description": "Como se reparte el mensaje (RF-WM-18): una campana para toda la seleccion, o un lote con una\ncampana por segmento (RF-WM-23)."
       },
       "MotivoNoEliminable": {
         "type": "string",
@@ -10642,6 +10939,135 @@
         ],
         "title": "PrevisualizacionCampanaRespuesta"
       },
+      "PrevisualizacionCampanasWhatsmktEntrada": {
+        "properties": {
+          "fecha_corte": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha Corte"
+          },
+          "filtros": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Filtros",
+            "default": []
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          },
+          "cantidad": {
+            "type": "integer",
+            "maximum": 120000.0,
+            "minimum": 1.0,
+            "title": "Cantidad"
+          },
+          "seleccion_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seleccion Id",
+            "description": "Referencia informativa a la seleccion guardada de origen"
+          },
+          "definicion": {
+            "$ref": "#/components/schemas/DefinicionWhatsmktEntrada"
+          },
+          "modo": {
+            "$ref": "#/components/schemas/ModoCampana",
+            "default": "global"
+          },
+          "fecha_envio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Envio",
+            "description": "Fecha de envio, solo para los dias de atraso ajustados (RF-55); sin ella, hoy en America/Lima. Todavia SIN validar contra los dias de envio (RF-70): eso llega con el mensaje"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fecha_corte",
+          "cantidad",
+          "definicion"
+        ],
+        "title": "PrevisualizacionCampanasWhatsmktEntrada"
+      },
+      "PrevisualizacionCampanasWhatsmktRespuesta": {
+        "properties": {
+          "campanas": {
+            "items": {
+              "$ref": "#/components/schemas/CampanaPrevistaWhatsmktRespuesta"
+            },
+            "type": "array",
+            "title": "Campanas"
+          },
+          "problemas": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemaWhatsmktRespuesta"
+            },
+            "type": "array",
+            "title": "Problemas",
+            "description": "Lo que impide crear; con alguno, la pantalla deja «Crear» inactivo"
+          },
+          "disponibles": {
+            "type": "integer",
+            "title": "Disponibles",
+            "description": "Productos de la seleccion completa (RF-08)"
+          },
+          "solicitados": {
+            "type": "integer",
+            "title": "Solicitados"
+          },
+          "total_exclusiones": {
+            "type": "integer",
+            "title": "Total Exclusiones",
+            "description": "Todas, incluidas las que no son de una campana"
+          },
+          "total_exclusiones_sin_campana": {
+            "type": "integer",
+            "title": "Total Exclusiones Sin Campana"
+          },
+          "exclusiones_sin_campana": {
+            "items": {
+              "$ref": "#/components/schemas/ExclusionWhatsmktRespuesta"
+            },
+            "type": "array",
+            "title": "Exclusiones Sin Campana",
+            "description": "Exclusiones que no son de ninguna campana: un producto sin dias de atraso, o de un segmento que se quedo sin productos. Las primeras 100"
+          }
+        },
+        "type": "object",
+        "required": [
+          "campanas",
+          "problemas",
+          "disponibles",
+          "solicitados",
+          "total_exclusiones",
+          "total_exclusiones_sin_campana",
+          "exclusiones_sin_campana"
+        ],
+        "title": "PrevisualizacionCampanasWhatsmktRespuesta"
+      },
       "PrevisualizacionEntrada": {
         "properties": {
           "expresiones": {
@@ -10963,6 +11389,23 @@
         ],
         "title": "ProblemaTextoRespuesta",
         "description": "`ubicacion` es nula cuando el problema es de toda la expresion. `columna` y `segmento`\nubican el problema dentro de una definicion; `campo` nombra el campo de la definicion cuando\nno es de una columna (`definicion`, `nombre`, `campos`, `segmentacion`)."
+      },
+      "ProblemaWhatsmktRespuesta": {
+        "properties": {
+          "codigo": {
+            "$ref": "#/components/schemas/CodigoWhatsmkt"
+          },
+          "detalle": {
+            "type": "string",
+            "title": "Detalle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "detalle"
+        ],
+        "title": "ProblemaWhatsmktRespuesta"
       },
       "Programacion": {
         "type": "string",

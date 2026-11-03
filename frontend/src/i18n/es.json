@@ -1447,5 +1447,9 @@
   "whatsmkt.codigo.informe_ya_importado": "Esta campaña ya tiene un informe; confirma para reemplazarlo.",
   "whatsmkt.codigo.campana_descartada": "La campaña está descartada. Restáurala primero.",
   "whatsmkt.codigo.campana_no_descartada": "Solo se puede eliminar una campaña descartada. Descártala primero.",
-  "whatsmkt.codigo.horario_invalido": "{horario} termina antes de empezar: la hora de inicio tiene que ser anterior a la de fin."
+  "whatsmkt.codigo.horario_invalido": "{horario} termina antes de empezar: la hora de inicio tiene que ser anterior a la de fin.",
+  "whatsmkt.codigo.sin_dias_atraso": "Sin días de atraso",
+  "whatsmkt.codigo.sin_supervisores": "No hay supervisores configurados: sin ellos no se crea la campaña.",
+  "whatsmkt.exclusiones.sin_dias_atraso": "No tiene días de atraso, así que no cae en ningún segmento. En el modo «Global» sí entraría.",
+  "whatsmkt.previa.irSupervisores": "Configurar supervisores"
 }

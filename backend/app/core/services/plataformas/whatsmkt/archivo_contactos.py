@@ -73,6 +73,8 @@ class ExclusionContacto:
     detalle: str
     macro: int | None = None
     etiqueta: str | None = None
+    # El segmento al que pertenece el producto (solo en un lote por segmento; None si no tiene).
+    segmento: str | None = None
 
 
 @dataclass(frozen=True)
@@ -163,17 +165,15 @@ class ArchivoContactosService:
         por_clave: dict[str | None, list[dict[str, Any]]] = {}
         for posicion, fila in enumerate(generado.tabla.filas, 1):
             pagare = None if vacia(fila[_PAGARE]) else str(fila[_PAGARE])
+            segmento = segmento_de(_dias(fila[_DIAS]), segmentos) if por_segmento else None
+            clave = None if segmento is None else segmento.clave
             exclusion = _exclusion(posicion, pagare, fila, definicion)
             if exclusion is not None:
-                exclusiones.append(exclusion)
+                exclusiones.append(replace(exclusion, segmento=clave))
                 continue
-            clave = None
-            if por_segmento:
-                segmento = segmento_de(_dias(fila[_DIAS]), segmentos)
-                if segmento is None:
-                    sin_segmento.append(SinSegmento(posicion, pagare))
-                    continue
-                clave = segmento.clave
+            if por_segmento and segmento is None:
+                sin_segmento.append(SinSegmento(posicion, pagare))
+                continue
             por_clave.setdefault(clave, []).append({c: fila[c] for c in cabeceras})
         return ResultadoContactos(
             archivos=tuple(

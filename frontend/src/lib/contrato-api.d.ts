@@ -1320,6 +1320,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/whatsmkt/campanas/previsualizacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Previsualizar los archivos de la campana
+         * @description Los archivos que resultarian de la seleccion, sin guardar nada (RF-WM-35).
+         *
+         *     En modo `por_segmento` sale una campana por cada segmento con productos (RF-WM-23); en
+         *     `global`, una. Los problemas (`definicion_no_whatsmkt`, `sin_supervisores`, `sin_productos`)
+         *     se listan con un 200: no impiden previsualizar, impiden crear.
+         */
+        post: operations["previsualizar_campanas_whatsmkt_campanas_previsualizacion_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1543,6 +1567,19 @@ export interface components {
              */
             hoja: string;
         };
+        /** CabeceraWhatsmktRespuesta */
+        CabeceraWhatsmktRespuesta: {
+            /**
+             * Nombre
+             * @description El encabezado del archivo
+             */
+            nombre: string;
+            /**
+             * Etiqueta
+             * @description La etiqueta de la columna; no sale en el archivo
+             */
+            etiqueta: string | null;
+        };
         /**
          * CambioCampoAdicionalEntrada
          * @description Renombrar, archivar o reactivar: lo que no viene no cambia. El nombre tecnico no cambia.
@@ -1552,6 +1589,39 @@ export interface components {
             nombre_legible?: string | null;
             /** Archivado */
             archivado?: boolean | null;
+        };
+        /** CampanaPrevistaWhatsmktRespuesta */
+        CampanaPrevistaWhatsmktRespuesta: {
+            /**
+             * Segmento
+             * @description La clave del segmento; null en una campana global
+             */
+            segmento: string | null;
+            /** Etiqueta Segmento */
+            etiqueta_segmento: string | null;
+            /**
+             * Cantidad
+             * @description Filas del archivo, supervisores incluidos (S-WM-4)
+             */
+            cantidad: number;
+            /** Productos */
+            productos: number;
+            /** Supervisores */
+            supervisores: number;
+            /** Cabeceras */
+            cabeceras: components["schemas"]["CabeceraWhatsmktRespuesta"][];
+            /** Total Exclusiones */
+            total_exclusiones: number;
+            /**
+             * Exclusiones
+             * @description Las primeras 100; el total esta en `total_exclusiones`
+             */
+            exclusiones: components["schemas"]["ExclusionWhatsmktRespuesta"][];
+            /**
+             * Muestra
+             * @description Las primeras 20 filas del archivo
+             */
+            muestra: components["schemas"]["FilaMuestraWhatsmktRespuesta"][];
         };
         /** CampanaRespuesta */
         CampanaRespuesta: {
@@ -1912,14 +1982,15 @@ export interface components {
          * CodigoWhatsmkt
          * @description Codigos de error del modulo; el frontend los traduce como `whatsmkt.codigo.<codigo>`.
          *
-         *     Los 27 de docs/whatsmkt-interfaz.md §7 mas `horario_invalido`, todos desde B1 para que la
+         *     Los de docs/whatsmkt-interfaz.md §7 (con `horario_invalido`, `sin_dias_atraso` y
+         *     `sin_supervisores`), todos desde B1 para que la
          *     prueba espejo de i18n no cambie en cada corte. Un codigo por linea, con la forma
          *     `NOMBRE = "codigo"`: la prueba espejo lee esta clase. Un codigo nuevo se acuerda antes con
          *     designer. B1 emite solo `horario_invalido`, `variable_inexistente`, `segmentos_superpuestos`
          *     y `segmentos_con_hueco`; los demas los emiten B2 a B6.
          * @enum {string}
          */
-        CodigoWhatsmkt: "sin_telefono" | "telefono_invalido" | "macro_vacia" | "mensaje_con_emoji" | "macro_inexistente" | "mensaje_largo" | "mensaje_deshabilitado" | "nombre_largo" | "variable_inexistente" | "fecha_no_gestionable" | "sin_horario" | "sin_productos" | "definicion_no_whatsmkt" | "foto_formato" | "foto_medidas" | "foto_peso" | "adjunto_tipo" | "adjunto_peso" | "adjunto_danado" | "segmentos_superpuestos" | "segmentos_con_hueco" | "informe_sin_encabezados" | "informe_sin_filas" | "informe_ya_importado" | "campana_descartada" | "campana_no_descartada" | "horario_invalido";
+        CodigoWhatsmkt: "sin_telefono" | "telefono_invalido" | "macro_vacia" | "mensaje_con_emoji" | "macro_inexistente" | "mensaje_largo" | "mensaje_deshabilitado" | "nombre_largo" | "variable_inexistente" | "fecha_no_gestionable" | "sin_horario" | "sin_productos" | "definicion_no_whatsmkt" | "foto_formato" | "foto_medidas" | "foto_peso" | "adjunto_tipo" | "adjunto_peso" | "adjunto_danado" | "segmentos_superpuestos" | "segmentos_con_hueco" | "informe_sin_encabezados" | "informe_sin_filas" | "informe_ya_importado" | "campana_descartada" | "campana_no_descartada" | "horario_invalido" | "sin_dias_atraso" | "sin_supervisores";
         /**
          * ColumnaAnalizadaRespuesta
          * @description Una columna del archivo. `indice` va en base 0 y es su posicion en el archivo (los
@@ -2472,6 +2543,16 @@ export interface components {
             problemas: components["schemas"]["ProblemaTextoRespuesta"][];
         };
         /**
+         * DefinicionWhatsmktEntrada
+         * @description Una definicion de `/definiciones-columnas`: la version pedida o, sin ella, la vigente.
+         */
+        DefinicionWhatsmktEntrada: {
+            /** Id */
+            id: number;
+            /** Version */
+            version?: number | null;
+        };
+        /**
          * DetalleError
          * @description Motivo legible por el que la API rechazo la peticion.
          */
@@ -2795,6 +2876,29 @@ export interface components {
              */
             campos: components["schemas"]["CampoNombradoRespuesta"][];
         };
+        /** ExclusionWhatsmktRespuesta */
+        ExclusionWhatsmktRespuesta: {
+            codigo: components["schemas"]["CodigoWhatsmkt"];
+            /**
+             * Fila
+             * @description Posicion del producto entre los que genero la seleccion
+             */
+            fila: number;
+            /** Pagare */
+            pagare: string | null;
+            /** Detalle */
+            detalle: string;
+            /**
+             * Macro
+             * @description macro_vacia: el numero de la macro (1 es la segunda)
+             */
+            macro: number | null;
+            /**
+             * Etiqueta
+             * @description macro_vacia: la etiqueta de la columna
+             */
+            etiqueta: string | null;
+        };
         /** ExpresionEntrada */
         ExpresionEntrada: {
             /** Nodos */
@@ -2860,6 +2964,19 @@ export interface components {
             largo: number;
             /** Advertencias */
             advertencias: components["schemas"]["CodigoMowaMes"][];
+        };
+        /** FilaMuestraWhatsmktRespuesta */
+        FilaMuestraWhatsmktRespuesta: {
+            /**
+             * Supervision
+             * @description Una fila de supervision (van antes de los productos)
+             */
+            supervision: boolean;
+            /**
+             * Celdas
+             * @description Un valor por cabecera, en el mismo orden
+             */
+            celdas: (string | null)[];
         };
         /**
          * FilaRespuesta
@@ -3188,6 +3305,13 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * ModoCampana
+         * @description Como se reparte el mensaje (RF-WM-18): una campana para toda la seleccion, o un lote con una
+         *     campana por segmento (RF-WM-23).
+         * @enum {string}
+         */
+        ModoCampana: "global" | "por_segmento";
         /**
          * MotivoNoEliminable
          * @description Por que una version no se podra eliminar por mas que se deshabilite (RF-MM-30).
@@ -3694,6 +3818,65 @@ export interface components {
              */
             nombre_estimado: boolean;
         };
+        /** PrevisualizacionCampanasWhatsmktEntrada */
+        PrevisualizacionCampanasWhatsmktEntrada: {
+            /**
+             * Fecha Corte
+             * Format: date
+             */
+            fecha_corte: string;
+            /**
+             * Filtros
+             * @default []
+             */
+            filtros: string[];
+            /** Orden */
+            orden?: string | null;
+            /** Cantidad */
+            cantidad: number;
+            /**
+             * Seleccion Id
+             * @description Referencia informativa a la seleccion guardada de origen
+             */
+            seleccion_id?: number | null;
+            definicion: components["schemas"]["DefinicionWhatsmktEntrada"];
+            /** @default global */
+            modo: components["schemas"]["ModoCampana"];
+            /**
+             * Fecha Envio
+             * @description Fecha de envio, solo para los dias de atraso ajustados (RF-55); sin ella, hoy en America/Lima. Todavia SIN validar contra los dias de envio (RF-70): eso llega con el mensaje
+             */
+            fecha_envio?: string | null;
+        };
+        /** PrevisualizacionCampanasWhatsmktRespuesta */
+        PrevisualizacionCampanasWhatsmktRespuesta: {
+            /** Campanas */
+            campanas: components["schemas"]["CampanaPrevistaWhatsmktRespuesta"][];
+            /**
+             * Problemas
+             * @description Lo que impide crear; con alguno, la pantalla deja «Crear» inactivo
+             */
+            problemas: components["schemas"]["ProblemaWhatsmktRespuesta"][];
+            /**
+             * Disponibles
+             * @description Productos de la seleccion completa (RF-08)
+             */
+            disponibles: number;
+            /** Solicitados */
+            solicitados: number;
+            /**
+             * Total Exclusiones
+             * @description Todas, incluidas las que no son de una campana
+             */
+            total_exclusiones: number;
+            /** Total Exclusiones Sin Campana */
+            total_exclusiones_sin_campana: number;
+            /**
+             * Exclusiones Sin Campana
+             * @description Exclusiones que no son de ninguna campana: un producto sin dias de atraso, o de un segmento que se quedo sin productos. Las primeras 100
+             */
+            exclusiones_sin_campana: components["schemas"]["ExclusionWhatsmktRespuesta"][];
+        };
         /** PrevisualizacionEntrada */
         PrevisualizacionEntrada: {
             /**
@@ -3790,6 +3973,12 @@ export interface components {
             segmento: string | null;
             /** Campo */
             campo: string | null;
+        };
+        /** ProblemaWhatsmktRespuesta */
+        ProblemaWhatsmktRespuesta: {
+            codigo: components["schemas"]["CodigoWhatsmkt"];
+            /** Detalle */
+            detalle: string;
         };
         /**
          * Programacion
@@ -7801,6 +7990,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DetalleError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    previsualizar_campanas_whatsmkt_campanas_previsualizacion_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrevisualizacionCampanasWhatsmktEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrevisualizacionCampanasWhatsmktRespuesta"];
+                };
+            };
+            /** @description La peticion no se puede atender tal como viene; el motivo esta en detail. Con el codigo fecha_envio_anterior trae ademas fecha_envio y fecha_corte */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorFechaEnvio"];
+                };
+            };
+            /** @description No existe lo pedido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleErrorConCodigo"];
                 };
             };
             /** @description Validation Error */

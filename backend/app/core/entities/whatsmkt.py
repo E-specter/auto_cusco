@@ -19,7 +19,8 @@ VARIABLES_PLANTILLA = ("fecha_corte", "segmento")
 class CodigoWhatsmkt(StrEnum):
     """Codigos de error del modulo; el frontend los traduce como `whatsmkt.codigo.<codigo>`.
 
-    Los 27 de docs/whatsmkt-interfaz.md §7 mas `horario_invalido`, todos desde B1 para que la
+    Los de docs/whatsmkt-interfaz.md §7 (con `horario_invalido`, `sin_dias_atraso` y
+    `sin_supervisores`), todos desde B1 para que la
     prueba espejo de i18n no cambie en cada corte. Un codigo por linea, con la forma
     `NOMBRE = "codigo"`: la prueba espejo lee esta clase. Un codigo nuevo se acuerda antes con
     designer. B1 emite solo `horario_invalido`, `variable_inexistente`, `segmentos_superpuestos`
@@ -53,6 +54,16 @@ class CodigoWhatsmkt(StrEnum):
     CAMPANA_DESCARTADA = "campana_descartada"
     CAMPANA_NO_DESCARTADA = "campana_no_descartada"
     HORARIO_INVALIDO = "horario_invalido"
+    SIN_DIAS_ATRASO = "sin_dias_atraso"
+    SIN_SUPERVISORES = "sin_supervisores"
+
+
+class ModoCampana(StrEnum):
+    """Como se reparte el mensaje (RF-WM-18): una campana para toda la seleccion, o un lote con una
+    campana por segmento (RF-WM-23)."""
+
+    GLOBAL = "global"
+    POR_SEGMENTO = "por_segmento"
 
 
 class ErrorWhatsmkt(Exception):
