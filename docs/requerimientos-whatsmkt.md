@@ -212,8 +212,10 @@ Fuente: «El campo de mensaje es un solo bloque, WhatsMKT ya hace el reemplazo d
   * el tipo se reconoce por la firma del archivo, no por la extensión;
   * el tamaño se controla antes de leer el archivo completo;
   * los topes de video, audio y PDF son configurables (RF-WM-04), con el valor inicial del supuesto S-WM-8. Los límites reales de WhatsMKT no se conocen (P-8).
+  * el tope de las imágenes es fijo, de 5 000 000 bytes, el máximo de imagen de WhatsApp (duda DU-WM-13).
 * **RF-WM-32 — Limpieza de metadatos:** Quitar los metadatos de las imágenes al guardarlas, sin perder calidad (P-8): no se vuelve a codificar la imagen, solo se quitan bloques del archivo.
   * JPEG: se quitan los segmentos EXIF y XMP (APP1), IPTC (APP13) y los comentarios. El perfil de color (APP2) y los datos de la imagen quedan byte a byte.
+  * Del EXIF se conserva solo la orientación, en un APP1 mínimo: sin ella, una foto de celular tomada en vertical se vería girada, y la orientación no es un dato personal. Si la foto no trae orientación, si vale «normal» o si el EXIF es ilegible, no queda ningún APP1 (duda DU-WM-12).
   * PNG: se quitan los bloques de texto, `eXIf` y `tIME`.
   * Si el archivo está truncado o mal formado, entonces se rechaza.
   * Video, audio y PDF se guardan tal como llegan: limpiarlos exigiría herramientas externas y queda fuera de esta entrega.
@@ -362,12 +364,15 @@ No están en el plan v2 ni en las decisiones del 2026-11-02. Mientras no se resp
 | DU-WM-9 | ¿Se registra una tarifa por mensaje y un costo por campaña, o un límite mensual, como en MOWA MES (RF-MM-01, RF-MM-23, RF-MM-24)? (No, en esta entrega.) | Sección 6 |
 | DU-WM-10 | ¿Cómo se nombra el archivo de contactos que se descarga? El del 29.10 se llamaba `CUSCO_Vencida WhatsMKT Whatsapp 2026.10.29.xlsx`. (El nombre de la campaña más `.xlsx`, con los caracteres no válidos en Windows cambiados por `_`.) | RF-WM-16 |
 | DU-WM-11 | El speech original trae el enlace de WhatsApp de contacto de la Caja dentro del texto, pero el número real no puede guardarse en el repositorio, ni en la siembra de B3. ¿Cómo entra? (a) Como en MOWA (RF-MM-16): un número de contacto en la configuración de WhatsMKT, que el sistema pone en lugar de `[whatsapp]` al mostrar y copiar el mensaje; sin número configurado, no se crea una campaña cuyo mensaje lo use. (b) La v1 se siembra con `[whatsapp]` literal, y el usuario lo cambia por el enlace al editar el mensaje en la configuración. (Provisional: (a), el patrón ya probado en MOWA; se decide antes de B3.) | RF-WM-21 |
+| DU-WM-12 | Al limpiar un JPEG, ¿se conserva la orientación del EXIF (que la foto no se vea girada) o se quita todo el EXIF, como decía RF-WM-32? (Se conserva solo la orientación; todo lo demás, incluido el GPS, se quita.) | RF-WM-32 |
+| DU-WM-13 | La configuración no tiene tope para las imágenes. ¿Se agrega como los de video, audio y PDF, o queda fijo? (Fijo, de 5 000 000 bytes, el máximo de imagen de WhatsApp; no está verificado en WhatsMKT.) | RF-WM-31 |
 
 ## 12. Registro de cambios
 
 **2026-11-02**
 - **RF nuevos incorporados:** RF-WM-01 a RF-WM-44, documento nuevo (T-WM-0b), a partir del plan WhatsMKT v2 y de las decisiones del usuario del 2026-11-02.
 - **RF existentes ampliados o modificados:** ninguno en este documento. Cita los RF globales RF-44 y RF-49 (ampliados) y RF-69 a RF-74 (nuevos), que escribe T-HI-0, y el cambio de RF-MM-08 a lunes a sábado (T-MM-0), que escriben sus dueños.
-- **Supuestos nuevos:** S-WM-1 a S-WM-9 (los S-1 a S-9 del plan). **Dudas nuevas:** DU-WM-1 a DU-WM-11.
+- **Supuestos nuevos:** S-WM-1 a S-WM-9 (los S-1 a S-9 del plan). **Dudas nuevas:** DU-WM-1 a DU-WM-13.
 - **Nota de numeración:** secuencia propia del módulo, continua y sin huecos. Los RF que se agreguen después continúan la secuencia sin renumerar los existentes, como en MOWA MES.
 - **RF existentes ampliados:** RF-WM-21: el enlace de WhatsApp de contacto de los speeches pasa a `[whatsapp]`, porque el número real no puede estar en el repositorio (la prueba `test_datos_sinteticos` lo detectó en `main`). DU-WM-11 se reescribe con las dos opciones.
+- **RF existentes ampliados:** RF-WM-31 (tope fijo de las imágenes) y RF-WM-32 (del EXIF se conserva solo la orientación), según lo implementado en T-WM-B5. **Dudas nuevas:** DU-WM-12 y DU-WM-13.
