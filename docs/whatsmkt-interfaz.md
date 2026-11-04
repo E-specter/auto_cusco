@@ -181,11 +181,12 @@ Es el seguimiento de MOWA ([mowa-mes-interfaz.md](mowa-mes-interfaz.md) §4.2 y 
 
   - Estado: el tag «Pendiente del informe» (`tag--advertencia`, `hourglass`) o nada si ya está conciliada. Una descartada lleva «Descartada» (`archive`).
   - Acción: «Ver» (`eye`), «Descargar» (`download`) y «Descartar» (`archive`). En Descartadas: «Ver», «Restaurar» (`archive-restore`) y «Eliminar definitivamente» (`trash-2`, rojo).
-  - Lote: el número del lote en mono, con el filtro al tocarlo. Las campañas de un mismo lote quedan juntas.
+  - Lote: el número del lote en mono, como un botón con aspecto de enlace (subrayado) y `aria-label` «Ver solo el lote {lote}», que filtra al tocarlo. Las campañas de un mismo lote quedan juntas.
+  - Si la otra vista (Activas o Descartadas) no carga, la pantalla se queda en la que tenía y el error va en el diálogo de error.
 
 ### 4.2 Detalle de la campaña
 
-- **Encabezado del panel:** «Campaña 37 · Preventivo · lote 12», y a la derecha, en mono: «Corte 13 set. 2026 · envío 15 set. 2026 · Horario 1».
+- **Encabezado del panel:** «Campaña 37 · Preventivo · lote 12» (en una global, «Campaña 37 · lote 12»), y a la derecha, en mono, muted y `text-xs`: «Corte 13 set. 2026 · envío 15 set. 2026 · Horario 1».
 - **Pendiente del informe:** un `.notice--warning` con «Falta importar el informe de WhatsMKT. Cuando la campaña se haya enviado, descárgalo de WhatsMKT e impórtalo aquí», y «Importar el informe» (`upload`).
 - **Cifras,** con los iconos del catálogo: productos cargados, supervisión (`user-check`), total cargados (`file-up`), excluidos (`ban`) y, con informe, enviados (`send`) y no enviados (`circle-x`).
 - **Archivos:** la lista de contactos, la foto y el adjunto, con «Descargar» y su rótulo, como en la ficha.
@@ -208,7 +209,7 @@ Es el seguimiento de MOWA ([mowa-mes-interfaz.md](mowa-mes-interfaz.md) §4.2 y 
   - Un `<details>` cerrado, debajo de las exclusiones: «Productos fuera de las campañas del lote 12 (87)». Va cerrado porque se repite en cada campaña del lote y no es de esta.
   - Dentro, el hint de la previsualización y la misma tabla, con el paginador.
   - Con cero, o en una campaña global, no se muestra.
-- **Descartar, restaurar y eliminar:** las confirmaciones de [mowa-mes-interfaz.md](mowa-mes-interfaz.md) §4.6, con los textos de WhatsMKT (§8). Eliminar dice además que la biblioteca y los mensajes no cambian (RF-WM-42).
+- **Descartar, restaurar y eliminar:** las confirmaciones de [mowa-mes-interfaz.md](mowa-mes-interfaz.md) §4.6, con los textos de WhatsMKT (§8) y la casilla obligatoria para eliminar. Si al descartar llega `campana_descartada` (otro la descartó entretanto), va `whatsmkt.seguimiento.yaDescartada`, no el texto común del código, y la lista se recarga. Eliminar dice además que la biblioteca y los mensajes no cambian (RF-WM-42).
 
 ## 5. Configuración (`/whatsmkt/configuracion`)
 
@@ -229,7 +230,7 @@ Cada bloque se guarda por separado, como en MOWA. Los paneles van en este orden:
    - el número no vive en el repositorio: los mensajes sembrados llevan el marcador `[whatsapp]`, y el sistema lo cambia por el enlace al mostrar y copiar (vista previa, ficha y «Copiar»).
 4. **Horarios de envío** (RF-WM-07): las dos franjas, cada una con dos `input type="time"` (desde y hasta). Una franja cuyo inicio no es anterior a su fin (14:00 a 08:00, o la misma hora) se rechaza con `horario_invalido`, bajo esa franja; `{horario}` es su nombre, «Horario 1» o «Horario 2».
 5. **Nombre de la campaña** (RF-WM-33): la plantilla, con sus fichas de variables, el contador «/ 75» y los nombres resultantes en un `dl`: el segmento en `dt` y el nombre en `dd`, en mono y con `overflow-wrap: anywhere`, para que a 360 px la etiqueta no se parta en medio del nombre del segmento.
-6. **Archivo de carga** (RF-WM-09): el `select` de la definición por defecto, con las de plataforma WhatsMKT, y «Editar en Columnas de carga».
+6. **Archivo de carga** (RF-WM-09): el `select` de la definición por defecto, con las de plataforma WhatsMKT, y «Editar en Columnas de carga». Al volver de Columnas (§12.4 del motor), la definición queda elegida pero **sin guardar**: el anuncio es `whatsmkt.configuracion.definicion.elegidaSinGuardar`, no el `herramientas.volver.elegida` de la campaña, que no tiene un guardado aparte. «Guardar definición» queda activo.
 7. **Topes** (RF-WM-26 y RF-WM-31): largo máximo del mensaje (caracteres) y tamaño máximo de video, audio y PDF (MB). La API los guarda en bytes; el panel los muestra y los recibe en MB, en base decimal (1 MB son un millón de bytes). Los `input` llevan `min="1"`, así que un tope de cero o negativo no llega a validarse. Cada uno con su hint del supuesto: «Valor inicial: el largo de un mensaje de WhatsApp (4096). No es un dato verificado de WhatsMKT».
 8. **Biblioteca de adjuntos** (RF-WM-30 a RF-WM-32):
    - Una tabla apilable con Nombre, Tipo, Tamaño, Subido y Acciones («Descargar» y «Archivar»), y «Subir un archivo». El tamaño, en base decimal como los topes (240 KB, 1.5 MB), alineado a la derecha. La tabla de los archivados comparte los anchos de columna (`table-layout: fixed` y el mismo `<colgroup>`), para que las dos se lean como una lista.
@@ -304,7 +305,11 @@ Los códigos los define el backend en su enum (`whatsmkt.codigo.*`, RF-WM-43) y 
 | `sin_whatsapp` | Resumen de la previsualización y «Crear» | El mensaje usa [whatsapp] y no hay WhatsApp de contacto configurado. | The message uses [whatsapp] and no contact WhatsApp is set up. |
 
 Las cuatro primeras son motivos de exclusión: además del texto corto, llevan un detalle para la columna Detalle, con su clave `whatsmkt.exclusiones.*`, como en MOWA:
-- `macro_vacia`: es «La macro {n} ({etiqueta}) queda vacía y su columna no tiene valor por defecto.» / en «Macro {n} ({etiqueta}) is empty and its column has no default value.»
+- `sin_telefono`: es «No tiene un teléfono registrado.» / en «It has no phone number on record.»
+- `telefono_invalido`: es «El teléfono no es un celular válido.» / en «The phone number is not a valid mobile number.»
+- `macro_vacia`: es «La macro {n} ({etiqueta}) queda vacía y su columna no tiene valor por defecto.» / en «Macro {n} ({etiqueta}) is empty and its column has no default value.» Sale de los campos `macro` y `etiqueta` de la exclusión (`ExclusionWhatsmktRespuesta`, el mismo esquema en la previsualización y en el detalle), con `{n}` igual a `macro`. Si `etiqueta` viene vacía o nula, `whatsmkt.exclusiones.macro_vacia_sinEtiqueta`: es «La macro {n} queda vacía y su columna no tiene valor por defecto.» / en «Macro {n} is empty and its column has no default value.»
+
+El Detalle se pinta con `whatsmkt.exclusiones.<codigo>` y los datos de la exclusión. La frase del servidor queda solo como respaldo, si no hay clave.
 - `sin_dias_atraso`: es «No tiene días de atraso, así que no cae en ningún segmento. En el modo «Global» sí entraría.» / en «It has no days overdue, so it falls in no segment. In “Global” mode it would be included.» Es el caso de `sin_speech` de MOWA. En el modo global no se excluye.
 
 `sin_supervisores` se detecta en la previsualización, no recién al crear: va en el resumen de problemas, deja «Crear» inactivo, y en lugar de «Ir al campo» lleva «Configurar supervisores» (`whatsmkt.previa.irSupervisores`), que abre Supervisores con ir y volver (§2). Si aun así llega al crear (alguien los borró entretanto), va arriba en `role="alert"` con el mismo enlace.
@@ -439,6 +444,12 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.previa.fuera.hint` | No entran en ninguna campaña del lote: no tienen días de atraso, o su segmento se quedó sin productos. | They are in no campaign of the batch: they have no days overdue, or their segment was left with no products. |
 | `whatsmkt.previa.fuera.truncadas` | Se muestran las primeras {mostradas} de {total}. La lista completa estará en el seguimiento de cualquier campaña del lote después de crearlas. | Showing the first {mostradas} of {total}. The full list will be in the tracking of any campaign of the batch once they are created. |
 | `whatsmkt.seguimiento.exclusiones` | Exclusiones | Exclusions |
+| `whatsmkt.seguimiento.exclusionesTruncadas` | Se muestran las primeras {mostradas} de {total}. | Showing the first {mostradas} of {total}. |
+| `whatsmkt.exclusiones.sin_telefono` | No tiene un teléfono registrado. | It has no phone number on record. |
+| `whatsmkt.exclusiones.telefono_invalido` | El teléfono no es un celular válido. | The phone number is not a valid mobile number. |
+| `whatsmkt.exclusiones.macro_vacia` | La macro {n} ({etiqueta}) queda vacía y su columna no tiene valor por defecto. | Macro {n} ({etiqueta}) is empty and its column has no default value. |
+| `whatsmkt.exclusiones.macro_vacia_sinEtiqueta` | La macro {n} queda vacía y su columna no tiene valor por defecto. | Macro {n} is empty and its column has no default value. |
+| `whatsmkt.exclusiones.sin_dias_atraso` | No tiene días de atraso, así que no cae en ningún segmento. En el modo «Global» sí entraría. | It has no days overdue, so it falls in no segment. In “Global” mode it would be included. |
 | `whatsmkt.seguimiento.fueraLote` | Productos fuera de las campañas del lote {lote} ({n}) | Products outside the campaigns of batch {lote} ({n}) |
 | `whatsmkt.crear.una` | Crear campaña | Create campaign |
 | `whatsmkt.crear.varias` | Crear {n} campañas | Create {n} campaigns |
@@ -464,6 +475,38 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.subir.dato.mensaje` | Texto del mensaje | Message text |
 | `whatsmkt.subir.irSeguimiento` | Ir al seguimiento de la campaña | Go to the campaign's tracking |
 | `whatsmkt.seguimiento.titulo` | Seguimiento de WhatsMKT | WhatsMKT tracking |
+| `whatsmkt.seguimiento.lista` | Campañas | Campaigns |
+| `whatsmkt.seguimiento.tabla` | Campañas de WhatsMKT | WhatsMKT campaigns |
+| `whatsmkt.seguimiento.filtro.mes` | Mes de envío | Send month |
+| `whatsmkt.seguimiento.filtro.lote` | Lote | Batch |
+| `whatsmkt.seguimiento.filtro.segmento` | Segmento | Segment |
+| `whatsmkt.seguimiento.filtro.todos` | Todos | All |
+| `whatsmkt.seguimiento.filtro.global` | Global | Global |
+| `whatsmkt.seguimiento.col.numero` | # | # |
+| `whatsmkt.seguimiento.col.creada` | Creada | Created |
+| `whatsmkt.seguimiento.col.nombre` | Nombre | Name |
+| `whatsmkt.seguimiento.col.lote` | Lote | Batch |
+| `whatsmkt.seguimiento.col.segmento` | Segmento | Segment |
+| `whatsmkt.seguimiento.col.envio` | Envío | Send date |
+| `whatsmkt.seguimiento.col.filas` | Filas | Rows |
+| `whatsmkt.seguimiento.col.estado` | Estado | Status |
+| `whatsmkt.seguimiento.col.accion` | Acciones | Actions |
+| `whatsmkt.seguimiento.vacia` | No hay campañas con estos filtros. | There are no campaigns with these filters. |
+| `whatsmkt.seguimiento.sinCampanas` | Todavía no hay campañas. Se crean en la pantalla de Campaña. | There are no campaigns yet. They are created in the Campaign screen. |
+| `whatsmkt.seguimiento.verLote` | Ver solo el lote {lote} | Show only batch {lote} |
+| `whatsmkt.seguimiento.encabezado` | Campaña {id} · {segmento} · lote {lote} | Campaign {id} · {segmento} · batch {lote} |
+| `whatsmkt.seguimiento.encabezadoGlobal` | Campaña {id} · lote {lote} | Campaign {id} · batch {lote} |
+| `whatsmkt.seguimiento.fechas` | Corte {corte} · envío {envio} · {horarios} | Cut-off {corte} · send date {envio} · {horarios} |
+| `whatsmkt.seguimiento.cifra.productos` | Productos cargados | Products loaded |
+| `whatsmkt.seguimiento.cifra.supervision` | Supervisión | Supervision |
+| `whatsmkt.seguimiento.cifra.total` | Total cargados | Total loaded |
+| `whatsmkt.seguimiento.cifra.excluidos` | Excluidos | Excluded |
+| `whatsmkt.seguimiento.archivos` | Archivos | Files |
+| `whatsmkt.seguimiento.ficha` | Datos del formulario de WhatsMKT | WhatsMKT form data |
+| `whatsmkt.seguimiento.descartada` | Se descartó la campaña {id}. | Campaign {id} was discarded. |
+| `whatsmkt.seguimiento.restaurada` | Se restauró la campaña {id}. | Campaign {id} was restored. |
+| `whatsmkt.seguimiento.eliminada` | Se eliminó la campaña {id}. | Campaign {id} was deleted. |
+| `whatsmkt.seguimiento.yaDescartada` | Esta campaña ya estaba descartada: alguien la descartó mientras tanto. Se actualizó la lista. | This campaign was already discarded: someone discarded it in the meantime. The list was refreshed. |
 | `whatsmkt.seguimiento.pendientes` | {n} campañas pendientes del informe | {n} campaigns with the report pending |
 | `whatsmkt.seguimiento.pendientesUna` | 1 campaña pendiente del informe | 1 campaign with the report pending |
 | `whatsmkt.estado.pendienteInforme` | Pendiente del informe | Report pending |
@@ -478,6 +521,11 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.conciliacion.sinCorrespondencia` | Números del informe que no están en la carga: {n} | Report numbers that are not in the load: {n} |
 | `whatsmkt.conciliacion.nombreInforme` | Nombre en el informe: {nombre} | Name in the report: {nombre} |
 | `whatsmkt.conciliacion.nota` | Un producto cuenta como enviado si su número aparece en el informe. Si dos productos comparten número, el envío cuenta para los dos. | A product counts as sent if its number appears in the report. If two products share a number, the sending counts for both. |
+| `whatsmkt.confirmar.descartar.titulo` | Descartar la campaña {id} | Discard campaign {id} |
+| `whatsmkt.confirmar.descartar.cuerpo` | Deja de mostrarse entre las activas. No se borra nada: se puede restaurar. | It stops showing among the active ones. Nothing is deleted: it can be restored. |
+| `whatsmkt.confirmar.restaurar.titulo` | Restaurar la campaña {id} | Restore campaign {id} |
+| `whatsmkt.confirmar.restaurar.cuerpo` | Vuelve a las activas. | It goes back to the active ones. |
+| `whatsmkt.confirmar.eliminar.titulo` | Eliminar definitivamente la campaña {id} | Delete campaign {id} permanently |
 | `whatsmkt.confirmar.eliminar.cuerpo` | Se borran la campaña, su lista de contactos, sus filas, exclusiones e informe. La biblioteca de adjuntos y los mensajes no cambian. No se puede deshacer. | The campaign, its contact list, rows, exclusions and report are deleted. The attachment library and the messages do not change. This cannot be undone. |
 | `whatsmkt.configuracion.titulo` | Configuración de WhatsMKT | WhatsMKT settings |
 | `whatsmkt.configuracion.herramientas` | Columnas de carga, Supervisores y Calendario laboral tienen su propia pantalla: | Load columns, Supervisors and Working calendar have their own screens: |
@@ -504,6 +552,7 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.configuracion.definicion.ninguna` | Sin definición por defecto | No default definition |
 | `whatsmkt.configuracion.definicion.hint` | La definición de columnas con la que parte cada campaña de WhatsMKT. En la campaña se puede elegir otra. | The column definition every WhatsMKT campaign starts from. Another one can be chosen in the campaign. |
 | `whatsmkt.configuracion.guardarDefinicion` | Guardar definición | Save definition |
+| `whatsmkt.configuracion.definicion.elegidaSinGuardar` | Se eligió {nombreCitado}, versión {n}. Falta guardarla como definición por defecto. | {nombreCitado}, version {n}, was chosen. It still has to be saved as the default definition. |
 | `whatsmkt.configuracion.topes` | Topes | Limits |
 | `whatsmkt.configuracion.tope.mensaje` | Largo máximo del mensaje | Maximum message length |
 | `whatsmkt.configuracion.tope.mensajeHint` | Valor inicial: el largo de un mensaje de WhatsApp (4096). No es un dato verificado de WhatsMKT. | Initial value: the length of a WhatsApp message (4096). It is not a verified WhatsMKT figure. |
