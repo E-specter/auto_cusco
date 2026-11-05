@@ -31,7 +31,7 @@ El cambio de RF-MM-08 a lunes a sábado (D-A) lo escribe `coordinador_modulo_mow
 | Canal | WhatsApp |
 | País | Perú, único (decisión del usuario, 2026-11-02, P-9) |
 | Tipos de envío publicados | Texto, imagen de perfil más texto, con imagen, con audio, video o PDF, y con vCard |
-| Variables por mensaje publicadas | «hasta 5 variables» (ver duda DU-WM-1) |
+| Variables por mensaje publicadas | «hasta 5 variables»: 5 macros por mensaje (RF-WM-47) |
 | API o webhooks | No publicados |
 
 * **RF-WM-01 — Módulo propio:** Implementar WhatsMKT como un módulo de canal propio, hermano de MOWA MES y distinto de él (decisión del usuario, 2026-11-02, P-1).
@@ -58,6 +58,7 @@ El cambio de RF-MM-08 a lunes a sábado (D-A) lo escribe `coordinador_modulo_mow
   * la plantilla del nombre de campaña (RF-WM-33);
   * la definición de columnas por defecto (RF-WM-09);
   * el tope de largo del mensaje (RF-WM-26);
+  * el número de WhatsApp de contacto que reemplaza a `[whatsapp]` (RF-WM-21);
   * los topes de tamaño de los adjuntos (RF-WM-31);
   * la biblioteca de adjuntos (RF-WM-30).
 
@@ -176,7 +177,11 @@ Fuente: «El campo de mensaje es un solo bloque, WhatsMKT ya hace el reemplazo d
     ```
 
   * Los espacios dobles («vence  el», «agentes  KASNET») y los espacios antes de una coma se conservan tal como vienen, hasta que el usuario decida (duda DU-WM-2).
-  * `[whatsapp]` reemplaza aquí el enlace `https://wa.me/+51…` con el número de WhatsApp de contacto que trae el speech original. El número real no se escribe en el repositorio (regla de datos sintéticos, `AGENTS.md`), ni en este documento ni en la siembra. Cómo entra a los mensajes es la duda DU-WM-11.
+  * `[whatsapp]` reemplaza aquí el enlace `https://wa.me/+51…` con el número de WhatsApp de contacto que trae el speech original. El número real no se escribe en el repositorio (regla de datos sintéticos, `AGENTS.md`), ni en este documento ni en la siembra. Cómo entra a los mensajes lo decidió el usuario (DU-WM-11, opción (a)):
+    * el número de WhatsApp de contacto se guarda en la configuración (RF-WM-04), y el sistema reemplaza `[whatsapp]` por `https://wa.me/+51<número>` al mostrar y copiar el mensaje (RF-WM-36);
+    * cada campaña congela el número vigente al crearla: si después cambia la configuración, la ficha de la campaña sigue mostrando el que usó;
+    * sin número configurado, no se crea una campaña cuyo mensaje use `[whatsapp]`;
+    * el mensaje se guarda y se sube con el marcador literal `[whatsapp]`, también con el editor de la fase B (RF-WM-51).
 * **RF-WM-22 — Mensaje de la campaña:** Elegir al crear la campaña el mensaje guardado que usa: en modo global, un mensaje global o el de un segmento; en modo por segmento, el de cada segmento, que por defecto es su mensaje de la configuración.
   * Una versión deshabilitada no se ofrece, y crear o previsualizar una campaña con ella se rechaza con el motivo.
 * **RF-WM-23 — Lote de campañas por segmento:** Si el modo es por segmento, entonces crear una campaña de WhatsMKT por cada segmento que tenga productos, porque cada campaña de WhatsMKT lleva un solo mensaje.
@@ -192,11 +197,46 @@ Fuente: «El campo de mensaje es un solo bloque, WhatsMKT ya hace el reemplazo d
 * **RF-WM-25 — Macros del mensaje contra las columnas:** Rechazar el mensaje si contiene un `[$MACROn$]` cuya macro n no existe en la definición de columnas elegida.
   * Ejemplo: con una definición de 3 macros, `[$MACRO4$]` se rechaza.
   * Una macro de la definición que el mensaje no usa no es un error.
+  * La definición no tiene tope de columnas de macro: el tope de 5 es por mensaje (RF-WM-47).
 * **RF-WM-26 — Largo del mensaje:** Mostrar un contador de caracteres del mensaje y rechazar el que pase el tope configurado: «con el largo que define WhatsApp» (decisión del usuario, 2026-11-02, P-14).
   * El tope inicial es de 4096 caracteres (supuesto S-WM-7).
   * El largo se mide sobre el mensaje tal como se guarda, con los marcadores `[$MACROn$]` sin reemplazar (duda DU-WM-3).
   * `[whatsapp]` cuenta como 26 caracteres, el largo fijo del enlace que lo reemplaza (`https://wa.me/+51` y 9 dígitos), no como los 10 del marcador. El contador de la pantalla cuenta igual.
 * **RF-WM-27 — Editor del mensaje:** Ofrecer en el editor del mensaje botones que insertan `[$MACROn$]` mostrando su etiqueta (por ejemplo, «MACRO2 · Vencimiento de la cuota») y una vista previa que reemplaza las macros con los valores de las primeras filas, como lo hará WhatsMKT.
+  * El editor pasa al editor común de herramientas en dos pasos: el corte A3 lo usa con las macros y el enlace, sin funciones (§13.7 de `motor-texto-enriquecido-interfaz.md`); la fase B le suma las variables con función (RF-WM-45 a RF-WM-52).
+
+### 4.1 Mensaje con variables y funciones (fase B del motor)
+
+Fuente: el usuario eligió la opción 2 del diagnóstico del motor (`docs/agents/coordinador_herramientas_implementadas/diagnostico-motor-2026-11-04.md`), por fases. La fase A mejora el editor común. La fase B, que lleva este módulo después de la A, permite escribir el mensaje con variables de la cartera y sus funciones, que el sistema convierte en columnas de macro, con hasta 5 macros por mensaje, `[whatsapp]` literal y columnas idénticas compartidas. El usuario aprobó además que cambiar una función cree una columna nueva y lo avise (decisiones del usuario transmitidas por `architec`, 2026-11-04).
+
+* **RF-WM-45 — Contexto `whatsmkt.mensaje` en el backend:** Registrar en el backend el contexto de texto enriquecido `whatsmkt.mensaje`, armado en cada petición desde la definición de columnas elegida, para que el editor común valide y previsualice el mensaje contra el servidor.
+  * Ofrece las macros de la definición, con su etiqueta (RF-WM-12), el «Enlace de WhatsApp» (RF-WM-51) y, desde la fase B, las variables de la cartera con sus funciones, como el contexto `cartera`.
+  * Convierte entre la expresión del editor y el texto plano que se guarda, con `[$MACROn$]` y `[whatsapp]` (RF-WM-17).
+  * Si la definición cambia, entonces el contexto cambia con ella, porque se arma por petición.
+  * El editor sigue aplicando las reglas del mensaje: emojis (RF-WM-24), macro inexistente (RF-WM-25) y largo (RF-WM-26).
+* **RF-WM-46 — Variable con función como columna de macro:** Si el usuario inserta en el mensaje una variable con funciones (por ejemplo, «Nombres del titular · mayúsculas»), entonces agregar a la definición una columna de macro con esa expresión, o reusar la que ya la tenga, e insertar en el mensaje su `[$MACROn$]`.
+  * Se reusa la columna con la misma expresión: la misma variable, las mismas funciones en el mismo orden y los mismos parámetros. Si no hay ninguna, se agrega al final de la definición.
+  * Al insertar, un aviso dice qué pasó: «Se agregó la columna 3…» o «Usa la columna 2, que ya lleva lo mismo».
+  * La píldora muestra la variable y su función, y la macro como dato secundario («Columna 3 del archivo, `[$MACRO3$]`»).
+  * La definición donde se agrega la columna es la que el editor tiene elegida: la de por defecto de la configuración (RF-WM-04), salvo que el usuario elija otra de plataforma `whatsmkt` (supuesto S-WM-10).
+  * El mensaje que se guarda sigue siendo texto plano con `[$MACROn$]`, lo que espera WhatsMKT (RF-WM-17).
+* **RF-WM-47 — Tope de 5 macros por mensaje:** Rechazar el mensaje que use más de 5 macros distintas, el máximo que publica WhatsMKT (DU-WM-1).
+  * El tope es del mensaje, no de la definición: la definición puede tener más columnas de macro, y cada mensaje usa hasta 5 (RF-WM-25).
+  * Una macro repetida en el mensaje cuenta una vez, y `[whatsapp]` no cuenta, porque no es una columna del archivo (supuesto S-WM-11).
+  * Si el usuario inserta la sexta macro distinta, entonces el editor lo avisa en ese momento, y el guardado se rechaza con el motivo.
+  * El backend valida el tope al guardar el mensaje y al crear o previsualizar la campaña.
+* **RF-WM-48 — Guardado conjunto del mensaje y la definición:** Guardar en una sola acción el mensaje y las columnas que agregó (RF-WM-46), con un resumen antes de confirmar, por ejemplo «Mensaje Preventivo, versión 2; Contactos WhatsMKT, versión 4, columna 3 nueva».
+  * Por dentro se guarda primero la definición y después el mensaje. Si falla el guardado del mensaje, entonces ningún mensaje queda apuntando a una macro que no existe.
+  * Cada guardado crea una versión nueva de la definición y del mensaje, con las reglas de versionado de RF-WM-19 y RF-49: una versión ya usada en una campaña no se modifica.
+* **RF-WM-49 — Columnas compartidas entre mensajes:** Compartir entre los mensajes la columna de macro con la misma expresión (RF-WM-46), en lugar de repetirla.
+  * Si el usuario cambia la función de una píldora, entonces se agrega una columna nueva con la nueva expresión, o se reusa una idéntica, y se avisa. La columna anterior no cambia (decisión del usuario, 2026-11-04).
+  * Un mensaje nunca altera a otro.
+* **RF-WM-50 — Quitar una variable no borra su columna:** Si el usuario quita una píldora del mensaje, entonces conservar su columna en la definición.
+  * La configuración muestra qué mensajes usan cada macro, para que el usuario decida en el constructor si la borra.
+* **RF-WM-51 — Enlace de WhatsApp como píldora:** Mostrar `[whatsapp]` en el editor como la píldora «Enlace de WhatsApp», y guardarlo y subirlo como el marcador literal `[whatsapp]` (DU-WM-11, opción (a)).
+  * El sistema lo reemplaza por el número congelado de la campaña al mostrar y copiar el mensaje (RF-WM-21).
+  * Cuenta como 26 caracteres (RF-WM-26).
+* **RF-WM-52 — Constructor para lo avanzado:** Mantener el constructor de columnas (RF-WM-09) para lo que el editor del mensaje no hace, como el formato de la celda o un valor fijo, con el ir y volver entre la configuración de WhatsMKT y Columnas de carga.
 
 ## 5. Envío, adjuntos y ficha
 
@@ -314,6 +354,10 @@ Fuente: «El campo de mensaje es un solo bloque, WhatsMKT ya hace el reemplazo d
 | Mensajes guardados (P-12) | Textos guardados y versionados, compartidos (RF-WM-19, RF-69) | Decisión del usuario, 2026-11-02 |
 | Nombre, mensaje y cantidad (P-14) | Nombre de hasta 75 caracteres; mensaje solo texto, sin emojis, con el largo de WhatsApp; cantidad con `maxlength="18"` (RF-WM-24, RF-WM-26, RF-WM-33, RF-WM-34) | Decisión del usuario, 2026-11-02 |
 | Nombre de campaña (P-15) | Plantilla editable, como RF-MM-25 (RF-WM-33) | Decisión del usuario, 2026-11-02 |
+| Variables por mensaje (DU-WM-1) | 5 macros por mensaje; la definición no tiene tope (RF-WM-25, RF-WM-47) | Decisión del usuario, 2026-11-04 |
+| Enlace de WhatsApp (DU-WM-11) | Opción (a): número en la configuración, congelado por campaña; el mensaje guarda `[whatsapp]` literal (RF-WM-21, RF-WM-51) | Decisión del usuario, 2026-11-04 |
+| Motor del mensaje | Opción 2 por fases: la fase A, el editor común, la lleva herramientas; la fase B, las variables con función, este módulo (RF-WM-45 a RF-WM-52) | Decisión del usuario, 2026-11-04 |
+| Columnas idénticas | Se comparten entre los mensajes; cambiar una función crea una columna nueva y avisa (RF-WM-49) | Decisión del usuario, 2026-11-04 |
 
 ## 9. Evidencia de los ejemplos
 
@@ -350,6 +394,8 @@ Vienen del plan v2 (S-1 a S-9). No frenan el desarrollo: cada uno se corrige con
 | S-WM-7 | El tope del mensaje es configurable y empieza en 4096 caracteres, el largo de un mensaje de WhatsApp. No es un dato verificado de WhatsMKT | RF-WM-26 |
 | S-WM-8 | Los topes de video, audio y PDF son configurables y empiezan en 16 MB, el límite general de WhatsApp para multimedia. No es un dato verificado de WhatsMKT | RF-WM-31 |
 | S-WM-9 | La lista se genera en `.xlsx`. El CSV ya lo tiene el exportador; el `.xls`, no | RF-WM-16 |
+| S-WM-10 | Las columnas que crea el editor del mensaje van a la definición que el editor tiene elegida, que es la de por defecto de la configuración salvo que el usuario elija otra | RF-WM-46 |
+| S-WM-11 | Las «5 variables» de WhatsMKT son 5 macros distintas: una repetida cuenta una vez, y `[whatsapp]` no cuenta | RF-WM-47 |
 
 ## 11. Dudas para el usuario
 
@@ -357,7 +403,7 @@ No están en el plan v2 ni en las decisiones del 2026-11-02. Mientras no se resp
 
 | Duda | Pregunta | Dónde aplica |
 |---|---|---|
-| DU-WM-1 | WhatsMKT publica «hasta 5 variables» por mensaje, y el pedido dice que no hay una cantidad fija de macros. ¿Se limita la definición a 5 macros o se deja libre? (Libre.) | RF-WM-11, RF-WM-25 |
+| DU-WM-1 | **Cerrada el 2026-11-04:** 5 macros por mensaje; la definición no tiene tope (RF-WM-47). | RF-WM-11, RF-WM-25, RF-WM-47 |
 | DU-WM-2 | Los speeches traen espacios dobles («vence  el», «agentes  KASNET») y espacios antes de una coma («[$MACRO2$] ,», «agencias ,»). ¿Se normalizan al sembrarlos, o se dejan tal cual? (Tal cual.) | RF-WM-21 |
 | DU-WM-3 | ¿El tope de largo se mide sobre el mensaje con los marcadores o sobre el mensaje ya reemplazado con los valores más largos de las filas? (Con los marcadores.) | RF-WM-26 |
 | DU-WM-4 | En «texto + vCard», ¿qué datos lleva la vCard (nombre, teléfono, otros) y de dónde salen? (Solo la etiqueta del contacto, escrita en la campaña.) | RF-WM-28 |
@@ -367,7 +413,7 @@ No están en el plan v2 ni en las decisiones del 2026-11-02. Mientras no se resp
 | DU-WM-8 | ¿Se confirma el formato de las macros en el mensaje: fecha `15/10/2026` y monto `1,234.50`, sin `S/`? En el archivo del 29.10 eran una celda de fecha y una de número. (Ese formato, editable en la definición.) | RF-WM-09 |
 | DU-WM-9 | ¿Se registra una tarifa por mensaje y un costo por campaña, o un límite mensual, como en MOWA MES (RF-MM-01, RF-MM-23, RF-MM-24)? (No, en esta entrega.) | Sección 6 |
 | DU-WM-10 | ¿Cómo se nombra el archivo de contactos que se descarga? El del 29.10 se llamaba `CUSCO_Vencida WhatsMKT Whatsapp 2026.10.29.xlsx`. (El nombre de la campaña más `.xlsx`, con los caracteres no válidos en Windows cambiados por `_`.) | RF-WM-16 |
-| DU-WM-11 | El speech original trae el enlace de WhatsApp de contacto de la Caja dentro del texto, pero el número real no puede guardarse en el repositorio, ni en la siembra de B3. ¿Cómo entra? (a) Como en MOWA (RF-MM-16): un número de contacto en la configuración de WhatsMKT, que el sistema pone en lugar de `[whatsapp]` al mostrar y copiar el mensaje; sin número configurado, no se crea una campaña cuyo mensaje lo use. (b) La v1 se siembra con `[whatsapp]` literal, y el usuario lo cambia por el enlace al editar el mensaje en la configuración. (Provisional: (a), el patrón ya probado en MOWA; se decide antes de B3.) | RF-WM-21 |
+| DU-WM-11 | **Cerrada el 2026-11-04:** opción (a). El número va en la configuración, cada campaña congela el suyo, y el mensaje guarda `[whatsapp]` literal (RF-WM-21, RF-WM-51). | RF-WM-21, RF-WM-51 |
 | DU-WM-12 | Al limpiar un JPEG, ¿se conserva la orientación del EXIF (que la foto no se vea girada) o se quita todo el EXIF, como decía RF-WM-32? (Se conserva solo la orientación; todo lo demás, incluido el GPS, se quita.) | RF-WM-32 |
 | DU-WM-13 | La configuración no tiene tope para las imágenes. ¿Se agrega como los de video, audio y PDF, o queda fijo? (Fijo, de 5 000 000 bytes, el máximo de imagen de WhatsApp; no está verificado en WhatsMKT.) | RF-WM-31 |
 | DU-WM-14 | `❤` y `♥` son símbolos de texto para Unicode, pero WhatsApp puede mostrar `❤` como emoji. ¿Se rechazan, por el «sin emoticons» de P-14? (Pasan.) | RF-WM-24 |
@@ -383,3 +429,9 @@ No están en el plan v2 ni en las decisiones del 2026-11-02. Mientras no se resp
 - **RF existentes ampliados:** RF-WM-31 (tope fijo de las imágenes) y RF-WM-32 (del EXIF se conserva solo la orientación), según lo implementado en T-WM-B5. **Dudas nuevas:** DU-WM-12 y DU-WM-13.
 - **RF existentes ampliados:** RF-WM-14 (sin supervisores configurados no se crea la campaña, código `sin_supervisores`) y RF-WM-15 (exclusión `sin_dias_atraso` en el modo por segmento), según las decisiones de la entrega de T-WM-B2, con los textos de designer.
 - **RF existentes ampliados:** RF-WM-24 (criterio de qué es un emoji) y RF-WM-26 (`[whatsapp]` cuenta como 26 caracteres), según lo implementado en T-WM-B3. **Duda nueva:** DU-WM-14.
+
+**2026-11-04**
+- **RF nuevos incorporados:** RF-WM-45 a RF-WM-52, sección 4.1, la fase B del motor: el contexto `whatsmkt.mensaje` en el backend, las variables con función que crean o reusan columnas de macro, el tope de 5 macros por mensaje, el guardado conjunto, las columnas compartidas, quitar una variable sin borrar su columna, el enlace de WhatsApp como píldora y el constructor para lo avanzado.
+- **RF existentes ampliados:** RF-WM-04 (el número de WhatsApp de contacto en la configuración); RF-WM-21 (cómo entra `[whatsapp]`, según DU-WM-11 (a), con el número congelado por campaña); RF-WM-25 (la definición no tiene tope de macros); RF-WM-27 (el editor pasa al editor común en A3 y en la fase B). La tabla de la sección 1 cita RF-WM-47.
+- **Dudas cerradas:** DU-WM-1 y DU-WM-11. **Supuestos nuevos:** S-WM-10 y S-WM-11. **Decisiones nuevas:** cuatro filas en la sección 8.
+- **Nota de numeración:** los RF nuevos continúan la secuencia (RF-WM-45 a RF-WM-52) aunque estén en la sección 4.1, sin renumerar los existentes, según la nota del 2026-11-02.
