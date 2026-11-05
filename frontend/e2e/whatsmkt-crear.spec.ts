@@ -219,6 +219,26 @@ test.describe('crear el lote', () => {
     expect(copiado).toContain('https://wa.me/+51900000123');
     expect(copiado).toContain('[$MACRO1$]');
   });
+
+  test('con el portapapeles bloqueado, «Copiar» deja el texto seleccionado y lo dice', async ({ page }) => {
+    // What a browser does with a page it does not trust: the async clipboard rejects and the classic copy refuses.
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: () => Promise.reject(new DOMException('bloqueado', 'NotAllowedError')) },
+        configurable: true,
+      });
+      document.execCommand = () => false;
+    });
+    await conSeleccion(page);
+    await crearLote(page);
+
+    await ficha(page).getByRole('button', { name: 'Copiar Texto del mensaje' }).click();
+
+    await expect(ficha(page).locator('[data-ficha-copia-estado]')).toHaveText('No se pudo copiar Texto del mensaje. Quedó seleccionado: cópialo con Ctrl+C.');
+    const seleccionado = await page.evaluate(() => window.getSelection()?.toString() ?? '');
+    expect(seleccionado).toContain('https://wa.me/+51900000123');
+    expect(seleccionado).toContain('[$MACRO1$]');
+  });
 });
 
 test.describe('cuando no se puede crear', () => {

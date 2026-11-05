@@ -98,6 +98,39 @@ for (const tema of ['light', 'dark'] as const) {
         await sinViolaciones(page);
       });
 
+      // Back from Columnas de carga (T-WM-F2b): the announcement of the definition chosen, the notice of one that is gone, the error of one that is not WhatsMKT's.
+      test('campaña, de vuelta de Columnas con la definición elegida y su anuncio', async ({ page }) => {
+        await montarCampanaWhatsmkt(page, campanaFalsa());
+        await montarSeleccion(page);
+        await page.goto('/whatsmkt/campana?definicion=12&version=1');
+        await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 1000' });
+        await expect(page.locator('[data-definicion-anuncio]')).toHaveText('Se eligió «Contactos WhatsMKT con apellido», versión 1.');
+        await sinViolaciones(page);
+      });
+
+      test('campaña, de vuelta con una definición que ya no existe, con su aviso', async ({ page }) => {
+        await montarCampanaWhatsmkt(page, campanaFalsa());
+        await montarSeleccion(page);
+        await page.goto('/whatsmkt/campana?definicion=99&version=1');
+        await page.getByLabel('Selección guardada').selectOption({ label: 'Preventiva top 1000' });
+        await expect(page.locator('[data-definicion-noexiste]')).toBeVisible();
+        await sinViolaciones(page);
+      });
+
+      test('configuración, recién vuelta de Columnas con la definición elegida y su anuncio', async ({ page }) => {
+        await page.goto('/whatsmkt/configuracion?definicion=12&version=1');
+        await expect(page.locator('[data-definicion-anuncio]')).toHaveText(
+          'Se eligió «Contactos WhatsMKT con apellido», versión 1. Falta guardarla como definición por defecto.',
+        );
+        await sinViolaciones(page);
+      });
+
+      test('configuración, de vuelta con una definición que no es de WhatsMKT, con su error', async ({ page }) => {
+        await page.goto('/whatsmkt/configuracion?definicion=13&version=1');
+        await expect(page.locator('[data-definicion-error]')).toHaveText('La definición elegida no es de WhatsMKT.');
+        await sinViolaciones(page);
+      });
+
       test('seguimiento, con la lista y el detalle abierto con sus productos fuera del lote', async ({ page }) => {
         await montarSeguimientoWhatsmkt(page, seguimientoFalso());
         await page.goto('/whatsmkt/seguimiento?campana=37');

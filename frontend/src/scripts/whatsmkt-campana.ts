@@ -35,11 +35,13 @@ import { applyTranslations, t, traducirPorPrefijo } from '../lib/i18n';
 import { pintarBotonesDeVariables } from '../lib/mowa-mes-plantilla';
 import { FILAS_POR_PAGINA, paginar, pintarPaginador } from '../lib/paginacion';
 import { celda, celdaDeFila, cifra, tabla, vacio } from '../lib/tabla-dom';
-import { enlaceEditarEnCartera, seleccionDeLaUrl } from '../lib/volver';
+import { destinoConSeleccion, enlaceEditarEnCartera, seleccionDeLaUrl } from '../lib/volver';
 import { largoDelMensaje } from '../lib/whatsmkt-mensaje';
+import { destinoDeColumnas, enlaceConVolver, vueltaDeDefinicion } from '../lib/whatsmkt-vuelta';
 import { tablaDeExclusiones } from './whatsmkt-exclusiones';
 import { montarFicha } from './whatsmkt-ficha';
 import { montarSubida } from './whatsmkt-subida';
+import { decirLaVuelta, limpiarLaUrl, olvidarLaVuelta } from './whatsmkt-vuelta';
 import {
   MACROS_PUBLICADAS,
   borradorInicial,
@@ -68,6 +70,15 @@ const ESPERA_PREVIA = 400;
 /** The page of the saved selection that Cartera sends the analyst back to. */
 const VUELTA = '/whatsmkt/campana';
 
+/**
+ * Where Columnas, Supervisores or Calendario send the analyst back: this screen with its query, which carries what the form keeps in the URL (the
+ * saved selection). The rest of the form comes back as new, as it does from Cartera.
+ */
+function volverActual(): string {
+  const id = estado.seleccion?.guardada?.id;
+  return id === undefined ? VUELTA : destinoConSeleccion(VUELTA, id);
+}
+
 const estado = {
   configuracion: null as ConfiguracionWhatsmkt | null,
   segmentos: [] as SegmentoWhatsmkt[],
@@ -89,6 +100,8 @@ const estado = {
   tocadas: new Set<SeccionDeProblema>(),
   /** What failed reading the definitions, or a definition's columns; empty when nothing did. */
   errorDefinicion: '',
+  /** What Columnas sent back that is wrong (a definition that is not WhatsMKT's); it goes under the select until another is chosen. */
+  errorDeVuelta: '',
   /** What failed reading the saved texts or the library, said in their section. */
   errorMensajes: '',
   errorAdjuntos: '',
@@ -148,13 +161,18 @@ function pintarDefinicion(): void {
   const elegida = borrador().definicionId;
   selectDefinicion.value = elegida !== null && lista.some((d) => d.id === elegida) ? String(elegida) : '';
   $<HTMLElement>('[data-sin-definiciones]').hidden = lista.length > 0;
-  // With none of the platform the link goes to create one; both go to the same screen (shortcut: a plain link until T-WM-F2b brings the go-and-back to the constructor).
-  const texto = $<HTMLElement>('[data-columnas-texto]');
-  const clave = lista.length === 0 ? 'whatsmkt.archivo.crear' : 'whatsmkt.archivo.editar';
-  texto.dataset.i18n = clave;
-  texto.textContent = t(clave);
+  pintarEnlaceColumnas();
   $<HTMLElement>('[data-version-linea]').textContent =
     estado.versionDefinicion === null ? '' : t('whatsmkt.archivo.versionLinea', { n: estado.versionDefinicion });
+}
+
+/** Edits the definition chosen, or creates one of the platform when none is; either way Columnas brings the analyst back to this screen. */
+function pintarEnlaceColumnas(): void {
+  const { href, clave } = destinoDeColumnas(borrador().definicionId, estado.definiciones.length > 0, volverActual());
+  $<HTMLAnchorElement>('[data-columnas]').href = href;
+  const texto = $<HTMLElement>('[data-columnas-texto]');
+  texto.dataset.i18n = clave;
+  texto.textContent = t(clave);
 }
 
 function pintarColumnas(): void {
@@ -233,6 +251,9 @@ async function cargarColumnas(): Promise<void> {
 
 selectDefinicion.addEventListener('change', () => {
   borrador().definicionId = aNumero(selectDefinicion.value);
+  estado.errorDeVuelta = '';
+  olvidarLaVuelta();
+  pintarEnlaceColumnas();
   void cargarColumnas();
   cambioDelFormulario();
 });
@@ -632,10 +653,10 @@ function pintarErroresLocales(): void {
   errorEnvio.textContent = [estado.errorAdjuntos, de('envio')].filter(Boolean).join(' ');
   errorPlantilla.textContent = de('nombre');
   // What the API said about the definition (a list or a read that failed) comes before what the form says by itself.
-  errorDefinicion.textContent = estado.errorDefinicion || de('archivo');
+  errorDefinicion.textContent = estado.errorDefinicion || estado.errorDeVuelta || de('archivo');
   // The field of each error is marked too, as the select of a message is when its message has a problem.
   const hay = (codigo: string): boolean => visibles.some((p) => p.codigo === codigo);
-  marcar(selectDefinicion, estado.errorDefinicion !== '' || hay('sin_definicion'));
+  marcar(selectDefinicion, estado.errorDefinicion !== '' || estado.errorDeVuelta !== '' || hay('sin_definicion'));
   marcar(selectAdjunto, hay('sin_adjunto'));
   marcar(campoVcard, hay('sin_etiqueta'));
   marcar(campoPlantilla, visibles.some((p) => p.seccion === 'nombre'));
@@ -713,9 +734,10 @@ function itemDeProblema(texto: string, seccion: SeccionDeProblema | null, codigo
   if (seccion === null) return item;
   item.append(' ');
   if (seccion === 'supervisores' || seccion === 'whatsapp') {
-    // They are fixed in another screen: a plain link (shortcut: no way back to the campaign until T-WM-F2b wires the go-and-back).
+    // They are fixed in another screen. Supervisores brings the analyst back here; the WhatsApp is set in the settings, which has no way back to the
+    // campaign yet (shortcut: a plain link, until the settings carry a `volver` of their own).
     const enlace = document.createElement('a');
-    enlace.href = seccion === 'supervisores' ? '/supervisores' : '/whatsmkt/configuracion#wm-whatsapp';
+    enlace.href = seccion === 'supervisores' ? enlaceConVolver('/supervisores', volverActual()) : '/whatsmkt/configuracion#wm-whatsapp';
     enlace.textContent = t(seccion === 'supervisores' ? 'whatsmkt.previa.irSupervisores' : 'whatsmkt.previa.irWhatsapp');
     item.append(enlace);
     return item;
@@ -1076,6 +1098,8 @@ pagerFuera.querySelector('[data-page-next]')!.addEventListener('click', () => {
 raiz.addEventListener(EVENTO_SELECCION, (evento) => {
   estado.seleccion = (evento as CustomEvent<EstadoSeleccion>).detail ?? controlador?.estado() ?? null;
   pintarEditarEnCartera();
+  // The way back of the other tools carries the selection saved.
+  if (estado.borrador) pintarEnlaceColumnas();
   estado.campanaElegida = 0;
   programarPrevia(0);
 });
@@ -1171,6 +1195,15 @@ async function arrancar(): Promise<void> {
     if (programacion && borrador().fechaEnvio === '') borrador().fechaEnvio = programacion.sugerida;
     // The default definition, if it is still one of the platform's.
     if (!estado.definiciones.some((d) => d.id === borrador().definicionId)) borrador().definicionId = null;
+    // Back from Columnas de carga: the definition it saved is the one chosen, or the screen says why not. Not read when the list itself failed.
+    if (estado.errorDefinicion === '') {
+      const vuelta = vueltaDeDefinicion(window.location.search, definiciones);
+      // A definition that is gone or is not WhatsMKT's leaves the select with none chosen (§12.4), not with the default.
+      if (vuelta.tipo === 'elegida') borrador().definicionId = vuelta.id;
+      else if (vuelta.tipo !== 'ninguna') borrador().definicionId = null;
+      estado.errorDeVuelta = decirLaVuelta(vuelta);
+    }
+    limpiarLaUrl();
 
     sinConexion(false);
     pintarDefinicion();

@@ -121,7 +121,7 @@ test.describe('archivo de carga', () => {
     await expect(filas.nth(2)).toContainText('Variable: Saldo de capital pendiente');
     // A column with no label says «—», as the constructor does.
     await expect(filas.nth(2).locator('td').nth(2)).toHaveText('—');
-    await expect(page.getByRole('link', { name: 'Editar en Columnas de carga' })).toHaveAttribute('href', '/columnas');
+    await expect(page.getByRole('link', { name: 'Editar en Columnas de carga' })).toHaveAttribute('href', /^\/columnas\?definicion=11&volver=%2Fwhatsmkt%2Fcampana(%3Fseleccion%3D\d+)?$/);
   });
 
   test('cambiar de definición pide otra previsualización con la elegida', async ({ page }) => {
@@ -143,7 +143,7 @@ test.describe('archivo de carga', () => {
 
     await expect(page.locator('#wm-definicion')).toBeDisabled();
     await expect(page.locator('[data-sin-definiciones]')).toContainText('Crea una definición de WhatsMKT en Columnas de carga');
-    await expect(page.getByRole('link', { name: 'Crear en Columnas de carga' })).toHaveAttribute('href', '/columnas');
+    await expect(page.getByRole('link', { name: 'Crear en Columnas de carga' })).toHaveAttribute('href', /^\/columnas\?plataforma=whatsmkt&volver=%2Fwhatsmkt%2Fcampana(%3Fseleccion%3D\d+)?$/);
   });
 
   test('más de 5 macros avisan sin bloquear (DU-WM-1)', async ({ page }) => {
@@ -610,7 +610,7 @@ test.describe('los problemas y «Crear»', () => {
     // It reads as a hint (small, muted, sans), like «Disponible pronto.», not as data.
     await expect(page.locator('[data-crear-motivo]')).toHaveClass(/field__hint/);
     await expect(page.locator('[data-crear-motivo]')).not.toHaveClass(/mono/);
-    await expect(page.getByRole('link', { name: 'Configurar supervisores' })).toHaveAttribute('href', '/supervisores');
+    await expect(page.getByRole('link', { name: 'Configurar supervisores' })).toHaveAttribute('href', /^\/supervisores\?volver=%2Fwhatsmkt%2Fcampana%3Fseleccion%3D\d+$/);
     await expect(page.getByRole('link', { name: 'Configurar el WhatsApp de contacto' })).toHaveAttribute('href', '/whatsmkt/configuracion#wm-whatsapp');
     expect(api.pedidos.filter((p) => p.metodo === 'POST' && p.ruta === '/whatsmkt/campanas')).toHaveLength(0);
   });

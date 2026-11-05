@@ -74,9 +74,10 @@ test.describe('carga inicial', () => {
     await expect(aviso).toHaveText(
       'Columnas de carga, Supervisores y Calendario laboral tienen su propia pantalla: Columnas de carga · Supervisores · Calendario laboral.',
     );
-    await expect(aviso.getByRole('link', { name: 'Columnas de carga' })).toHaveAttribute('href', '/columnas');
-    await expect(aviso.getByRole('link', { name: 'Supervisores' })).toHaveAttribute('href', '/supervisores');
-    await expect(aviso.getByRole('link', { name: 'Calendario laboral' })).toHaveAttribute('href', '/calendario');
+    // Each one brings the analyst back here (T-WM-F2b).
+    await expect(aviso.getByRole('link', { name: 'Columnas de carga' })).toHaveAttribute('href', '/columnas?volver=%2Fwhatsmkt%2Fconfiguracion');
+    await expect(aviso.getByRole('link', { name: 'Supervisores' })).toHaveAttribute('href', '/supervisores?volver=%2Fwhatsmkt%2Fconfiguracion');
+    await expect(aviso.getByRole('link', { name: 'Calendario laboral' })).toHaveAttribute('href', '/calendario?volver=%2Fwhatsmkt%2Fconfiguracion');
   });
 
   test('sin conexión con la API muestra el aviso en vez de paneles vacíos, y Reintentar recupera la pantalla', async ({ page }) => {

@@ -251,6 +251,12 @@ import '../../styles/whatsmkt.css';
               Es la definición de plataforma WhatsMKT con la que parte cada campaña; en la campaña se puede elegir otra.
             </p>
             <p class="field__error" id="wm-definicion-error" data-definicion-error role="alert"></p>
+            <!-- Back from Columnas de carga (T-WM-F2b): what was chosen (to save it here), or that it no longer exists. -->
+            <p class="field__hint" data-definicion-anuncio role="status"></p>
+            <p class="notice notice--warning" data-definicion-noexiste hidden role="status">
+              <Icon name="triangle-alert" size={20} />
+              <span data-i18n="herramientas.volver.noExiste">La definición que editaste ya no existe. Elige otra.</span>
+            </p>
           </div>
 
           <p class="notice notice--warning" data-sin-definiciones hidden>
@@ -263,7 +269,7 @@ import '../../styles/whatsmkt.css';
               <span class="btn__spinner" aria-hidden="true"></span>
               <span class="btn__label" data-i18n="whatsmkt.configuracion.guardarDefinicion">Guardar definición</span>
             </button>
-            <!-- A plain link until the constructor can send the analyst back (T-HI-F3). -->
+            <!-- The link goes to the definition on the select (or creates one) and comes back here: the script sets its `href`. -->
             <a class="btn btn--sm" href="/columnas" data-columnas>
               <Icon name="square-pen" size={16} />
               <span data-columnas-texto data-i18n="whatsmkt.archivo.editar">Editar en Columnas de carga</span>
@@ -460,6 +466,8 @@ import '../../styles/whatsmkt.css';
 <script>
   import { NetworkError, mensajeDeError } from '../../lib/api';
   import { listarDefiniciones, type ResumenDefinicion } from '../../lib/api-definiciones';
+  import { destinoDeColumnas, enlaceConVolver, vueltaDeDefinicion } from '../../lib/whatsmkt-vuelta';
+  import { decirLaVuelta, limpiarLaUrl, olvidarLaVuelta } from '../../scripts/whatsmkt-vuelta';
   import { montarBiblioteca } from '../../scripts/whatsmkt-biblioteca';
   import { montarMensajes, type ControladorMensajes } from '../../scripts/whatsmkt-mensajes';
   import { $, ocupado } from '../../lib/dom';
@@ -1080,6 +1088,8 @@ import '../../styles/whatsmkt.css';
   const selectDefinicion = $<HTMLSelectElement>('#wm-definicion');
   const botonDefinicion = $<HTMLButtonElement>('[data-definicion-guardar]');
   const errorDefinicion = $<HTMLElement>('[data-definicion-error]');
+  /** Where Columnas, Supervisores and Calendario send the analyst back: this screen. It keeps nothing in its URL. */
+  const VUELTA = '/whatsmkt/configuracion';
 
   function opcionDe(valor: string, texto: string): HTMLOptionElement {
     const opcion = document.createElement('option');
@@ -1113,17 +1123,27 @@ import '../../styles/whatsmkt.css';
     selectDefinicion.value = guardada === null || sinLista ? '' : String(guardada);
     selectDefinicion.disabled = sinLista;
     botonDefinicion.disabled = sinLista;
-    // With no definition of the platform the notice says to create one; the link goes to the same screen either way.
+    // With no definition of the platform the notice says to create one.
     $<HTMLElement>('[data-sin-definiciones]').hidden = !sinLista || estado.definiciones === null;
+    pintarEnlaceColumnas();
+  }
+
+  /** Edits the definition on the select, or creates one of the platform when none is; either way Columnas brings the analyst back here. */
+  function pintarEnlaceColumnas(): void {
+    const { href, clave } = destinoDeColumnas(aNumeroODefinicion(selectDefinicion.value), definicionesDeWhatsmkt(estado.definiciones ?? []).length > 0, VUELTA);
+    $<HTMLAnchorElement>('[data-columnas]').href = href;
     const textoEnlace = $<HTMLElement>('[data-columnas-texto]');
-    const clave = sinLista ? 'whatsmkt.archivo.crear' : 'whatsmkt.archivo.editar';
     textoEnlace.dataset.i18n = clave;
     textoEnlace.textContent = t(clave);
   }
 
+  const aNumeroODefinicion = (valor: string): number | null => (valor === '' ? null : Number(valor));
+
   selectDefinicion.addEventListener('change', () => {
     errorDefinicion.textContent = '';
     marcar(selectDefinicion, false);
+    olvidarLaVuelta();
+    pintarEnlaceColumnas();
   });
 
   formDefinicion.addEventListener('submit', async (evento) => {
@@ -1156,6 +1176,11 @@ import '../../styles/whatsmkt.css';
   const biblioteca = montarBiblioteca();
 
   // ---- Boot ----------------------------------------------------------------------------------------
+
+  // The tools of the notice at the top bring the analyst back here (Columnas, Supervisores and Calendario laboral).
+  document.querySelectorAll<HTMLAnchorElement>('[data-herramientas] a').forEach((enlace) => {
+    enlace.href = enlaceConVolver(enlace.getAttribute('href')!, VUELTA);
+  });
 
   function sinConexion(si: boolean): void {
     $<HTMLElement>('[data-offline]').hidden = !si;
@@ -1207,6 +1232,22 @@ import '../../styles/whatsmkt.css';
         errorDefinicion.textContent = mensajeDeError(caido);
       }
       pintarDefinicion();
+      // Back from Columnas de carga: the definition it saved is chosen on the select (to save it here), or the panel says why not.
+      // Not read when the list itself failed.
+      if (estado.definiciones !== null) {
+        const vuelta = vueltaDeDefinicion(window.location.search, estado.definiciones);
+        const error = decirLaVuelta(vuelta, true);
+        // A definition that is gone or is not WhatsMKT's leaves the select with none chosen (§12.4).
+        if (vuelta.tipo !== 'ninguna') {
+          selectDefinicion.value = vuelta.tipo === 'elegida' ? String(vuelta.id) : '';
+          pintarEnlaceColumnas();
+        }
+        if (error !== '') {
+          errorDefinicion.textContent = error;
+          marcar(selectDefinicion, true);
+        }
+      }
+      limpiarLaUrl();
       void biblioteca.cargar();
     } catch (caido) {
       if (caido instanceof NetworkError) {

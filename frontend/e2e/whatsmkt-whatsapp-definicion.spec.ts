@@ -211,13 +211,13 @@ test.describe('definición por defecto', () => {
     );
     await expect(guardar(page, 'Guardar definición')).toBeDisabled();
     const enlace = page.getByRole('link', { name: 'Crear en Columnas de carga' });
-    await expect(enlace).toHaveAttribute('href', '/columnas');
+    await expect(enlace).toHaveAttribute('href', '/columnas?plataforma=whatsmkt&volver=%2Fwhatsmkt%2Fconfiguracion');
   });
 
-  test('con definiciones, el enlace es «Editar en Columnas de carga» y es un enlace simple', async ({ page }) => {
+  test('con definiciones y ninguna elegida, el enlace es «Editar en Columnas de carga» y lleva solo el camino de vuelta', async ({ page }) => {
     await abrir(page, apiWhatsmkt());
 
-    await expect(page.getByRole('link', { name: 'Editar en Columnas de carga' })).toHaveAttribute('href', '/columnas');
+    await expect(page.getByRole('link', { name: 'Editar en Columnas de carga' })).toHaveAttribute('href', '/columnas?volver=%2Fwhatsmkt%2Fconfiguracion');
   });
 
   test('una definición guardada que ya no es de WhatsMKT sigue a la vista por su número, no se disfraza', async ({ page }) => {

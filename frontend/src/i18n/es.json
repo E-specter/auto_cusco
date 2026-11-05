@@ -1686,6 +1686,7 @@
   "whatsmkt.biblioteca.archivados": "Archivados ({n})",
   "whatsmkt.biblioteca.sinMetadatos": "Se guardó sin metadatos (EXIF, ubicación).",
   "whatsmkt.configuracion.definicion.ninguna": "Sin definición por defecto",
+  "whatsmkt.configuracion.definicion.elegidaSinGuardar": "Se eligió {nombreCitado}, versión {n}. Falta guardarla como definición por defecto.",
   "whatsmkt.configuracion.definicion.hint": "La definición de columnas con la que parte cada campaña de WhatsMKT. En la campaña se puede elegir otra.",
   "whatsmkt.configuracion.guardarDefinicion": "Guardar definición",
   "whatsmkt.biblioteca.col.nombre": "Nombre",

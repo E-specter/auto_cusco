@@ -1686,6 +1686,7 @@
   "whatsmkt.biblioteca.archivados": "Archived ({n})",
   "whatsmkt.biblioteca.sinMetadatos": "It was saved without metadata (EXIF, location).",
   "whatsmkt.configuracion.definicion.ninguna": "No default definition",
+  "whatsmkt.configuracion.definicion.elegidaSinGuardar": "{nombreCitado}, version {n}, was chosen. It still has to be saved as the default definition.",
   "whatsmkt.configuracion.definicion.hint": "The column definition every WhatsMKT campaign starts from. Another one can be chosen in the campaign.",
   "whatsmkt.configuracion.guardarDefinicion": "Save definition",
   "whatsmkt.biblioteca.col.nombre": "Name",

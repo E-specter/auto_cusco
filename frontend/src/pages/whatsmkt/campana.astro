@@ -71,6 +71,12 @@ import '../../styles/whatsmkt.css';
               <select class="input" id="wm-definicion" aria-describedby="wm-definicion-version wm-definicion-error"></select>
               <p class="field__hint mono" id="wm-definicion-version" data-version-linea></p>
               <p class="field__error" id="wm-definicion-error" data-definicion-error role="alert"></p>
+              <!-- Back from Columnas de carga (T-WM-F2b): what was chosen, or that it no longer exists. -->
+              <p class="field__hint" data-definicion-anuncio role="status"></p>
+              <p class="notice notice--warning" data-definicion-noexiste hidden role="status">
+                <Icon name="triangle-alert" size={20} />
+                <span data-i18n="herramientas.volver.noExiste">La definición que editaste ya no existe. Elige otra.</span>
+              </p>
             </div>
 
             <p class="notice notice--warning" data-sin-definiciones hidden>
@@ -81,7 +87,7 @@ import '../../styles/whatsmkt.css';
             <div data-columnas-tabla></div>
             <p class="field__hint" data-cinco-macros hidden></p>
 
-            <!-- shortcut: a plain link until T-WM-F2b brings the go-and-back to the constructor (T-HI-F3 already gives Columnas its side). -->
+            <!-- The link goes to the definition chosen (or creates one) and comes back to this screen: the script sets its `href`. -->
             <div class="wm-form__foot">
               <a class="btn btn--sm" href="/columnas" data-columnas>
                 <Icon name="square-pen" size={16} />
