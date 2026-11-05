@@ -14,26 +14,21 @@
 
 import { mensajeDeError } from '../lib/api';
 import { obtenerDefinicion } from '../lib/api-definiciones';
-import { previsualizarTexto } from '../lib/api-texto-enriquecido';
-import { listarTextos, type ContenidoTexto, type ResumenTexto } from '../lib/api-textos-guardados';
+import { olvidarCatalogo, previsualizarTexto } from '../lib/api-texto-enriquecido';
+import { listarTextos, type ContenidoTexto, type ProblemaTexto, type ResumenTexto } from '../lib/api-textos-guardados';
 import { guardarSegmentos, type ConfiguracionWhatsmkt, type SegmentoWhatsmkt } from '../lib/api-whatsmkt';
 import { guardadaDesdeRespuesta } from '../lib/constructor-columnas';
 import { t } from '../lib/i18n';
-import {
-  MARCADOR_WHATSAPP,
-  largoDelMensaje,
-  macrosDeLaDefinicion,
-  partesDeLaVista,
-  primerEmoji,
-  primeraMacroInexistente,
-  textoDeMacro,
-  textoDeProblemaDelMensaje,
-  type EmojiEncontrado,
-  type MacroDeDefinicion,
-} from '../lib/whatsmkt-mensaje';
+import type { Expresion } from '../lib/expresion';
+import { largoDelMensaje, macrosDeLaDefinicion, partesDeLaVista, primerEmoji, textoDeProblemaDelMensaje, type MacroDeDefinicion } from '../lib/whatsmkt-mensaje';
+import { expresionDeMensaje, numeroDeMacro, textoDeMensaje } from '../lib/whatsmkt-mensaje-expresion';
+import { destinoDeColumnas } from '../lib/whatsmkt-vuelta';
+import { EVENTO_EXPRESION, mensajeProblema, montarEditor, type ControladorEditor, type EstadoEditor, type OpcionesEditor as OpcionesDelEditor } from './editor-texto';
 import { EVENTO_TEXTOS, montarTextosGuardados, type ControladorTextos, type EstadoTextos, type FabricaEditor } from './textos-guardados';
 
 export const CONTEXTO_MENSAJE = 'whatsmkt.mensaje';
+/** Where Columnas de carga sends the analyst back to from the panel of functions: these settings. */
+const VUELTA = '/whatsmkt/configuracion';
 /** The rows of the preview: the first three of the example of the context, one per segment of the engine. */
 const FILAS_DE_EJEMPLO = 3;
 
@@ -76,13 +71,17 @@ const nodo = <K extends keyof HTMLElementTagNameMap>(etiqueta: K, clase?: string
 
 export async function montarMensajes(opciones: OpcionesMensajes): Promise<ControladorMensajes> {
   let configuracion = opciones.configuracion;
+  /** What the editors were mounted with: the page may change the object it handed over, so a change is told against these. */
+  let contexto = { definicion: configuracion.definicion_defecto_id, tope: configuracion.tope_mensaje };
   let segmentos = opciones.segmentos;
   let textos: ResumenTexto[] = [];
   let activo = segmentos[0]?.clave ?? '';
   let datos: DatosDeLaDefinicion = { id: null, macros: [], ejemplos: null };
   const alta = new AbortController();
   const escucha = { signal: alta.signal };
-  const editores = new Set<{ repintar: () => void }>();
+  const editores = new Set<{ repintar: (contextoCambio?: boolean) => Promise<void> }>();
+  /** Each panel's editor listens for what its panel's save was refused (`alRechazar`): by the prefix of the editor. */
+  const alRechazarDe = new Map<string, (problemas: ProblemaTexto[]) => void>();
   let controladores: { segmentos: ControladorTextos | null; globales: ControladorTextos | null } = { segmentos: null, globales: null };
 
   const vinculadoASegmento = (id: number): boolean => segmentos.some((s) => s.texto_guardado_id === id);
@@ -116,33 +115,54 @@ export async function montarMensajes(opciones: OpcionesMensajes): Promise<Contro
     editores.forEach((editor) => editor.repintar());
   }
 
-  // ---- The editor of a message (§5.1) ----------------------------------------------------------------------------
+  // ---- The editor of a message (§13.7 of the engine) --------------------------------------------------------------
 
-  function fabricaDeEditor(prefijo: string): FabricaEditor {
-    return (anfitrion, { alCambiar }) => {
-      const barra = nodo('div', 'wm-editor__barra');
-      barra.setAttribute('role', 'group');
-      const rotulo = nodo('label', 'field__label');
-      rotulo.htmlFor = `${prefijo}-texto`;
-      const area = nodo('textarea', 'input wm-editor__campo');
-      area.id = `${prefijo}-texto`;
-      area.rows = 4;
-      area.spellcheck = true;
-      area.setAttribute('aria-describedby', `${prefijo}-contador ${prefijo}-error`);
-      const contador = nodo('p', 'wm-contador');
-      contador.id = `${prefijo}-contador`;
-      // The counter and, over the limit, its tag (the same as the common editor's). No «Cerca del tope»: this limit has no threshold.
-      const etiquetaTope = nodo('span', 'tag tag--error');
-      etiquetaTope.textContent = t('editorTexto.largo.pasa');
-      etiquetaTope.hidden = true;
-      const filaContador = nodo('div', 'wm-contador-fila');
-      filaContador.append(contador, etiquetaTope);
-      const anuncio = nodo('p', 'visually-hidden');
-      anuncio.setAttribute('role', 'status');
-      // One line per problem, in the order of the interface rules (§5.1): the macro, the emoji, the length.
-      const errores = nodo('div', 'wm-editor__errores');
-      errores.id = `${prefijo}-error`;
-      errores.setAttribute('role', 'alert');
+  /** Where the editors rest while no panel holds one: the page renders them (the markup of the engine is built with the page) and the factory moves them. */
+  const ALMACEN = '[data-editores-mensaje]';
+
+  /** What the panel of a piece says, the context admitting no functions, and the link to where the function is made: the column, in Columnas de carga. */
+  function palabrasSinFunciones(): NonNullable<OpcionesDelEditor['sinFunciones']> {
+    const id = configuracion.definicion_defecto_id;
+    const { href, clave } = destinoDeColumnas(id, id !== null, VUELTA);
+    return { texto: t('whatsmkt.mensaje.sinFunciones'), enlace: { texto: t(clave), href } };
+  }
+
+  /**
+   * The editor of a message is the common one, in the context `whatsmkt.mensaje`: its macros and the link of WhatsApp are pills, and the
+   * text that is saved stays plain (`lib/whatsmkt-mensaje-expresion.ts`). It brings its own counter and its own problems of the backend's
+   * validation; this adds the rules the backend only applies when it saves (no emojis, the limit) and the preview with a row of the definition,
+   * and gathers every problem in ONE summary above the editor (§13.6), with «Ir al problema» for each one. The summary follows each change: it does not
+   * wait for the save to say there is an emoji. What the backend refuses on save comes in too (`alRechazar` of the component) and the focus goes to the
+   * summary; then the component's own list would say the same twice, and it is hidden while the summary carries what it refused.
+   */
+  function fabricaDeEditor(prefijo: string, panel: HTMLElement): FabricaEditor {
+    return async (anfitrion, { alCambiar }) => {
+      const idEditor = `${prefijo}-editor`;
+      let raizEditor = document.getElementById(idEditor)!;
+      // Mounting binds the markup it is given: a second mount (the context changed) takes a fresh copy, not the one that is bound.
+      const intacta = raizEditor.cloneNode(true) as HTMLElement;
+
+      // The summary of every problem, above the editor.
+      const resumen = nodo('div', 'notice notice--danger editor-texto__resumen');
+      resumen.tabIndex = -1;
+      resumen.hidden = true;
+      const cuerpoResumen = nodo('div');
+      const tituloResumen = nodo('p', 'editor-texto__resumenTitulo');
+      // The focus goes to it after a refused save and that is all: no `role="alert"` (it would be said twice). Its title is its name.
+      tituloResumen.id = `${prefijo}-resumen-titulo`;
+      resumen.setAttribute('role', 'group');
+      resumen.setAttribute('aria-labelledby', tituloResumen.id);
+      const listaResumen = nodo('ul', 'editor-texto__resumenLista');
+      cuerpoResumen.append(tituloResumen, listaResumen);
+      resumen.append(
+        raizEditor.querySelector<HTMLTemplateElement>('template[data-icono="triangle-alert"]')!.content.firstElementChild!.cloneNode(true),
+        cuerpoResumen,
+      );
+      const sinMacros = nodo('p', 'field__hint wm-editor__aviso');
+      // Each problem once, in its place (§13.6): the emoji marks its text run and says itself under the line, as any error of a run does (the editor
+      // does not know this rule, so the page puts that line); the limit is the counter in the error colour with its tag, with no box of its own; an
+      // unknown macro is its red pill, which the editor draws.
+      const errorDeEmoji = nodo('p', 'field__error');
       const vista = nodo('div', 'wm-vista');
       const tituloVista = nodo('h3', 'wm-subtitulo');
       const campoFila = nodo('div', 'field wm-vista__fila');
@@ -156,103 +176,112 @@ export async function montarMensajes(opciones: OpcionesMensajes): Promise<Contro
       cuerpoVista.setAttribute('aria-live', 'off');
       const notaVista = nodo('p', 'field__hint');
       vista.append(tituloVista, campoFila, cuerpoVista, notaVista);
-      const raiz = nodo('div', 'wm-editor');
-      raiz.append(barra, rotulo, area, filaContador, anuncio, errores, vista);
-      anfitrion.replaceChildren(raiz);
+      anfitrion.replaceChildren(resumen, sinMacros, raizEditor, vista);
 
+      const opcionesEditor: OpcionesDelEditor = {
+        contexto: CONTEXTO_MENSAJE,
+        expresion: null,
+        // No «Producto real» here: the sample is the example of the context, and the rows of the definition have their own preview below.
+        controlMuestra: false,
+        // One preview only: «Así lo verá el cliente», below. The editor keeps its counter (which still asks the engine for the length).
+        vistaPrevia: false,
+        resumen: 'ninguno',
+        sinFunciones: palabrasSinFunciones(),
+        // A macro the definition does not have reads «MACRO4» as the marker says, and the engine gives the pill its error icon and its name.
+        nombreDesconocida: (nombre) => nombre.toUpperCase(),
+      };
+      let controlador!: ControladorEditor;
       let soloLectura = false;
-      let paso = false;
-      let emoji: EmojiEncontrado | null = null;
       let fila = 0;
-      let errorVisible = false;
+      /** What the backend refused on the last save, as the summary says it; it goes with the next edit. */
+      let refusados: ProblemaDelMensaje[] = [];
 
       const tope = (): number => configuracion.tope_mensaje;
+      const textoActual = (): string => textoDeMensaje(controlador.expresion());
+      const tramos = (): HTMLTextAreaElement[] => [...raizEditor.querySelectorAll<HTMLTextAreaElement>('[data-linea] [data-tramo]')];
 
-      function pintarBarra(): void {
-        barra.setAttribute('aria-label', t('whatsmkt.mensaje.insertarMacro'));
-        const botones: Node[] = [];
-        if (datos.id === null) {
-          const aviso = nodo('p', 'field__hint wm-editor__aviso');
-          aviso.textContent = t('whatsmkt.mensaje.sinMacros');
-          botones.push(aviso);
-        }
-        for (const macro of datos.macros) {
-          const boton = nodo('button', 'btn btn--sm');
-          boton.type = 'button';
-          boton.textContent = textoDeMacro(macro);
-          boton.disabled = soloLectura;
-          boton.addEventListener('click', () => insertar(`[$MACRO${macro.n}$]`));
-          botones.push(boton);
-        }
-        if (datos.macros.length > 0) {
-          const separador = nodo('span', 'wm-editor__separador');
-          separador.textContent = '|';
-          separador.setAttribute('aria-hidden', 'true');
-          botones.push(separador);
-        }
-        const whatsapp = nodo('button', 'btn btn--sm');
-        whatsapp.type = 'button';
-        whatsapp.textContent = t('whatsmkt.mensaje.insertarWhatsapp');
-        whatsapp.disabled = soloLectura;
-        whatsapp.addEventListener('click', () => insertar(MARCADOR_WHATSAPP));
-        botones.push(whatsapp);
-        barra.replaceChildren(...botones);
-      }
-
-      /** Writes `texto` where the cursor is (or over what is selected) and gives the focus back to the field. */
-      function insertar(texto: string): void {
-        if (soloLectura) return;
-        area.focus();
-        area.setRangeText(texto, area.selectionStart, area.selectionEnd, 'end');
-        alEscribir();
-      }
-
-      function pintarContador(): void {
-        const largo = largoDelMensaje(area.value);
-        const excede = largo > tope();
-        contador.textContent = t('whatsmkt.mensaje.largo', { largo, maximo: tope() });
-        contador.dataset.excede = String(excede);
-        etiquetaTope.hidden = !excede;
-        // The announcement is said only when the limit is crossed, not at every key.
-        if (excede !== paso) {
-          paso = excede;
-          anuncio.textContent = excede ? t('whatsmkt.mensaje.pasoElTope', { largo, maximo: tope() }) : '';
+      /** Puts the caret over the first emoji, in the text run that has it: where the error says it is. */
+      function irAlEmoji(): void {
+        for (const area of tramos()) {
+          const encontrado = primerEmoji(area.value);
+          if (!encontrado) continue;
+          area.focus();
+          area.setSelectionRange(encontrado.indice, encontrado.indice + encontrado.caracter.length);
+          return;
         }
       }
 
-      /**
-       * What is wrong with the text, every problem and in this order (§5.1): the first macro the definition lacks (RF-WM-25), the first emoji
-       * with its position (RF-WM-24) and the length over the limit (RF-WM-26). The red counter does not replace the last one.
-       */
-      function pintarError(): void {
-        emoji = primerEmoji(area.value);
-        const macro = datos.id === null ? null : primeraMacroInexistente(area.value, datos.macros.length);
-        const largo = largoDelMensaje(area.value);
-        const lineas: HTMLElement[] = [];
-        const linea = (texto: string): HTMLElement => {
-          const p = nodo('p', 'field__error');
-          p.textContent = texto;
-          lineas.push(p);
-          return p;
-        };
-        if (macro) linea(t('whatsmkt.codigo.macro_inexistente', { macro, n: datos.macros.length }));
-        if (emoji) {
-          const delEmoji = linea(t('whatsmkt.codigo.mensaje_con_emoji', { caracter: emoji.caracter, posicion: emoji.posicion }));
-          // The cursor goes where the error says: over the emoji it names. The move waits for the event to end: inside it the browser gives
-          // the focus back to the line, and the field's `focusout` would then redraw the lines and drop the focus on the page.
-          delEmoji.dataset.emoji = '';
-          delEmoji.tabIndex = -1;
-          delEmoji.addEventListener('focus', () =>
-            window.setTimeout(() => {
-              area.focus();
-              if (emoji) area.setSelectionRange(emoji.indice, emoji.indice + emoji.caracter.length);
-            }, 0),
-          );
-        }
-        if (largo > tope()) linea(t('whatsmkt.codigo.mensaje_largo', { largo, maximo: tope() }));
-        errores.replaceChildren(...(errorVisible ? lineas : []));
-        if (errorVisible && lineas.length > 0) area.setAttribute('aria-invalid', 'true');
-        else area.removeAttribute('aria-invalid');
+      function irAlFinal(): void {
+        const ultimo = tramos().at(-1);
+        ultimo?.focus();
+        ultimo?.setSelectionRange(ultimo.value.length, ultimo.value.length);
+      }
+
+      interface ProblemaDelMensaje {
+        texto: string;
+        ir: () => void;
+      }
+
+      /** What the editor found when it validated (the backend's judgement), in the words of this screen where it has them: an unknown macro says so as the rule does (RF-WM-25). */
+      function problemasDelEditor(): ProblemaDelMensaje[] {
+        const nodos = controlador.expresion().nodos;
+        return controlador.estado().problemas.map((problema, indice) => {
+          const nodo = problema.ubicacion ? nodos[problema.ubicacion.nodo] : undefined;
+          const macro = problema.codigo === 'variable_desconocida' && nodo?.tipo === 'variable' ? numeroDeMacro(nodo.nombre) : null;
+          const texto =
+            macro === null
+              ? mensajeProblema(problema)
+              : t('whatsmkt.codigo.macro_inexistente', { macro: `[$MACRO${(nodo as { nombre: string }).nombre.slice(5)}$]`, n: datos.macros.length });
+          return { texto, ir: () => controlador.irAProblema(indice) };
+        });
+      }
+
+      /** The rules the backend applies when it saves: the first emoji with its position (RF-WM-24) and the limit (RF-WM-26). */
+      function problemasDeGuardado(): ProblemaDelMensaje[] {
+        const texto = textoActual();
+        const lista: ProblemaDelMensaje[] = [];
+        const emoji = primerEmoji(texto);
+        if (emoji) lista.push({ texto: t('whatsmkt.codigo.mensaje_con_emoji', { caracter: emoji.caracter, posicion: emoji.posicion }), ir: irAlEmoji });
+        const largo = largoDelMensaje(texto);
+        if (largo > tope()) lista.push({ texto: t('whatsmkt.codigo.mensaje_largo', { largo, maximo: tope() }), ir: irAlFinal });
+        return lista;
+      }
+
+      function pintarProblemas(): void {
+        const propios = problemasDeGuardado();
+        // What the backend refused and this summary does not already say (its sentence is another).
+        const dichos = new Set([...problemasDelEditor(), ...propios].map((problema) => problema.texto));
+        const todos = [...problemasDelEditor(), ...propios, ...refusados.filter((problema) => !dichos.has(problema.texto))];
+        resumen.hidden = todos.length === 0;
+        panel.classList.toggle('wm-resumen-activo', refusados.length > 0 && !resumen.hidden);
+        tituloResumen.textContent = todos.length === 1 ? t('editorTexto.resumen.uno') : t('editorTexto.resumen.varios', { n: todos.length });
+        listaResumen.replaceChildren(
+          ...todos.map((problema, indice) => {
+            const item = nodo('li');
+            const texto = nodo('span');
+            texto.id = `${prefijo}-problema-${indice}`;
+            texto.textContent = problema.texto;
+            const ir = nodo('button', 'editor-texto__ir');
+            ir.type = 'button';
+            ir.textContent = t('editorTexto.resumen.ir');
+            ir.setAttribute('aria-describedby', texto.id);
+            ir.addEventListener('click', problema.ir);
+            item.append(texto, ' ', ir);
+            return item;
+          }),
+        );
+        const emoji = primerEmoji(textoActual());
+        errorDeEmoji.textContent = emoji ? t('whatsmkt.codigo.mensaje_con_emoji', { caracter: emoji.caracter, posicion: emoji.posicion }) : '';
+        // The text run that holds the emoji is marked invalid; only the mark this put is taken off.
+        tramos().forEach((area) => {
+          if (primerEmoji(area.value)) {
+            area.setAttribute('aria-invalid', 'true');
+            area.dataset.emoji = '';
+          } else if ('emoji' in area.dataset) {
+            delete area.dataset.emoji;
+            area.removeAttribute('aria-invalid');
+          }
+        });
       }
 
       function pintarVista(): void {
@@ -271,7 +300,7 @@ export async function montarMensajes(opciones: OpcionesMensajes): Promise<Contro
         fila = Math.min(fila, Math.max(0, ejemplos.length - 1));
         selectFila.value = String(fila);
         notaVista.textContent = datos.id === null ? '' : datos.ejemplos === null ? t('whatsmkt.mensaje.sinFilasEjemplo') : '';
-        const partes = partesDeLaVista(area.value, ejemplos[fila] ? ejemplos[fila].slice(1) : [], configuracion.whatsapp_contacto, t('whatsmkt.mensaje.sinWhatsapp'));
+        const partes = partesDeLaVista(textoActual(), ejemplos[fila] ? ejemplos[fila].slice(1) : [], configuracion.whatsapp_contacto, t('whatsmkt.mensaje.sinWhatsapp'));
         cuerpoVista.replaceChildren(
           ...partes.map((parte) => {
             if (!parte.apagado) return document.createTextNode(parte.texto);
@@ -282,69 +311,95 @@ export async function montarMensajes(opciones: OpcionesMensajes): Promise<Contro
         );
       }
 
-      function crecer(): void {
-        area.style.height = 'auto';
-        area.style.height = `${area.scrollHeight}px`;
-      }
-
-      function repintar(): void {
-        pintarBarra();
-        rotulo.textContent = t('whatsmkt.mensaje.global');
-        pintarContador();
-        pintarError();
+      function pintar(): void {
+        sinMacros.textContent = datos.id === null ? t('whatsmkt.mensaje.sinMacros') : '';
+        sinMacros.hidden = datos.id !== null;
+        pintarProblemas();
         pintarVista();
-        crecer();
       }
 
-      function alEscribir(): void {
-        pintarContador();
-        // Once an error is there it follows what is typed; a new one waits for the field to be left.
-        if (errorVisible) pintarError();
-        pintarVista();
-        crecer();
-        alCambiar();
+      function alEvento(evento: Event): void {
+        // The editor emits as it mounts, before `montarEditor` hands the controller back.
+        if ((controlador as ControladorEditor | undefined) === undefined) return;
+        // A change of the person's own, not the one the component made showing a text: that one is not an unsaved change.
+        if ((evento as CustomEvent<EstadoEditor>).detail.origen === 'usuario') {
+          refusados = [];
+          alCambiar();
+        }
+        pintar();
       }
 
-      area.addEventListener('input', alEscribir);
+      /** A save refused for its content: the summary gets what was refused and takes the focus (§13.6). */
+      function alRechazar(problemas: ProblemaTexto[]): void {
+        // The module's own sentence for its codes; for a rule this build does not know, the backend's detail says more than the generic text.
+        refusados = problemas.map((problema) => ({
+          texto: textoDeProblemaDelMensaje(problema) ?? (problema.codigo === 'regla_del_contexto' ? problema.detalle : mensajeProblema(problema)),
+          ir: () => tramos()[0]?.focus(),
+        }));
+        pintar();
+        resumen.focus();
+      }
+
+      /** Mounts the engine's editor on the root it has now, with the text and the mode that are on screen. */
+      async function montar(expresion: Expresion | null): Promise<void> {
+        // Under the line of text runs and the errors of the editor's own: where an error of a run is said.
+        raizEditor.querySelector('[data-error-tramo]')!.after(errorDeEmoji);
+        raizEditor.addEventListener(EVENTO_EXPRESION, alEvento);
+        opcionesEditor.expresion = expresion;
+        opcionesEditor.soloLectura = soloLectura;
+        controlador = await montarEditor(raizEditor, opcionesEditor);
+      }
+
       selectFila.addEventListener('change', () => {
         fila = Number(selectFila.value);
         pintarVista();
       });
-      // Leaving the field says its errors, except on the way to «Guardar»: there the answer of the save is what is said, and a message
-      // that appeared and moved the button would lose the click.
-      area.addEventListener('focusout', (evento) => {
-        const destino = evento.relatedTarget;
-        if (destino instanceof HTMLElement && destino.matches('[data-textos-guardar]')) return;
-        errorVisible = true;
-        pintarError();
-      });
+
+      await montar(null);
 
       const editor = {
-        repintar,
+        /** The configuration changed: the words follow it, and with another default definition or limit the context itself is another. */
+        async repintar(contextoCambio = false): Promise<void> {
+          opcionesEditor.sinFunciones = palabrasSinFunciones();
+          if (contextoCambio) {
+            const expresion = controlador.expresion();
+            controlador.destruir();
+            raizEditor.removeEventListener(EVENTO_EXPRESION, alEvento);
+            // The catalogue of this context is built per request (its macros and its limit follow the configuration), and the client keeps one per context.
+            olvidarCatalogo(CONTEXTO_MENSAJE);
+            const nueva = intacta.cloneNode(true) as HTMLElement;
+            raizEditor.replaceWith(nueva);
+            raizEditor = nueva;
+            await montar(expresion);
+          }
+          pintar();
+        },
         fijar(contenido: ContenidoTexto | null, lectura: boolean): void {
           soloLectura = lectura;
-          area.value = String(contenido?.texto ?? '');
-          area.readOnly = lectura;
-          errorVisible = false;
-          // A text that opens already over the limit is not a crossing: only what is typed past it is announced.
-          paso = largoDelMensaje(area.value) > tope();
-          anuncio.textContent = '';
-          repintar();
+          refusados = [];
+          controlador.fijarExpresion(expresionDeMensaje(String(contenido?.texto ?? '')));
+          controlador.fijarSoloLectura(lectura);
+          pintar();
         },
-        leer: (): ContenidoTexto => ({ texto: area.value }),
+        leer: (): ContenidoTexto => ({ texto: textoActual() }),
         destruir(): void {
           editores.delete(editor);
+          alRechazarDe.delete(prefijo);
+          panel.classList.remove('wm-resumen-activo');
+          controlador.destruir();
+          raizEditor.removeEventListener(EVENTO_EXPRESION, alEvento);
+          // The editor goes back to where the page keeps it, so the next factory finds it.
+          document.querySelector(ALMACEN)?.append(raizEditor);
           anfitrion.replaceChildren();
         },
         enfocar(): void {
-          // After a refused save the cursor goes to the first emoji, as the error says.
-          const rechazado = primerEmoji(area.value);
-          area.focus();
-          if (rechazado) area.setSelectionRange(rechazado.indice, rechazado.indice + rechazado.caracter.length);
+          if (!resumen.hidden) resumen.focus();
+          else tramos()[0]?.focus();
         },
       };
       editores.add(editor);
-      repintar();
+      alRechazarDe.set(prefijo, alRechazar);
+      pintar();
       return editor;
     };
   }
@@ -364,13 +419,15 @@ export async function montarMensajes(opciones: OpcionesMensajes): Promise<Contro
     segmentos: await montarTextosGuardados(opciones.raizSegmentos, {
       ...opcionesComunes,
       titulo: t('whatsmkt.mensaje.porSegmento'),
-      editor: fabricaDeEditor('wm-msg-segmento'),
+      editor: fabricaDeEditor('wm-msg-segmento', opciones.raizSegmentos),
+      alRechazar: (problemas) => alRechazarDe.get('wm-msg-segmento')?.(problemas),
       etiquetaDe,
     }),
     globales: await montarTextosGuardados(opciones.raizGlobales, {
       ...opcionesComunes,
       titulo: t('whatsmkt.mensaje.globales'),
-      editor: fabricaDeEditor('wm-msg-global'),
+      editor: fabricaDeEditor('wm-msg-global', opciones.raizGlobales),
+      alRechazar: (problemas) => alRechazarDe.get('wm-msg-global')?.(problemas),
       etiquetaDe,
       // The global messages are the ones no segment owns.
       filtrar: (texto) => !vinculadoASegmento(texto.id),
@@ -527,8 +584,11 @@ export async function montarMensajes(opciones: OpcionesMensajes): Promise<Contro
 
   return {
     configuracionCambio(nueva) {
+      // With another default definition or another limit the context the editors read is another: they mount again.
+      const contextoCambio = nueva.definicion_defecto_id !== contexto.definicion || nueva.tope_mensaje !== contexto.tope;
+      contexto = { definicion: nueva.definicion_defecto_id, tope: nueva.tope_mensaje };
       configuracion = nueva;
-      editores.forEach((editor) => editor.repintar());
+      editores.forEach((editor) => void editor.repintar(contextoCambio));
       void cargarDatos();
     },
     segmentosCambiaron(nuevos) {

@@ -1,0 +1,918 @@
+{
+  "contexto": {
+    "nombre": "whatsmkt.mensaje",
+    "clave_nombre": "textoEnriquecido.contexto.whatsmkt.mensaje",
+    "variables": [
+      {
+        "nombre": "macro1",
+        "tipo": "texto",
+        "clave_nombre": null,
+        "origen": "whatsmkt.mensaje",
+        "etiqueta": "MACRO1 · Nombres del titular",
+        "adicional": false,
+        "archivado": false,
+        "tema": "archivo"
+      },
+      {
+        "nombre": "macro2",
+        "tipo": "texto",
+        "clave_nombre": null,
+        "origen": "whatsmkt.mensaje",
+        "etiqueta": "MACRO2 · Vencimiento de la cuota",
+        "adicional": false,
+        "archivado": false,
+        "tema": "archivo"
+      },
+      {
+        "nombre": "whatsapp",
+        "tipo": "texto",
+        "clave_nombre": "textoEnriquecido.variable.whatsapp",
+        "origen": "whatsmkt.mensaje",
+        "etiqueta": null,
+        "adicional": false,
+        "archivado": false,
+        "tema": "persona"
+      }
+    ],
+    "ejemplo": {
+      "macro1": "[$MACRO1$]",
+      "macro2": "[$MACRO2$]",
+      "whatsapp": "https://wa.me/+51900000000"
+    },
+    "limite_largo": 4096,
+    "umbral_advertencia": null,
+    "variable_dias": "dias_atraso_ajustados",
+    "segmentos": [
+      {
+        "clave": "preventiva",
+        "etiqueta": "Preventiva",
+        "desde": null,
+        "hasta": 0
+      },
+      {
+        "clave": "1_a_8",
+        "etiqueta": "1 a 8",
+        "desde": 1,
+        "hasta": 8
+      },
+      {
+        "clave": "9_a_30",
+        "etiqueta": "9 a 30",
+        "desde": 9,
+        "hasta": 30
+      },
+      {
+        "clave": "31_a_60",
+        "etiqueta": "31 a 60",
+        "desde": 31,
+        "hasta": 60
+      },
+      {
+        "clave": "61_a_90",
+        "etiqueta": "61 a 90",
+        "desde": 61,
+        "hasta": 90
+      },
+      {
+        "clave": "91_a_120",
+        "etiqueta": "91 a 120",
+        "desde": 91,
+        "hasta": 120
+      }
+    ],
+    "clave_alcance": "textoEnriquecido.alcance.whatsmkt.mensaje",
+    "admite_funciones": false
+  },
+  "contextos": [
+    {
+      "nombre": "cartera",
+      "clave_nombre": "textoEnriquecido.contexto.cartera"
+    },
+    {
+      "nombre": "mowa_mes.speech",
+      "clave_nombre": "textoEnriquecido.contexto.mowa_mes.speech"
+    },
+    {
+      "nombre": "whatsmkt.mensaje",
+      "clave_nombre": "textoEnriquecido.contexto.whatsmkt.mensaje"
+    }
+  ],
+  "funciones": [
+    {
+      "nombre": "primeros",
+      "familia": "texto",
+      "clave_familia": "textoEnriquecido.familia.texto",
+      "clave_nombre": "textoEnriquecido.funcion.primeros.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.primeros.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "n",
+          "clave_nombre": "textoEnriquecido.funcion.primeros.parametro.n",
+          "tipo": "numero",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": false,
+          "entero": true,
+          "minimo": 1,
+          "maximo": 10000,
+          "largo_minimo": null,
+          "largo_maximo": null,
+          "opciones": [],
+          "opciones_cerradas": false
+        }
+      ]
+    },
+    {
+      "nombre": "ultimos",
+      "familia": "texto",
+      "clave_familia": "textoEnriquecido.familia.texto",
+      "clave_nombre": "textoEnriquecido.funcion.ultimos.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.ultimos.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "n",
+          "clave_nombre": "textoEnriquecido.funcion.ultimos.parametro.n",
+          "tipo": "numero",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": false,
+          "entero": true,
+          "minimo": 1,
+          "maximo": 10000,
+          "largo_minimo": null,
+          "largo_maximo": null,
+          "opciones": [],
+          "opciones_cerradas": false
+        }
+      ]
+    },
+    {
+      "nombre": "mayusculas",
+      "familia": "texto",
+      "clave_familia": "textoEnriquecido.familia.texto",
+      "clave_nombre": "textoEnriquecido.funcion.mayusculas.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.mayusculas.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": []
+    },
+    {
+      "nombre": "minusculas",
+      "familia": "texto",
+      "clave_familia": "textoEnriquecido.familia.texto",
+      "clave_nombre": "textoEnriquecido.funcion.minusculas.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.minusculas.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": []
+    },
+    {
+      "nombre": "capitalizar",
+      "familia": "texto",
+      "clave_familia": "textoEnriquecido.familia.texto",
+      "clave_nombre": "textoEnriquecido.funcion.capitalizar.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.capitalizar.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": []
+    },
+    {
+      "nombre": "recortar",
+      "familia": "texto",
+      "clave_familia": "textoEnriquecido.familia.texto",
+      "clave_nombre": "textoEnriquecido.funcion.recortar.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.recortar.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": []
+    },
+    {
+      "nombre": "nombres",
+      "familia": "texto",
+      "clave_familia": "textoEnriquecido.familia.texto",
+      "clave_nombre": "textoEnriquecido.funcion.nombres.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.nombres.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": []
+    },
+    {
+      "nombre": "apellidos",
+      "familia": "texto",
+      "clave_familia": "textoEnriquecido.familia.texto",
+      "clave_nombre": "textoEnriquecido.funcion.apellidos.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.apellidos.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": []
+    },
+    {
+      "nombre": "sin_tildes",
+      "familia": "texto",
+      "clave_familia": "textoEnriquecido.familia.texto",
+      "clave_nombre": "textoEnriquecido.funcion.sin_tildes.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.sin_tildes.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": []
+    },
+    {
+      "nombre": "a_gsm7",
+      "familia": "texto",
+      "clave_familia": "textoEnriquecido.familia.texto",
+      "clave_nombre": "textoEnriquecido.funcion.a_gsm7.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.a_gsm7.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": []
+    },
+    {
+      "nombre": "reemplazar",
+      "familia": "texto",
+      "clave_familia": "textoEnriquecido.familia.texto",
+      "clave_nombre": "textoEnriquecido.funcion.reemplazar.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.reemplazar.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "buscar",
+          "clave_nombre": "textoEnriquecido.funcion.reemplazar.parametro.buscar",
+          "tipo": "texto",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": false,
+          "entero": false,
+          "minimo": null,
+          "maximo": null,
+          "largo_minimo": 1,
+          "largo_maximo": 200,
+          "opciones": [],
+          "opciones_cerradas": false
+        },
+        {
+          "nombre": "reemplazo",
+          "clave_nombre": "textoEnriquecido.funcion.reemplazar.parametro.reemplazo",
+          "tipo": "texto",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": false,
+          "entero": false,
+          "minimo": null,
+          "maximo": null,
+          "largo_minimo": null,
+          "largo_maximo": 200,
+          "opciones": [],
+          "opciones_cerradas": false
+        }
+      ]
+    },
+    {
+      "nombre": "rellenar_izquierda",
+      "familia": "texto",
+      "clave_familia": "textoEnriquecido.familia.texto",
+      "clave_nombre": "textoEnriquecido.funcion.rellenar_izquierda.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.rellenar_izquierda.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "largo",
+          "clave_nombre": "textoEnriquecido.funcion.rellenar_izquierda.parametro.largo",
+          "tipo": "numero",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": false,
+          "entero": true,
+          "minimo": 1,
+          "maximo": 1000,
+          "largo_minimo": null,
+          "largo_maximo": null,
+          "opciones": [],
+          "opciones_cerradas": false
+        },
+        {
+          "nombre": "relleno",
+          "clave_nombre": "textoEnriquecido.funcion.rellenar_izquierda.parametro.relleno",
+          "tipo": "texto",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": false,
+          "entero": false,
+          "minimo": null,
+          "maximo": null,
+          "largo_minimo": 1,
+          "largo_maximo": 1,
+          "opciones": [],
+          "opciones_cerradas": false
+        }
+      ]
+    },
+    {
+      "nombre": "sumar",
+      "familia": "numero",
+      "clave_familia": "textoEnriquecido.familia.numero",
+      "clave_nombre": "textoEnriquecido.funcion.sumar.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.sumar.descripcion",
+      "recibe": [
+        "numero"
+      ],
+      "devuelve": "numero",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "valor",
+          "clave_nombre": "textoEnriquecido.funcion.sumar.parametro.valor",
+          "tipo": "numero",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": true,
+          "entero": false,
+          "minimo": null,
+          "maximo": null,
+          "largo_minimo": null,
+          "largo_maximo": null,
+          "opciones": [],
+          "opciones_cerradas": false
+        }
+      ]
+    },
+    {
+      "nombre": "restar",
+      "familia": "numero",
+      "clave_familia": "textoEnriquecido.familia.numero",
+      "clave_nombre": "textoEnriquecido.funcion.restar.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.restar.descripcion",
+      "recibe": [
+        "numero"
+      ],
+      "devuelve": "numero",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "valor",
+          "clave_nombre": "textoEnriquecido.funcion.restar.parametro.valor",
+          "tipo": "numero",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": true,
+          "entero": false,
+          "minimo": null,
+          "maximo": null,
+          "largo_minimo": null,
+          "largo_maximo": null,
+          "opciones": [],
+          "opciones_cerradas": false
+        }
+      ]
+    },
+    {
+      "nombre": "multiplicar",
+      "familia": "numero",
+      "clave_familia": "textoEnriquecido.familia.numero",
+      "clave_nombre": "textoEnriquecido.funcion.multiplicar.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.multiplicar.descripcion",
+      "recibe": [
+        "numero"
+      ],
+      "devuelve": "numero",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "valor",
+          "clave_nombre": "textoEnriquecido.funcion.multiplicar.parametro.valor",
+          "tipo": "numero",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": true,
+          "entero": false,
+          "minimo": null,
+          "maximo": null,
+          "largo_minimo": null,
+          "largo_maximo": null,
+          "opciones": [],
+          "opciones_cerradas": false
+        }
+      ]
+    },
+    {
+      "nombre": "dividir",
+      "familia": "numero",
+      "clave_familia": "textoEnriquecido.familia.numero",
+      "clave_nombre": "textoEnriquecido.funcion.dividir.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.dividir.descripcion",
+      "recibe": [
+        "numero"
+      ],
+      "devuelve": "numero",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "valor",
+          "clave_nombre": "textoEnriquecido.funcion.dividir.parametro.valor",
+          "tipo": "numero",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": true,
+          "entero": false,
+          "minimo": null,
+          "maximo": null,
+          "largo_minimo": null,
+          "largo_maximo": null,
+          "opciones": [],
+          "opciones_cerradas": false
+        }
+      ]
+    },
+    {
+      "nombre": "redondear",
+      "familia": "numero",
+      "clave_familia": "textoEnriquecido.familia.numero",
+      "clave_nombre": "textoEnriquecido.funcion.redondear.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.redondear.descripcion",
+      "recibe": [
+        "numero"
+      ],
+      "devuelve": "numero",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "decimales",
+          "clave_nombre": "textoEnriquecido.funcion.redondear.parametro.decimales",
+          "tipo": "numero",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": false,
+          "entero": true,
+          "minimo": 0,
+          "maximo": 6,
+          "largo_minimo": null,
+          "largo_maximo": null,
+          "opciones": [],
+          "opciones_cerradas": false
+        }
+      ]
+    },
+    {
+      "nombre": "formato_numero",
+      "familia": "numero",
+      "clave_familia": "textoEnriquecido.familia.numero",
+      "clave_nombre": "textoEnriquecido.funcion.formato_numero.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.formato_numero.descripcion",
+      "recibe": [
+        "numero"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "decimales",
+          "clave_nombre": "textoEnriquecido.funcion.formato_numero.parametro.decimales",
+          "tipo": "numero",
+          "obligatorio": false,
+          "por_defecto": 2,
+          "acepta_variable": false,
+          "entero": true,
+          "minimo": 0,
+          "maximo": 6,
+          "largo_minimo": null,
+          "largo_maximo": null,
+          "opciones": [],
+          "opciones_cerradas": false
+        },
+        {
+          "nombre": "miles",
+          "clave_nombre": "textoEnriquecido.funcion.formato_numero.parametro.miles",
+          "tipo": "texto",
+          "obligatorio": false,
+          "por_defecto": ",",
+          "acepta_variable": false,
+          "entero": false,
+          "minimo": null,
+          "maximo": null,
+          "largo_minimo": null,
+          "largo_maximo": 1,
+          "opciones": [
+            {
+              "valor": ",",
+              "ejemplo": null
+            },
+            {
+              "valor": ".",
+              "ejemplo": null
+            },
+            {
+              "valor": " ",
+              "ejemplo": null
+            },
+            {
+              "valor": "",
+              "ejemplo": null
+            }
+          ],
+          "opciones_cerradas": true
+        },
+        {
+          "nombre": "decimal",
+          "clave_nombre": "textoEnriquecido.funcion.formato_numero.parametro.decimal",
+          "tipo": "texto",
+          "obligatorio": false,
+          "por_defecto": ".",
+          "acepta_variable": false,
+          "entero": false,
+          "minimo": null,
+          "maximo": null,
+          "largo_minimo": 1,
+          "largo_maximo": 1,
+          "opciones": [
+            {
+              "valor": ".",
+              "ejemplo": null
+            },
+            {
+              "valor": ",",
+              "ejemplo": null
+            }
+          ],
+          "opciones_cerradas": true
+        }
+      ]
+    },
+    {
+      "nombre": "a_numero",
+      "familia": "conversion",
+      "clave_familia": "textoEnriquecido.familia.conversion",
+      "clave_nombre": "textoEnriquecido.funcion.a_numero.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.a_numero.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "numero",
+      "acepta_nulo": false,
+      "parametros": []
+    },
+    {
+      "nombre": "a_texto",
+      "familia": "conversion",
+      "clave_familia": "textoEnriquecido.familia.conversion",
+      "clave_nombre": "textoEnriquecido.funcion.a_texto.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.a_texto.descripcion",
+      "recibe": [
+        "numero",
+        "fecha"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": []
+    },
+    {
+      "nombre": "sumar_dias",
+      "familia": "fecha",
+      "clave_familia": "textoEnriquecido.familia.fecha",
+      "clave_nombre": "textoEnriquecido.funcion.sumar_dias.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.sumar_dias.descripcion",
+      "recibe": [
+        "fecha"
+      ],
+      "devuelve": "fecha",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "dias",
+          "clave_nombre": "textoEnriquecido.funcion.sumar_dias.parametro.dias",
+          "tipo": "numero",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": true,
+          "entero": true,
+          "minimo": -100000,
+          "maximo": 100000,
+          "largo_minimo": null,
+          "largo_maximo": null,
+          "opciones": [],
+          "opciones_cerradas": false
+        }
+      ]
+    },
+    {
+      "nombre": "restar_dias",
+      "familia": "fecha",
+      "clave_familia": "textoEnriquecido.familia.fecha",
+      "clave_nombre": "textoEnriquecido.funcion.restar_dias.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.restar_dias.descripcion",
+      "recibe": [
+        "fecha"
+      ],
+      "devuelve": "fecha",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "dias",
+          "clave_nombre": "textoEnriquecido.funcion.restar_dias.parametro.dias",
+          "tipo": "numero",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": true,
+          "entero": true,
+          "minimo": -100000,
+          "maximo": 100000,
+          "largo_minimo": null,
+          "largo_maximo": null,
+          "opciones": [],
+          "opciones_cerradas": false
+        }
+      ]
+    },
+    {
+      "nombre": "formato_fecha",
+      "familia": "fecha",
+      "clave_familia": "textoEnriquecido.familia.fecha",
+      "clave_nombre": "textoEnriquecido.funcion.formato_fecha.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.formato_fecha.descripcion",
+      "recibe": [
+        "fecha"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "patron",
+          "clave_nombre": "textoEnriquecido.funcion.formato_fecha.parametro.patron",
+          "tipo": "texto",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": false,
+          "entero": false,
+          "minimo": null,
+          "maximo": null,
+          "largo_minimo": 1,
+          "largo_maximo": 64,
+          "opciones": [
+            {
+              "valor": "dd/mm/aaaa",
+              "ejemplo": "05/10/2026"
+            },
+            {
+              "valor": "aaaa-mm-dd",
+              "ejemplo": "2026-10-05"
+            },
+            {
+              "valor": "dd-mm-aaaa",
+              "ejemplo": "05-10-2026"
+            },
+            {
+              "valor": "dd/mm/aa",
+              "ejemplo": "05/10/26"
+            },
+            {
+              "valor": "dd de nombre_mes de aaaa",
+              "ejemplo": "05 de octubre de 2026"
+            },
+            {
+              "valor": "dd/mm",
+              "ejemplo": "05/10"
+            },
+            {
+              "valor": "mm/aaaa",
+              "ejemplo": "10/2026"
+            }
+          ],
+          "opciones_cerradas": false
+        }
+      ]
+    },
+    {
+      "nombre": "a_fecha",
+      "familia": "conversion",
+      "clave_familia": "textoEnriquecido.familia.conversion",
+      "clave_nombre": "textoEnriquecido.funcion.a_fecha.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.a_fecha.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "fecha",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "patron",
+          "clave_nombre": "textoEnriquecido.funcion.a_fecha.parametro.patron",
+          "tipo": "texto",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": false,
+          "entero": false,
+          "minimo": null,
+          "maximo": null,
+          "largo_minimo": 1,
+          "largo_maximo": 64,
+          "opciones": [
+            {
+              "valor": "dd/mm/aaaa",
+              "ejemplo": "05/10/2026"
+            },
+            {
+              "valor": "aaaa-mm-dd",
+              "ejemplo": "2026-10-05"
+            },
+            {
+              "valor": "dd-mm-aaaa",
+              "ejemplo": "05-10-2026"
+            },
+            {
+              "valor": "dd/mm/aa",
+              "ejemplo": "05/10/26"
+            },
+            {
+              "valor": "dd de nombre_mes de aaaa",
+              "ejemplo": "05 de octubre de 2026"
+            },
+            {
+              "valor": "dd/mm",
+              "ejemplo": "05/10"
+            },
+            {
+              "valor": "mm/aaaa",
+              "ejemplo": "10/2026"
+            }
+          ],
+          "opciones_cerradas": false
+        }
+      ]
+    },
+    {
+      "nombre": "si_vacio",
+      "familia": "nulos",
+      "clave_familia": "textoEnriquecido.familia.nulos",
+      "clave_nombre": "textoEnriquecido.funcion.si_vacio.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.si_vacio.descripcion",
+      "recibe": [
+        "texto",
+        "numero",
+        "fecha",
+        "booleano"
+      ],
+      "devuelve": "entrada",
+      "acepta_nulo": true,
+      "parametros": [
+        {
+          "nombre": "alternativo",
+          "clave_nombre": "textoEnriquecido.funcion.si_vacio.parametro.alternativo",
+          "tipo": "entrada",
+          "obligatorio": true,
+          "por_defecto": null,
+          "acepta_variable": true,
+          "entero": false,
+          "minimo": null,
+          "maximo": null,
+          "largo_minimo": null,
+          "largo_maximo": null,
+          "opciones": [],
+          "opciones_cerradas": false
+        }
+      ]
+    },
+    {
+      "nombre": "enlace_whatsapp",
+      "familia": "enlaces",
+      "clave_familia": "textoEnriquecido.familia.enlaces",
+      "clave_nombre": "textoEnriquecido.funcion.enlace_whatsapp.nombre",
+      "clave_descripcion": "textoEnriquecido.funcion.enlace_whatsapp.descripcion",
+      "recibe": [
+        "texto"
+      ],
+      "devuelve": "texto",
+      "acepta_nulo": false,
+      "parametros": [
+        {
+          "nombre": "prefijo",
+          "clave_nombre": "textoEnriquecido.funcion.enlace_whatsapp.parametro.prefijo",
+          "tipo": "texto",
+          "obligatorio": false,
+          "por_defecto": "https://wa.me/+51",
+          "acepta_variable": false,
+          "entero": false,
+          "minimo": null,
+          "maximo": null,
+          "largo_minimo": 1,
+          "largo_maximo": 200,
+          "opciones": [],
+          "opciones_cerradas": false
+        }
+      ]
+    }
+  ],
+  "familias": [
+    "texto",
+    "numero",
+    "conversion",
+    "fecha",
+    "nulos",
+    "enlaces"
+  ],
+  "patrones_fecha": [
+    {
+      "patron": "dd/mm/aaaa",
+      "ejemplo": "05/10/2026"
+    },
+    {
+      "patron": "aaaa-mm-dd",
+      "ejemplo": "2026-10-05"
+    },
+    {
+      "patron": "dd-mm-aaaa",
+      "ejemplo": "05-10-2026"
+    },
+    {
+      "patron": "dd/mm/aa",
+      "ejemplo": "05/10/26"
+    },
+    {
+      "patron": "dd de nombre_mes de aaaa",
+      "ejemplo": "05 de octubre de 2026"
+    },
+    {
+      "patron": "dd/mm",
+      "ejemplo": "05/10"
+    },
+    {
+      "patron": "mm/aaaa",
+      "ejemplo": "10/2026"
+    }
+  ],
+  "marcas_fecha": [
+    {
+      "marca": "dd",
+      "clave": "textoEnriquecido.marcaFecha.dd",
+      "ejemplo": "05"
+    },
+    {
+      "marca": "mm",
+      "clave": "textoEnriquecido.marcaFecha.mm",
+      "ejemplo": "10"
+    },
+    {
+      "marca": "aaaa",
+      "clave": "textoEnriquecido.marcaFecha.aaaa",
+      "ejemplo": "2026"
+    },
+    {
+      "marca": "aa",
+      "clave": "textoEnriquecido.marcaFecha.aa",
+      "ejemplo": "26"
+    },
+    {
+      "marca": "nombre_mes",
+      "clave": "textoEnriquecido.marcaFecha.nombre_mes",
+      "ejemplo": "octubre"
+    }
+  ],
+  "limites": {
+    "nodos": 200,
+    "funciones_por_nodo": 10,
+    "argumentos_por_funcion": 8,
+    "largo_literal": 5000,
+    "columnas_por_definicion": 100,
+    "variantes_por_columna": 50,
+    "largo_nombre_definicion": 120
+  }
+}

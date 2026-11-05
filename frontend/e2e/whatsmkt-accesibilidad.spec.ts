@@ -7,7 +7,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 import { apiWhatsmkt, errorWhatsmkt, montarApiWhatsmkt } from './api-falsa-whatsmkt';
-import { mensajesFalsos, montarMensajesWhatsmkt } from './api-falsa-whatsmkt-mensajes';
+import { mensajeFalso, mensajesFalsos, montarMensajesWhatsmkt } from './api-falsa-whatsmkt-mensajes';
 import { campanaFalsa, montarCampanaWhatsmkt } from './api-falsa-whatsmkt-campana';
 import { informeFalso, montarSeguimientoWhatsmkt, seguimientoFalso } from './api-falsa-whatsmkt-seguimiento';
 import { montarSeleccion } from './apoyo-seleccion';
@@ -39,9 +39,10 @@ for (const tema of ['light', 'dark'] as const) {
         await page.addInitScript((elegido) => {
           localStorage.setItem('app:appearance', JSON.stringify({ theme: elegido, language: 'es' }));
         }, tema);
-        await montarApiWhatsmkt(page, apiWhatsmkt());
+        const api = apiWhatsmkt();
+        await montarApiWhatsmkt(page, api);
         // The settings read the saved messages and the default definition; what a spec registers after this one answers first.
-        await montarMensajesWhatsmkt(page, mensajesFalsos());
+        await montarMensajesWhatsmkt(page, mensajesFalsos(), api);
       });
 
       test('campaña, sin selección elegida', async ({ page }) => {
@@ -248,25 +249,45 @@ for (const tema of ['light', 'dark'] as const) {
         await sinViolaciones(page);
       });
 
-      test('configuración, con los mensajes: el emoji, la macro que no existe, el tope pasado y la vista previa', async ({ page }) => {
+      // The message in the common editor (T-WM-F4): the summary of problems with its links, the counter over the limit, the panel of a pill with no
+      // functions and its link to Columnas, and the preview with a row of the definition.
+      test('configuración, con los mensajes: el resumen de problemas, el tope pasado y la vista previa', async ({ page }) => {
         const api = apiWhatsmkt();
         api.configuracion.definicion_defecto_id = 11;
         api.configuracion.tope_mensaje = 30;
         api.configuracion.whatsapp_contacto = '900000123';
         api.segmentos[0].texto_guardado_id = 101;
         api.segmentos[1].texto_guardado_id = 102;
+        const mensajes = mensajesFalsos();
+        mensajes.textos.textos.push(mensajeFalso(106, 'Con una macro de más', ['Hola 😀 [$MACRO7$] y [whatsapp]']));
         await montarApiWhatsmkt(page, api);
-        await montarMensajesWhatsmkt(page, mensajesFalsos());
+        await montarMensajesWhatsmkt(page, mensajes, api);
         await page.goto('/whatsmkt/configuracion');
         await expect(page.locator('#wm-mensajes-segmento')).toHaveAttribute('data-montado', 'true');
-        await expect(page.getByRole('button', { name: 'MACRO1 · Nombres del titular' }).first()).toBeVisible();
-        await expect(page.locator('#wm-msg-segmento-texto')).toHaveValue(/tu cuota vence el/);
-        await page.locator('#wm-msg-segmento-texto').fill('Hola 😀 INFO por [whatsapp] y [$MACRO4$]');
-        // Leaving the field says the error, and the counter is over the limit.
-        await page.locator('#wm-whatsapp').focus();
-        await expect(page.locator('#wm-msg-segmento-error')).not.toBeEmpty();
-        await expect(page.locator('#wm-msg-segmento-contador')).toHaveAttribute('data-excede', 'true');
+        await expect(page.locator('#wm-msg-segmento-editor [data-tramo="2"]')).toHaveValue(/tu cuota vence el/);
+        await page.locator('#wm-mensajes-segmento [data-textos-select]').selectOption('106');
+        const resumen = page.locator('#wm-mensajes-segmento [data-textos-editor] > .editor-texto__resumen');
+        await expect(resumen.locator('li')).toHaveCount(3);
+        await expect(page.locator('#wm-msg-segmento-editor [data-largo-nivel]')).toHaveText('Pasa el tope');
         await expect(page.locator('#wm-mensajes-segmento .wm-vista__texto')).toContainText('https://wa.me/+51900000123');
+        await sinViolaciones(page);
+      });
+
+      test('configuración, con el panel de una píldora sin funciones y el buscador de variables abierto', async ({ page }) => {
+        const api = apiWhatsmkt();
+        api.configuracion.definicion_defecto_id = 11;
+        api.segmentos[0].texto_guardado_id = 101;
+        await montarApiWhatsmkt(page, api);
+        await montarMensajesWhatsmkt(page, mensajesFalsos(), api);
+        await page.goto('/whatsmkt/configuracion');
+        await expect(page.locator('#wm-mensajes-segmento')).toHaveAttribute('data-montado', 'true');
+        await expect(page.locator('#wm-msg-segmento-editor [data-tramo="2"]')).toHaveValue(/tu cuota vence el/);
+        await page.locator('#wm-msg-segmento-editor [data-linea]').getByRole('button', { name: /MACRO1 · Nombres del titular/ }).click();
+        await expect(page.locator('#wm-msg-segmento-editor [data-sin-funciones]')).toBeVisible();
+        await sinViolaciones(page);
+        await page.locator('#wm-msg-segmento-editor [data-tramo="6"]').click();
+        await page.keyboard.type('[@');
+        await expect(page.locator('#wm-msg-segmento-editor').getByRole('listbox', { name: 'Elegir una variable' })).toBeVisible();
         await sinViolaciones(page);
       });
     });

@@ -10,6 +10,7 @@
  */
 import Shell from '../../layouts/Shell.astro';
 import Icon from '../../components/Icon.astro';
+import EditorTexto from '../../components/EditorTexto.astro';
 import TextosGuardados from '../../components/TextosGuardados.astro';
 import '../../styles/whatsmkt.css';
 ---
@@ -89,6 +90,12 @@ import '../../styles/whatsmkt.css';
 
       <!-- ---- 2. Global messages: the saved texts no segment owns (the title and the hint are put by `montarMensajes`) ------ -->
       <TextosGuardados id="wm-globales" />
+
+      <!-- The common editor of each message panel (T-WM-F4): its markup is built with the page, and `montarMensajes` moves it into its panel. -->
+      <div hidden data-editores-mensaje>
+        <EditorTexto id="wm-msg-segmento-editor" etiqueta="Mensaje" claveEtiqueta="whatsmkt.mensaje.global" />
+        <EditorTexto id="wm-msg-global-editor" etiqueta="Mensaje" claveEtiqueta="whatsmkt.mensaje.global" />
+      </div>
 
       <!-- ---- 3. Contact WhatsApp: what `[whatsapp]` in a message is replaced with (DU-WM-11) ---------- -->
       <section class="panel" aria-labelledby="wm-whatsapp-title">

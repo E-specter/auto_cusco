@@ -185,9 +185,10 @@ test.describe('mensaje', () => {
     await expect(bloque.locator('.wm-mensaje-texto__cuerpo')).toHaveText('Hola [$MACRO1$], Preventivo: tu saldo es [$MACRO2$]. INFO por [whatsapp]');
     // «[whatsapp]» counts as the link it becomes (26): 72 characters of text plus the 16 the link adds.
     await expect(bloque.locator('.wm-contador')).toHaveText('88 / 4096 caracteres');
-    // The macros are marked, and the one whose column has a label says it in its title.
-    await expect(bloque.locator('mark.wm-macro')).toHaveText(['[$MACRO1$]', '[$MACRO2$]']);
+    // The macros are marked, and the one whose column has a label says it in its title. The link of WhatsApp is marked too, with the name the editor gives it.
+    await expect(bloque.locator('mark.wm-macro')).toHaveText(['[$MACRO1$]', '[$MACRO2$]', '[whatsapp]']);
     await expect(bloque.locator('mark.wm-macro').first()).toHaveAttribute('title', 'MACRO1 · Nombres del titular');
+    await expect(bloque.locator('mark.wm-macro').last()).toHaveAttribute('title', 'Enlace de WhatsApp');
     // The segment with no message has no block.
     await expect(page.locator('[data-texto-mensaje="mayores_2"]')).toBeHidden();
 

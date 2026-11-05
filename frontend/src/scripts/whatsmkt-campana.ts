@@ -36,7 +36,7 @@ import { pintarBotonesDeVariables } from '../lib/mowa-mes-plantilla';
 import { FILAS_POR_PAGINA, paginar, pintarPaginador } from '../lib/paginacion';
 import { celda, celdaDeFila, cifra, tabla, vacio } from '../lib/tabla-dom';
 import { destinoConSeleccion, enlaceEditarEnCartera, seleccionDeLaUrl } from '../lib/volver';
-import { largoDelMensaje } from '../lib/whatsmkt-mensaje';
+import { MARCADOR_WHATSAPP, largoDelMensaje } from '../lib/whatsmkt-mensaje';
 import { destinoDeColumnas, enlaceConVolver, vueltaDeDefinicion } from '../lib/whatsmkt-vuelta';
 import { tablaDeExclusiones } from './whatsmkt-exclusiones';
 import { montarFicha } from './whatsmkt-ficha';
@@ -318,7 +318,15 @@ async function pintarTextoDeMensaje(destino: HTMLElement, id: number | null): Pr
   if (destino.dataset.id !== String(id)) return;
   const cuerpo = document.createElement('p');
   cuerpo.className = 'mono wm-mensaje-texto__cuerpo';
-  texto.split(/(\[\$MACRO\d+\$\])/).forEach((trozo) => {
+  texto.split(/(\[\$MACRO\d+\$\]|\[whatsapp\])/).forEach((trozo) => {
+    // The link of WhatsApp is marked like a macro, with the name the editor gives it (the message is shown as it is saved).
+    if (trozo === MARCADOR_WHATSAPP) {
+      const enlace = document.createElement('mark');
+      enlace.className = 'wm-macro';
+      enlace.textContent = trozo;
+      enlace.title = t('textoEnriquecido.variable.whatsapp');
+      return void cuerpo.append(enlace);
+    }
     const macro = /^\[\$MACRO(\d+)\$\]$/.exec(trozo);
     if (!macro) return void cuerpo.append(trozo);
     const marca = document.createElement('mark');

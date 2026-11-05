@@ -1066,6 +1066,7 @@
   "editorTexto.largo.deTope": "{n} / {tope} caracteres",
   "editorTexto.largo.hasta": "· hasta {maximo} con los datos más largos",
   "editorTexto.largo.cerca": "Cerca del tope",
+  "whatsmkt.mensaje.sinFunciones": "En WhatsMKT las funciones van en la columna, en Columnas de carga.",
   "editorTexto.largo.pasa": "Pasa el tope",
   "editorTexto.largo.sinCota": "sin máximo calculable: {motivo}",
   "editorTexto.sinCatalogo": "No se pudo cargar el catálogo de variables. Recarga la pantalla.",

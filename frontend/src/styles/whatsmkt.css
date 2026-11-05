@@ -513,6 +513,16 @@
 }
 
 /* The editor of a message (§5.1): the macros over the field, the counter and the errors under it, and the preview. */
+/* The summary of the editor carries what the backend refused on save (`alRechazar`): the saved-texts component's own list would repeat it. */
+.wm-resumen-activo [data-textos-problemas] {
+  display: none;
+}
+
+/* The page's summary sits right over the label of the field: it gets the space the editor's own children get. */
+[data-textos-editor] > .editor-texto__resumen {
+  margin-block-end: var(--space-3);
+}
+
 .wm-editor {
   display: flex;
   flex-direction: column;
@@ -533,10 +543,6 @@
 
 .wm-editor__aviso {
   margin: 0;
-}
-
-.wm-editor__errores:empty {
-  display: none;
 }
 
 .wm-editor__campo {
