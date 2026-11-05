@@ -867,6 +867,7 @@
   "textoEnriquecido.contexto.mowa_mes.speech": "MOWA MES speech",
   "textoEnriquecido.alcance.whatsmkt.mensaje": "Until WhatsMKT has its own variables, the message uses the macros of the default definition and the WhatsApp link.",
   "textoEnriquecido.contexto.whatsmkt.mensaje": "WhatsMKT message",
+  "editorTexto.tema.archivo": "File columns",
   "editorTexto.tema.persona": "Person and contact",
   "editorTexto.tema.deuda": "Instalment and debt",
   "editorTexto.tema.fechas": "Dates and days overdue",

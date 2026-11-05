@@ -58,6 +58,7 @@ def contexto_mensaje_texto(
             None,
             NOMBRE,
             f"MACRO{n} · {etiqueta}" if etiqueta else f"MACRO{n}",
+            tema=TemaVariable.ARCHIVO,
         )
         for n, etiqueta in enumerate(etiquetas, 1)
     )

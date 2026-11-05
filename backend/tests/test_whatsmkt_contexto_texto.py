@@ -140,6 +140,16 @@ def test_el_ejemplo_de_whatsapp_es_un_enlace_sintetico_de_26_caracteres() -> Non
     assert len(ejemplo) == 26 == mensaje.largo_del_mensaje("[whatsapp]")
 
 
+def test_las_macros_van_en_el_tema_columnas_del_archivo_y_whatsapp_en_persona() -> None:
+    contexto = contexto_mensaje_texto(("A", None))
+
+    assert [v.tema for v in contexto.variables] == [
+        TemaVariable.ARCHIVO,
+        TemaVariable.ARCHIVO,
+        TemaVariable.PERSONA,
+    ]
+
+
 def test_whatsapp_es_texto_con_su_clave_y_su_tema() -> None:
     whatsapp = contexto_mensaje_texto().variables[-1]
 

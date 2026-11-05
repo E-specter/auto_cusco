@@ -260,6 +260,12 @@ describe('el buscador por tema (§13.3)', () => {
     expect(grupos[0][1].map((x) => x.nombre)).toEqual(['telefono', 'titular']);
   });
 
+  it('el tema «archivo» (las macros del mensaje de WhatsMKT) sale primero y no cae en «otros»', () => {
+    const grupos = agruparPorTema([v('titular', 'persona'), v('macro1', 'archivo'), v('whatsapp', 'persona')]);
+    expect(grupos.map(([tema]) => tema)).toEqual(['archivo', 'persona']);
+    expect(grupos[0][1].map((x) => x.nombre)).toEqual(['macro1']);
+  });
+
   it('deja fuera el tema sin variables', () => {
     expect(agruparPorTema([v('titular', 'persona')]).map(([tema]) => tema)).toEqual(['persona']);
     expect(agruparPorTema([])).toEqual([]);

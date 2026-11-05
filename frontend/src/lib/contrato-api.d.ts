@@ -5388,10 +5388,11 @@ export interface components {
          * TemaVariable
          * @description El tema en que el buscador agrupa una variable (§13.3 del motor), en el orden en que se
          *     muestran. `OTROS` es un campo base sin tema asignado: nunca se pierde, y la prueba del catalogo
-         *     avisa que le falta uno.
+         *     avisa que le falta uno. `ARCHIVO` va primero: las macros del mensaje de WhatsMKT, que son
+         *     columnas del archivo de contactos (T-WM-B9b); mover su lugar es mover una linea.
          * @enum {string}
          */
-        TemaVariable: "persona" | "deuda" | "fechas" | "credito" | "gestion" | "riesgo" | "adicionales" | "otros";
+        TemaVariable: "archivo" | "persona" | "deuda" | "fechas" | "credito" | "gestion" | "riesgo" | "adicionales" | "otros";
         /**
          * TextoEntrada
          * @description Lo que no es texto o objeto llega al servicio tal cual y se informa como problema.

@@ -20,8 +20,10 @@ ORIGEN_CARTERA = "cartera"
 class TemaVariable(StrEnum):
     """El tema en que el buscador agrupa una variable (§13.3 del motor), en el orden en que se
     muestran. `OTROS` es un campo base sin tema asignado: nunca se pierde, y la prueba del catalogo
-    avisa que le falta uno."""
+    avisa que le falta uno. `ARCHIVO` va primero: las macros del mensaje de WhatsMKT, que son
+    columnas del archivo de contactos (T-WM-B9b); mover su lugar es mover una linea."""
 
+    ARCHIVO = "archivo"
     PERSONA = "persona"
     DEUDA = "deuda"
     FECHAS = "fechas"

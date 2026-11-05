@@ -88,7 +88,7 @@ export function consultaDelBuscador(valor: string, inicio: number, cursor: numbe
 // ---- The search by theme (interface rules §13.3) -------------------------------------------
 
 /** The themes the variable search groups by, in the order they show. The backend assigns each variable one (`tema`). */
-export const TEMAS = ['persona', 'deuda', 'fechas', 'credito', 'gestion', 'riesgo', 'adicionales', 'otros'] as const;
+export const TEMAS = ['archivo', 'persona', 'deuda', 'fechas', 'credito', 'gestion', 'riesgo', 'adicionales', 'otros'] as const;
 export type Tema = (typeof TEMAS)[number];
 
 /**

@@ -41,6 +41,7 @@ def _tema(contexto, nombre: str) -> TemaVariable:
 
 def test_los_temas_salen_en_el_orden_del_buscador() -> None:
     assert [t.value for t in TemaVariable] == [
+        "archivo",
         "persona",
         "deuda",
         "fechas",

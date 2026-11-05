@@ -15378,6 +15378,7 @@
       "TemaVariable": {
         "type": "string",
         "enum": [
+          "archivo",
           "persona",
           "deuda",
           "fechas",
@@ -15388,7 +15389,7 @@
           "otros"
         ],
         "title": "TemaVariable",
-        "description": "El tema en que el buscador agrupa una variable (§13.3 del motor), en el orden en que se\nmuestran. `OTROS` es un campo base sin tema asignado: nunca se pierde, y la prueba del catalogo\navisa que le falta uno."
+        "description": "El tema en que el buscador agrupa una variable (§13.3 del motor), en el orden en que se\nmuestran. `OTROS` es un campo base sin tema asignado: nunca se pierde, y la prueba del catalogo\navisa que le falta uno. `ARCHIVO` va primero: las macros del mensaje de WhatsMKT, que son\ncolumnas del archivo de contactos (T-WM-B9b); mover su lugar es mover una linea."
       },
       "TextoEntrada": {
         "properties": {
