@@ -749,7 +749,7 @@ A1 no depende de nada. A2 y A3 van después de A1.
 
   | Clave | es | en |
   |---|---|---|
-  | `columnas` | Columnas del archivo | File columns |
+  | `archivo` | Columnas del archivo | File columns |
   | `persona` | Persona y contacto | Person and contact |
   | `deuda` | Cuota y deuda | Instalment and debt |
   | `fechas` | Fechas y atraso | Dates and days overdue |
@@ -760,7 +760,7 @@ A1 no depende de nada. A2 y A3 van después de A1.
   | `otros` | Otros | Other |
 
 - **En qué tema cae cada variable:**
-  - **columnas:** las macros del mensaje de WhatsMKT, que son las columnas de su definición (T-WM-B9b). Va primero porque ahí es lo principal; en los demás contextos no hay ninguna y el tema no aparece.
+  - **archivo:** las macros del mensaje de WhatsMKT, que son las columnas de su definición (T-WM-B9b). Va primero porque ahí es lo principal; en los demás contextos no hay ninguna y el tema no aparece.
   - **persona:** `titular`, `documento_tipo`, `documento_numero`, `telefono` y `cliente_fallecido`; en MOWA, `titular` y `whatsapp_contacto`.
   - **deuda:** `monto_cuota`, `cuotas_aprobadas`, `cuotas_pagadas`, `cuotas_pendientes`, `saldo_capital_pendiente`, `saldo_soles_corte`, `saldo_cierre_actual` y `valor_cierre_mes_anterior`.
   - **fechas:** `fecha_vencimiento_cuota`, `vencimiento_operativo_aplica`, `vencimiento_operativo_fecha`, `dias_atraso`, `dias_atraso_entidad`, `mes_gestion`, `fecha_envio` y `dias_atraso_ajustados`; en MOWA, `vencimiento` y los días ajustados.
@@ -849,7 +849,7 @@ Quedan fuera, como dijo el coordinador: pegar texto con marcadores, el producto 
 | `editorTexto.disparador.insertada` | Se insertó {variable}. | {variable} was inserted. |
 | `editorTexto.disparador.alFinal` | Se insertará al final del texto. | It will be inserted at the end of the text. |
 | `editorTexto.disparador.ninguna` | Ninguna variable coincide con {textoCitado}. | No variable matches {textoCitado}. |
-| `editorTexto.tema.columnas` | Columnas del archivo | File columns |
+| `editorTexto.tema.archivo` | Columnas del archivo | File columns |
 | `editorTexto.tema.persona` | Persona y contacto | Person and contact |
 | `editorTexto.tema.deuda` | Cuota y deuda | Instalment and debt |
 | `editorTexto.tema.fechas` | Fechas y atraso | Dates and days overdue |
