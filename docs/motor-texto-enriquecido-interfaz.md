@@ -757,16 +757,17 @@ A1 no depende de nada. A2 y A3 van después de A1.
   - **deuda:** `monto_cuota`, `cuotas_aprobadas`, `cuotas_pagadas`, `cuotas_pendientes`, `saldo_capital_pendiente`, `saldo_soles_corte`, `saldo_cierre_actual` y `valor_cierre_mes_anterior`.
   - **fechas:** `fecha_vencimiento_cuota`, `vencimiento_operativo_aplica`, `vencimiento_operativo_fecha`, `dias_atraso`, `dias_atraso_entidad`, `mes_gestion`, `fecha_envio` y `dias_atraso_ajustados`; en MOWA, `vencimiento` y los días ajustados.
   - **credito:** `pagare`, `tipo_producto`, `estado_credito`, `moneda`, `tipo_reprogramacion`, `descuento_planilla`, `cantidad_paralelos` y `cartera_tag`.
-  - **gestion:** `agencia`, `region`, `analista_actual`, `analista_asignacion`, `celular_analista`, `bpo` y `validador`.
-  - **riesgo:** `segmento_actual`, `segmento_atraso`, `segmento_financiero`, `segmento_saldo`, `tramo_actual`, `tramo_proyectado`, `tipo_basilea`, `cod_tipo_basilea`, `mora_impacto_actual`, `mora_impacto_proyectada`, `provision_actual` y `provision_proyectada`.
+  - **gestion:** `agencia`, `region`, `analista_actual`, `analista_asignacion`, `celular_analista` y `bpo`.
+  - **riesgo:** `segmento_actual`, `segmento_atraso`, `segmento_financiero`, `segmento_saldo`, `tramo_actual`, `tramo_proyectado`, `tipo_basilea`, `mora_impacto_actual`, `mora_impacto_proyectada`, `provision_actual` y `provision_proyectada`.
   - **adicionales:** todo campo adicional (RF-63).
   - **otros:** un campo base nuevo sin tema asignado. Así nunca se pierde, y la prueba del catálogo avisa que le falta tema.
 - **Cada fila:** el nombre visible en sans, el tipo como tag chico (texto, número, fecha, sí/no) y, a la derecha, en mono y muted, **el valor de ejemplo** del contexto (`contexto.ejemplo`), formateado como en la vista previa: «Titular · texto · TITULAR/SINTETICO,UNO». El nombre técnico ya no va en la fila: queda en `title` y se busca igual.
 - **Búsqueda:** por nombre visible, nombre técnico y alias, sin tildes ni mayúsculas. Con texto, los temas vacíos se ocultan.
-- **Lo que no está en un contexto:** al pie del buscador, una línea `.field__hint` con el alcance del contexto, que trae el catálogo (`clave_alcance`):
-  - en el speech de MOWA: «El speech solo usa las variables de la campaña y los campos adicionales.»;
-  - en Columnas: ninguna línea, porque están todas.
-  Así «no está» se lee como regla del lugar y no como falla del editor. Sumar campos de la cartera al speech es una decisión aparte, de datos, no de esta fase.
+- **El speech de MOWA ofrecerá todos los campos de la cartera** (decisión del usuario, 2026-11-04), con los mismos temas que Columnas. Entra con la parte 2 de T-HI-B7, que espera la decisión D-CA-2. Un campo que viene vacío en un producto sigue la regla «Obligatoria» de la pieza (RF-45): si está marcada, el producto se informa con su motivo; si no, el campo queda vacío en el mensaje.
+- **Lo que de verdad no está en un contexto:** solo entonces, al pie del buscador, una línea `.field__hint` con el alcance, que trae el catálogo (`clave_alcance`):
+  - el speech de MOWA, **hasta la parte 2 de B7**: «El speech usa las variables de la campaña y los campos adicionales.». Con la parte 2, su `clave_alcance` se quita y la línea desaparece;
+  - el mensaje de WhatsMKT, hasta la fase B (§13.7);
+  - Columnas, nunca: ofrece todo.
 
 ### 13.4 Funciones, con su ejemplo antes de elegirla (A1)
 
@@ -843,7 +844,7 @@ Quedan fuera, como dijo el coordinador: pegar texto con marcadores, el producto 
 | `editorTexto.tema.riesgo` | Riesgo y segmentos | Risk and segments |
 | `editorTexto.tema.adicionales` | Campos adicionales | Additional fields |
 | `editorTexto.tema.otros` | Otros | Other |
-| `textoEnriquecido.alcance.mowa_mes.speech` | El speech solo usa las variables de la campaña y los campos adicionales. | The speech only uses the campaign variables and the additional fields. |
+| `textoEnriquecido.alcance.mowa_mes.speech` | El speech usa las variables de la campaña y los campos adicionales. | The speech uses the campaign variables and the additional fields. |
 | `textoEnriquecido.alcance.whatsmkt.mensaje` | Hasta que WhatsMKT tenga variables propias, el mensaje usa las macros de la definición por defecto y el enlace de WhatsApp. | Until WhatsMKT has its own variables, the message uses the macros of the default definition and the WhatsApp link. |
 | `editorTexto.funcion.agregar` | Agregar función | Add function |
 | `editorTexto.funcion.buscar` | Buscar función | Search function |
@@ -873,7 +874,8 @@ Quedan fuera, como dijo el coordinador: pegar texto con marcadores, el producto 
   - los atributos de combobox del tramo y los dos anuncios;
   - «Insertar variable» arriba de la línea, con el anuncio de «al final» si no hubo foco;
   - el buscador por tema en el orden de 13.3, con el ejemplo formateado, el tag de tipo y la búsqueda por el nombre técnico; un campo sin tema cae en Otros;
-  - la línea de alcance en MOWA y su ausencia en Columnas;
+  - la línea de alcance en el speech de MOWA mientras no entre la parte 2 de B7, y en el mensaje de WhatsMKT (A3); ninguna en Columnas;
+  - con la parte 2 de B7: el speech de MOWA con todos los campos de la cartera por tema y sin línea de alcance;
   - la lista de funciones con su descripción, el resultado de ejemplo en las sin parámetros y el filtro; los cuatro errores de parámetro con su rango;
   - el panel que nombra la pieza repetida; la píldora con una y con varias funciones, el corte de nombre largo y su nombre accesible completo;
   - la línea que crece; la píldora de WhatsApp en MOWA;
