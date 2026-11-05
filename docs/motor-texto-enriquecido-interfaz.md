@@ -799,7 +799,11 @@ A1 no depende de nada. A2 y A3 van después de A1.
   - con **dos o más**: «Titular · 3 funciones»;
   - la cadena completa va en `title` y en el nombre accesible («Titular, con mayúsculas, primeros caracteres 8»);
   - un ancho máximo de unas 24 letras, con puntos suspensivos; el nombre accesible no se corta.
-- **La línea es un párrafo:** crece con el texto (de 3 líneas mínimo a unas 10), los tramos se parten como texto y las píldoras quedan en línea con él. Sigue siendo `input` en su borde y su foco, pero no de una sola fila.
+- **La línea, compacta (T-HI-F11):** crece en alto con el texto, de 3 líneas mínimo a unas 10, y sigue siendo `input` en su borde y su foco.
+  - Tramos y píldoras van **en línea mientras caben**: cada tramo mide lo que su texto (`field-sizing: content` o una medida equivalente) y se parte en renglones solo si no cabe en uno. Un tramo largo ocupa su renglón.
+  - Un tramo vacío o de un solo signo («.», «,») queda pegado a la píldora de antes (no se separa en renglón propio) y conserva un blanco mínimo clicable de 24 px, para poder poner el cursor.
+  - **Criterio de las capturas,** con «Hola [Titular · mayúsculas], vence el [Vencimiento de la cuota].»: a 1280, en 1 renglón; a 360, en 3 renglones como máximo, y ningún renglón con solo un signo de puntuación.
+  - El **párrafo real** (un texto que fluye y se parte alrededor de las píldoras, con `contenteditable` o una capa espejo) queda como un corte aparte (§13.8): rehace el cursor, la selección, el IME, el foco, el lector y el teclado de §2.4, y es el cambio más caro y riesgoso del motor.
 - **El WhatsApp de contacto es una píldora** en los tres lugares, con el ícono `message-circle` y el nombre «Enlace de WhatsApp». En MOWA es la variable `whatsapp_contacto` con su función; en WhatsMKT (A3) se guarda como el marcador literal `[whatsapp]`. El usuario lo decidió así, y el editor no muestra la diferencia.
 - **El resumen de una columna compuesta** en la lista de Columnas y en la campaña de WhatsMKT marca la variable entre corchetes: «Texto: 51[Teléfono]» (`textoDeContenido`). Sin las funciones, que se ven en la fila abierta.
 
@@ -830,7 +834,7 @@ A1 no depende de nada. A2 y A3 van después de A1.
 
 ### 13.8 Fuera de la fase A
 
-Quedan fuera, como dijo el coordinador: pegar texto con marcadores, el producto real con fecha y pagaré, y el resaltado por píldora en la vista previa. Ninguno es imprescindible para la comodidad que pide el usuario: el disparador y el buscador resuelven lo que más cuesta. Si el usuario los pide, el primero a sumar es **pegar con marcadores**, porque hoy migrar un speech es pieza por pieza.
+Quedan fuera, como dijo el coordinador: pegar texto con marcadores, el producto real con fecha y pagaré, y el resaltado por píldora en la vista previa. Ninguno es imprescindible para la comodidad que pide el usuario: el disparador y el buscador resuelven lo que más cuesta. Si el usuario los pide, el primero a sumar es **pegar con marcadores**, porque hoy migrar un speech es pieza por pieza. También queda fuera el **párrafo real** de la línea (§13.5): F11 la deja compacta, y el párrafo real va en un corte propio si hace falta.
 
 ### 13.9 Textos (es / en)
 
