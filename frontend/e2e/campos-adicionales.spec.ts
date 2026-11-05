@@ -557,7 +557,7 @@ test.describe('el editor de texto', () => {
 
     const opcion = editor.getByRole('option', { name: /^Zona de cobranza/ });
     await expect(opcion.locator('.tag')).toContainText(['texto', 'Adicional']);
-    await expect(opcion.locator('.selector-variable__tecnico')).toHaveText('ad_zona');
+    await expect(opcion).toHaveAttribute('title', 'ad_zona');
     await expect(editor.getByRole('option', { name: /^Campo antiguo/ })).toHaveCount(0);
   });
 

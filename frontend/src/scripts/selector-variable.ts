@@ -7,19 +7,21 @@
  */
 
 import { etiquetaVariable } from '../lib/campos';
-import { agruparPorOrigen, filtrarVariables } from '../lib/editor-texto';
+import { agruparPorTema, ejemploDeVariable, filtrarVariables } from '../lib/editor-texto';
 import { t } from '../lib/i18n';
 import type { components } from '../lib/contrato-api';
 
 type Esquemas = components['schemas'];
 type Variable = Esquemas['VariableRespuesta'];
-type Contexto = Esquemas['ContextoDisponibleRespuesta'];
 
 export interface OpcionesBuscadorVariables {
   /** Prefix for every id inside, so several editors can share a page. */
   id: string;
   variables: readonly Variable[];
-  contextos: readonly Contexto[];
+  /** The context's example record (`contexto.ejemplo`): each row shows its variable's value. */
+  ejemplo: Readonly<Record<string, unknown>>;
+  /** What the context does not offer (`clave_alcance`, already translated); a line at the foot. Without it, no line. */
+  alcance?: string;
   onElegir: (nombre: string) => void;
   /** With a search field of its own (opened from the button). Without it, the text run drives the list. */
   conCampo?: boolean;
@@ -48,15 +50,6 @@ export function etiquetaTipo(tipo: string): string {
   const clave = `editorTexto.tipo.${tipo}`;
   const texto = t(clave);
   return texto === clave ? tipo : texto;
-}
-
-function nombreDeOrigen(origen: string, contextos: readonly Contexto[]): string {
-  const contexto = contextos.find((c) => c.nombre === origen);
-  if (contexto) {
-    const texto = t(contexto.clave_nombre);
-    if (texto !== contexto.clave_nombre) return texto;
-  }
-  return origen;
 }
 
 export function crearBuscadorVariables(opciones: OpcionesBuscadorVariables): BuscadorVariables {
@@ -91,6 +84,12 @@ export function crearBuscadorVariables(opciones: OpcionesBuscadorVariables): Bus
   cajaCampo.className = 'selector-variable__campo';
   if (campo) cajaCampo.append(campo);
   raiz.append(...(campo ? [cajaCampo] : []), lista, vacio);
+  if (opciones.alcance) {
+    const alcance = document.createElement('p');
+    alcance.className = 'field__hint selector-variable__alcance';
+    alcance.textContent = opciones.alcance;
+    raiz.append(alcance);
+  }
 
   let encontradas: Variable[] = [];
   let indice = 0;
@@ -125,10 +124,17 @@ export function crearBuscadorVariables(opciones: OpcionesBuscadorVariables): Bus
       marca.textContent = t('camposAdicionales.adicional');
       opcion.append(marca);
     }
-    const tecnico = document.createElement('span');
-    tecnico.className = 'mono muted selector-variable__tecnico';
-    tecnico.textContent = variable.nombre;
-    opcion.append(tecnico);
+    // The technical name is not in the row: it is in the tooltip, and the search finds it all the same.
+    opcion.title = variable.nombre;
+    const valor = ejemploDeVariable(variable.tipo, opciones.ejemplo[variable.nombre], (si) =>
+      t(si ? 'editorTexto.ejemplo.si' : 'editorTexto.ejemplo.no'),
+    );
+    if (valor !== null) {
+      const ejemplo = document.createElement('span');
+      ejemplo.className = 'mono muted selector-variable__ejemplo';
+      ejemplo.textContent = valor;
+      opcion.append(ejemplo);
+    }
     // The mouse picks without taking the focus away from the text run.
     opcion.addEventListener('mousedown', (evento) => evento.preventDefault());
     opcion.addEventListener('click', () => opciones.onElegir(variable.nombre));
@@ -143,16 +149,16 @@ export function crearBuscadorVariables(opciones: OpcionesBuscadorVariables): Bus
     vacio.textContent = t('editorTexto.disparador.ninguna', {
       textoCitado: t('camposAdicionales.nombreCitado', { campo: consulta }),
     });
-    // Grouped by origin; `encontradas` follows the groups' order so the arrows walk the list as it reads.
-    const grupos = agruparPorOrigen(encontradas);
+    // Grouped by theme; `encontradas` follows the groups' order so the arrows walk the list as it reads.
+    const grupos = agruparPorTema(encontradas);
     encontradas = grupos.flatMap(([, variables]) => variables);
-    for (const [origen, variables] of grupos) {
+    for (const [tema, variables] of grupos) {
       const grupo = document.createElement('div');
       grupo.setAttribute('role', 'group');
       const nombreGrupo = document.createElement('div');
-      nombreGrupo.className = 'selector-variable__origen';
-      nombreGrupo.id = `${opciones.id}-origen-${origen.replace(/[^a-z0-9]+/gi, '-')}`;
-      nombreGrupo.textContent = nombreDeOrigen(origen, opciones.contextos);
+      nombreGrupo.className = 'selector-variable__tema';
+      nombreGrupo.id = `${opciones.id}-tema-${tema}`;
+      nombreGrupo.textContent = t(`editorTexto.tema.${tema}`);
       grupo.setAttribute('aria-labelledby', nombreGrupo.id);
       grupo.append(nombreGrupo, ...variables.map(crearOpcion));
       lista.append(grupo);

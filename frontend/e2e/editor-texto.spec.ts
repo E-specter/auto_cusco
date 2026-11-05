@@ -16,6 +16,7 @@ import {
   apiTextoEnriquecidoVacia,
   catalogoSintetico,
   manejarTextoEnriquecido,
+  variablesAdicionalesSinteticas,
   type ApiFalsaTextoEnriquecido,
 } from './api-falsa-texto-enriquecido';
 
@@ -620,6 +621,159 @@ test.describe('el disparador [@ (§13.2)', () => {
   });
 });
 
+test.describe('el buscador por tema (§13.3)', () => {
+  const tramo = (page: Page, indice: number) => editor(page).locator(`[data-tramo="${indice}"]`);
+  const buscador = (page: Page) => editor(page).getByRole('listbox', { name: 'Elegir una variable' });
+  const temas = (page: Page) => editor(page).locator('.selector-variable__tema');
+  const abrirPorBoton = (page: Page) => editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
+  const abrirPorDisparador = async (page: Page) => {
+    await tramo(page, 0).click();
+    await page.keyboard.type('[@');
+  };
+  type Variable = Esquemas['VariableRespuesta'];
+  const variable = (nombre: string, tema: string, cambios: Partial<Variable> = {}): Variable =>
+    ({ nombre, tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false, tema, ...cambios }) as Variable;
+
+  for (const [como, abrirBuscador] of [
+    ['desde el botón', abrirPorBoton],
+    ['por [@', abrirPorDisparador],
+  ] as const) {
+    test(`${como}: la lista se agrupa por tema, no por origen, y cada fila trae el ejemplo`, async ({ page }) => {
+      await abrir(page);
+      await abrirBuscador(page);
+
+      // Las variables del módulo (WhatsApp, días ajustados) entran en su tema, no en un grupo aparte.
+      await expect(temas(page)).toHaveText(['Persona y contacto', 'Cuota y deuda', 'Fechas y atraso']);
+      const persona = buscador(page).getByRole('group', { name: 'Persona y contacto' });
+      await expect(persona.getByRole('option')).toHaveCount(4);
+      await expect(persona.getByRole('option', { name: /^WhatsApp de contacto/ })).toHaveCount(1);
+    });
+  }
+
+  test('los ocho temas salen en el orden de §13.3 y un campo con un tema desconocido cae en Otros', async ({ page }) => {
+    await abrir(page, {
+      ajustar: (motor) => {
+        motor.catalogos['mowa_mes.speech'].contexto.variables.unshift(
+          variable('campo_nuevo', 'inventado'),
+          variable('segmento_actual', 'riesgo'),
+          variable('agencia', 'gestion'),
+          variable('pagare', 'credito'),
+          ...variablesAdicionalesSinteticas(),
+        );
+      },
+    });
+    await abrirPorBoton(page);
+
+    await expect(temas(page)).toHaveText([
+      'Persona y contacto',
+      'Cuota y deuda',
+      'Fechas y atraso',
+      'Crédito',
+      'Gestión y asignación',
+      'Riesgo y segmentos',
+      'Campos adicionales',
+      'Otros',
+    ]);
+    await expect(buscador(page).getByRole('group', { name: 'Otros' }).getByRole('option')).toHaveCount(1);
+    // El archivado no se ofrece.
+    await expect(buscador(page).getByRole('option', { name: /^Región/ })).toHaveCount(0);
+  });
+
+  test('cada fila trae el tag de tipo y el valor de ejemplo, formateado; el nombre técnico queda en el title', async ({ page }) => {
+    await abrir(page);
+    await abrirPorBoton(page);
+    const fila = (nombre: RegExp) => buscador(page).getByRole('option', { name: nombre });
+
+    await expect(fila(/^Titular/).locator('.tag')).toHaveText('texto');
+    await expect(fila(/^Titular/).locator('.selector-variable__ejemplo')).toHaveText('NOMBRE SINTETICO DE PRUEBA');
+    await expect(fila(/^Titular/)).toHaveAttribute('title', 'titular');
+    await expect(fila(/^Vencimiento/).locator('.tag')).toHaveText('fecha');
+    await expect(fila(/^Vencimiento/).locator('.selector-variable__ejemplo')).toHaveText('05/10/2026');
+    await expect(fila(/^Saldo de capital pendiente/).locator('.selector-variable__ejemplo')).toHaveText('1500.50');
+    await expect(fila(/^Cliente fallecido/).locator('.tag')).toHaveText('sí/no');
+    await expect(fila(/^Cliente fallecido/).locator('.selector-variable__ejemplo')).toHaveText('No');
+    // El nombre técnico ya no está escrito en la fila.
+    await expect(fila(/^Titular/)).not.toContainText('titular');
+  });
+
+  test('una variable sin ejemplo en el contexto no lleva el valor', async ({ page }) => {
+    await abrir(page, {
+      ajustar: (motor) => {
+        motor.catalogos['mowa_mes.speech'].contexto.variables.push(...variablesAdicionalesSinteticas());
+      },
+    });
+    await abrirPorBoton(page);
+    await expect(buscador(page).getByRole('option', { name: /^Zona/ }).locator('.selector-variable__ejemplo')).toHaveCount(0);
+  });
+
+  test('se busca por el nombre técnico, aunque no se vea, y con texto los temas vacíos se ocultan', async ({ page }) => {
+    await abrir(page);
+    await abrirPorBoton(page);
+    await page.keyboard.type('fecha_venc');
+
+    await expect(buscador(page).getByRole('option')).toHaveCount(1);
+    await expect(buscador(page).getByRole('option', { name: /^Vencimiento/ })).toBeVisible();
+    await expect(temas(page)).toHaveText(['Fechas y atraso']);
+  });
+
+  test('las flechas recorren la lista en el orden en que se lee, tema por tema', async ({ page }) => {
+    const { motor } = await abrir(page);
+    await abrirPorDisparador(page);
+    // Persona (4): la primera ya está resaltada; la quinta es la de «Cuota y deuda».
+    for (let i = 0; i < 4; i += 1) await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => ultimaValidacion(motor)).toMatchObject({ nodos: [{ tipo: 'variable', nombre: 'saldo_capital_pendiente' }] });
+  });
+
+  test('la línea de alcance sale al pie cuando el contexto la trae, y no cuando no', async ({ page }) => {
+    await abrir(page, {
+      ajustar: (motor) => {
+        motor.catalogos['mowa_mes.speech'].contexto.clave_alcance = 'textoEnriquecido.alcance.whatsmkt.mensaje';
+      },
+    });
+    await abrirPorBoton(page);
+    const alcance = buscador(page).locator('xpath=..').locator('.selector-variable__alcance');
+    await expect(alcance).toHaveText(
+      'Hasta que WhatsMKT tenga variables propias, el mensaje usa las macros de la definición por defecto y el enlace de WhatsApp.',
+    );
+    await expect(alcance).toHaveClass(/field__hint/);
+    await page.keyboard.press('Escape');
+
+    // Sin alcance (Columnas ofrece todo; MOWA, con la parte 2 de B7): ninguna línea, en los dos modos.
+    await abrir(page, {
+      ajustar: (motor) => {
+        motor.catalogos['mowa_mes.speech'].contexto.clave_alcance = null;
+      },
+    });
+    await abrirPorBoton(page);
+    await expect(buscador(page)).toBeVisible();
+    await expect(editor(page).locator('.selector-variable__alcance')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await abrirPorDisparador(page);
+    await expect(buscador(page)).toBeVisible();
+    await expect(editor(page).locator('.selector-variable__alcance')).toHaveCount(0);
+  });
+
+  test('en Columnas (contexto cartera) no hay línea de alcance', async ({ page }) => {
+    await abrir(page, { extra: '&contexto=cartera' });
+    await abrirPorBoton(page);
+    await expect(buscador(page)).toBeVisible();
+    await expect(editor(page).locator('.selector-variable__alcance')).toHaveCount(0);
+  });
+
+  test('en inglés los temas salen en inglés', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app:appearance', JSON.stringify({ theme: 'light', language: 'en' }));
+    });
+    await abrir(page);
+    await editor(page).getByRole('button', { name: 'Insert variable', exact: true }).click();
+    await expect(temas(page)).toHaveText(['Person and contact', 'Instalment and debt', 'Dates and days overdue']);
+    await expect(
+      editor(page).getByRole('listbox', { name: 'Choose a variable' }).getByRole('option', { name: /^Deceased client/ }).locator('.selector-variable__ejemplo'),
+    ).toHaveText('No');
+  });
+});
+
 test.describe('variantes por segmento', () => {
   const variantes = [
     { segmento: '1_a_8', expresion: { nodos: [{ tipo: 'texto', valor: 'Recuerda tu cuota.' }] } },
@@ -1002,8 +1156,13 @@ for (const tema of ['light', 'dark'] as const) {
       expect(ancho).toBeLessThanOrEqual(360);
     });
 
-    test('editor con el buscador de variables abierto desde el botón, con su campo', async ({ page }) => {
-      await abrir(page, { expresion: SPEECH });
+    test('editor con el buscador de variables abierto desde el botón, con su campo y la línea de alcance', async ({ page }) => {
+      await abrir(page, {
+        expresion: SPEECH,
+        ajustar: (motor) => {
+          motor.catalogos['mowa_mes.speech'].contexto.clave_alcance = 'textoEnriquecido.alcance.whatsmkt.mensaje';
+        },
+      });
       await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
       await expect(editor(page).getByRole('combobox', { name: 'Buscar una variable' })).toBeFocused();
       await expect(editor(page).getByRole('listbox', { name: 'Elegir una variable' })).toBeVisible();

@@ -589,6 +589,13 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     el.disparadorAnuncio.textContent = texto;
   }
 
+  /** What the context does not offer, in words, or `undefined` when it offers everything or the text is not translated. */
+  function textoDeAlcance(): string | undefined {
+    const clave = catalogo.contexto.clave_alcance;
+    const texto = clave ? t(clave) : '';
+    return texto && texto !== clave ? texto : undefined;
+  }
+
   /** The search a text run drives, if it is the run `indice` (the button's search has a field of its own). */
   const disparoDelTramo = (indice: number): Disparo | null =>
     s.disparo && !s.disparo.desdeBoton && s.disparo.indice === indice ? s.disparo : null;
@@ -605,7 +612,8 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     const buscador = crearBuscadorVariables({
       id: `${id}-variable`,
       variables: catalogo.contexto.variables.filter((v) => !v.archivado),
-      contextos: catalogo.contextos,
+      ejemplo: catalogo.contexto.ejemplo,
+      alcance: textoDeAlcance(),
       onElegir: insertar,
       conCampo: desdeBoton,
       onCerrar: (porEscape) => {

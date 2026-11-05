@@ -155,7 +155,7 @@
   max-block-size: 20rem;
   overflow-y: auto;
 }
-.selector-variable__origen {
+.selector-variable__tema {
   margin: 0 0 var(--space-1);
   font-family: var(--font-secondary);
   font-size: var(--text-xs);
@@ -187,9 +187,19 @@
 .selector-variable__nombre {
   font-weight: 500;
 }
-.selector-variable__tecnico {
+.selector-variable__ejemplo {
   font-size: var(--text-xs);
   margin-inline-start: auto;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selector-variable__alcance {
+  margin: 0;
+  padding: var(--space-2);
+  border-block-start: var(--color-border-hairline) solid var(--color-border-subtle);
 }
 
 /* ---- Panel of the open piece ------------------------------------------------------ */

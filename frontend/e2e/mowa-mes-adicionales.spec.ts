@@ -447,7 +447,7 @@ test.describe('configuración: el editor v2 con campos adicionales', () => {
 
     const opcion = editor(page).getByRole('option', { name: /^Zona/ });
     await expect(opcion.locator('.tag')).toContainText(['texto', 'Adicional']);
-    await expect(opcion.locator('.selector-variable__tecnico')).toHaveText('ad_zona');
+    await expect(opcion).toHaveAttribute('title', 'ad_zona');
     await expect(editor(page).getByRole('option', { name: /^Monto en mora/ }).locator('.tag')).toContainText(['número', 'Adicional']);
     await expect(editor(page).getByRole('option', { name: /^Región/ })).toHaveCount(0);
   });

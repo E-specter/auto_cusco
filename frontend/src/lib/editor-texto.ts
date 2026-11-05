@@ -25,7 +25,8 @@ export function filtrarVariables<V extends { nombre: string }>(
   const palabras = normalizarBusqueda(consulta).split(/\s+/).filter(Boolean);
   if (palabras.length === 0) return [...variables];
   return variables.filter((variable) => {
-    const texto = normalizarBusqueda(`${etiqueta(variable)} ${variable.nombre.replace(/_/g, ' ')}`);
+    // The technical name counts as it is written («fecha_venc») and with spaces («fecha venc»).
+    const texto = normalizarBusqueda(`${etiqueta(variable)} ${variable.nombre} ${variable.nombre.replace(/_/g, ' ')}`);
     return palabras.every((palabra) => texto.includes(palabra));
   });
 }
@@ -63,6 +64,34 @@ export function consultaDelBuscador(valor: string, inicio: number, cursor: numbe
   if (!valor.startsWith(DISPARADOR, inicio) || cursor < inicio + DISPARADOR.length) return null;
   const consulta = valor.slice(inicio + DISPARADOR.length, cursor);
   return consulta.includes('\n') ? null : consulta;
+}
+
+// ---- The search by theme (interface rules §13.3) -------------------------------------------
+
+/** The themes the variable search groups by, in the order they show. The backend assigns each variable one (`tema`). */
+export const TEMAS = ['persona', 'deuda', 'fechas', 'credito', 'gestion', 'riesgo', 'adicionales', 'otros'] as const;
+export type Tema = (typeof TEMAS)[number];
+
+/**
+ * The variables grouped by theme, in the order of `TEMAS`; inside a theme, in the order they came. A theme with no variable
+ * is left out, and so is one a search emptied. A variable whose theme this does not know goes to «otros», so none is lost.
+ */
+export function agruparPorTema<V extends { tema: string }>(variables: readonly V[]): Array<[Tema, V[]]> {
+  const conocido = (tema: string): Tema => (TEMAS as readonly string[]).includes(tema) ? (tema as Tema) : 'otros';
+  return TEMAS.map((tema): [Tema, V[]] => [tema, variables.filter((v) => conocido(v.tema) === tema)]).filter(
+    ([, lista]) => lista.length > 0,
+  );
+}
+
+/**
+ * How a variable's example value reads in its row, or `null` when the context has none for it. A date shows as dd/mm/aaaa and
+ * a yes/no as the word; anything else as it is. The backend's preview is what really evaluates: this only reads the value.
+ */
+export function ejemploDeVariable(tipo: string, valor: unknown, siNo: (si: boolean) => string): string | null {
+  if (valor === undefined || valor === null || valor === '') return null;
+  if (typeof valor === 'boolean') return siNo(valor);
+  const fecha = tipo === 'fecha' && typeof valor === 'string' ? /^(\d{4})-(\d{2})-(\d{2})/.exec(valor) : null;
+  return fecha ? `${fecha[3]}/${fecha[2]}/${fecha[1]}` : String(valor);
 }
 
 export type NivelLargo = 'sin_limite' | 'dentro' | 'cerca' | 'excedido';

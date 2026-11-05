@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   agruparPorOrigen,
+  agruparPorTema,
   aVariableDirecta,
   anclaDe,
   argumentosIniciales,
@@ -14,6 +15,7 @@ import {
   conArgumento,
   consultaDelBuscador,
   disparadorEn,
+  ejemploDeVariable,
   esReferencia,
   filtrarVariables,
   leerArgumento,
@@ -41,6 +43,12 @@ describe('buscar una variable', () => {
   it('busca por la etiqueta y por el nombre técnico, con todas las palabras', () => {
     expect(filtrarVariables(VARIABLES, 'whatsapp contacto', etiqueta).map((v) => v.nombre)).toEqual(['whatsapp_contacto']);
     expect(filtrarVariables(VARIABLES, 'atraso dias', etiqueta).map((v) => v.nombre)).toEqual(['dias_atraso']);
+  });
+
+  it('el nombre técnico se encuentra tal como se escribe, con guion bajo, y con espacios', () => {
+    expect(filtrarVariables(VARIABLES, 'whatsapp_contacto', etiqueta).map((v) => v.nombre)).toEqual(['whatsapp_contacto']);
+    expect(filtrarVariables(VARIABLES, 'dias_atr', etiqueta).map((v) => v.nombre)).toEqual(['dias_atraso']);
+    expect(filtrarVariables(VARIABLES, 'dias atr', etiqueta).map((v) => v.nombre)).toEqual(['dias_atraso']);
   });
 
   it('una búsqueda vacía devuelve todas', () => {
@@ -224,5 +232,57 @@ describe('el disparador [@ (§13.2)', () => {
 
   it('se cierra con un salto de línea en la consulta', () => {
     expect(consultaDelBuscador('[@ti\ntu', 0, 7)).toBeNull();
+  });
+});
+
+describe('el buscador por tema (§13.3)', () => {
+  const v = (nombre: string, tema: string) => ({ nombre, tema });
+
+  it('agrupa por tema en el orden fijo de los ocho, sea cual sea el orden en que llegan', () => {
+    const grupos = agruparPorTema([
+      v('segmento_actual', 'riesgo'),
+      v('ad_zona', 'adicionales'),
+      v('agencia', 'gestion'),
+      v('pagare', 'credito'),
+      v('dias_atraso', 'fechas'),
+      v('monto_cuota', 'deuda'),
+      v('titular', 'persona'),
+      v('campo_nuevo', 'otros'),
+    ]);
+    expect(grupos.map(([tema]) => tema)).toEqual(['persona', 'deuda', 'fechas', 'credito', 'gestion', 'riesgo', 'adicionales', 'otros']);
+  });
+
+  it('dentro de un tema deja las variables en el orden en que llegaron', () => {
+    const grupos = agruparPorTema([v('telefono', 'persona'), v('saldo', 'deuda'), v('titular', 'persona')]);
+    expect(grupos[0][1].map((x) => x.nombre)).toEqual(['telefono', 'titular']);
+  });
+
+  it('deja fuera el tema sin variables', () => {
+    expect(agruparPorTema([v('titular', 'persona')]).map(([tema]) => tema)).toEqual(['persona']);
+    expect(agruparPorTema([])).toEqual([]);
+  });
+
+  it('una variable con un tema que no se conoce cae en «otros», no se pierde', () => {
+    const grupos = agruparPorTema([v('titular', 'persona'), v('raro', 'inventado'), v('sin', '')]);
+    expect(grupos.map(([tema]) => tema)).toEqual(['persona', 'otros']);
+    expect(grupos[1][1].map((x) => x.nombre)).toEqual(['raro', 'sin']);
+  });
+
+  const siNo = (si: boolean) => (si ? 'Sí' : 'No');
+
+  it('el ejemplo de una fecha se lee dd/mm/aaaa; el de un sí/no, con la palabra; lo demás, como llega', () => {
+    expect(ejemploDeVariable('fecha', '2026-10-05', siNo)).toBe('05/10/2026');
+    expect(ejemploDeVariable('booleano', false, siNo)).toBe('No');
+    expect(ejemploDeVariable('booleano', true, siNo)).toBe('Sí');
+    expect(ejemploDeVariable('numero', '1500.50', siNo)).toBe('1500.50');
+    expect(ejemploDeVariable('numero', 12, siNo)).toBe('12');
+    expect(ejemploDeVariable('texto', 'NOMBRE SINTETICO', siNo)).toBe('NOMBRE SINTETICO');
+  });
+
+  it('una fecha que no viene en ISO se deja como llega; sin valor no hay ejemplo', () => {
+    expect(ejemploDeVariable('fecha', '05/10/2026', siNo)).toBe('05/10/2026');
+    expect(ejemploDeVariable('texto', undefined, siNo)).toBeNull();
+    expect(ejemploDeVariable('texto', null, siNo)).toBeNull();
+    expect(ejemploDeVariable('texto', '', siNo)).toBeNull();
   });
 });
