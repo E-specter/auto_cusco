@@ -923,3 +923,34 @@ RF en `3dbfc97` (T-HI-0) y RF-MM-08/RF-MM-37 en `a86e524` (T-MM-0). Los supuesto
 - La mutación va sobre una copia.
 - La cola de máquina la llevo yo; `-ConBase` y `@postgres` las corre architec.
 - La prueba de oro de MOWA corre en B2, B3 y B5.
+
+## 31. Fase A del motor: el editor común mejorado (2026-11-04)
+
+El usuario eligió la opción 2 del diagnóstico (`diagnostico-motor-2026-11-04.md`), por fases. La especificación de la fase A está en §13 de `motor-texto-enriquecido-interfaz.md`, a cargo de `designer`. Los devs trabajan con ponytail full (regla del usuario del 2026-11-03): cada entrega trae la línea de «qué no hice o no verifiqué».
+
+### Cortes
+
+| Corte | Qué (§13) | Quién | Depende de |
+|---|---|---|---|
+| **T-HI-B7** | Catálogo: `tema` en cada variable y `clave_alcance` en el contexto (§13.3). Hay 8 temas y la tabla de §13.3; un campo sin tema cae en `otros`, y una prueba del catálogo lo avisa. El contexto de MOWA (`plataformas/mowa_mes/contexto_texto.py`) declara los temas de sus variables y su alcance. Contrato regenerado, con el espejo i18n. | dev_backend_herramientas | — |
+| **T-HI-F8** | El disparador `[@`, con el combobox y sus anuncios. «Insertar variable» pasa arriba de la línea, con la pista debajo (§13.2). | dev_frontend_herramientas | — |
+| **T-HI-F9** | El buscador por tema, con el ejemplo de `contexto.ejemplo`, el nombre técnico en `title` y la línea de alcance al pie (§13.3). | dev_frontend_herramientas | B7, F8 |
+| **T-HI-F10** | Funciones: una lista filtrable, con la descripción y el resultado de ejemplo de las que no tienen parámetros; el error de parámetro con su rango; y el panel que nombra su pieza y marca la píldora abierta (§13.4). | dev_frontend_herramientas | F9 |
+| **T-HI-F11** | Píldoras en sans, con su resumen corto y un ancho máximo, y la línea que crece como un párrafo (§13.5). El resumen compuesto con corchetes ya entra en T-HI-F7. | dev_frontend_herramientas | F10 |
+| **T-HI-F12** (A2) | El contador «n / tope» y el resumen de errores con «Ir al problema», iguales en los tres sitios (§13.6). Toca la página de MOWA (el contador GSM-7, sin cambiar la cuenta) y la de WhatsMKT (la lista de errores del mensaje, sin cambiar la cuenta de 26). Lleva la revisión §13 de los dos coordinadores. | dev_frontend_herramientas | F11 |
+| **A3** | WhatsMKT usa el editor común en su mensaje (§13.7). Es un corte de WhatsMKT (`coordinador_modulo_whatsmkt`), con el apoyo de herramientas. | dev_frontend_modulo_whatsmkt | F11 |
+
+F8, F10, F11 y F12 tocan `editor-texto.ts`, así que van **en serie**, con un solo dev y un worktree por corte. B7 va en paralelo, con el dev de backend. Cada corte de frontend lleva su Vitest, las specs del editor y la de Columnas, y la de MOWA configuración cuando cambia algo que MOWA ve. Las capturas van a `designer`, y el usuario aprueba las de A1 al cerrar F11.
+
+### Abierto antes de A3
+
+El editor valida y previsualiza contra un contexto del backend. Para A3, `whatsmkt.mensaje` necesita sus variables: las macros de la definición por defecto, que cambian con la definición, y el «Enlace de WhatsApp». También hace falta la conversión entre la expresión y el texto plano guardado: `[$MACROn$]` y `[whatsapp]` (RF-WM-17, RF-WM-26). Hay dos caminos:
+- **(a)** un contexto de WhatsMKT registrado en el backend, armado por petición desde la definición elegida, como `cartera` desde el catálogo;
+- **(b)** que el editor acepte un catálogo local para un contexto «solo marcadores», sin validación del backend.
+
+Lo decide `coordinador_modulo_whatsmkt` con `architec` antes de encargar A3. Recomiendo (a), porque la fase B lo necesita igual para resolver una variable con función en una columna.
+
+### Fuera de la fase A
+
+§13.8: pegar con marcadores, el producto real con fecha y pagaré, y el resaltado por píldora. El speech de MOWA con todos los campos de la cartera espera la respuesta del usuario a la pregunta 5 del diagnóstico. Si la respuesta es sí, es un corte de MOWA (`coordinador_modulo_mowa_mes`).
+</content>
