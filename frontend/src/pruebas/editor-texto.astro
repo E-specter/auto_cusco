@@ -17,6 +17,8 @@
  *   &resumen=ninguno               no summary of its own
  *   &soloLectura=1                 read-only
  *   &soloVariable=1                a direct-variable column (§5.3)
+ *   &sinFunciones=1                the words a screen gives where the context takes no functions (text and link)
+ *   &sinFunciones=texto            the same with the text only, no link
  *
  * The mounted controller is left on `window.controladorPrueba`, so a test can
  * call what a screen would (destruir, fijarSegmentos, fijarSoloLectura).
@@ -135,6 +137,12 @@ import VariantesSegmento from '../components/VariantesSegmento.astro';
         resumen: parametros.get('resumen') === 'ninguno' ? 'ninguno' : 'propio',
         soloLectura: parametros.get('soloLectura') === '1',
         soloVariable: parametros.get('soloVariable') === '1',
+        sinFunciones:
+          parametros.get('sinFunciones') === '1'
+            ? { texto: 'Aquí las funciones se arman en otra pantalla.', enlace: { texto: 'Abrir Columnas de carga', href: '/columnas?volver=%2Fpruebas%2Feditor-texto' } }
+            : parametros.get('sinFunciones') === 'texto'
+              ? { texto: 'Aquí las funciones se arman en otra pantalla.' }
+              : undefined,
       });
       expuesta.controladorPrueba = editor;
       document.querySelector('[data-guardar]')!.addEventListener('click', () => {

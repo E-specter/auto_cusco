@@ -132,6 +132,12 @@ export interface OpcionesEditor {
    * expression with text is reduced to its first variable.
    */
   soloVariable?: boolean;
+  /**
+   * What the panel of a piece says where the context does not admit functions (`admite_funciones: false` in the catalogue):
+   * the page's own words and, if it has one, a link to where they are made. The engine names no channel and brings no text.
+   * Without it a context that does not admit functions just does not offer «Agregar función».
+   */
+  sinFunciones?: { texto: string; enlace?: { texto: string; href: string } };
   muestra?: MuestraTexto;
 }
 
@@ -241,6 +247,8 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     throw error;
   }
   const tipos = catalogoDe(catalogo);
+  /** `false` in the catalogue of a context that takes no functions (the message of a channel): nothing to add to a piece. */
+  const admiteFunciones = catalogo.contexto.admite_funciones;
 
   const piezasDe = (expresion: Expresion | null | undefined): Pieza[] =>
     desdeExpresion(soloVariable ? aVariableDirecta(expresion) : expresion);
@@ -807,6 +815,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     if (!disparo) return;
     const area = areaDe(disparo.indice);
     const tecleando = !disparo.desdeBoton;
+    const conPanel = !tecleando && admiteFunciones;
     // From `[@` what was typed to find the variable goes away with the trigger; from the button nothing was typed in the text.
     if (tecleando && area) {
       const fin = area.selectionStart ?? area.value.length;
@@ -815,11 +824,11 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     const { piezas, indiceVariable } = insertarVariable(s.piezas, disparo.indice, disparo.inicio, nombre);
     s.piezas = piezas;
     s.ultimoTramo = { indice: indiceVariable + 1, cursor: 0 };
-    if (!tecleando) s.abierta = (piezas[indiceVariable] as PiezaVariable).id;
+    if (conPanel) s.abierta = (piezas[indiceVariable] as PiezaVariable).id;
     cerrarBuscador();
     pintarLinea();
     anunciarBuscador(t('editorTexto.disparador.insertada', { variable: nombreVariable(nombre) }));
-    if (tecleando) {
+    if (!conPanel) {
       enfocarTramo(indiceVariable + 1, 0);
     } else {
       pintarPanel();
@@ -1206,6 +1215,22 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
   function crearAgregarFuncion(pieza: PiezaVariable): HTMLElement {
     const campo = document.createElement('div');
     campo.className = 'field editor-texto__agregarFuncion';
+    if (!admiteFunciones) {
+      const palabras = opciones.sinFunciones;
+      if (!palabras) return campo;
+      const nota = document.createElement('p');
+      nota.className = 'field__hint';
+      nota.dataset.sinFunciones = '';
+      nota.textContent = palabras.texto;
+      if (palabras.enlace) {
+        const enlace = document.createElement('a');
+        enlace.href = palabras.enlace.href;
+        enlace.textContent = palabras.enlace.texto;
+        nota.append(' ', enlace);
+      }
+      campo.append(nota);
+      return campo;
+    }
     const tipo = tipoEnPosicion(tipos, pieza);
     const compatibles = funcionesCompatibles(tipos, tipo);
     if (compatibles.length === 0) {

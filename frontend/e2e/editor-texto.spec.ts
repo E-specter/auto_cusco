@@ -1105,6 +1105,73 @@ test.describe('el buscador alineado al cursor (§13.2)', () => {
   });
 });
 
+test.describe('un contexto que no admite funciones (admite_funciones=false)', () => {
+  const sinFunciones = (motor: ApiFalsaTextoEnriquecido) => {
+    motor.catalogos['mowa_mes.speech'].contexto.admite_funciones = false;
+  };
+  const conTitular = (funciones: unknown[] = []) => ({ nodos: [{ tipo: 'variable', nombre: 'titular', funciones }] });
+
+  test('el panel de la pieza no ofrece «Agregar función» y dice lo que la página le pasó, con su enlace', async ({ page }) => {
+    await abrir(page, { expresion: conTitular(), ajustar: sinFunciones, extra: '&sinFunciones=1' });
+    await pieza(page, /^Variable Titular/).click();
+
+    await expect(editor(page).getByRole('button', { name: 'Agregar función', exact: true })).toHaveCount(0);
+    await expect(editor(page).getByRole('combobox', { name: 'Buscar función' })).toHaveCount(0);
+    const nota = editor(page).locator('[data-sin-funciones]');
+    await expect(nota).toContainText('Aquí las funciones se arman en otra pantalla.');
+    const enlace = nota.getByRole('link', { name: 'Abrir Columnas de carga' });
+    await expect(enlace).toBeVisible();
+    await expect(enlace).toHaveAttribute('href', '/columnas?volver=%2Fpruebas%2Feditor-texto');
+    // El resto del panel sigue: la casilla, el resultado y quitar la variable.
+    await expect(editor(page).getByRole('checkbox', { name: 'Obligatoria' })).toBeVisible();
+    await expect(editor(page).getByRole('button', { name: 'Quitar variable' })).toBeVisible();
+  });
+
+  test('con solo el texto, sin enlace, no hay enlace; sin la opción, solo se oculta «Agregar función»', async ({ page }) => {
+    await abrir(page, { expresion: conTitular(), ajustar: sinFunciones, extra: '&sinFunciones=texto' });
+    await pieza(page, /^Variable Titular/).click();
+    await expect(editor(page).locator('[data-sin-funciones]')).toContainText('Aquí las funciones se arman en otra pantalla.');
+    await expect(editor(page).locator('[data-sin-funciones] a')).toHaveCount(0);
+
+    await abrir(page, { expresion: conTitular(), ajustar: sinFunciones });
+    await pieza(page, /^Variable Titular/).click();
+    await expect(editor(page).getByRole('button', { name: 'Agregar función', exact: true })).toHaveCount(0);
+    await expect(editor(page).locator('[data-sin-funciones]')).toHaveCount(0);
+    await expect(editor(page).getByRole('button', { name: 'Quitar variable' })).toBeVisible();
+  });
+
+  test('las funciones que ya tuviera la expresión se siguen viendo y se pueden quitar, para corregir lo que el backend rechace', async ({ page }) => {
+    await abrir(page, { expresion: conTitular([{ nombre: 'mayusculas', args: [] }]), ajustar: sinFunciones, extra: '&sinFunciones=1' });
+    await pieza(page, /^Variable Titular/).click();
+    await expect(editor(page).getByRole('button', { name: 'Quitar Mayúsculas' })).toBeVisible();
+    await expect(editor(page).getByRole('button', { name: 'Agregar función', exact: true })).toHaveCount(0);
+  });
+
+  test('«Insertar variable» no abre el panel de una pieza que no admite funciones: el cursor queda después de ella', async ({ page }) => {
+    const { motor } = await abrir(page, { ajustar: sinFunciones, extra: '&sinFunciones=1' });
+    await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
+    await page.keyboard.type('titu');
+    await page.keyboard.press('Enter');
+
+    await expect(pieza(page, /^Variable Titular/)).toHaveAttribute('aria-expanded', 'false');
+    await expect(editor(page).locator('[data-tramo="2"]')).toBeFocused();
+    await expect.poll(() => ultimaValidacion(motor)).toEqual({ nodos: [{ tipo: 'variable', nombre: 'titular', funciones: [] }] });
+  });
+
+  test('un contexto que sí admite funciones queda igual: «Agregar función» y sin la nota', async ({ page }) => {
+    await abrir(page, { expresion: conTitular(), extra: '&sinFunciones=1' });
+    await pieza(page, /^Variable Titular/).click();
+    await expect(botonFuncion(page)).toBeVisible();
+    await expect(editor(page).locator('[data-sin-funciones]')).toHaveCount(0);
+    // Y «Insertar variable» sigue abriendo el panel de la pieza, con el foco en «Agregar función».
+    await abrir(page);
+    await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
+    await page.keyboard.type('titu');
+    await page.keyboard.press('Enter');
+    await expect(botonFuncion(page)).toBeFocused();
+  });
+});
+
 test.describe('las funciones (§13.4)', () => {
   const unaPieza = (funciones: unknown[] = []) => ({
     expresion: { nodos: [{ tipo: 'variable', nombre: 'titular', funciones }] },
@@ -1921,6 +1988,19 @@ for (const tema of ['light', 'dark'] as const) {
       await sinViolaciones(page);
       const ancho = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(ancho).toBeLessThanOrEqual(360);
+    });
+
+    test('panel de una pieza en un contexto sin funciones, con su texto y su enlace', async ({ page }) => {
+      await abrir(page, {
+        expresion: { nodos: [{ tipo: 'variable', nombre: 'titular', funciones: [] }] },
+        extra: '&sinFunciones=1',
+        ajustar: (motor) => {
+          motor.catalogos['mowa_mes.speech'].contexto.admite_funciones = false;
+        },
+      });
+      await pieza(page, /^Variable Titular/).click();
+      await expect(editor(page).locator('[data-sin-funciones] a')).toBeVisible();
+      await sinViolaciones(page);
     });
 
     for (const ancho of [1280, 360] as const) {
