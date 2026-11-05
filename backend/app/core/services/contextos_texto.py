@@ -6,10 +6,11 @@ que es de todos. Cada modulo declara el suyo en su propio paquete (el speech de 
 linea por contexto: sumar un canal no toca este archivo. Este modulo no importa de `plataformas/`.
 """
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from typing import Any
+from typing import Any, NamedTuple
 
 from app.core.entities.contexto_texto import (
     ORIGEN_CARTERA,
@@ -23,7 +24,13 @@ from app.core.entities.texto_enriquecido import TipoValor
 from app.core.services.fecha_envio import DIAS_AJUSTADOS, FECHA_ENVIO, VARIABLES_DE_ENVIO
 from app.core.services.seleccion_cartera.campos import CatalogoCartera
 
-__all__ = ["ContextoDesconocido", "RegistroContextos", "contexto_cartera"]
+__all__ = [
+    "ContextoDesconocido",
+    "ContextoDisponible",
+    "ContextoPerezoso",
+    "RegistroContextos",
+    "contexto_cartera",
+]
 
 # Datos sinteticos: nunca de un producto real.
 _EJEMPLO_POR_CAMPO: dict[str, Any] = {
@@ -176,21 +183,50 @@ def contexto_cartera(catalogo: CatalogoCartera) -> ContextoTexto:
     )
 
 
+class ContextoDisponible(NamedTuple):
+    """Lo que se sabe de un contexto sin armarlo: su nombre y la clave de su nombre."""
+
+    nombre: str
+    clave_nombre: str
+
+
+@dataclass(frozen=True)
+class ContextoPerezoso:
+    """Un contexto que se arma al pedirlo (`obtener`), no al registrarlo: el que depende de datos
+    que se leen de otro modulo no los consulta en las peticiones que usan otro contexto.
+    Un fallo de `construir` se propaga: el registro no lo disimula."""
+
+    nombre: str
+    clave_nombre: str
+    construir: Callable[[], ContextoTexto]
+
+
 class RegistroContextos:
     """Los contextos que la aplicacion ofrece, por nombre y en el orden en que se registraron."""
 
-    def __init__(self, contextos: Iterable[ContextoTexto]) -> None:
-        self._contextos: dict[str, ContextoTexto] = {}
+    def __init__(self, contextos: Iterable[ContextoTexto | ContextoPerezoso]) -> None:
+        self._contextos: dict[str, ContextoTexto | ContextoPerezoso] = {}
         for contexto in contextos:
             if contexto.nombre in self._contextos:
                 raise ValueError(f"El contexto {contexto.nombre!r} esta registrado dos veces")
             self._contextos[contexto.nombre] = contexto
 
+    def listado(self) -> tuple[ContextoDisponible, ...]:
+        """Los nombres de todos, sin armar ninguno perezoso (lo que lista el catalogo)."""
+        return tuple(ContextoDisponible(c.nombre, c.clave_nombre) for c in self._contextos.values())
+
     def disponibles(self) -> tuple[ContextoTexto, ...]:
-        return tuple(self._contextos.values())
+        """Todos, ARMADOS: arma tambien los perezosos (y si uno falla, falla). Solo lo usan las
+        pruebas (los espejos de i18n), no la app: el catalogo lista con `listado()`, que no arma
+        ninguno."""
+        return tuple(self._armado(c) for c in self._contextos.values())
 
     def obtener(self, nombre: str) -> ContextoTexto:
         try:
-            return self._contextos[nombre]
+            return self._armado(self._contextos[nombre])
         except KeyError:
             raise ContextoDesconocido(nombre) from None
+
+    @staticmethod
+    def _armado(contexto: ContextoTexto | ContextoPerezoso) -> ContextoTexto:
+        return contexto.construir() if isinstance(contexto, ContextoPerezoso) else contexto

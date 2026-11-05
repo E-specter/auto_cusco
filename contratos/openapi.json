@@ -7793,7 +7793,8 @@
           "texto_guardado_deshabilitado",
           "contexto_guardado_desconocido",
           "regla_del_contexto",
-          "proximos_fuera_de_rango"
+          "proximos_fuera_de_rango",
+          "funcion_no_admitida"
         ],
         "title": "CodigoTexto",
         "description": "Catalogo de codigos que el frontend traducira como `textoEnriquecido.codigo.<codigo>`.\n\nUn codigo por linea, con la forma `NOMBRE = \"codigo\"`: la prueba espejo del\nfrontend lee esta clase. Los primeros se detectan al compilar (una expresion\ninvalida no procesa ninguna fila); los siguientes, al evaluar una fila concreta; al final,\nlos que solo informa la API del motor (B4a): lo que no se puede leer, el contexto o el\nproducto que no existen, y por que una expresion no tiene largo maximo."
@@ -8925,6 +8926,10 @@
               }
             ],
             "title": "Clave Alcance"
+          },
+          "admite_funciones": {
+            "type": "boolean",
+            "title": "Admite Funciones"
           }
         },
         "type": "object",
@@ -8937,7 +8942,8 @@
           "umbral_advertencia",
           "variable_dias",
           "segmentos",
-          "clave_alcance"
+          "clave_alcance",
+          "admite_funciones"
         ],
         "title": "ContextoRespuesta"
       },

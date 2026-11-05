@@ -146,6 +146,7 @@ export function catalogoSintetico(contexto = 'mowa_mes.speech'): Catalogo {
       limite_largo: esSpeech ? 160 : null,
       umbral_advertencia: esSpeech ? 150 : null,
       clave_alcance: null, // el speech ya ofrece todos los campos (T-HI-B7, parte 2): sin linea
+      admite_funciones: true, // solo el mensaje de WhatsMKT no las admite (T-WM-B9)
       // A new definition counts days adjusted to the send date (RF-55, B13), in every context.
       variable_dias: 'dias_atraso_ajustados',
       segmentos: SEGMENTOS_SINTETICOS,

@@ -91,6 +91,8 @@ class CodigoTexto(StrEnum):
     REGLA_DEL_CONTEXTO = "regla_del_contexto"
     # Los proximos dias gestionables (RF-71)
     PROXIMOS_FUERA_DE_RANGO = "proximos_fuera_de_rango"  # N no esta entre 1 y el tope
+    # Un contexto sin funciones (el mensaje de WhatsMKT, §13.7 del motor)
+    FUNCION_NO_ADMITIDA = "funcion_no_admitida"  # la variable lleva una funcion
 
 
 @dataclass(frozen=True)

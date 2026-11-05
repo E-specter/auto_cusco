@@ -109,7 +109,11 @@ def test_el_catalogo_de_la_cartera_trae_variables_funciones_y_limites(cliente) -
         "largo_nombre_definicion": 120,
     }
     assert cuerpo["familias"] == ["texto", "numero", "conversion", "fecha", "nulos", "enlaces"]
-    assert [c["nombre"] for c in cuerpo["contextos"]] == ["cartera", "mowa_mes.speech"]
+    assert [c["nombre"] for c in cuerpo["contextos"]] == [
+        "cartera",
+        "mowa_mes.speech",
+        "whatsmkt.mensaje",
+    ]
 
 
 def test_el_catalogo_sin_contexto_es_el_de_la_cartera(cliente) -> None:

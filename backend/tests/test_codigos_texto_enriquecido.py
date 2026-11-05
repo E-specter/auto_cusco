@@ -17,6 +17,7 @@ from app.api.calendario import obtener_servicio_calendario
 from app.api.cartera import obtener_servicio_cartera
 from app.api.definiciones_columnas import obtener_servicio_definiciones
 from app.api.selecciones import obtener_servicio_selecciones
+from app.api.texto_enriquecido import obtener_constructor_contexto_mensaje_whatsmkt
 from app.api.textos_guardados import obtener_servicio_textos_guardados
 from app.core.entities import texto_enriquecido as entidades
 from app.core.entities.cartera import PaginaCartera, SinVersionVigente
@@ -40,6 +41,7 @@ from app.core.services.definiciones_columnas.servicio import (
     DefinicionesColumnasService,
     DefinicionInvalida,
 )
+from app.core.services.plataformas.whatsmkt.contexto_texto import contexto_mensaje_texto
 from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.texto_enriquecido import evaluador, sintaxis
 from app.core.services.textos_guardados.contextos import (
@@ -114,6 +116,10 @@ def _emitidos_por_la_api() -> set[CodigoTexto]:
     app.dependency_overrides[obtener_servicio_cartera] = lambda: cartera
     app.dependency_overrides[obtener_servicio_definiciones] = lambda: definiciones
     app.dependency_overrides[obtener_servicio_selecciones] = lambda: _SeleccionesVacias()
+    # El contexto del mensaje de WhatsMKT se arma desde la base: aqui, sin macros y sin base.
+    app.dependency_overrides[obtener_constructor_contexto_mensaje_whatsmkt] = lambda: (
+        contexto_mensaje_texto
+    )
     try:
         return _pedir_a_la_api(TestClient(app), cartera)
     finally:
@@ -121,6 +127,7 @@ def _emitidos_por_la_api() -> set[CodigoTexto]:
             obtener_servicio_cartera,
             obtener_servicio_definiciones,
             obtener_servicio_selecciones,
+            obtener_constructor_contexto_mensaje_whatsmkt,
         ):
             app.dependency_overrides.pop(dependencia, None)
 
@@ -285,6 +292,16 @@ def _pedir_a_la_api(cliente: TestClient, cartera: _CarteraVacia) -> set[CodigoTe
         "funciones": [{"nombre": "a_texto", "args": []}],
     }  # sin_cota_funcion
     buscar(desde_problemas, validacion, {"contexto": "cartera", "expresion": {"nodos": [numero]}})
+    con_funcion = {
+        "tipo": "variable",
+        "nombre": "whatsapp",
+        "funciones": [{"nombre": "a_texto", "args": []}],
+    }
+    buscar(  # funcion_no_admitida: el mensaje de WhatsMKT no admite funciones (§13.7)
+        desde_problemas,
+        validacion,
+        {"contexto": "whatsmkt.mensaje", "expresion": {"nodos": [con_funcion]}},
+    )
     buscar(desde_problemas, previa, {"contexto": "cartera", "definicion": {"columnas": []}})
     buscar(
         desde_problemas,

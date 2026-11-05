@@ -38,7 +38,7 @@ from app.core.entities.texto_enriquecido import (
     Problema,
     TipoValor,
 )
-from app.core.services.contextos_texto import RegistroContextos
+from app.core.services.contextos_texto import ContextoDisponible, RegistroContextos
 from app.core.services.fecha_envio import (
     DIAS_AJUSTADOS,
     DIAS_ATRASO,
@@ -61,6 +61,7 @@ from app.core.services.selecciones.servicio import SeleccionesService
 from app.core.services.texto_enriquecido import catalogo, evaluador
 from app.core.services.texto_enriquecido.evaluador import NodoEvaluado
 from app.core.services.texto_enriquecido.serializacion import expresion_desde_dict
+from app.core.services.texto_enriquecido.uso import problemas_de_funciones
 
 COLUMNA_DE_UNA_EXPRESION = "texto"
 
@@ -213,8 +214,8 @@ class PrevisualizacionTextoService:
 
     # --- catalogo ---
 
-    def contextos_disponibles(self) -> tuple[ContextoTexto, ...]:
-        return self._contextos.disponibles()
+    def contextos_disponibles(self) -> tuple[ContextoDisponible, ...]:
+        return self._contextos.listado()
 
     def catalogo(self, contexto: str) -> CatalogoTexto:
         return CatalogoTexto(
@@ -232,6 +233,8 @@ class PrevisualizacionTextoService:
         ctx = self._contextos.obtener(contexto)
         try:
             leida = expresion_desde_dict(expresion)
+            if not ctx.admite_funciones and (rechazadas := problemas_de_funciones(leida)):
+                return ValidacionTexto(rechazadas, None, None, None, ())
             compilada = evaluador.compilar(leida, ctx.tipos, medida=ctx.medida)
         except ExpresionInvalida as error:
             return ValidacionTexto(error.problemas, None, None, None, ())
@@ -287,6 +290,8 @@ class PrevisualizacionTextoService:
             return sin_filas(error.problemas)
         definicion_leida = leida.definicion
         problemas = diagnosticar_leida(leida, ctx.tipos)
+        if not ctx.admite_funciones:
+            problemas = (*_funciones_no_admitidas(leida), *problemas)
         if problemas:
             # Una expresion suelta no tiene columnas: sus problemas no llevan `columna`.
             if expresion is not None:
@@ -415,6 +420,21 @@ class PrevisualizacionTextoService:
         if not pagina.filas:
             raise ProductoNoEncontrado(muestra.fecha_corte, muestra.pagare)
         return pagina.filas[0]
+
+
+def _funciones_no_admitidas(leida: DefinicionLeida) -> tuple[ProblemaDeDefinicion, ...]:
+    """Las funciones de cada columna y variante de una definicion, para un contexto sin ellas."""
+    encontrados: list[ProblemaDeDefinicion] = []
+    for indice, campo in enumerate(leida.definicion.campos):
+        contenidos = [(campo.expresion, None)]
+        contenidos += [(v.expresion, v.segmento) for v in campo.variantes]
+        for expresion, segmento in contenidos:
+            if expresion is not None:
+                encontrados += (
+                    ProblemaDeDefinicion(p, leida.posiciones[indice], segmento)
+                    for p in problemas_de_funciones(expresion)
+                )
+    return tuple(encontrados)
 
 
 def _fecha(envio: EnvioDeCarga | None) -> date | None:

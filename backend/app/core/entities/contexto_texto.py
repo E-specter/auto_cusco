@@ -76,6 +76,9 @@ class ContextoTexto:
     # La clave i18n de la linea de alcance que el buscador muestra al pie (§13.3): que NO ofrece
     # este contexto, dicho como regla del lugar. None si ofrece todo (Columnas): sin linea.
     clave_alcance: str | None = None
+    # Si las variables admiten funciones (RF-46). El mensaje de WhatsMKT no las admite hasta la
+    # fase B (§13.7 del motor): una expresion con una funcion es un problema, no se compila.
+    admite_funciones: bool = True
     # Comportamiento del canal, no datos del catalogo (por eso no entran en `repr`, en la
     # comparacion ni en el contrato). `medida` es la unidad del largo y de la cota (por defecto,
     # caracteres); `salida` es lo que se le hace al texto antes de enviarlo (por defecto, nada). El

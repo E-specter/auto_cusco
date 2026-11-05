@@ -17,6 +17,7 @@ Los contextos se registran aqui, una linea por contexto (`obtener_registro_conte
 canal es su archivo en `services/plataformas/<canal>/` mas una linea en esta funcion.
 """
 
+from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal
@@ -25,6 +26,11 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.adapters.persistence.db import get_engine
+from app.adapters.persistence.repositorio_definiciones_postgres import (
+    RepositorioDefinicionesPostgres,
+)
+from app.adapters.persistence.repositorio_whatsmkt_postgres import RepositorioWhatsmktPostgres
 from app.api.cartera import obtener_catalogo_cartera, obtener_servicio_cartera
 from app.api.errores import DetalleError, ErrorConCodigo
 from app.api.fecha_envio import DetalleErrorFechaEnvio, error_de_fecha_envio
@@ -40,10 +46,24 @@ from app.core.entities.definiciones_columnas import (
 from app.core.entities.segmentacion import RangoDias
 from app.core.entities.selecciones import SeleccionNoEncontrada
 from app.core.entities.texto_enriquecido import CodigoTexto, MotivoSinCota, Problema
-from app.core.services.contextos_texto import RegistroContextos, contexto_cartera
+from app.core.services.contextos_texto import (
+    ContextoPerezoso,
+    RegistroContextos,
+    contexto_cartera,
+)
 from app.core.services.fecha_envio import FechaEnvioAnterior
 from app.core.services.mapeo_campos.serializacion import ProblemaDeDefinicion
 from app.core.services.plataformas.mowa_mes.contexto_texto import contexto_speech
+from app.core.services.plataformas.whatsmkt.contexto_texto import (
+    CLAVE_NOMBRE as CLAVE_MENSAJE_WHATSMKT,
+)
+from app.core.services.plataformas.whatsmkt.contexto_texto import (
+    NOMBRE as NOMBRE_MENSAJE_WHATSMKT,
+)
+from app.core.services.plataformas.whatsmkt.contexto_texto import (
+    ConstructorContextoMensaje,
+    contexto_mensaje_texto,
+)
 from app.core.services.previsualizar_texto import (
     MAXIMO_MUESTRA,
     MUESTRA_POR_DEFECTO,
@@ -70,17 +90,41 @@ router = APIRouter(prefix="/texto-enriquecido", tags=["texto enriquecido"])
 # --- Composicion --------------------------------------------------------------------------------
 
 
-def registro_de_contextos(catalogo: CatalogoCartera) -> RegistroContextos:
-    """Los contextos de la aplicacion con ese catalogo de campos: una linea por contexto."""
-    return RegistroContextos([contexto_cartera(catalogo), contexto_speech(catalogo)])
+def registro_de_contextos(
+    catalogo: CatalogoCartera, mensaje_whatsmkt: Callable[[], ContextoTexto] | None = None
+) -> RegistroContextos:
+    """Los contextos de la aplicacion con ese catalogo de campos: una linea por contexto. El del
+    mensaje de WhatsMKT se arma desde su configuracion, y solo cuando se pide ESE contexto
+    (`mensaje_whatsmkt`); sin el, queda sin macros."""
+    return RegistroContextos(
+        [
+            contexto_cartera(catalogo),
+            contexto_speech(catalogo),
+            ContextoPerezoso(NOMBRE_MENSAJE_WHATSMKT, CLAVE_MENSAJE_WHATSMKT, mensaje_whatsmkt)
+            if mensaje_whatsmkt is not None
+            else contexto_mensaje_texto(),
+        ]
+    )
+
+
+def obtener_constructor_contexto_mensaje_whatsmkt() -> ConstructorContextoMensaje:
+    """Dependencia de FastAPI: lo que arma el contexto del mensaje de WhatsMKT con las macros de la
+    definicion por defecto y el tope de la configuracion (RF-WM-45). Crearlo no consulta nada: la
+    base se lee solo si se pide ese contexto, y un fallo de la base se propaga."""
+    return ConstructorContextoMensaje(
+        RepositorioWhatsmktPostgres(get_engine()), RepositorioDefinicionesPostgres(get_engine())
+    )
 
 
 def obtener_registro_contextos(
     catalogo: CatalogoCartera = Depends(obtener_catalogo_cartera),
+    mensaje_whatsmkt: ConstructorContextoMensaje = Depends(
+        obtener_constructor_contexto_mensaje_whatsmkt
+    ),
 ) -> RegistroContextos:
     """Dependencia de FastAPI: los contextos con los campos de la cartera de ESTA peticion (los
     base y los adicionales que el usuario haya creado)."""
-    return registro_de_contextos(catalogo)
+    return registro_de_contextos(catalogo, mensaje_whatsmkt)
 
 
 def obtener_servicio_texto(
@@ -370,6 +414,7 @@ class ContextoRespuesta(ModeloRespuesta):
     variable_dias: str
     segmentos: list[RangoRespuesta]
     clave_alcance: str | None  # la linea de alcance al pie del buscador; None = sin linea
+    admite_funciones: bool  # falso: una variable con funcion es el problema funcion_no_admitida
 
 
 class ContextoDisponibleRespuesta(ModeloRespuesta):
@@ -584,6 +629,7 @@ def _contexto(contexto: ContextoTexto) -> ContextoRespuesta:
         variable_dias=contexto.variable_dias,
         segmentos=[_rango(r) for r in contexto.tabla_rangos],
         clave_alcance=contexto.clave_alcance,
+        admite_funciones=contexto.admite_funciones,
     )
 
 
