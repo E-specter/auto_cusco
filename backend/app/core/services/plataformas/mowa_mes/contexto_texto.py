@@ -13,7 +13,7 @@ from typing import Any
 from app.core.entities.contexto_texto import ORIGEN_CARTERA, ContextoTexto, VariableContexto
 from app.core.entities.mowa_mes import LARGO_ADVERTENCIA, LARGO_MAXIMO, RANGOS_SEGMENTO
 from app.core.entities.segmentacion import RangoDias
-from app.core.services.contextos_texto import tema_de
+from app.core.services.contextos_texto import contexto_cartera, tema_de
 from app.core.services.plataformas.mowa_mes import speech
 from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.texto_enriquecido.gsm7 import a_gsm7, largo_gsm7_normalizado
@@ -35,22 +35,20 @@ _CLAVES = {
     speech.VARIABLE_CONTACTO: "textoEnriquecido.variable.whatsapp_contacto",
     VARIABLE_DIAS: "textoEnriquecido.variable.dias_atraso_ajustados",
 }
-# La clave i18n de la linea de alcance que el buscador muestra al pie (§13.3): lo que ofrece el
-# speech, dicho como regla del lugar.
-CLAVE_ALCANCE = "textoEnriquecido.alcance.mowa_mes.speech"
 
 
 @dataclass(frozen=True)
 class _RegistroDeProducto:
-    """Titular y vencimiento salen del producto y el contacto es el de ejemplo.
+    """Los campos de la cartera que ofrece el speech salen del producto y el contacto es el de
+    ejemplo.
 
     Los dias ajustados los trae el producto: la previsualizacion los calcula con la fecha de envio
     de la muestra (hoy en Lima, RF-55) antes de pedir el registro, con la misma formula que la
-    campana (RF-MM-15). Esto no ajusta nada: la campana sigue aportando los suyos. Cada campo
-    adicional toma el valor que trae el producto de la muestra (D-CA-0). Es una clase y no una
-    funcion para que dos contextos con los mismos adicionales sean iguales."""
+    campana (RF-MM-15). Esto no ajusta nada: la campana sigue aportando los suyos. Cada otro campo
+    de la cartera, base o adicional, toma el valor que trae el producto de la muestra (D-CA-0). Es
+    una clase y no una funcion para que dos contextos con los mismos campos sean iguales."""
 
-    adicionales: Collection[str] = ()
+    campos: Collection[str] = ()
 
     def __call__(self, producto: Mapping[str, Any]) -> dict[str, Any]:
         return {
@@ -58,15 +56,19 @@ class _RegistroDeProducto:
             speech.VARIABLE_VENCIMIENTO: producto.get("fecha_vencimiento_cuota"),
             speech.VARIABLE_CONTACTO: WHATSAPP_DE_EJEMPLO,
             VARIABLE_DIAS: producto.get(VARIABLE_DIAS),
-            **{nombre: producto.get(nombre) for nombre in self.adicionales},
+            **{nombre: producto.get(nombre) for nombre in self.campos},
         }
 
 
 def contexto_speech(catalogo: CatalogoCartera | None = None) -> ContextoTexto:
-    """Las variables v2 y, con el catalogo, los campos adicionales de la cartera (archivados
-    incluidos: lo que ya los usa sigue compilando), con su etiqueta y su marca de archivado."""
+    """Las variables v2 y TODOS los campos de la cartera (decision del usuario, D-CA-2 opcion a):
+    los base y, con el catalogo, los adicionales (archivados incluidos: lo que ya los usa sigue
+    compilando), con su etiqueta, su marca de archivado y su tema. `fecha_envio` no va: no es un
+    campo del producto."""
+    catalogo = catalogo if catalogo is not None else CatalogoCartera()
+    cartera = contexto_cartera(catalogo)
     adicionales = speech.adicionales_de(catalogo)
-    campos = catalogo.campos() if catalogo is not None else {}
+    ofrecidos = speech.campos_de(catalogo)  # sin los si/no: el motor no los sabe escribir
     propias = tuple(
         VariableContexto(
             nombre,
@@ -77,31 +79,23 @@ def contexto_speech(catalogo: CatalogoCartera | None = None) -> ContextoTexto:
         )
         for nombre, tipo in speech.VARIABLES_V2.items()
     )
-    de_la_cartera = tuple(
-        VariableContexto(
-            nombre,
-            tipo,
-            origen=ORIGEN_CARTERA,
-            etiqueta=campos[nombre].etiqueta,
-            adicional=True,
-            archivado=campos[nombre].archivado,
-            tema=tema_de(nombre, adicional=True),
-        )
-        for nombre, tipo in adicionales.items()
-    )
+    de_la_cartera = tuple(v for v in cartera.variables if v.nombre in ofrecidos)
     return ContextoTexto(
         nombre=NOMBRE,
         clave_nombre=f"textoEnriquecido.contexto.{NOMBRE}",
         variables=propias + de_la_cartera,
-        ejemplo={**_EJEMPLO, **{n: speech.EJEMPLO_ADICIONAL[t] for n, t in adicionales.items()}},
+        ejemplo={
+            **{v.nombre: cartera.ejemplo[v.nombre] for v in de_la_cartera if not v.adicional},
+            **_EJEMPLO,
+            **{n: speech.EJEMPLO_ADICIONAL[t] for n, t in adicionales.items()},
+        },
         limite_largo=LARGO_MAXIMO,
         umbral_advertencia=LARGO_ADVERTENCIA,
         variable_dias=VARIABLE_DIAS,
         tabla_rangos=tuple(
             RangoDias(r.segmento.value, r.etiqueta, r.desde, r.hasta) for r in RANGOS_SEGMENTO
         ),
-        registro_de_producto=_RegistroDeProducto(tuple(adicionales)),
-        clave_alcance=CLAVE_ALCANCE,
+        registro_de_producto=_RegistroDeProducto(tuple(v.nombre for v in de_la_cartera)),
         # Como el mensaje que se envia (RF-MM-27): se mide en unidades GSM-7 lo que SALDRIA de
         # normalizar, y la previsualizacion muestra el texto ya normalizado.
         medida=largo_gsm7_normalizado,

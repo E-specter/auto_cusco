@@ -9,9 +9,10 @@ from fastapi.testclient import TestClient
 
 from app.core.entities.campos_adicionales import CampoAdicional, TipoAdicional
 from app.core.entities.contexto_texto import TemaVariable
+from app.core.entities.texto_enriquecido import TipoValor
 from app.core.services.contextos_texto import contexto_cartera, tema_de
 from app.core.services.plataformas.mowa_mes import speech
-from app.core.services.plataformas.mowa_mes.contexto_texto import CLAVE_ALCANCE, contexto_speech
+from app.core.services.plataformas.mowa_mes.contexto_texto import contexto_speech
 from app.core.services.seleccion_cartera.campos import CAMPOS_BASE, CatalogoCartera
 from app.main import app
 
@@ -98,13 +99,17 @@ def test_columnas_no_tiene_linea_de_alcance_porque_ofrece_todo() -> None:
 # --- El speech de MOWA MES: lo de hoy, con tema y linea de alcance (parte 1) --------------------
 
 
-def test_el_speech_ofrece_lo_de_hoy_sus_variables_y_los_adicionales_con_tema() -> None:
+def test_el_speech_ofrece_todos_los_campos_de_la_cartera_con_tema() -> None:
     contexto = contexto_speech(_con_adicional())
+    cartera = contexto_cartera(_con_adicional())
+    ofrecidas = {v.nombre for v in contexto.variables}
 
-    assert {v.nombre for v in contexto.variables} == {*speech.VARIABLES_V2, "ad_monto_mora"}
+    # Todas las de la cartera menos `fecha_envio` (no es un campo del producto) y los si/no (el
+    # motor no los sabe escribir), mas el contacto.
+    sin_booleanos = {v.nombre for v in cartera.variables if v.tipo is not TipoValor.BOOLEANO}
+    assert ofrecidas == (sin_booleanos - {"fecha_envio"}) | {speech.VARIABLE_CONTACTO}
+    assert len(contexto.variables) == len(ofrecidas)  # ninguna repetida
     assert [v.nombre for v in contexto.variables if v.tema is TemaVariable.OTROS] == []
-    # Los campos base de la cartera no se ofrecen todavia (parte 2 de T-HI-B7).
-    assert "saldo_soles_corte" not in {v.nombre for v in contexto.variables}
 
 
 def test_el_speech_conserva_sus_variables_propias_con_su_nombre_y_su_origen() -> None:
@@ -117,8 +122,8 @@ def test_el_speech_conserva_sus_variables_propias_con_su_nombre_y_su_origen() ->
     assert _tema(contexto_speech(), speech.VARIABLE_VENCIMIENTO) is TemaVariable.FECHAS
 
 
-def test_el_speech_trae_su_linea_de_alcance() -> None:
-    assert contexto_speech().clave_alcance == CLAVE_ALCANCE
+def test_el_speech_ya_no_tiene_linea_de_alcance_porque_ofrece_todo() -> None:
+    assert contexto_speech().clave_alcance is None
 
 
 # --- La API ------------------------------------------------------------------------------------
@@ -133,5 +138,5 @@ def test_el_catalogo_por_http_trae_el_tema_de_cada_variable_y_la_linea_de_alcanc
     assert {v["tema"] for v in cartera["contexto"]["variables"]} <= {t.value for t in TemaVariable}
     assert [v["nombre"] for v in cartera["contexto"]["variables"] if v["tema"] == "otros"] == []
     assert cartera["contexto"]["clave_alcance"] is None
-    assert mowa["contexto"]["clave_alcance"] == CLAVE_ALCANCE
-    assert len(mowa["contexto"]["variables"]) == len(speech.VARIABLES_V2)  # sin adicionales
+    assert mowa["contexto"]["clave_alcance"] is None
+    assert len(mowa["contexto"]["variables"]) > len(speech.VARIABLES_V2)

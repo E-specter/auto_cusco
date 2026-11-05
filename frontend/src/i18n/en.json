@@ -864,7 +864,6 @@
   "textoEnriquecido.marcaFecha.nombre_mes": "Month name",
   "textoEnriquecido.contexto.cartera": "Portfolio",
   "textoEnriquecido.contexto.mowa_mes.speech": "MOWA MES speech",
-  "textoEnriquecido.alcance.mowa_mes.speech": "The speech uses the campaign variables and the additional fields.",
   "editorTexto.tema.persona": "Person and contact",
   "editorTexto.tema.deuda": "Instalment and debt",
   "editorTexto.tema.fechas": "Dates and days overdue",

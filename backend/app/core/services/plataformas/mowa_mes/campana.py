@@ -232,10 +232,13 @@ def evaluar_producto(
     vencimiento = producto.get("fecha_vencimiento_cuota")
     if constructor.usa_vencimiento(rango.segmento) and vencimiento is None:
         return Exclusion(pagare, CodigoMowaMes.FALTA_VENCIMIENTO)
-    # D-CA-2: un campo adicional vacio que el speech lee dejaria un hueco en el SMS. Va antes del
-    # WhatsApp y de los 160; uno vacio que el segmento no usa no excluye nada.
+    # D-CA-2: un campo que el speech exige (Obligatoria, o leido como argumento) y llega vacio
+    # dejaria un hueco en el SMS. Va antes del WhatsApp y de los 160; uno vacio que el segmento no
+    # usa, o que usa sin exigirlo, no excluye nada.
     adicionales = {n: producto.get(n) for n in constructor.adicionales_usados(rango.segmento)}
-    faltan = tuple(n for n, valor in adicionales.items() if vacia(valor))
+    faltan = tuple(
+        n for n in constructor.obligatorios_usados(rango.segmento) if vacia(adicionales[n])
+    )
     if faltan:
         return Exclusion(pagare, CodigoMowaMes.FALTA_CAMPO_ADICIONAL, campos=faltan)
     if constructor.requiere_whatsapp_faltante(rango.segmento):
@@ -311,7 +314,7 @@ class CampanasMowaMesService:
         documentos = supervision.documentos_por_posicion(supervisores, procedencias)
 
         constructor = speech.ConstructorMensajes(
-            version.datos, whatsapp, adicionales=speech.adicionales_de(catalogo)
+            version.datos, whatsapp, adicionales=speech.campos_de(catalogo)
         )
         seleccion = SeleccionPaginada(
             self._consulta, peticion.fecha_corte, filtros, orden, peticion.cantidad

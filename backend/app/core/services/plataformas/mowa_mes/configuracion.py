@@ -220,7 +220,7 @@ class ConfiguracionMowaMesService:
         if whatsapp is not None and not speech.whatsapp_valido(whatsapp):
             raise ConfiguracionInvalida("El WhatsApp debe tener 9 digitos y empezar con 9")
         numero = whatsapp or self._repositorio.obtener_configuracion().whatsapp_contacto
-        adicionales = speech.adicionales_de(self._catalogo)
+        adicionales = speech.campos_de(self._catalogo)
         problemas = speech.problemas_de(
             DatosSpeech(nombre="previsualizacion", expresiones=expresiones),
             adicionales=adicionales,
@@ -242,7 +242,7 @@ class ConfiguracionMowaMesService:
 
     def _validos(self, datos: DatosSpeech) -> DatosSpeech:
         limpios = speech.limpiar(datos)
-        problemas = speech.problemas_de(limpios, adicionales=speech.adicionales_de(self._catalogo))
+        problemas = speech.problemas_de(limpios, adicionales=speech.campos_de(self._catalogo))
         if problemas:
             raise SpeechInvalido(problemas)
         orden = {segmento: i for i, segmento in enumerate(Segmento)}

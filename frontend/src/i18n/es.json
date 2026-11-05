@@ -864,7 +864,6 @@
   "textoEnriquecido.marcaFecha.nombre_mes": "Nombre del mes",
   "textoEnriquecido.contexto.cartera": "Cartera",
   "textoEnriquecido.contexto.mowa_mes.speech": "Speech de MOWA MES",
-  "textoEnriquecido.alcance.mowa_mes.speech": "El speech usa las variables de la campaña y los campos adicionales.",
   "editorTexto.tema.persona": "Persona y contacto",
   "editorTexto.tema.deuda": "Cuota y deuda",
   "editorTexto.tema.fechas": "Fechas y atraso",

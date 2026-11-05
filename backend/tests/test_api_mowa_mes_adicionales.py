@@ -85,6 +85,33 @@ def test_guardar_un_adicional_sin_tope_es_un_400_con_el_problema_ubicado_y_no_se
     assert len(repositorio.versiones) == 1  # solo el Speech original
 
 
+def test_guardar_un_speech_con_un_campo_si_no_es_un_400_variable_desconocida(speech_api) -> None:
+    # Los sí/no no se ofrecen (el motor los escribiria «True»/«False»): el problema llega a la API.
+    client, repositorio = speech_api
+    datos = _v2(_var("cliente_fallecido"))
+
+    respuesta = client.post(
+        "/mowa-mes/speech", json={"nombre": "Con si/no", "expresiones": _expresiones_json(datos)}
+    )
+
+    assert respuesta.status_code == 400
+    problemas = respuesta.json()["problemas"]
+    assert {p["codigo"] for p in problemas} == {"variable_desconocida"}
+    assert problemas[0]["ubicacion"]["nodo"] == 0
+    assert len(repositorio.versiones) == 1  # solo el Speech original
+
+
+def test_la_previsualizacion_de_un_speech_con_un_campo_si_no_trae_el_problema(speech_api) -> None:
+    client, _ = speech_api
+    datos = _v2(_var("cliente_fallecido"))
+
+    cuerpo = client.post(
+        "/mowa-mes/speech/previsualizacion", json={"expresiones": _expresiones_json(datos)}
+    ).json()
+
+    assert {p["codigo"] for p in cuerpo["problemas"]} == {"variable_desconocida"}
+
+
 def test_guardar_una_v2_con_los_tres_tipos_acotados_da_201(speech_api) -> None:
     client, _ = speech_api
 

@@ -94,6 +94,23 @@ def adicionales_de(catalogo: CatalogoCartera | None) -> dict[str, TipoValor]:
     }
 
 
+def campos_de(catalogo: CatalogoCartera | None) -> dict[str, TipoValor]:
+    """Todos los campos de la cartera que el speech ofrece ademas de sus variables propias (D-CA-2,
+    opcion a): los base y los adicionales (archivados incluidos), con su tipo. Es lo que reciben,
+    como `adicionales`, la validacion, la previsualizacion y el constructor de mensajes.
+
+    Los campos si/no (booleanos) NO se ofrecen: el motor los escribe con `str` («True»/«False») y
+    ninguna funcion los convierte, y un SMS no puede salir asi (decision del usuario). Un speech que
+    lea uno da `variable_desconocida`. Es el unico lugar donde se filtra: el contexto lo hereda."""
+    if catalogo is None:
+        return {}
+    return {
+        nombre: TipoValor(campo.tipo.value)
+        for nombre, campo in catalogo.campos().items()
+        if nombre not in VARIABLES_V2 and campo.tipo.value != TipoValor.BOOLEANO.value
+    }
+
+
 def _leidas_por(nodo: NodoVariable) -> list[str]:
     """Las variables que lee un nodo: la base y las que son argumento de sus funciones."""
     return [
@@ -115,6 +132,22 @@ def adicionales_usados_en(
         n for nodo in expresion.nodos if isinstance(nodo, NodoVariable) for n in _leidas_por(nodo)
     )
     return tuple(n for n in dict.fromkeys(leidas) if n in adicionales)
+
+
+def obligatorios_en(expresion: Expresion, campos: Mapping[str, TipoValor]) -> tuple[str, ...]:
+    """Los campos de la cartera que la expresion exige no vacios (RF-45), en el orden de sus nodos.
+
+    Un nodo marcado `obligatoria` exige su variable base. Un campo leido como ARGUMENTO de una
+    funcion no se puede marcar y deja un hueco si llega vacio: siempre se exige, como hasta ahora
+    (D-CA-2). Una variable base sin marcar y vacia sale vacia, o con su valor por defecto."""
+    exigidos: list[str] = []
+    for nodo in expresion.nodos:
+        if not isinstance(nodo, NodoVariable):
+            continue
+        if nodo.obligatoria:
+            exigidos.append(nodo.nombre)
+        exigidos += [n for n in _leidas_por(nodo)[1:]]
+    return tuple(n for n in dict.fromkeys(exigidos) if n in campos)
 
 
 def codigo_por_largo(largo: int) -> CodigoMowaMes | None:
@@ -256,6 +289,7 @@ class _Segmento:
         usa_vencimiento: bool,
         usa_whatsapp: bool,
         adicionales_usados: tuple[str, ...] = (),
+        obligatorios: tuple[str, ...] = (),
     ) -> None:
         self.expresion = expresion
         self.variables = variables
@@ -264,6 +298,7 @@ class _Segmento:
         self.usa_vencimiento = usa_vencimiento
         self.usa_whatsapp = usa_whatsapp
         self.adicionales_usados = adicionales_usados
+        self.obligatorios = obligatorios
 
 
 def _segmentos_de(
@@ -281,6 +316,7 @@ def _segmentos_de(
             VARIABLE_VENCIMIENTO in usadas,
             VARIABLE_CONTACTO in usadas,
             adicionales_usados_en(item.expresion, adicionales),
+            obligatorios_en(item.expresion, adicionales),
         )
     return resultado
 
@@ -336,6 +372,11 @@ class ConstructorMensajes:
         """Los campos adicionales que lee la expresion del segmento, en el orden de sus nodos
         (D-CA-2)."""
         return self._segmentos[segmento].adicionales_usados
+
+    def obligatorios_usados(self, segmento: Segmento) -> tuple[str, ...]:
+        """Los campos que el segmento exige no vacios (RF-45): un producto con alguno vacio se
+        excluye. Los demas campos usados, vacios, salen vacios o con su valor por defecto."""
+        return self._segmentos[segmento].obligatorios
 
     def adicionales_usados_en_todos(self) -> tuple[str, ...]:
         """Los adicionales que lee el speech entero, sin repetir y en el orden de sus segmentos y

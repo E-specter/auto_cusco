@@ -72,7 +72,9 @@ ENVIO = date(2026, 9, 14)  # + 4 dias de atraso hasta el envio = 8: segmento 1 a
 
 
 def _var(nombre: str, *funciones: LlamadaFuncion) -> NodoVariable:
-    return NodoVariable(nombre, tuple(funciones))
+    # Los adicionales van marcados Obligatoria, como los deja la migracion d3a9c5e1b742 (D-CA-2,
+    # opcion a): asi un adicional vacio sigue excluyendo, que es lo que estas pruebas verifican.
+    return NodoVariable(nombre, tuple(funciones), obligatoria=nombre.startswith("ad_"))
 
 
 def _f(nombre: str, *args) -> LlamadaFuncion:
@@ -232,10 +234,14 @@ def test_el_producto_de_la_muestra_trae_su_propio_valor_en_el_contexto() -> None
     assert registro[VISITA] is None  # el producto no lo trae
 
 
-def test_el_contexto_sin_catalogo_es_el_de_hoy() -> None:
+def test_el_contexto_sin_catalogo_ofrece_sus_variables_y_los_campos_base() -> None:
+    # Desde T-HI-B7 (parte 2) el speech ofrece todos los campos de la cartera, tambien sin
+    # adicionales: sus variables propias primero y despues los campos base.
     contexto = contexto_speech()
+    nombres = [v.nombre for v in contexto.variables]
 
-    assert [v.nombre for v in contexto.variables] == list(speech.VARIABLES_V2)
+    assert nombres[: len(speech.VARIABLES_V2)] == list(speech.VARIABLES_V2)
+    assert len(nombres) == len(set(nombres)) and "saldo_soles_corte" in nombres
 
 
 # --- D-CA-1: el tope obligatorio -----------------------------------------------------------------

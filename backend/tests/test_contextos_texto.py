@@ -156,21 +156,21 @@ def test_un_producto_de_la_cartera_es_su_propio_registro() -> None:
 # --- MOWA MES: speech ----------------------------------------------------------------------------
 
 
-def test_las_variables_del_speech_son_las_del_mensaje_mas_los_dias_ajustados() -> None:
+def test_las_variables_del_speech_son_las_suyas_mas_todos_los_campos_de_la_cartera() -> None:
+    # Desde T-HI-B7 (parte 2) el speech ofrece todos los campos de la cartera, no solo 4.
     variables = {v.nombre: v.tipo for v in SPEECH.variables}
 
-    assert variables == {
-        **speech.VARIABLES_DEL_MENSAJE,
-        "dias_atraso_ajustados": TipoValor.NUMERO,
-    }
+    assert variables == {**speech.campos_de(CatalogoCartera()), **speech.VARIABLES_V2}
+    assert (
+        variables["titular"] is TipoValor.TEXTO
+        and variables["saldo_soles_corte"] is TipoValor.NUMERO
+    )
 
 
 def test_solo_las_variables_que_aporta_el_modulo_llevan_clave_i18n() -> None:
     claves = {v.nombre: v.clave_nombre for v in SPEECH.variables}
 
-    assert claves == {
-        "titular": None,
-        "fecha_vencimiento_cuota": None,
+    assert {k: v for k, v in claves.items() if v is not None} == {
         "whatsapp_contacto": "textoEnriquecido.variable.whatsapp_contacto",
         "dias_atraso_ajustados": "textoEnriquecido.variable.dias_atraso_ajustados",
     }
@@ -211,12 +211,15 @@ def test_el_producto_se_convierte_al_registro_del_speech() -> None:
 
     registro = SPEECH.registro_de_producto(producto)
 
-    assert registro == {
+    assert {k: registro[k] for k in ("titular", "fecha_vencimiento_cuota")} == {
         "titular": "OTRO/SINTETICO,TRES",
         "fecha_vencimiento_cuota": date(2026, 9, 5),
-        "whatsapp_contacto": SPEECH.ejemplo["whatsapp_contacto"],
-        "dias_atraso_ajustados": 45,
     }
+    assert registro["whatsapp_contacto"] == SPEECH.ejemplo["whatsapp_contacto"]
+    assert registro["dias_atraso_ajustados"] == 45
+    # Los demas campos de la cartera que el speech ofrece viajan con el producto (o vacios).
+    assert registro["telefono"] == "900000001" and registro["dias_atraso"] == 40
+    assert registro["saldo_soles_corte"] is None
 
 
 def test_el_registro_del_speech_no_ajusta_los_dias_por_su_cuenta() -> None:
@@ -241,9 +244,8 @@ def test_los_campos_de_la_cartera_tienen_a_la_cartera_como_origen() -> None:
 
 
 def test_en_el_speech_solo_lo_que_aporta_el_modulo_lo_tiene_como_origen() -> None:
-    assert {v.nombre: v.origen for v in SPEECH.variables} == {
-        "titular": "cartera",
-        "fecha_vencimiento_cuota": "cartera",
-        "whatsapp_contacto": "mowa_mes.speech",
-        "dias_atraso_ajustados": "mowa_mes.speech",
+    assert {v.nombre for v in SPEECH.variables if v.origen == "mowa_mes.speech"} == {
+        "whatsapp_contacto",
+        "dias_atraso_ajustados",
     }
+    assert {v.origen for v in SPEECH.variables} == {"cartera", "mowa_mes.speech"}

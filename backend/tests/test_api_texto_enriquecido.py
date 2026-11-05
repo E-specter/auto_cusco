@@ -127,9 +127,7 @@ def test_el_catalogo_del_speech_trae_el_limite_y_la_advertencia_de_mowa_mes(clie
 
     assert (contexto["limite_largo"], contexto["umbral_advertencia"]) == (160, 150)
     assert contexto["variable_dias"] == "dias_atraso_ajustados"
-    assert {v["nombre"]: v["clave_nombre"] for v in contexto["variables"]} == {
-        "titular": None,
-        "fecha_vencimiento_cuota": None,
+    assert {v["nombre"]: v["clave_nombre"] for v in contexto["variables"] if v["clave_nombre"]} == {
         "whatsapp_contacto": "textoEnriquecido.variable.whatsapp_contacto",
         "dias_atraso_ajustados": "textoEnriquecido.variable.dias_atraso_ajustados",
     }
@@ -313,7 +311,9 @@ def test_validar_en_un_contexto_desconocido_es_404(cliente) -> None:
 
 def test_la_validacion_usa_las_variables_del_contexto(cliente) -> None:
     client, _ = cliente
-    expresion = _expresion(_variable("telefono"))  # de la cartera, no del speech
+    # `fecha_envio` es una variable de la cartera que el speech no ofrece (no es un campo del
+    # producto): desde T-HI-B7 el speech ofrece todos los demas campos, `telefono` incluido.
+    expresion = _expresion(_variable("fecha_envio"))
 
     en_cartera = client.post(
         "/texto-enriquecido/validacion", json={"contexto": "cartera", "expresion": expresion}
@@ -1049,12 +1049,11 @@ def test_cada_variable_del_catalogo_dice_que_contexto_la_aporta(cliente) -> None
     ).json()
 
     assert {v["origen"] for v in cartera["contexto"]["variables"]} == {"cartera"}
-    assert {v["nombre"]: v["origen"] for v in speech["contexto"]["variables"]} == {
-        "titular": "cartera",
-        "fecha_vencimiento_cuota": "cartera",
-        "whatsapp_contacto": "mowa_mes.speech",
-        "dias_atraso_ajustados": "mowa_mes.speech",
+    propias = {
+        v["nombre"] for v in speech["contexto"]["variables"] if v["origen"] == "mowa_mes.speech"
     }
+    assert propias == {"whatsapp_contacto", "dias_atraso_ajustados"}
+    assert {v["origen"] for v in speech["contexto"]["variables"]} == {"cartera", "mowa_mes.speech"}
     nombres = {c["nombre"] for c in speech["contextos"]}
     assert {v["origen"] for v in speech["contexto"]["variables"]} <= nombres
 
