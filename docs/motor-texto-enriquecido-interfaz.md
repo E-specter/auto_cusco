@@ -813,7 +813,8 @@ A1 no depende de nada. A2 y A3 van después de A1.
   - con tope: «{n} / {tope} caracteres»;
   - si los datos pueden alargarlo, se suma «· hasta {maximo} con los datos más largos»;
   - sin tope (Columnas): «{n} caracteres».
-  - Al llegar al umbral del contexto: el tag `tag--advertencia` «Cerca del tope». Al pasarlo: el contador en `.field__error` y el tag `tag--error` «Pasa el tope».
+  - Al llegar al umbral del contexto: el tag `tag--advertencia` «Cerca del tope». Solo si el contexto tiene umbral: sin umbral (hoy, WhatsMKT) no hay ese tag.
+  - Al pasar el tope: el contador **en color de error, sin la caja** de `.field__error`, y el tag `tag--error` «Pasa el tope». Lo mismo en los tres lugares: la caja haría que el contador se leyera como un mensaje aparte, y el tag ya dice qué pasa.
   - Se anuncia solo al cruzar el umbral o el tope, no en cada tecla.
   - MOWA conserva la medida en GSM-7 y WhatsMKT la de [whatsapp] como 26 caracteres. Cambia la forma, no la cuenta.
 - **Errores,** con un solo patrón:
@@ -821,7 +822,7 @@ A1 no depende de nada. A2 y A3 van después de A1.
   - cada error también en su lugar: bajo el tramo, bajo el parámetro o en la píldora;
   - al guardar con errores, el foco va al resumen.
   WhatsMKT pasa a este patrón (hoy los muestra en fila bajo el textarea). La posición del emoji sigue llevando al carácter.
-- **Lo que no es un error de lo escrito** (un dato vacío en la muestra) va aparte, en la vista previa, como `.field__hint`: «Con este producto, {variable} viene vacía.». No en el resumen.
+- **Lo que no es un error de lo escrito** (un dato vacío en la muestra) va aparte, en la vista previa, como `.field__hint`: «Con este producto, falta el dato de {variable}.». La forma no depende del género del nombre de la variable. No en el resumen.
 
 ### 13.7 WhatsMKT con el editor común (A3)
 
@@ -870,7 +871,7 @@ Quedan fuera, como dijo el coordinador: pegar texto con marcadores, el producto 
 | `editorTexto.largo.hasta` | · hasta {maximo} con los datos más largos | · up to {maximo} with the longest data |
 | `editorTexto.largo.cerca` | Cerca del tope | Near the limit |
 | `editorTexto.largo.pasa` | Pasa el tope | Over the limit |
-| `editorTexto.muestra.vacia` | Con este producto, {variable} viene vacía. | With this product, {variable} is empty. |
+| `editorTexto.muestra.vacia` | Con este producto, falta el dato de {variable}. | With this product, {variable} is empty. |
 | `textoEnriquecido.codigo.funcion_no_admitida` | Este texto no admite funciones en sus variables. Quita la función de esta pieza. | This text does not allow functions on its variables. Remove the function from this piece. |
 | `editorTexto.whatsmkt.sinFunciones` | En WhatsMKT las funciones van en la columna, en Columnas de carga. | In WhatsMKT functions go in the column, in Load columns. |
 
