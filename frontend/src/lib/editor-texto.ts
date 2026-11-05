@@ -119,6 +119,29 @@ export function leerArgumento(texto: string, tipo: TipoValor | 'entrada' | null)
   return tipo === 'numero' ? limpio : texto;
 }
 
+/**
+ * What a parameter's error says when the analyst typed something it refuses (interface rules §13.4): the range it accepts,
+ * from the catalogue, or that a required text is missing. `null` when the catalogue gives nothing more specific, and the
+ * generic message stays as a fallback. The values go in the `valores` of the text; `parametro` is added by the caller.
+ */
+export function errorDeParametro(
+  parametro: { tipo: string; obligatorio: boolean; minimo: number | null; maximo: number | null },
+  argumento: Argumento | undefined,
+): { clave: string; valores: { min?: number; max?: number } } | null {
+  if (esReferencia(argumento)) return null;
+  const { minimo, maximo } = parametro;
+  if (parametro.tipo === 'numero') {
+    if (minimo !== null && maximo !== null) return { clave: 'editorTexto.parametro.rango', valores: { min: minimo, max: maximo } };
+    if (minimo !== null) return { clave: 'editorTexto.parametro.minimo', valores: { min: minimo } };
+    if (maximo !== null) return { clave: 'editorTexto.parametro.maximo', valores: { max: maximo } };
+    return null;
+  }
+  if (parametro.tipo === 'texto' && parametro.obligatorio && (argumento === undefined || argumento === '')) {
+    return { clave: 'editorTexto.parametro.vacio', valores: {} };
+  }
+  return null;
+}
+
 /** What a parameter field shows for a stored argument. */
 export function textoArgumento(argumento: Argumento | undefined): string {
   if (argumento === undefined || argumento === null) return '';

@@ -64,6 +64,14 @@ async function abrir(page: Page, caso: Caso = {}) {
 const editor = (page: Page) => page.locator('#editor-prueba');
 const resultado = (page: Page) => editor(page).locator('[data-resultado]');
 const pieza = (page: Page, nombre: RegExp) => editor(page).getByRole('button', { name: nombre });
+const botonFuncion = (page: Page) => editor(page).getByRole('button', { name: 'Agregar función', exact: true });
+const listaFunciones = (page: Page) => editor(page).getByRole('listbox', { name: 'Agregar función' });
+
+/** Opens the list of functions of the open piece and chooses one by its name. */
+async function agregarFuncion(page: Page, nombre: RegExp): Promise<void> {
+  await botonFuncion(page).click();
+  await editor(page).getByRole('option', { name: nombre }).click();
+}
 
 function ultimaValidacion(motor: ApiFalsaTextoEnriquecido) {
   const pedidos = motor.pedidos.filter((p) => p.ruta === '/texto-enriquecido/validacion');
@@ -81,9 +89,8 @@ test.describe('armar un texto', () => {
     await editor(page).getByRole('option', { name: /^Titular/ }).click();
 
     // The piece opens with the focus on «Agregar función».
-    const agregar = editor(page).getByRole('combobox', { name: 'Agregar función' });
-    await expect(agregar).toBeFocused();
-    await agregar.selectOption({ label: 'Primeros caracteres' });
+    await expect(botonFuncion(page)).toBeFocused();
+    await agregarFuncion(page, /^Primeros caracteres/);
     const cantidad = editor(page).getByRole('textbox', { name: 'Cantidad de caracteres' });
     await expect(cantidad).toBeFocused();
     await cantidad.fill('8');
@@ -129,7 +136,7 @@ test.describe('armar un texto', () => {
       expresion: { nodos: [{ tipo: 'variable', nombre: 'titular', funciones: [{ nombre: 'primeros', args: [8] }] }] },
     });
     await pieza(page, /^Variable Titular/).click();
-    await editor(page).getByRole('combobox', { name: 'Agregar función' }).selectOption({ label: 'Mayúsculas' });
+    await agregarFuncion(page, /^Mayúsculas/);
 
     await editor(page).getByRole('button', { name: 'Bajar Primeros caracteres' }).click();
     // The moved function is now the last one: the focus stays on its row.
@@ -150,10 +157,9 @@ test.describe('armar un texto', () => {
       expresion: { nodos: [{ tipo: 'variable', nombre: 'fecha_vencimiento_cuota', funciones: [] }] },
     });
     await pieza(page, /^Variable Vencimiento/).click();
-    const agregar = editor(page).getByRole('combobox', { name: 'Agregar función' });
-    const opciones = await agregar.locator('option').allTextContents();
-    expect(opciones).toContain('Formato de fecha');
-    expect(opciones).not.toContain('Mayúsculas');
+    await botonFuncion(page).click();
+    await expect(listaFunciones(page).getByRole('option', { name: /^Formato de fecha/ })).toHaveCount(1);
+    await expect(listaFunciones(page).getByRole('option', { name: /^Mayúsculas/ })).toHaveCount(0);
   });
 
   test('el patrón de fecha se elige con ejemplos y uno propio se arma con marcas', async ({ page }) => {
@@ -197,7 +203,8 @@ test.describe('errores en su lugar', () => {
     const campo = editor(page).getByRole('textbox', { name: 'Cantidad de caracteres' });
     await expect(campo).toBeFocused();
     await expect(campo).toHaveAttribute('aria-invalid', 'true');
-    await expect(campo).toHaveAccessibleDescription(/Un valor de la función no es válido/);
+    // El mensaje dice el rango del catálogo (primeros: entero, mínimo 1), no el genérico.
+    await expect(campo).toHaveAccessibleDescription('Escribe un número de 1 en adelante.');
   });
 
   test('guardar con problemas no guarda y lleva el foco al primero', async ({ page }) => {
@@ -579,12 +586,23 @@ test.describe('el disparador [@ (§13.2)', () => {
     await expect(editor(page).locator('[data-pieza]')).toHaveCount(0);
   });
 
+  test('Tab desde el campo del buscador de variables sale directo y lo cierra, sin pasar por la lista', async ({ page }) => {
+    await abrir(page);
+    await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
+    await expect(editor(page).getByRole('combobox', { name: 'Buscar una variable' })).toBeFocused();
+    await expect(buscador(page)).toHaveAttribute('tabindex', '-1');
+    await page.keyboard.press('Tab');
+    await expect(buscador(page)).toHaveCount(0);
+    await expect(editor(page).getByRole('button', { name: 'Insertar variable', exact: true })).not.toBeFocused();
+    expect(await page.evaluate(() => document.activeElement?.getAttribute('role'))).not.toBe('listbox');
+  });
+
   test('desde el botón la pieza abre su panel, como siempre', async ({ page }) => {
     await abrir(page);
     await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
     await page.keyboard.type('titu');
     await page.keyboard.press('Enter');
-    await expect(editor(page).getByRole('combobox', { name: 'Agregar función' })).toBeFocused();
+    await expect(botonFuncion(page)).toBeFocused();
   });
 
   test('a 360 px el buscador ocupa el ancho de la línea, abierto por [@ o por el botón, y la página no desborda', async ({ page }) => {
@@ -618,6 +636,291 @@ test.describe('el disparador [@ (§13.2)', () => {
     expect(Math.abs(porBoton.izquierda)).toBeLessThanOrEqual(1);
     expect(Math.abs(porBoton.derecha)).toBeLessThanOrEqual(1);
     expect(porBoton.pagina).toBeLessThanOrEqual(porBoton.vista);
+  });
+});
+
+test.describe('las funciones (§13.4)', () => {
+  const unaPieza = (funciones: unknown[] = []) => ({
+    expresion: { nodos: [{ tipo: 'variable', nombre: 'titular', funciones }] },
+  });
+  const campoFuncion = (page: Page) => editor(page).getByRole('combobox', { name: 'Buscar función' });
+
+  test('«Agregar función» es un botón que abre una lista con su campo, agrupada por familia y con la descripción', async ({ page }) => {
+    await abrir(page, unaPieza());
+    await pieza(page, /^Variable Titular/).click();
+    await expect(botonFuncion(page)).toHaveAttribute('aria-expanded', 'false');
+    await botonFuncion(page).click();
+
+    await expect(botonFuncion(page)).toHaveAttribute('aria-expanded', 'true');
+    await expect(campoFuncion(page)).toBeFocused();
+    await expect(campoFuncion(page)).toHaveAttribute('aria-controls', (await listaFunciones(page).getAttribute('id')) ?? '');
+    const primera = (await listaFunciones(page).getByRole('option').first().getAttribute('id')) ?? '';
+    await expect(campoFuncion(page)).toHaveAttribute('aria-activedescendant', primera);
+    // Texto (tipo de titular): sus tres funciones, por familia; las de fecha o número no se ofrecen.
+    await expect(editor(page).locator('.selector-funcion .selector-variable__tema')).toHaveText(['Texto', 'Valores vacíos', 'Enlaces']);
+    const mayusculas = listaFunciones(page).getByRole('option', { name: /^Mayúsculas/ });
+    await expect(mayusculas.locator('.selector-funcion__descripcion')).toHaveText('Pasa el texto a mayúsculas. ana ruiz → ANA RUIZ.');
+    await expect(listaFunciones(page).getByRole('option', { name: /^Redondear/ })).toHaveCount(0);
+  });
+
+  test('las funciones sin parámetro muestran su resultado con el ejemplo de la pieza, antes de elegirla; las que piden uno, no', async ({ page }) => {
+    await abrir(page, unaPieza([{ nombre: 'primeros', args: [8] }]));
+    await pieza(page, /^Variable Titular/).click();
+    await botonFuncion(page).click();
+
+    // El resultado parte de la cadena de la pieza: primeros 8, y la función que se vería.
+    await expect(listaFunciones(page).getByRole('option', { name: /^Mayúsculas/ }).locator('.selector-variable__ejemplo')).toHaveText('Mayúsculas → NOMBRE S');
+    await expect(listaFunciones(page).getByRole('option', { name: /^Quitar tildes/ }).locator('.selector-variable__ejemplo')).toHaveText('Quitar tildes → NOMBRE S');
+    await expect(listaFunciones(page).getByRole('option', { name: /^Primeros caracteres/ }).locator('.selector-variable__ejemplo')).toHaveCount(0);
+  });
+
+  test('escribir filtra, las flechas mueven y Enter agrega al final de la cadena con el foco en su primer parámetro', async ({ page }) => {
+    const { motor } = await abrir(page, unaPieza());
+    await pieza(page, /^Variable Titular/).click();
+    await botonFuncion(page).click();
+    await page.keyboard.type('prim');
+
+    await expect(listaFunciones(page).getByRole('option')).toHaveCount(1);
+    await expect(editor(page).locator('.selector-funcion .selector-variable__tema')).toHaveText(['Texto']);
+    await page.keyboard.press('Enter');
+
+    await expect(editor(page).getByRole('textbox', { name: 'Cantidad de caracteres' })).toBeFocused();
+    await expect(listaFunciones(page)).toHaveCount(0);
+    await expect.poll(() => ultimaValidacion(motor)).toMatchObject({
+      nodos: [{ tipo: 'variable', nombre: 'titular', funciones: [{ nombre: 'primeros' }] }],
+    });
+  });
+
+  test('las flechas recorren la lista y Enter elige la resaltada', async ({ page }) => {
+    const { motor } = await abrir(page, unaPieza());
+    await pieza(page, /^Variable Titular/).click();
+    await botonFuncion(page).click();
+    const segunda = (await listaFunciones(page).getByRole('option').nth(1).getAttribute('id')) ?? '';
+    await page.keyboard.press('ArrowDown');
+    await expect(campoFuncion(page)).toHaveAttribute('aria-activedescendant', segunda);
+    await expect(page.locator(`#${segunda}`)).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('Enter');
+    await expect
+      .poll(() => (ultimaValidacion(motor) as { nodos: Array<{ funciones: Array<{ nombre: string }> }> } | undefined)?.nodos[0]?.funciones[0]?.nombre)
+      .toBe(segunda.split('-opcion-')[1]);
+  });
+
+  test('sin coincidencias lo dice y Enter no agrega nada; Escape cierra y devuelve el foco al botón sin agregar', async ({ page }) => {
+    const { motor } = await abrir(page, unaPieza());
+    await pieza(page, /^Variable Titular/).click();
+    await botonFuncion(page).click();
+    await page.keyboard.type('zzzz');
+    await expect(editor(page).getByText('Ninguna variable coincide con «zzzz».')).toBeVisible();
+    await page.keyboard.press('Enter');
+    await expect(campoFuncion(page)).toBeFocused();
+
+    await page.keyboard.press('Escape');
+    await expect(campoFuncion(page)).toHaveCount(0);
+    await expect(botonFuncion(page)).toBeFocused();
+    await expect(botonFuncion(page)).toHaveAttribute('aria-expanded', 'false');
+    // Escape no cerró el panel de la pieza.
+    await expect(editor(page).getByRole('button', { name: 'Quitar variable' })).toBeVisible();
+    await expect.poll(() => ultimaValidacion(motor)).toEqual({ nodos: [{ tipo: 'variable', nombre: 'titular', funciones: [] }] });
+  });
+
+  test('a 360 px los botones de una función mantienen su tamaño y pasan a una fila propia bajo el título, a la derecha', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 900 });
+    await abrir(page, unaPieza([{ nombre: 'primeros', args: [8] }]));
+    await pieza(page, /^Variable Titular/).click();
+
+    const g = await page.evaluate(() => {
+      const caja = (e: Element) => e.getBoundingClientRect();
+      const cabeza = document.querySelector('.editor-texto__funcionCabeza')!;
+      const titulo = caja(cabeza.querySelector('.editor-texto__funcionNombre')!);
+      const botones = [...cabeza.querySelectorAll('.editor-texto__funcionAcciones .btn')].map(caja);
+      return {
+        cabeza: caja(cabeza),
+        // El título cabe en una línea: su alto es el de una línea de texto, no de dos.
+        tituloLineas: Math.round(titulo.height / parseFloat(getComputedStyle(cabeza.querySelector('.editor-texto__funcionNombre')!).lineHeight)),
+        titulo,
+        botones: botones.map((b) => ({ ancho: Math.round(b.width), alto: Math.round(b.height), arriba: b.top, derecha: b.right })),
+        pagina: document.documentElement.scrollWidth,
+      };
+    });
+    expect(g.tituloLineas).toBe(1);
+    // Los tres botones conservan su tamaño de botón (2,5 rem = 40 px) y quedan en una fila bajo el título.
+    expect(g.botones).toHaveLength(3);
+    for (const b of g.botones) {
+      expect(b.ancho).toBe(40);
+      expect(b.alto).toBe(40);
+      expect(b.arriba).toBeGreaterThanOrEqual(g.titulo.bottom - 1);
+    }
+    // Alineados a la derecha de la fila, sin salirse de ella.
+    expect(Math.abs(Math.max(...g.botones.map((b) => b.derecha)) - g.cabeza.right)).toBeLessThanOrEqual(1);
+    expect(g.pagina).toBeLessThanOrEqual(360);
+  });
+
+  test('a 1280 px los botones siguen en la misma fila que el título', async ({ page }) => {
+    await abrir(page, unaPieza([{ nombre: 'primeros', args: [8] }]));
+    await pieza(page, /^Variable Titular/).click();
+    const g = await page.evaluate(() => {
+      const cabeza = document.querySelector('.editor-texto__funcionCabeza')!;
+      const titulo = cabeza.querySelector('.editor-texto__funcionNombre')!.getBoundingClientRect();
+      const boton = cabeza.querySelector('.editor-texto__funcionAcciones .btn')!.getBoundingClientRect();
+      return { tituloArriba: titulo.top, botonArriba: boton.top, botonAbajo: boton.bottom, tituloAbajo: titulo.bottom };
+    });
+    expect(g.botonArriba).toBeLessThan(g.tituloAbajo);
+  });
+
+  test('un clic en una función la agrega, y salir de la lista con Tab la cierra', async ({ page }) => {
+    await abrir(page, unaPieza());
+    await pieza(page, /^Variable Titular/).click();
+    await botonFuncion(page).click();
+    // La lista no es un destino del teclado: un Tab desde el campo sale de la búsqueda y la cierra.
+    await page.keyboard.press('Tab');
+    await expect(listaFunciones(page)).toHaveCount(0);
+    await expect(editor(page).getByRole('checkbox', { name: 'Obligatoria' })).toBeFocused();
+
+    await agregarFuncion(page, /^Mayúsculas/);
+    await expect(pieza(page, /^Variable Titular/)).toHaveText('Titular · mayúsculas');
+  });
+
+  test('los resultados salen de UNA sola petición, con un nodo por función sin parámetro', async ({ page }) => {
+    const { motor } = await abrir(page, unaPieza([{ nombre: 'primeros', args: [8] }]));
+    await pieza(page, /^Variable Titular/).click();
+    const vistas = () => motor.pedidos.filter((p) => p.ruta === '/texto-enriquecido/previsualizacion').length;
+    await expect.poll(vistas).toBeGreaterThan(0);
+    await page.waitForTimeout(700);
+    const antes = vistas();
+
+    await botonFuncion(page).click();
+    await expect(listaFunciones(page).getByRole('option', { name: /^Mayúsculas/ }).locator('.selector-variable__ejemplo')).toBeVisible();
+    expect(vistas()).toBe(antes + 1);
+    const lote = motor.pedidos.filter((p) => p.ruta === '/texto-enriquecido/previsualizacion').at(-1)?.cuerpo as {
+      expresion: { nodos: Array<{ nombre: string; funciones: Array<{ nombre: string }> }> };
+    };
+    // Una variable con la cadena de la pieza más la función de cada fila que no pide parámetro (no «Primeros caracteres»).
+    expect(lote.expresion.nodos.every((n) => n.nombre === 'titular' && n.funciones[0].nombre === 'primeros')).toBe(true);
+    expect(lote.expresion.nodos.map((n) => n.funciones.at(-1)!.nombre).sort()).toEqual(['enlace_whatsapp', 'mayusculas', 'sin_tildes']);
+  });
+
+  test('si un nodo falla, solo su fila queda sin resultado y la lista sigue sirviendo', async ({ page }) => {
+    await abrir(page, {
+      ...unaPieza(),
+      ajustar: (motor) => {
+        const original = motor.previsualizacion;
+        motor.previsualizacion = (cuerpo, catalogo) => {
+          const respuesta = original(cuerpo, catalogo);
+          if ('estado' in respuesta) return respuesta;
+          const nodos = (cuerpo.expresion?.nodos ?? []) as Array<{ funciones?: Array<{ nombre: string }> }>;
+          const indice = nodos.findIndex((n) => n.funciones?.some((f) => f.nombre === 'mayusculas'));
+          if (indice >= 0) respuesta.filas[0].columnas[0].problemas.push(problema('parametro_invalido', { nodo: indice, funcion: 0, parametro: null }));
+          return respuesta;
+        };
+      },
+    });
+    await pieza(page, /^Variable Titular/).click();
+    await botonFuncion(page).click();
+    await expect(listaFunciones(page).getByRole('option', { name: /^Quitar tildes/ }).locator('.selector-variable__ejemplo')).toHaveCount(1);
+    await expect(listaFunciones(page).getByRole('option', { name: /^Mayúsculas/ }).locator('.selector-variable__ejemplo')).toHaveCount(0);
+    await listaFunciones(page).getByRole('option', { name: /^Mayúsculas/ }).click();
+    await expect(pieza(page, /^Variable Titular/)).toHaveText('Titular · mayúsculas');
+  });
+
+  test('si toda la petición falla, ninguna fila lleva resultado y la lista sigue sirviendo', async ({ page }) => {
+    await abrir(page, {
+      ...unaPieza(),
+      ajustar: (motor) => {
+        const original = motor.previsualizacion;
+        motor.previsualizacion = (cuerpo, catalogo) =>
+          (cuerpo.expresion?.nodos ?? []).length > 1 ? { estado: 500, cuerpo: { detail: 'falla' } } : original(cuerpo, catalogo);
+      },
+    });
+    await pieza(page, /^Variable Titular/).click();
+    await botonFuncion(page).click();
+    await expect(listaFunciones(page).getByRole('option').first()).toBeVisible();
+    await expect(listaFunciones(page).locator('.selector-variable__ejemplo')).toHaveCount(0);
+    await listaFunciones(page).getByRole('option', { name: /^Quitar tildes/ }).click();
+    await expect(pieza(page, /^Variable Titular/)).toHaveText('Titular · quitar tildes');
+  });
+
+  const conProblemaEn = (funcion: string, parametro: string, args: unknown[]) => ({
+    expresion: { nodos: [{ tipo: 'variable', nombre: 'titular', funciones: [{ nombre: funcion, args }] }] },
+    ajustar: (motor: ApiFalsaTextoEnriquecido) => {
+      motor.validacion = () => ({
+        problemas: [problema('parametro_invalido', { nodo: 0, funcion: 0, parametro })],
+        tipo: 'texto', cota: 170, sin_cota: null, variables: [],
+      });
+    },
+  });
+  const parametroDe = (motor: ApiFalsaTextoEnriquecido, funcion: string) =>
+    motor.catalogos['mowa_mes.speech'].funciones.find((f) => f.nombre === funcion)!.parametros[0];
+
+  for (const [nombre, minimo, maximo, mensaje] of [
+    ['con mínimo y máximo', 0, 6, 'Escribe un número entre 0 y 6.'],
+    ['solo con mínimo', 1, null, 'Escribe un número de 1 en adelante.'],
+    ['solo con máximo', null, 100, 'Escribe un número hasta 100.'],
+  ] as const) {
+    test(`el error de un parámetro numérico ${nombre} dice su rango, en su lugar y en el resumen`, async ({ page }) => {
+      const caso = conProblemaEn('primeros', 'n', [-5]);
+      await abrir(page, {
+        ...caso,
+        ajustar: (motor) => {
+          caso.ajustar(motor);
+          Object.assign(parametroDe(motor, 'primeros'), { minimo, maximo });
+        },
+      });
+      await pieza(page, /^Variable Titular/).click();
+      await expect(editor(page).locator('[data-error-parametro="0:n"]')).toHaveText(mensaje);
+      await expect(editor(page).locator('[data-resumen-lista]')).toContainText(mensaje);
+      await expect(editor(page).getByRole('textbox', { name: 'Cantidad de caracteres' })).toHaveAttribute('aria-invalid', 'true');
+    });
+  }
+
+  test('un texto exigido y vacío dice «Escribe Inicio del enlace.»', async ({ page }) => {
+    const caso = conProblemaEn('enlace_whatsapp', 'prefijo', ['']);
+    await abrir(page, {
+      ...caso,
+      ajustar: (motor) => {
+        caso.ajustar(motor);
+        Object.assign(parametroDe(motor, 'enlace_whatsapp'), { obligatorio: true, por_defecto: null });
+      },
+    });
+    await pieza(page, /^Variable Titular/).click();
+    await expect(editor(page).locator('[data-error-parametro="0:prefijo"]')).toHaveText('Escribe Inicio del enlace.');
+  });
+
+  test('un parámetro sin rango en el catálogo deja el mensaje genérico', async ({ page }) => {
+    const caso = conProblemaEn('primeros', 'n', ['x']);
+    await abrir(page, {
+      ...caso,
+      ajustar: (motor) => {
+        caso.ajustar(motor);
+        Object.assign(parametroDe(motor, 'primeros'), { minimo: null, maximo: null });
+      },
+    });
+    await pieza(page, /^Variable Titular/).click();
+    await expect(editor(page).locator('[data-error-parametro="0:n"]')).toContainText('debe ser del tipo que se pide');
+  });
+
+  test('el panel nombra su pieza, con la posición si la variable está más de una vez, y la píldora abierta se marca', async ({ page }) => {
+    await abrir(page, {
+      expresion: {
+        nodos: [
+          { tipo: 'variable', nombre: 'titular', funciones: [] },
+          { tipo: 'texto', valor: ' y ' },
+          { tipo: 'variable', nombre: 'titular', funciones: [{ nombre: 'mayusculas', args: [] }] },
+          { tipo: 'texto', valor: ' y ' },
+          { tipo: 'variable', nombre: 'telefono', funciones: [] },
+        ],
+      },
+    });
+    const pildoras = editor(page).locator('[data-pieza]');
+    await pildoras.nth(1).click();
+    await expect(editor(page).getByRole('heading', { name: 'Titular (2.ª vez)' })).toBeVisible();
+    await expect(pildoras.nth(1)).toHaveAttribute('aria-expanded', 'true');
+    await expect(pildoras.nth(0)).toHaveAttribute('aria-expanded', 'false');
+
+    await pildoras.nth(0).click();
+    await expect(editor(page).getByRole('heading', { name: 'Titular (1.ª vez)' })).toBeVisible();
+    // Una variable que aparece una sola vez no lleva posición.
+    await pildoras.nth(2).click();
+    await expect(editor(page).getByRole('heading', { name: 'Teléfono', exact: true })).toBeVisible();
   });
 });
 
@@ -728,14 +1031,12 @@ test.describe('el buscador por tema (§13.3)', () => {
   test('la línea de alcance sale al pie cuando el contexto la trae, y no cuando no', async ({ page }) => {
     await abrir(page, {
       ajustar: (motor) => {
-        motor.catalogos['mowa_mes.speech'].contexto.clave_alcance = 'textoEnriquecido.alcance.whatsmkt.mensaje';
+        motor.catalogos['mowa_mes.speech'].contexto.clave_alcance = 'pruebas.alcance';
       },
     });
     await abrirPorBoton(page);
     const alcance = buscador(page).locator('xpath=..').locator('.selector-variable__alcance');
-    await expect(alcance).toHaveText(
-      'Hasta que WhatsMKT tenga variables propias, el mensaje usa las macros de la definición por defecto y el enlace de WhatsApp.',
-    );
+    await expect(alcance).toHaveText('Alcance de prueba: este contexto no ofrece todo.');
     await expect(alcance).toHaveClass(/field__hint/);
     await page.keyboard.press('Escape');
 
@@ -1048,7 +1349,7 @@ test.describe('variable directa (§5.3)', () => {
     const variable = editor(page).getByRole('combobox', { name: 'Texto del mensaje' });
     await expect(variable).toHaveAccessibleDescription('Conserva el valor original, sin pasarlo por texto.');
     await variable.selectOption({ label: 'Vencimiento de la cuota (fecha)' });
-    await editor(page).getByRole('combobox', { name: 'Agregar función' }).selectOption({ label: 'Sumar días' });
+    await agregarFuncion(page, /^Sumar días/);
     await editor(page).getByRole('textbox', { name: 'Cantidad de días' }).fill('3');
     await expect.poll(() => ultimaValidacion(motor)).toEqual({
       nodos: [{ tipo: 'variable', nombre: 'fecha_vencimiento_cuota', funciones: [{ nombre: 'sumar_dias', args: [3] }] }],
@@ -1156,11 +1457,42 @@ for (const tema of ['light', 'dark'] as const) {
       expect(ancho).toBeLessThanOrEqual(360);
     });
 
+    for (const ancho of [1280, 360] as const) {
+      test(`editor con la lista de funciones abierta, a ${ancho} px`, async ({ page }) => {
+        await page.setViewportSize({ width: ancho, height: 800 });
+        await abrir(page, { expresion: SPEECH });
+        await pieza(page, /^Variable Titular/).click();
+        await botonFuncion(page).click();
+        await expect(listaFunciones(page)).toBeVisible();
+        // Con los resultados ya pintados: la fila final es la que se mide.
+        await expect(listaFunciones(page).locator('.selector-variable__ejemplo').first()).toContainText('→');
+        await sinViolaciones(page);
+        const pagina = await page.evaluate(() => document.documentElement.scrollWidth);
+        expect(pagina).toBeLessThanOrEqual(ancho);
+      });
+    }
+
+    test('editor con un error de rango en un parámetro', async ({ page }) => {
+      await abrir(page, {
+        expresion: SPEECH,
+        ajustar: (motor) => {
+          motor.validacion = () => ({
+            problemas: [problema('parametro_invalido', { nodo: 1, funcion: 0, parametro: 'n' })],
+            tipo: 'texto', cota: 170, sin_cota: null, variables: [],
+          });
+          Object.assign(motor.catalogos['mowa_mes.speech'].funciones.find((f) => f.nombre === 'primeros')!.parametros[0], { minimo: 1, maximo: 50 });
+        },
+      });
+      await pieza(page, /^Variable Titular/).click();
+      await expect(editor(page).locator('[data-error-parametro="0:n"]')).toHaveText('Escribe un número entre 1 y 50.');
+      await sinViolaciones(page);
+    });
+
     test('editor con el buscador de variables abierto desde el botón, con su campo y la línea de alcance', async ({ page }) => {
       await abrir(page, {
         expresion: SPEECH,
         ajustar: (motor) => {
-          motor.catalogos['mowa_mes.speech'].contexto.clave_alcance = 'textoEnriquecido.alcance.whatsmkt.mensaje';
+          motor.catalogos['mowa_mes.speech'].contexto.clave_alcance = 'pruebas.alcance';
         },
       });
       await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();

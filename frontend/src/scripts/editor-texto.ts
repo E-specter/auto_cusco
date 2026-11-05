@@ -32,6 +32,7 @@ import {
   conArgumento,
   consultaDelBuscador,
   disparadorEn,
+  errorDeParametro,
   esReferencia,
   leerArgumento,
   nivelDeLargo,
@@ -67,6 +68,7 @@ import {
 } from '../lib/expresion';
 import { t, traducirPorPrefijo } from '../lib/i18n';
 import { crearSelectorPatronFecha } from './selector-patron-fecha';
+import { crearBuscadorFunciones } from './selector-funcion';
 import { crearBuscadorVariables, etiquetaTipo, type BuscadorVariables } from './selector-variable';
 import type { components } from '../lib/contrato-api';
 
@@ -300,6 +302,22 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
   }
 
   const problemasDePieza = (indice: number) => problemasActuales().filter((p) => p.pieza === indice);
+
+  /** A problem's message; a refused parameter says the range the catalogue gives (interface rules §13.4). */
+  function mensajeDe(problema: ProblemaUbicado): string {
+    const fi = problema.ubicacion?.funcion;
+    const nombre = problema.ubicacion?.parametro;
+    const pieza = problema.pieza === null ? undefined : s.piezas[problema.pieza];
+    if (problema.codigo === 'parametro_invalido' && pieza?.tipo === 'variable' && fi !== null && fi !== undefined && nombre) {
+      const llamada = pieza.funciones[fi];
+      const funcion = llamada ? funcionDe(llamada.nombre) : undefined;
+      const indice = funcion?.parametros.findIndex((p) => p.nombre === nombre) ?? -1;
+      const parametro = funcion?.parametros[indice];
+      const error = parametro ? errorDeParametro(parametro, llamada.args[indice]) : null;
+      if (parametro && error) return t(error.clave, { ...error.valores, parametro: nombreParametro(parametro) });
+    }
+    return mensajeProblema(problema);
+  }
 
   function nombreTramo(indice: number): string {
     const posicion = posicionTramo(s.piezas, indice);
@@ -735,6 +753,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
       enfocarTramo(indiceVariable + 1, 0);
     } else {
       pintarPanel();
+      mostrarPanel();
       enfocarEnPanel('agregar-funcion');
     }
     cambio();
@@ -762,6 +781,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
       boton.setAttribute('aria-expanded', String(boton.dataset.pieza === s.abierta));
     });
     pintarPanel();
+    if (s.abierta !== null) mostrarPanel();
   }
 
   function cerrarPanel(): void {
@@ -826,7 +846,9 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     const titulo = document.createElement('h3');
     titulo.className = 'panel__title';
     titulo.id = `${id}-panel-titulo`;
-    titulo.textContent = nombre;
+    // The same variable more than once: the panel says which one it is («Titular (2.ª vez)»).
+    const iguales = s.piezas.filter((p) => p.tipo === 'variable' && p.nombre === pieza.nombre);
+    titulo.textContent = iguales.length > 1 ? t('editorTexto.panel.vez', { variable: nombre, n: iguales.indexOf(pieza) + 1 }) : nombre;
     const tipo = document.createElement('span');
     tipo.className = 'tag tag--neutral';
     tipo.textContent = variable ? etiquetaTipo(variable.tipo) : '';
@@ -908,6 +930,9 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     pintarErroresPanel();
     pintarResultadoPieza();
   }
+
+  /** When a piece's panel opens, the panel comes into view; a repaint of the same panel does not move the page. */
+  const mostrarPanel = () => el.panelHueco.firstElementChild?.scrollIntoView({ block: 'nearest' });
 
   function crearFuncion(pieza: PiezaVariable, llamada: PiezaVariable['funciones'][number], fi: number) {
     const funcion = funcionDe(llamada.nombre);
@@ -1123,34 +1148,37 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
       return campo;
     }
 
-    const label = document.createElement('label');
-    label.className = 'visually-hidden';
-    label.htmlFor = `${id}-agregar-funcion`;
-    label.textContent = t('editorTexto.funcion.agregar');
-    const select = document.createElement('select');
-    select.className = 'input';
-    select.id = `${id}-agregar-funcion`;
-    select.dataset.foco = 'agregar-funcion';
-    select.disabled = s.soloLectura;
-    const primera = document.createElement('option');
-    primera.value = '';
-    primera.textContent = `+ ${t('editorTexto.funcion.agregar')}`;
-    select.append(primera);
-    for (const familia of catalogo.familias) {
-      const deFamilia = compatibles.filter((f) => f.familia === familia);
-      if (deFamilia.length === 0) continue;
-      const grupo = document.createElement('optgroup');
-      grupo.label = nombreTraducido(deFamilia[0].clave_familia, familia);
-      for (const funcion of deFamilia) {
-        const opcion = document.createElement('option');
-        opcion.value = funcion.nombre;
-        opcion.textContent = nombreFuncion(funcion.nombre);
-        grupo.append(opcion);
-      }
-      select.append(grupo);
-    }
-    select.addEventListener('change', () => {
-      const funcion = funcionDe(select.value);
+    const grupos = catalogo.familias
+      .map((familia) => {
+        const funciones = compatibles.filter((f) => f.familia === familia);
+        return { familia, nombre: nombreTraducido(funciones[0]?.clave_familia ?? '', familia), funciones };
+      })
+      .filter((g) => g.funciones.length > 0);
+
+    // A button that opens the list: search field, families, each function with its description and what it would give.
+    const boton = document.createElement('button');
+    boton.type = 'button';
+    boton.className = 'btn btn--sm';
+    boton.id = `${id}-agregar-funcion`;
+    boton.dataset.foco = 'agregar-funcion';
+    boton.disabled = s.soloLectura;
+    boton.setAttribute('aria-expanded', 'false');
+    boton.setAttribute('aria-controls', `${id}-funciones`);
+    const textoBoton = document.createElement('span');
+    textoBoton.textContent = t('editorTexto.funcion.agregar');
+    boton.append(icono('plus'), textoBoton);
+    const hueco = document.createElement('div');
+    hueco.id = `${id}-funciones`;
+
+    let pedidos: AbortController | null = null;
+    const cerrar = (devolverFoco: boolean) => {
+      pedidos?.abort();
+      hueco.replaceChildren();
+      boton.setAttribute('aria-expanded', 'false');
+      if (devolverFoco) boton.focus();
+    };
+    const elegir = (nombre: string) => {
+      const funcion = funcionDe(nombre);
       if (!funcion) return;
       const nueva = pieza.funciones.length;
       cambiarCadena(
@@ -1158,9 +1186,52 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
         `param-${nueva}-0`,
         `quitar-${nueva}`,
       );
+    };
+    boton.addEventListener('click', () => {
+      pedidos?.abort();
+      const propios = new AbortController();
+      pedidos = propios;
+      const buscador = crearBuscadorFunciones({
+        id: `${id}-funcion`,
+        grupos,
+        nombreDe: (funcion) => nombreFuncion(funcion.nombre),
+        descripcionDe: (funcion) => nombreTraducido(funcion.clave_descripcion, ''),
+        resultados: (funciones) => resultadosDeFunciones(pieza, funciones, propios.signal),
+        onElegir: elegir,
+        onCerrar: cerrar,
+      });
+      boton.setAttribute('aria-expanded', 'true');
+      hueco.replaceChildren(buscador.raiz);
+      buscador.campo.focus();
     });
-    campo.append(label, select);
+    campo.append(boton, hueco);
     return campo;
+  }
+
+  /**
+   * What each function without a required parameter would give added at the end of the piece's chain, with the example record,
+   * by function name. One request: an expression with a node per function, and the preview answers node by node, so one that
+   * fails (a problem located at its node) only leaves its own row without a result. The backend evaluates; the editor asks.
+   */
+  async function resultadosDeFunciones(
+    pieza: PiezaVariable,
+    funciones: readonly FuncionCatalogo[],
+    signal: AbortSignal,
+  ): Promise<Map<string, string>> {
+    const resultados = new Map<string, string>();
+    const probadas = funciones.filter((f) => !f.parametros.some((p) => p.obligatorio));
+    if (probadas.length === 0) return resultados;
+    const piezas: PiezaVariable[] = probadas.map((funcion) => ({
+      ...pieza,
+      funciones: [...pieza.funciones, { nombre: funcion.nombre, args: argumentosIniciales(funcion.parametros) }],
+    }));
+    const respuesta = await previsualizarTexto({ contexto: opciones.contexto, expresion: aExpresion(piezas), muestra: ejemplo() }, signal);
+    const columna = respuesta.filas[0]?.columnas[0];
+    for (const nodo of columna?.nodos ?? []) {
+      const falla = columna?.problemas.some((p) => p.ubicacion?.nodo === nodo.indice);
+      if (!falla && !nodo.vacio && probadas[nodo.indice]) resultados.set(probadas[nodo.indice].nombre, nodo.texto);
+    }
+    return resultados;
   }
 
   // ---- Painting problems ------------------------------------------------------------------------
@@ -1205,7 +1276,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     for (const problema of problemasDePieza(indiceDe(pieza.id))) {
       const fi = problema.ubicacion?.funcion;
       const parametro = problema.ubicacion?.parametro;
-      const mensaje = mensajeProblema(problema);
+      const mensaje = mensajeDe(problema);
       let destino: HTMLElement | null = null;
       if (fi !== null && fi !== undefined && parametro) {
         destino = panel.querySelector(`[data-error-parametro="${CSS.escape(`${fi}:${parametro}`)}"]`);
@@ -1233,7 +1304,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
         const item = document.createElement('li');
         const texto = document.createElement('span');
         texto.id = `${id}-problema-${indice}`;
-        texto.textContent = `${lugarProblema(problema)}: ${mensajeProblema(problema)}`;
+        texto.textContent = `${lugarProblema(problema)}: ${mensajeDe(problema)}`;
         const ir = document.createElement('button');
         ir.type = 'button';
         ir.className = 'btn btn--sm btn--quiet';

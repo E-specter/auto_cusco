@@ -16,6 +16,7 @@ import {
   consultaDelBuscador,
   disparadorEn,
   ejemploDeVariable,
+  errorDeParametro,
   esReferencia,
   filtrarVariables,
   leerArgumento,
@@ -284,5 +285,44 @@ describe('el buscador por tema (§13.3)', () => {
     expect(ejemploDeVariable('texto', undefined, siNo)).toBeNull();
     expect(ejemploDeVariable('texto', null, siNo)).toBeNull();
     expect(ejemploDeVariable('texto', '', siNo)).toBeNull();
+  });
+});
+
+describe('lo que dice el error de un parámetro (§13.4)', () => {
+  const numero = (minimo: number | null, maximo: number | null) => ({ tipo: 'numero', obligatorio: true, minimo, maximo });
+
+  it('con mínimo y máximo dice el rango', () => {
+    expect(errorDeParametro(numero(0, 6), 9)).toEqual({ clave: 'editorTexto.parametro.rango', valores: { min: 0, max: 6 } });
+  });
+
+  it('solo con mínimo dice «en adelante»; solo con máximo, «hasta»', () => {
+    expect(errorDeParametro(numero(1, null), 0)).toEqual({ clave: 'editorTexto.parametro.minimo', valores: { min: 1 } });
+    expect(errorDeParametro(numero(null, 100), 500)).toEqual({ clave: 'editorTexto.parametro.maximo', valores: { max: 100 } });
+  });
+
+  it('un cero es un límite, no la ausencia de uno', () => {
+    expect(errorDeParametro(numero(0, null), -1)).toEqual({ clave: 'editorTexto.parametro.minimo', valores: { min: 0 } });
+    expect(errorDeParametro(numero(null, 0), 3)).toEqual({ clave: 'editorTexto.parametro.maximo', valores: { max: 0 } });
+  });
+
+  it('un número sin rango en el catálogo no inventa uno: queda el mensaje genérico', () => {
+    expect(errorDeParametro(numero(null, null), 'x')).toBeNull();
+  });
+
+  it('un número escrito mal (texto) también recibe el rango', () => {
+    expect(errorDeParametro(numero(1, 10), 'abc')).toEqual({ clave: 'editorTexto.parametro.rango', valores: { min: 1, max: 10 } });
+    expect(errorDeParametro(numero(1, 10), undefined)).toEqual({ clave: 'editorTexto.parametro.rango', valores: { min: 1, max: 10 } });
+  });
+
+  it('un texto exigido y vacío dice que lo escriba', () => {
+    const texto = { tipo: 'texto', obligatorio: true, minimo: null, maximo: null };
+    expect(errorDeParametro(texto, '')).toEqual({ clave: 'editorTexto.parametro.vacio', valores: {} });
+    expect(errorDeParametro(texto, undefined)).toEqual({ clave: 'editorTexto.parametro.vacio', valores: {} });
+  });
+
+  it('un texto opcional, o que trae algo, o una referencia a otra variable, no es ese error', () => {
+    expect(errorDeParametro({ tipo: 'texto', obligatorio: false, minimo: null, maximo: null }, '')).toBeNull();
+    expect(errorDeParametro({ tipo: 'texto', obligatorio: true, minimo: null, maximo: null }, 'algo')).toBeNull();
+    expect(errorDeParametro(numero(1, 10), { variable: 'saldo_capital_pendiente' })).toBeNull();
   });
 });

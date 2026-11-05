@@ -74,10 +74,18 @@ import VariantesSegmento from '../components/VariantesSegmento.astro';
 
 <script>
   import { obtenerCatalogo } from '../lib/api-texto-enriquecido';
+  import en from '../i18n/en.json';
+  import es from '../i18n/es.json';
   import { EVENTO_EXPRESION, montarEditor } from '../scripts/editor-texto';
   import { EVENTO_VARIANTES, montarVariantes } from '../scripts/variantes-segmento';
 
   const parametros = new URLSearchParams(location.search);
+
+  // A scope key of the page's own (`clave_alcance`): no registered context sends one today, so the dictionaries do not carry any
+  // (the backend mirror forbids keys nobody sends). The specs use it as the catalogue's `clave_alcance`.
+  const textosDeAlcance = { es: 'Alcance de prueba: este contexto no ofrece todo.', en: 'Test scope: this context does not offer everything.' };
+  (es as Record<string, string>)['pruebas.alcance'] = textosDeAlcance.es;
+  (en as Record<string, string>)['pruebas.alcance'] = textosDeAlcance.en;
   const expuesta = window as unknown as { controladorPrueba?: unknown };
   const componente = parametros.get('componente') ?? 'editor';
   const contexto = parametros.get('contexto') ?? 'mowa_mes.speech';

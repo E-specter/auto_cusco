@@ -62,6 +62,8 @@ export function crearBuscadorVariables(opciones: OpcionesBuscadorVariables): Bus
   lista.id = listaId;
   lista.setAttribute('role', 'listbox');
   lista.setAttribute('aria-label', t('editorTexto.variable.elegir'));
+  // The field (or the text run) drives the list: the list is not a tab stop, so Tab leaves the search in one step.
+  lista.tabIndex = -1;
 
   const vacio = document.createElement('p');
   vacio.className = 'empty selector-variable__vacio';

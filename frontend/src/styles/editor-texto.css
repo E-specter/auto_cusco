@@ -155,6 +155,10 @@
   max-block-size: 20rem;
   overflow-y: auto;
 }
+/* A grid item does not shrink below its content: without this a long example pushes the group past the list. */
+.selector-variable__lista > [role='group'] {
+  min-inline-size: 0;
+}
 .selector-variable__tema {
   margin: 0 0 var(--space-1);
   font-family: var(--font-secondary);
@@ -195,6 +199,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.selector-funcion__descripcion {
+  inline-size: 100%;
+  margin: 0;
 }
 .selector-variable__alcance {
   margin: 0;
@@ -237,6 +245,7 @@
 }
 .editor-texto__funcionCabeza {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
 }
@@ -252,6 +261,15 @@
   display: flex;
   gap: var(--space-1);
   margin-inline-start: auto;
+}
+/* Where the row is narrow the actions go to a row of their own under the title, to the right, and keep their size
+   (the same pattern as the column builder's buttons, T-HI-F1) instead of shrinking beside a title that breaks in two. */
+.editor-texto__funcionAcciones .btn {
+  flex: none;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  padding: 0;
+  justify-content: center;
 }
 .editor-texto__funcion .field__hint {
   margin: 0;
