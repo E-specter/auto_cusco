@@ -713,8 +713,8 @@ Las reglas de §2 a §5 y §9 siguen valiendo; esta sección cambia solo lo que 
 | Corte | Qué | Dónde |
 |---|---|---|
 | **A1** | 13.2 a 13.5: el disparador, el buscador por tema, las funciones con su ejemplo y las píldoras | Solo el motor (`editor-texto.ts`, `selector-variable.ts` y su CSS). Columnas y MOWA lo heredan sin tocar sus páginas. Los temas son un dato nuevo de la variable en el catálogo (backend). |
-| **A2** | 13.6: contador y patrón de error únicos | El motor, más las páginas de MOWA (contador GSM-7) y WhatsMKT (lista de errores del mensaje). **Toca pantallas de MOWA y WhatsMKT.** |
-| **A3** | 13.7: WhatsMKT usa el editor común para su mensaje | La configuración y la campaña de WhatsMKT. **Toca pantallas de WhatsMKT.** Puede ir antes de la fase B. |
+| **A2** (T-HI-F12) | 13.6: contador y patrón de error únicos | El motor (Columnas y el speech de MOWA): el contador, el resumen con «Ir al problema» como enlace y el dato vacío como hint. De WhatsMKT, **solo** la forma del contador y sus dos tags: sus errores **no se tocan** y siguen debajo del textarea, todos y en orden, hasta A3. **Toca pantallas de MOWA y WhatsMKT.** |
+| **A3** | 13.7: WhatsMKT usa el editor común para su mensaje, y con él el resumen de errores de 13.6 | La configuración y la campaña de WhatsMKT. **Toca pantallas de WhatsMKT.** Puede ir antes de la fase B. |
 
 A1 no depende de nada. A2 y A3 van después de A1.
 
