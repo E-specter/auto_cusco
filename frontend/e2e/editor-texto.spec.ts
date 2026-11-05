@@ -1137,8 +1137,10 @@ test.describe('un contexto que no admite funciones (admite_funciones=false)', ()
     const enlace = nota.getByRole('link', { name: 'Abrir Columnas de carga' });
     await expect(enlace).toBeVisible();
     await expect(enlace).toHaveAttribute('href', '/columnas?volver=%2Fpruebas%2Feditor-texto');
-    // El resto del panel sigue: la casilla, el resultado y quitar la variable.
-    await expect(editor(page).getByRole('checkbox', { name: 'Obligatoria' })).toBeVisible();
+    // El panel queda con el aviso, su enlace y quitar la variable: sin «Obligatoria» ni «Resultado con el registro».
+    await expect(editor(page).getByRole('checkbox', { name: 'Obligatoria' })).toHaveCount(0);
+    await expect(editor(page).getByText('Resultado con el registro')).toHaveCount(0);
+    await expect(editor(page).locator('[data-resultado-pieza]')).toHaveCount(0);
     await expect(editor(page).getByRole('button', { name: 'Quitar variable' })).toBeVisible();
   });
 
@@ -1184,6 +1186,136 @@ test.describe('un contexto que no admite funciones (admite_funciones=false)', ()
     await page.keyboard.type('titu');
     await page.keyboard.press('Enter');
     await expect(botonFuncion(page)).toBeFocused();
+  });
+});
+
+test.describe('un contexto sin funciones: la vista previa y el panel (T-HI-F15)', () => {
+  const sinFunciones = (motor: ApiFalsaTextoEnriquecido) => {
+    motor.catalogos['mowa_mes.speech'].contexto.admite_funciones = false;
+  };
+
+  test('la vista previa no informa el dato vacío de una variable en ese contexto', async ({ page }) => {
+    await abrir(page, {
+      expresion: { nodos: [{ tipo: 'texto', valor: 'Hola ' }, { tipo: 'variable', nombre: 'fecha_vencimiento_cuota', funciones: [] }] },
+      extra: '&sinFunciones=1',
+      ajustar: (motor) => {
+        sinFunciones(motor);
+        delete motor.catalogos['mowa_mes.speech'].contexto.ejemplo.fecha_vencimiento_cuota;
+      },
+    });
+    await expect(resultado(page)).toContainText('Hola');
+    await expect(editor(page).locator('.editor-texto__datos .field__hint')).toHaveCount(0);
+
+    // En un contexto que sí admite funciones, el mismo dato vacío sí se informa.
+    await abrir(page, {
+      expresion: { nodos: [{ tipo: 'texto', valor: 'Hola ' }, { tipo: 'variable', nombre: 'fecha_vencimiento_cuota', funciones: [] }] },
+      ajustar: (motor) => {
+        delete motor.catalogos['mowa_mes.speech'].contexto.ejemplo.fecha_vencimiento_cuota;
+      },
+    });
+    await expect(editor(page).locator('.editor-texto__datos .field__hint')).toHaveCount(1);
+  });
+
+  test('en un contexto que admite funciones el panel conserva «Obligatoria» y el resultado de la pieza', async ({ page }) => {
+    await abrir(page, { expresion: { nodos: [{ tipo: 'variable', nombre: 'titular', funciones: [] }] } });
+    await pieza(page, /^Variable Titular/).click();
+    await expect(editor(page).getByRole('checkbox', { name: 'Obligatoria' })).toBeVisible();
+    await expect(editor(page).getByText('Resultado con el registro')).toBeVisible();
+  });
+});
+
+test.describe('una variable que el contexto no conoce (T-HI-F15)', () => {
+  const DESCONOCIDA = {
+    nodos: [{ tipo: 'texto', valor: 'Hola ' }, { tipo: 'variable', nombre: 'macro1', funciones: [] }, { tipo: 'texto', valor: '.' }],
+  };
+  const conProblema = (motor: ApiFalsaTextoEnriquecido) => {
+    motor.validacion = () => ({
+      problemas: [problema('variable_desconocida', { nodo: 1, funcion: null, parametro: null })],
+      tipo: 'texto', cota: 170, sin_cota: null, variables: [],
+    });
+  };
+
+  test('su píldora dice el nombre técnico tal cual, en sans, con el ícono y el estado de error, y su nombre accesible lo dice', async ({ page }) => {
+    await abrir(page, { expresion: DESCONOCIDA, ajustar: conProblema });
+    const p = editor(page).locator('[data-pieza]');
+    await expect(p).toHaveText('macro1');
+    await expect(p).toHaveAccessibleName(/^macro1, no existe en este contexto\. Abre sus funciones/);
+    await expect(p).toHaveClass(/editor-texto__pieza--problema/);
+    await expect(p.locator('svg')).toHaveCount(1);
+    // La misma letra que las demás píldoras: sans, no mono.
+    const fuente = await p.evaluate((boton) => getComputedStyle(boton).fontFamily);
+    expect(fuente).toMatch(/Inter/);
+    expect(fuente).not.toMatch(/JetBrains|monospace/);
+  });
+
+  test('está en error aunque el backend todavía no haya dicho nada', async ({ page }) => {
+    await abrir(page, { expresion: DESCONOCIDA });
+    await expect(editor(page).locator('[data-pieza]')).toHaveClass(/editor-texto__pieza--problema/);
+    await expect(editor(page).locator('[data-pieza]')).toHaveAccessibleName(/no existe en este contexto/);
+  });
+
+  test('una variable que sí existe no cambia: su nombre visible y su nombre accesible de siempre', async ({ page }) => {
+    await abrir(page, { expresion: { nodos: [{ tipo: 'variable', nombre: 'titular', funciones: [] }] } });
+    await expect(pieza(page, /^Variable Titular\. Abre sus funciones/)).toHaveText('Titular');
+    await expect(pieza(page, /no existe/)).toHaveCount(0);
+  });
+
+  test('con nombreDesconocida, la píldora y su panel dicen lo que la página devuelve', async ({ page }) => {
+    await abrir(page, { expresion: DESCONOCIDA, ajustar: conProblema, extra: '&nombreDesconocida=1' });
+    const p = editor(page).locator('[data-pieza]');
+    await expect(p).toHaveText('macro MACRO1');
+    await expect(p).toHaveAccessibleName(/^macro MACRO1, no existe en este contexto/);
+    await p.click();
+    await expect(editor(page).getByRole('heading', { name: 'macro MACRO1' })).toBeVisible();
+  });
+
+  test('sale solo como su problema en el resumen, con el texto del código, y no como «falta el dato de…»', async ({ page }) => {
+    await abrir(page, { expresion: DESCONOCIDA, ajustar: conProblema });
+    await expect(editor(page).locator('[data-resumen]')).toContainText('Hay 1 problema en el texto.');
+    await expect(editor(page).locator('[data-resumen-lista]')).toContainText('Esta variable no existe en este contexto. Elige otra de la lista.');
+    // El nodo viene vacío (la variable no existe en el registro de ejemplo), y aun así no hay hint de dato vacío.
+    await expect(editor(page).locator('.editor-texto__datos .field__hint')).toHaveCount(0);
+  });
+
+  test('«Ir al problema» lleva a su píldora', async ({ page }) => {
+    await abrir(page, { expresion: DESCONOCIDA, ajustar: conProblema });
+    await editor(page).locator('[data-resumen]').getByRole('button', { name: 'Ir al problema' }).click();
+    await expect(editor(page).locator('[data-pieza]')).toBeFocused();
+  });
+});
+
+test.describe('el editor sin vista previa (T-HI-F15)', () => {
+  test('con vistaPrevia en false oculta el título, el control de muestra, el resultado y los hints, y deja el contador', async ({ page }) => {
+    await abrir(page, {
+      expresion: SPEECH,
+      extra: '&vistaPrevia=0',
+      ajustar: (motor) => {
+        delete motor.catalogos['mowa_mes.speech'].contexto.ejemplo.fecha_vencimiento_cuota;
+      },
+    });
+    await expect(editor(page).locator('[data-largo-texto]')).toHaveText(/^\d+ \/ 160 caracteres/);
+    await expect(editor(page).getByRole('heading', { name: 'Vista previa' })).toBeHidden();
+    await expect(editor(page).getByRole('button', { name: 'Registro de ejemplo' })).toBeHidden();
+    await expect(resultado(page)).toBeHidden();
+    await expect(editor(page).locator('.editor-texto__datos')).toBeHidden();
+  });
+
+  test('el contador sigue su camino: avisa «Pasa el tope» sin que se vea la vista', async ({ page }) => {
+    await abrir(page, {
+      expresion: SPEECH,
+      extra: '&vistaPrevia=0',
+      ajustar: (motor) => {
+        motor.validacion = () => ({ problemas: [], tipo: 'texto', cota: 170, sin_cota: null, variables: [] });
+      },
+    });
+    await expect(editor(page).locator('.editor-texto__largo .tag')).toHaveText('Pasa el tope');
+    await expect(resultado(page)).toBeHidden();
+  });
+
+  test('sin la opción, la vista previa se ve como siempre', async ({ page }) => {
+    await abrir(page, { expresion: SPEECH });
+    await expect(editor(page).getByRole('heading', { name: 'Vista previa' })).toBeVisible();
+    await expect(resultado(page)).toBeVisible();
   });
 });
 
@@ -2043,6 +2175,34 @@ for (const tema of ['light', 'dark'] as const) {
       await expect.poll(() => motor.pedidos.filter((p) => p.ruta === '/texto-enriquecido/validacion').length).toBeGreaterThan(1);
       await page.waitForTimeout(600);
       await expect(resultado(page)).toHaveClass(/editor-texto__resultado--pendiente/);
+      await sinViolaciones(page);
+    });
+
+    test('editor con una variable que el contexto no conoce, con su panel abierto', async ({ page }) => {
+      await abrir(page, {
+        expresion: { nodos: [{ tipo: 'texto', valor: 'Hola ' }, { tipo: 'variable', nombre: 'macro1', funciones: [] }, { tipo: 'texto', valor: '.' }] },
+        ajustar: (motor) => {
+          motor.validacion = () => ({
+            problemas: [problema('variable_desconocida', { nodo: 1, funcion: null, parametro: null })],
+            tipo: 'texto', cota: 170, sin_cota: null, variables: [],
+          });
+        },
+      });
+      await expect(editor(page).locator('[data-resumen]')).toBeVisible();
+      await editor(page).locator('[data-pieza]').click();
+      await sinViolaciones(page);
+    });
+
+    test('panel de una pieza en un contexto sin funciones, solo con su aviso, su enlace y quitar', async ({ page }) => {
+      await abrir(page, {
+        expresion: { nodos: [{ tipo: 'variable', nombre: 'titular', funciones: [] }] },
+        extra: '&sinFunciones=1&vistaPrevia=0',
+        ajustar: (motor) => {
+          motor.catalogos['mowa_mes.speech'].contexto.admite_funciones = false;
+        },
+      });
+      await pieza(page, /^Variable Titular/).click();
+      await expect(editor(page).getByRole('checkbox', { name: 'Obligatoria' })).toHaveCount(0);
       await sinViolaciones(page);
     });
 

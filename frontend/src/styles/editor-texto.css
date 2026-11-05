@@ -394,6 +394,14 @@
 .editor-texto__nota {
   margin: 0;
 }
+/* Without its preview (`vistaPrevia: false`) the editor keeps the counter: the title, the sample control, the result and the
+   hints of the sample go away. */
+.editor-texto--sinVista .editor-texto__vistaCabeza,
+.editor-texto--sinVista .editor-texto__resultado,
+.editor-texto--sinVista .editor-texto__nota,
+.editor-texto--sinVista .editor-texto__datos {
+  display: none;
+}
 /* Waiting for the answer: the text steps back to the muted colour. It does not fade (opacity 0.6 left it at 4.34 against the
    sunken wash in the light theme, under the 4.5 it needs): the muted colour already passes everywhere it is used. */
 .editor-texto__resultado--pendiente {

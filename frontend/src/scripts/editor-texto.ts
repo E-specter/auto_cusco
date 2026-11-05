@@ -144,6 +144,13 @@ export interface OpcionesEditor {
    * Without it a context that does not admit functions just does not offer «Agregar función».
    */
   sinFunciones?: { texto: string; enlace?: { texto: string; href: string } };
+  /**
+   * How the pill of a variable the context does not know is named (a saved text may carry one: a macro that no longer exists).
+   * Without it, the technical name as it is.
+   */
+  nombreDesconocida?: (nombre: string) => string;
+  /** `false`: the editor does not show its preview (title, sample control, result, hints); the counter stays. */
+  vistaPrevia?: boolean;
   muestra?: MuestraTexto;
 }
 
@@ -235,6 +242,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     barra: q<HTMLElement>('[data-barra]'),
   };
   const soloVariable = Boolean(opciones.soloVariable);
+  raiz.classList.toggle('editor-texto--sinVista', opciones.vistaPrevia === false);
   /** After `destruir()`: no request, no event, no repaint from outside. */
   let destruido = false;
 
@@ -295,9 +303,10 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
   const variableDe = (nombre: string) => catalogo.contexto.variables.find((v) => v.nombre === nombre);
   const funcionDe = (nombre: string): FuncionCatalogo | undefined =>
     catalogo.funciones.find((f) => f.nombre === nombre);
+  const desconocida = (nombre: string): boolean => !variableDe(nombre);
   const nombreVariable = (nombre: string): string => {
     const variable = variableDe(nombre);
-    return variable ? etiquetaVariable(variable) : humanizarNombre(nombre);
+    return variable ? etiquetaVariable(variable) : (opciones.nombreDesconocida?.(nombre) ?? nombre);
   };
   const nombreFuncion = (nombre: string): string => {
     const funcion = funcionDe(nombre);
@@ -501,10 +510,11 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
           ? `${variable} · ${nombreFuncion(pieza.funciones[0].nombre).toLowerCase()}`
           : t('editorTexto.pildora.funciones', { variable, n: pieza.funciones.length });
     const accesible = [
-      t('editorTexto.pieza.variable', { variable }),
+      // «{nombre}, no existe en este contexto»: the name says it, so it does not add «con un problema».
+      desconocida(pieza.nombre) ? t('editorTexto.pieza.desconocida', { variable }) : t('editorTexto.pieza.variable', { variable }),
       resumen ? `, ${resumen}` : '',
       variableDe(pieza.nombre)?.archivado ? `, ${t('camposAdicionales.archivado')}` : '',
-      conProblema ? t('editorTexto.pieza.conProblema') : '',
+      conProblema && !desconocida(pieza.nombre) ? t('editorTexto.pieza.conProblema') : '',
       '. ',
       t('editorTexto.pieza.abre'),
     ].join('');
@@ -585,7 +595,9 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
   }
 
   function pintarPildora(boton: HTMLButtonElement, pieza: PiezaVariable, conProblema: boolean): void {
-    const { visible, titulo, accesible } = etiquetaPieza(pieza, conProblema);
+    // A variable the context does not know is in error whether or not the backend has said so yet.
+    const conError = conProblema || desconocida(pieza.nombre);
+    const { visible, titulo, accesible } = etiquetaPieza(pieza, conError);
     const texto = boton.querySelector<HTMLElement>('.editor-texto__piezaTexto')!;
     texto.textContent = visible;
     if (variableDe(pieza.nombre)?.archivado) {
@@ -596,10 +608,10 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     }
     boton.setAttribute('aria-label', accesible);
     boton.title = titulo;
-    boton.classList.toggle('editor-texto__pieza--problema', conProblema);
+    boton.classList.toggle('editor-texto__pieza--problema', conError);
     boton.querySelector('svg')?.remove();
     // The problem's icon wins; the contact WhatsApp is the one pill that carries its own (message-circle).
-    if (conProblema) boton.prepend(icono('triangle-alert'));
+    if (conError) boton.prepend(icono('triangle-alert'));
     else if (VARIABLES_WHATSAPP.has(pieza.nombre)) boton.prepend(icono('message-circle'));
   }
 
@@ -1007,7 +1019,9 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     quitarBoton.addEventListener('click', () => quitar(pieza.id));
     pie.append(quitarBoton);
 
-    cuerpo.append(casilla, hint, resultado);
+    // Where the context takes no functions the piece has nothing to mark as required nor a result to show: only the page's words
+    // (above), the link and «Quitar variable».
+    if (admiteFunciones) cuerpo.append(casilla, hint, resultado);
     // A direct variable changes or clears from its select, not from here.
     if (!soloVariable) cuerpo.append(pie);
     panel.append(cabeza, cuerpo);
@@ -1484,14 +1498,18 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     el.sinConexion.hidden = !s.sinConexion;
     // What the sample says about its data is not an error of what was written: it goes under the preview as hints (§13.6),
     // first «Con este producto, falta el dato de {variable}.» for each variable that came empty, then the row's own reasons.
-    const vacias = (columna?.nodos ?? [])
-      .filter((nodo) => nodo.vacio && nodo.tipo === 'variable')
-      .map((nodo) => {
-        const idPieza = [...(s.vista?.nodos ?? [])].find(([, indice]) => indice === nodo.indice)?.[0];
-        const pieza = s.piezas.find((p): p is PiezaVariable => p.tipo === 'variable' && p.id === idPieza);
-        return pieza ? t('editorTexto.muestra.vacia', { variable: nombreVariable(pieza.nombre) }) : null;
-      })
-      .filter((texto): texto is string => texto !== null);
+    // Not for a context that takes no functions (its variables are the channel's, not the product's) nor for a variable the
+    // context does not know: that one is a problem of the text, said in the summary with the code's own words.
+    const vacias = admiteFunciones
+      ? (columna?.nodos ?? [])
+          .filter((nodo) => nodo.vacio && nodo.tipo === 'variable')
+          .map((nodo) => {
+            const idPieza = [...(s.vista?.nodos ?? [])].find(([, indice]) => indice === nodo.indice)?.[0];
+            const pieza = s.piezas.find((p): p is PiezaVariable => p.tipo === 'variable' && p.id === idPieza);
+            return pieza && !desconocida(pieza.nombre) ? t('editorTexto.muestra.vacia', { variable: nombreVariable(pieza.nombre) }) : null;
+          })
+          .filter((texto): texto is string => texto !== null)
+      : [];
     const datos = [
       ...vacias,
       ...[...(s.vista?.excluida ? [s.vista.excluida] : []), ...(columna?.problemas ?? [])].map((problema) => mensajeProblema(problema)),

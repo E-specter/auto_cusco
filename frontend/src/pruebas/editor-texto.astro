@@ -19,6 +19,8 @@
  *   &soloVariable=1                a direct-variable column (§5.3)
  *   &sinFunciones=1                the words a screen gives where the context takes no functions (text and link)
  *   &sinFunciones=texto            the same with the text only, no link
+ *   &nombreDesconocida=1           a screen's own name for a variable the context does not know: «macro» + the name in capitals
+ *   &vistaPrevia=0                 the editor without its preview (the counter stays)
  *
  * The mounted controller is left on `window.controladorPrueba`, so a test can
  * call what a screen would (destruir, fijarSegmentos, fijarSoloLectura).
@@ -137,6 +139,8 @@ import VariantesSegmento from '../components/VariantesSegmento.astro';
         resumen: parametros.get('resumen') === 'ninguno' ? 'ninguno' : 'propio',
         soloLectura: parametros.get('soloLectura') === '1',
         soloVariable: parametros.get('soloVariable') === '1',
+        vistaPrevia: parametros.get('vistaPrevia') !== '0',
+        nombreDesconocida: parametros.get('nombreDesconocida') === '1' ? (nombre) => `macro ${nombre.toUpperCase()}` : undefined,
         sinFunciones:
           parametros.get('sinFunciones') === '1'
             ? { texto: 'Aquí las funciones se arman en otra pantalla.', enlace: { texto: 'Abrir Columnas de carga', href: '/columnas?volver=%2Fpruebas%2Feditor-texto' } }

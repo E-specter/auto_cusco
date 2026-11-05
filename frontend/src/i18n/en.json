@@ -1024,6 +1024,7 @@
   "editorTexto.tramo.final": "Text at the end",
   "editorTexto.pildora.funciones": "{variable} · {n} functions",
   "editorTexto.pieza.variable": "Variable {variable}",
+  "editorTexto.pieza.desconocida": "{variable}, does not exist in this context",
   "editorTexto.pieza.conProblema": ", with a problem",
   "editorTexto.pieza.abre": "Opens its functions",
   "editorTexto.panel.cerrar": "Close the functions of {variable}",
