@@ -12,6 +12,7 @@ import { apiMowaMes, montarApiMowaMes } from './api-falsa-mowa-mes';
 import { apiWhatsmkt, montarApiWhatsmkt } from './api-falsa-whatsmkt';
 import { mensajesFalsos, montarMensajesWhatsmkt } from './api-falsa-whatsmkt-mensajes';
 import { campanaFalsa, montarCampanaWhatsmkt } from './api-falsa-whatsmkt-campana';
+import { montarSeguimientoWhatsmkt, seguimientoFalso } from './api-falsa-whatsmkt-seguimiento';
 import { montarSeleccion } from './apoyo-seleccion';
 import { montarConfiguracion } from './api-falsa-speech-v2';
 
@@ -36,6 +37,8 @@ const conWhatsmkt = async (page: Page) => {
   // The campaign screen also reads the selection, the saved texts and a definition; the rest falls back to the fake above.
   await montarCampanaWhatsmkt(page, campanaFalsa());
   await montarSeleccion(page);
+  // The tracking reads the campaigns.
+  await montarSeguimientoWhatsmkt(page, seguimientoFalso());
 };
 
 const PANTALLAS: Pantalla[] = [

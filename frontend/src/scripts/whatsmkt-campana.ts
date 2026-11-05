@@ -37,6 +37,7 @@ import { FILAS_POR_PAGINA, paginar, pintarPaginador } from '../lib/paginacion';
 import { celda, celdaDeFila, cifra, tabla, vacio } from '../lib/tabla-dom';
 import { enlaceEditarEnCartera, seleccionDeLaUrl } from '../lib/volver';
 import { largoDelMensaje } from '../lib/whatsmkt-mensaje';
+import { tablaDeExclusiones } from './whatsmkt-exclusiones';
 import { montarFicha } from './whatsmkt-ficha';
 import { montarSubida } from './whatsmkt-subida';
 import {
@@ -845,29 +846,6 @@ function marcarCalculando(si: boolean): void {
   panelPrevia.dataset.calculando = String(si);
   panelPrevia.setAttribute('aria-busy', String(si));
   pintarCrear();
-}
-
-function tablaDeExclusiones(filas: ReadonlyArray<{ pagare: string | null; codigo: string; detalle: string }>): HTMLElement {
-  const { envoltorio, cuerpo } = tabla(
-    'wm-exclusiones',
-    [
-      [t('whatsmkt.previa.col.pagare'), false],
-      [t('whatsmkt.previa.col.motivo'), false],
-      [t('whatsmkt.previa.col.detalle'), false],
-    ],
-    { apilable: true },
-  );
-  filas.forEach((exclusion) => {
-    const motivo = celda('td', '', '', t('whatsmkt.previa.col.motivo'));
-    const marca = document.createElement('span');
-    marca.className = 'tag tag--neutral';
-    marca.textContent = traducirPorPrefijo('whatsmkt.codigo', exclusion.codigo, exclusion.detalle);
-    motivo.append(marca);
-    const fila = document.createElement('tr');
-    fila.append(celda('td', exclusion.pagare ?? '—', 'mono', t('whatsmkt.previa.col.pagare')), motivo, celda('td', exclusion.detalle, '', t('whatsmkt.previa.col.detalle')));
-    cuerpo.append(fila);
-  });
-  return envoltorio;
 }
 
 function pintarExclusiones(campana: CampanaPrevista): void {

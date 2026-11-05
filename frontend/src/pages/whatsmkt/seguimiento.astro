@@ -1,7 +1,8 @@
 ---
 /**
- * WhatsMKT tracking (T-WM-F3). Until that cut lands this is the screen's place in the menu: its title and a
- * notice that says what it will do, so the module reads as one from its first release.
+ * WhatsMKT tracking (T-WM-F3a, docs/whatsmkt-interfaz.md §4): the campaigns created, active or discarded, with their filters, and the detail of
+ * one (its card, its figures, its files, its exclusions and the products left out of the lot). Importing the report and reconciling it come in
+ * T-WM-F3b. The behaviour is in `scripts/whatsmkt-seguimiento.ts`; this is the markup.
  */
 import Shell from '../../layouts/Shell.astro';
 import Icon from '../../components/Icon.astro';
@@ -19,11 +20,186 @@ import '../../styles/whatsmkt.css';
       <p class="page__intro" data-i18n="whatsmkt.seguimiento.intro">Las campañas creadas y el informe de cada una.</p>
     </header>
 
-    <p class="notice notice--info">
-      <Icon name="info" size={20} />
-      <span data-i18n="whatsmkt.seguimiento.enConstruccion">
-        Esta pantalla está en construcción. Aquí verás las campañas creadas, importarás el informe de WhatsMKT y revisarás cuántos productos se enviaron y cuántos no.
-      </span>
-    </p>
+    <section class="standIn" data-offline hidden aria-labelledby="wm-seg-offline-title">
+      <h2 class="standIn__title" id="wm-seg-offline-title" data-i18n="console.offline.title">Sin conexión con la API</h2>
+      <p class="standIn__body" data-i18n="console.offline.body">
+        No se pudo contactar con el backend. Comprueba que esté en marcha y vuelve a intentarlo.
+      </p>
+      <button type="button" class="btn btn--primary" data-reintentar>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span class="btn__label" data-i18n="console.offline.retry">Reintentar</span>
+      </button>
+    </section>
+
+    <div class="wm__contenido" data-contenido hidden>
+      <!-- ---- The list: active or discarded, with its filters (RF-WM-40 to RF-WM-42) ------------------------------ -->
+      <section class="panel" aria-labelledby="wm-seg-lista-title">
+        <div class="panel__head">
+          <h2 class="panel__title" id="wm-seg-lista-title" data-i18n="whatsmkt.seguimiento.lista">Campañas</h2>
+        </div>
+        <div class="panel__body wm-form">
+          <div class="segmented" role="group" data-i18n-attr="aria-label:mowaMes.seguimiento.vista.etiqueta" aria-label="Mostrar" data-vistas>
+            <button type="button" class="segmented__item" data-vista="activas" aria-pressed="true"></button>
+            <button type="button" class="segmented__item" data-vista="descartadas" aria-pressed="false"></button>
+          </div>
+
+          <div class="wm-filtros">
+            <div class="field">
+              <label class="field__label" for="wm-seg-mes" data-i18n="whatsmkt.seguimiento.filtro.mes">Mes de envío</label>
+              <select class="input" id="wm-seg-mes" data-filtro="mes"></select>
+            </div>
+            <div class="field">
+              <label class="field__label" for="wm-seg-lote" data-i18n="whatsmkt.seguimiento.filtro.lote">Lote</label>
+              <select class="input" id="wm-seg-lote" data-filtro="lote"></select>
+            </div>
+            <div class="field">
+              <label class="field__label" for="wm-seg-segmento" data-i18n="whatsmkt.seguimiento.filtro.segmento">Segmento</label>
+              <select class="input" id="wm-seg-segmento" data-filtro="segmento"></select>
+            </div>
+          </div>
+
+          <p class="wm-pendientes" data-pendientes hidden>
+            <Icon name="hourglass" size={16} />
+            <span data-pendientes-texto></span>
+          </p>
+
+          <div data-tabla></div>
+          <div class="pager" data-pager role="group" data-i18n-attr="aria-label:whatsmkt.seguimiento.tabla" aria-label="Campañas de WhatsMKT" hidden>
+            <button type="button" class="btn btn--sm" data-page-prev>
+              <Icon name="chevron-left" size={16} />
+              <span data-i18n="console.incidencias.prev">Anteriores</span>
+            </button>
+            <p class="mono muted pager__rango" data-page-range aria-live="polite"></p>
+            <button type="button" class="btn btn--sm" data-page-next>
+              <span data-i18n="console.incidencias.next">Siguientes</span>
+              <Icon name="chevron-right" size={16} />
+            </button>
+          </div>
+          <p class="field__hint" data-lista-estado role="status"></p>
+        </div>
+      </section>
+
+      <!-- ---- The detail of one campaign ------------------------------------------------------------------------ -->
+      <section class="panel" id="wm-seg-detalle" tabindex="-1" aria-labelledby="wm-seg-detalle-title" data-detalle hidden>
+        <div class="panel__head wm-detalle__cabeza">
+          <h2 class="panel__title" id="wm-seg-detalle-title" data-detalle-titulo></h2>
+          <p class="mono muted wm__meta" data-detalle-fechas></p>
+        </div>
+        <div class="panel__body wm-form">
+          <p class="notice notice--warning" data-detalle-pendiente hidden>
+            <Icon name="hourglass" size={20} />
+            <span data-i18n="whatsmkt.seguimiento.pendiente.aviso">
+              Falta importar el informe de WhatsMKT. Cuando la campaña se haya enviado, descárgalo de WhatsMKT e impórtalo aquí.
+            </span>
+          </p>
+          <p class="notice notice--info" data-detalle-descartada hidden>
+            <Icon name="archive" size={20} />
+            <span data-detalle-descartada-texto></span>
+          </p>
+
+          <dl class="wm-cifras" data-detalle-cifras></dl>
+
+          <h3 class="wm-subtitulo" data-i18n="whatsmkt.seguimiento.archivos">Archivos</h3>
+          <ul class="wm-ficha__archivos" data-detalle-archivos></ul>
+          <p class="field__error" data-detalle-descarga-error role="alert"></p>
+
+          <h3 class="wm-subtitulo" data-i18n="whatsmkt.seguimiento.ficha">Datos del formulario de WhatsMKT</h3>
+          <dl class="wm-ficha__datos" data-detalle-datos></dl>
+          <p class="field__hint" data-detalle-copia-estado role="status"></p>
+
+          <h3 class="wm-subtitulo" data-i18n="whatsmkt.seguimiento.exclusiones">Exclusiones</h3>
+          <div data-detalle-exclusiones></div>
+          <div class="pager" data-pager-exclusiones role="group" data-i18n-attr="aria-label:whatsmkt.seguimiento.exclusiones" aria-label="Exclusiones" hidden>
+            <button type="button" class="btn btn--sm" data-page-prev>
+              <Icon name="chevron-left" size={16} />
+              <span data-i18n="console.incidencias.prev">Anteriores</span>
+            </button>
+            <p class="mono muted pager__rango" data-page-range aria-live="polite"></p>
+            <button type="button" class="btn btn--sm" data-page-next>
+              <span data-i18n="console.incidencias.next">Siguientes</span>
+              <Icon name="chevron-right" size={16} />
+            </button>
+          </div>
+          <p class="field__hint" data-detalle-exclusiones-truncadas hidden></p>
+
+          <!-- Closed: it repeats in every campaign of the lot and it is not this campaign's. -->
+          <details class="wm-fuera" data-detalle-fuera hidden>
+            <summary data-detalle-fuera-titulo></summary>
+            <p class="field__hint" data-i18n="whatsmkt.previa.fuera.hint">
+              No entran en ninguna campaña del lote: no tienen días de atraso, o su segmento se quedó sin productos.
+            </p>
+            <div data-detalle-fuera-tabla></div>
+            <div class="pager" data-pager-fuera role="group" data-i18n-attr="aria-label:whatsmkt.seguimiento.fueraLote" aria-label="Productos fuera de las campañas del lote" hidden>
+              <button type="button" class="btn btn--sm" data-page-prev>
+                <Icon name="chevron-left" size={16} />
+                <span data-i18n="console.incidencias.prev">Anteriores</span>
+              </button>
+              <p class="mono muted pager__rango" data-page-range aria-live="polite"></p>
+              <button type="button" class="btn btn--sm" data-page-next>
+                <span data-i18n="console.incidencias.next">Siguientes</span>
+                <Icon name="chevron-right" size={16} />
+              </button>
+            </div>
+          </details>
+        </div>
+      </section>
+    </div>
   </div>
+
+  <!-- Icons for what the script draws: rendered once here, cloned each time. -->
+  <template data-icono-ver><Icon name="eye" size={16} /></template>
+  <template data-icono-descargar><Icon name="download" size={16} /></template>
+  <template data-icono-descartar><Icon name="archive" size={16} /></template>
+  <template data-icono-restaurar><Icon name="archive-restore" size={16} /></template>
+  <template data-icono-eliminar><Icon name="trash-2" size={16} /></template>
+  <template data-icono-pendiente><Icon name="hourglass" size={16} /></template>
+  <template data-icono-copiar><Icon name="copy" size={16} /></template>
+  <template data-icono-productos><Icon name="package" size={16} /></template>
+  <template data-icono-supervision><Icon name="user-check" size={16} /></template>
+  <template data-icono-total><Icon name="file-up" size={16} /></template>
+  <template data-icono-excluidos><Icon name="ban" size={16} /></template>
+
+  <!-- ---- Confirming: discarding, restoring and deleting one campaign ---------------------------------------- -->
+  <dialog class="dialog" data-dialog="confirmar" aria-labelledby="wm-seg-confirmar-title">
+    <div class="dialog__head">
+      <h2 id="wm-seg-confirmar-title" data-confirmar-titulo></h2>
+    </div>
+    <div class="dialog__body wm-form">
+      <p data-confirmar-cuerpo></p>
+      <label class="wm-check" data-confirmar-casilla-caja hidden>
+        <input type="checkbox" data-confirmar-casilla />
+        <span class="wm-check__cuerpo">
+          <span class="wm-check__titulo" data-i18n="mowaMes.confirmar.eliminar.casilla">Entiendo que no se puede deshacer</span>
+        </span>
+      </label>
+      <p class="field__error" data-confirmar-error role="alert"></p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn" data-close data-i18n="mowaMes.confirmar.cancelar">Cancelar</button>
+      <button type="button" class="btn btn--primary" data-confirmar-aceptar>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span class="btn__label" data-confirmar-aceptar-texto></span>
+      </button>
+    </div>
+  </dialog>
+
+  <!-- ---- Generic failure ---------------------------------------------- -->
+  <dialog class="dialog" data-dialog="error" aria-labelledby="wm-seg-error-title">
+    <div class="dialog__head">
+      <h2 id="wm-seg-error-title" data-i18n="common.error">Algo salió mal</h2>
+    </div>
+    <div class="dialog__body">
+      <p class="notice notice--danger">
+        <Icon name="circle-alert" size={20} />
+        <span data-error-body></span>
+      </p>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn btn--primary" data-close data-i18n="common.close">Cerrar</button>
+    </div>
+  </dialog>
 </Shell>
+
+<script>
+  import '../../scripts/whatsmkt-seguimiento';
+</script>

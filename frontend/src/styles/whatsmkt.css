@@ -184,6 +184,41 @@
   font-size: var(--text-sm);
 }
 
+/* The list of the campaigns of the tracking: the filters in a row that wraps, the pending line, and the actions of a row side by side. */
+.wm-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.wm-filtros .field {
+  flex: 1 1 12rem;
+  min-inline-size: 0;
+}
+
+.wm-pendientes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.wm-seg__nombre {
+  overflow-wrap: anywhere;
+}
+
+.wm-seg__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.wm-detalle__cabeza {
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+}
+
 .wm-form {
   display: flex;
   flex-direction: column;

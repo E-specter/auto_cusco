@@ -7,6 +7,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { apiWhatsmkt, montarApiWhatsmkt } from './api-falsa-whatsmkt';
 import { mensajesFalsos, montarMensajesWhatsmkt } from './api-falsa-whatsmkt-mensajes';
 import { campanaFalsa, montarCampanaWhatsmkt } from './api-falsa-whatsmkt-campana';
+import { montarSeguimientoWhatsmkt, seguimientoFalso } from './api-falsa-whatsmkt-seguimiento';
 import { montarSeleccion } from './apoyo-seleccion';
 
 const nav = (page: Page) => page.getByRole('navigation', { name: /Secciones|Sections/ });
@@ -19,6 +20,8 @@ async function abrir(page: Page, ruta: string): Promise<void> {
   // The campaign screen also reads the selection, the saved texts and a definition: registered after, they fall back to the rest.
   await montarCampanaWhatsmkt(page, campanaFalsa());
   await montarSeleccion(page);
+  // The tracking reads the campaigns.
+  await montarSeguimientoWhatsmkt(page, seguimientoFalso());
   await page.goto(ruta);
 }
 
@@ -105,12 +108,11 @@ test.describe('pantallas que esperan su corte', () => {
     await expect(page.locator('[data-guardia]')).toContainText('Elige una selección guardada para armar la campaña.');
   });
 
-  test('Seguimiento tiene su título y dice lo que traerá', async ({ page }) => {
+  test('Seguimiento tiene su título y la lista de campañas', async ({ page }) => {
     await abrir(page, '/whatsmkt/seguimiento');
 
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Seguimiento de WhatsMKT');
-    const aviso = page.locator('.notice--info');
-    await expect(aviso).toContainText('en construcción');
-    await expect(aviso).toContainText('importarás el informe de WhatsMKT');
+    await expect(page.locator('[data-vista="activas"]')).toHaveText('Activas (4)');
+    await expect(page.locator('[data-tabla] tbody tr')).toHaveCount(4);
   });
 });

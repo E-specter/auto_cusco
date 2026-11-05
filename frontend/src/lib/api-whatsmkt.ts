@@ -127,3 +127,61 @@ export function crearCampanas(entrada: PeticionCreacion): Promise<CampanaCreada[
 export function descargarArchivoCampana(id: number): Promise<ArchivoDescargado> {
   return descargarArchivo(`/whatsmkt/campanas/${id}/archivo`);
 }
+
+// ---- Tracking (RF-WM-40 to RF-WM-42) ------------------------------------------------------------------
+
+export type ListaCampanas = Esquemas['ListaCampanasWhatsmktRespuesta'];
+export type ResumenCampana = Esquemas['ResumenCampanaWhatsmktRespuesta'];
+export type DetalleCampana = Esquemas['DetalleCampanaWhatsmktRespuesta'];
+export type PaginaExclusiones = Esquemas['PaginaExclusionesWhatsmktRespuesta'];
+export type EstadoCampana = Esquemas['EstadoCampana'];
+
+export interface FiltroCampanas {
+  estado: EstadoCampana;
+  /** `YYYY-MM`: the month of the send date. */
+  mes?: string;
+  loteId?: number;
+  limite: number;
+  desplazamiento: number;
+}
+
+/** The campaigns, the latest first (a lot stays together), one page, with the counts of the whole: active, discarded and pending the report. */
+export function listarCampanas(filtro: FiltroCampanas, signal?: AbortSignal): Promise<ListaCampanas> {
+  const consulta = new URLSearchParams({
+    estado: filtro.estado,
+    limite: String(filtro.limite),
+    desplazamiento: String(filtro.desplazamiento),
+  });
+  if (filtro.mes) consulta.set('mes', filtro.mes);
+  if (filtro.loteId) consulta.set('lote_id', String(filtro.loteId));
+  return request<ListaCampanas>(`/whatsmkt/campanas?${consulta}`, { signal });
+}
+
+/** One campaign with its card, its lot and its exclusions, its own and those left out of every campaign of the lot, each list with its page. */
+export function obtenerCampana(
+  id: number,
+  paginas: { exclusiones?: number; fuera?: number; limite: number },
+  signal?: AbortSignal,
+): Promise<DetalleCampana> {
+  const consulta = new URLSearchParams({
+    exclusiones_limite: String(paginas.limite),
+    exclusiones_desplazamiento: String(paginas.exclusiones ?? 0),
+    fuera_del_lote_limite: String(paginas.limite),
+    fuera_del_lote_desplazamiento: String(paginas.fuera ?? 0),
+  });
+  return request<DetalleCampana>(`/whatsmkt/campanas/${id}?${consulta}`, { signal });
+}
+
+/** Sets it aside without deleting anything: discarding one that is already discarded changes nothing. */
+export function descartarCampana(id: number): Promise<ResumenCampana> {
+  return request<ResumenCampana>(`/whatsmkt/campanas/${id}/descartar`, { method: 'POST' });
+}
+
+export function restaurarCampana(id: number): Promise<ResumenCampana> {
+  return request<ResumenCampana>(`/whatsmkt/campanas/${id}/restaurar`, { method: 'POST' });
+}
+
+/** Deletes a DISCARDED campaign for good (an active one answers 409 `campana_no_descartada`); the library and the messages stay. */
+export function eliminarCampana(id: number): Promise<void> {
+  return request<void>(`/whatsmkt/campanas/${id}`, { method: 'DELETE' });
+}

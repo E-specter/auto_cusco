@@ -8,14 +8,12 @@
  * was shown, so a language switch can draw it again.
  */
 
-import { mensajeDeError } from '../lib/api';
 import { descargarAdjunto, descargarArchivoCampana, type AdjuntoWhatsmkt, type CampanaCreada } from '../lib/api-whatsmkt';
-import { guardarArchivo, type ArchivoDescargado } from '../lib/descargas';
 import { $ } from '../lib/dom';
 import { t } from '../lib/i18n';
-import { copiarTexto } from '../lib/portapapeles';
 import { datosDeFicha } from '../lib/whatsmkt-campana';
 import { textoDeCodigo } from '../lib/whatsmkt';
+import { filaDeArchivo, pintarDatosDeFicha } from './whatsmkt-ficha-partes';
 
 export interface Ficha {
   /** Shows the card of the lot just created. `etiquetaDe` names a campaign in the `.segmented` (its segment), when the lot has more than one. */
@@ -23,8 +21,6 @@ export interface Ficha {
   /** Draws what is shown again, in the language that is on. */
   repintar(): void;
 }
-
-const icono = (clave: string): Node => $<HTMLTemplateElement>(`template[data-icono-${clave}]`).content.cloneNode(true);
 
 export function montarFicha(): Ficha {
   const panel = $<HTMLElement>('[data-ficha]');
@@ -42,47 +38,10 @@ export function montarFicha(): Ficha {
   let etiquetaDe: (campana: CampanaCreada) => string = (campana) => campana.nombre;
   let elegida = 0;
 
+  const alFallar = (texto: string): void => {
+    errorDescarga.textContent = texto;
+  };
   const nombreDeAdjunto = (id: number, respaldo: string): string => adjuntos.find((a) => a.id === id)?.nombre ?? respaldo;
-
-  async function descargar(pedir: () => Promise<ArchivoDescargado>, nombre: string): Promise<void> {
-    errorDescarga.textContent = '';
-    try {
-      const archivo = await pedir();
-      guardarArchivo(archivo.blob, archivo.nombre || nombre);
-    } catch (caido) {
-      errorDescarga.textContent = mensajeDeError(caido);
-    }
-  }
-
-  /** A file with what it is in front (the photo and the attachment can be the same file, and two equal names would confuse). */
-  function filaDeArchivo(rotulo: string, nombre: string, pedir: () => Promise<ArchivoDescargado>): HTMLElement {
-    const fila = document.createElement('li');
-    fila.className = 'wm-ficha__archivo';
-    const queEs = document.createElement('span');
-    queEs.className = 'muted wm-ficha__rotulo';
-    queEs.textContent = rotulo;
-    const texto = document.createElement('span');
-    texto.className = 'mono wm-ficha__valor';
-    texto.textContent = nombre;
-    const boton = document.createElement('button');
-    boton.type = 'button';
-    boton.className = 'btn btn--sm';
-    boton.setAttribute('aria-label', `${t('whatsmkt.biblioteca.descargar')} ${rotulo}: ${nombre}`);
-    boton.append(icono('descargar'), document.createTextNode(t('whatsmkt.biblioteca.descargar')));
-    boton.addEventListener('click', () => void descargar(pedir, nombre));
-    fila.append(queEs, texto, boton);
-    return fila;
-  }
-
-  /** Marks a text as selected: when the clipboard is refused, the analyst copies it with Ctrl+C. */
-  function seleccionar(nodo: HTMLElement): void {
-    const seleccion = window.getSelection();
-    if (!seleccion) return;
-    seleccion.removeAllRanges();
-    const rango = document.createRange();
-    rango.selectNodeContents(nodo);
-    seleccion.addRange(rango);
-  }
 
   function pintarCampana(): void {
     const campana = creadas[elegida];
@@ -92,52 +51,21 @@ export function montarFicha(): Ficha {
     estadoCopia.textContent = '';
 
     // Step 1: the files, in the order they are asked for: the list of contacts, the photo, the attachment.
-    const lista: HTMLElement[] = [filaDeArchivo(t('whatsmkt.subir.archivo.lista'), campana.archivo.nombre, () => descargarArchivoCampana(campana.id))];
+    const lista: HTMLElement[] = [filaDeArchivo(t('whatsmkt.subir.archivo.lista'), campana.archivo.nombre, () => descargarArchivoCampana(campana.id), alFallar)];
     if (ficha.foto_id !== null) {
       const id = ficha.foto_id;
-      lista.push(filaDeArchivo(t('whatsmkt.subir.archivo.foto'), nombreDeAdjunto(id, t('whatsmkt.envio.foto')), () => descargarAdjunto(id)));
+      lista.push(filaDeArchivo(t('whatsmkt.subir.archivo.foto'), nombreDeAdjunto(id, t('whatsmkt.envio.foto')), () => descargarAdjunto(id), alFallar));
     }
     if (ficha.adjunto_id !== null) {
       const id = ficha.adjunto_id;
-      lista.push(filaDeArchivo(t('whatsmkt.subir.archivo.adjunto'), nombreDeAdjunto(id, t('whatsmkt.envio.adjunto')), () => descargarAdjunto(id)));
+      lista.push(filaDeArchivo(t('whatsmkt.subir.archivo.adjunto'), nombreDeAdjunto(id, t('whatsmkt.envio.adjunto')), () => descargarAdjunto(id), alFallar));
     }
     archivos.replaceChildren(...lista);
 
     // Step 2: the data of the form, one line each: what it asks, what to write, «Copiar».
     avisos.hidden = !ficha.avisos.includes('sin_whatsapp');
     avisos.textContent = ficha.avisos.includes('sin_whatsapp') ? textoDeCodigo({ codigo: 'sin_whatsapp', detail: '' }) : '';
-    datos.replaceChildren(
-      ...datosDeFicha(ficha, adjuntos).map((dato) => {
-        const fila = document.createElement('div');
-        fila.className = 'wm-ficha__dato';
-        const nombre = document.createElement('dt');
-        nombre.textContent = dato.etiqueta;
-        const valor = document.createElement('dd');
-        const texto = document.createElement('span');
-        texto.className = `mono wm-ficha__valor${dato.multilinea ? ' wm-ficha__valor--bloque' : ''}`;
-        texto.textContent = dato.valor;
-        valor.append(texto);
-        const copiar = document.createElement('dd');
-        copiar.className = 'wm-ficha__copiar';
-        const boton = document.createElement('button');
-        boton.type = 'button';
-        boton.className = 'btn btn--sm btn--icon';
-        boton.setAttribute('aria-label', t('mowaMes.accion.copiar', { dato: dato.etiqueta }));
-        boton.title = t('mowaMes.accion.copiar', { dato: dato.etiqueta });
-        boton.append(icono('copiar'));
-        boton.addEventListener('click', async () => {
-          if ((await copiarTexto(dato.valor)) === 'fallo') {
-            seleccionar(texto);
-            estadoCopia.textContent = t('mowaMes.campana.subir.copiarFallo', { dato: dato.etiqueta });
-          } else {
-            estadoCopia.textContent = t('mowaMes.estado.copiado', { dato: dato.etiqueta });
-          }
-        });
-        copiar.append(boton);
-        fila.append(nombre, valor, copiar);
-        return fila;
-      }),
-    );
+    pintarDatosDeFicha(datos, datosDeFicha(ficha, adjuntos), (texto) => (estadoCopia.textContent = texto));
 
     // Step 3: the follow-up of this campaign, where its report is imported.
     seguimiento.href = `/whatsmkt/seguimiento?campana=${campana.id}`;

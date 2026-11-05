@@ -9,6 +9,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { apiWhatsmkt, montarApiWhatsmkt } from './api-falsa-whatsmkt';
 import { mensajesFalsos, montarMensajesWhatsmkt } from './api-falsa-whatsmkt-mensajes';
 import { campanaFalsa, montarCampanaWhatsmkt } from './api-falsa-whatsmkt-campana';
+import { montarSeguimientoWhatsmkt, seguimientoFalso } from './api-falsa-whatsmkt-seguimiento';
 import { montarSeleccion } from './apoyo-seleccion';
 
 const REGLAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
@@ -97,9 +98,25 @@ for (const tema of ['light', 'dark'] as const) {
         await sinViolaciones(page);
       });
 
-      test('seguimiento, con su aviso de construcción', async ({ page }) => {
-        await page.goto('/whatsmkt/seguimiento');
+      test('seguimiento, con la lista y el detalle abierto con sus productos fuera del lote', async ({ page }) => {
+        await montarSeguimientoWhatsmkt(page, seguimientoFalso());
+        await page.goto('/whatsmkt/seguimiento?campana=37');
         await expect(page.getByRole('heading', { name: 'Seguimiento de WhatsMKT', level: 1 })).toBeVisible();
+        await expect(page.locator('[data-detalle]')).toBeVisible();
+        await sinViolaciones(page);
+        // The folded list open: its table and its pager are on screen too.
+        await page.locator('[data-detalle-fuera-titulo]').click();
+        await expect(page.locator('[data-detalle-fuera-tabla] tbody tr').first()).toBeVisible();
+        await sinViolaciones(page);
+      });
+
+      test('seguimiento, con las descartadas y la confirmación de eliminar', async ({ page }) => {
+        await montarSeguimientoWhatsmkt(page, seguimientoFalso());
+        await page.goto('/whatsmkt/seguimiento?vista=descartadas');
+        await expect(page.locator('tr[data-campana="30"]')).toBeVisible();
+        await sinViolaciones(page);
+        await page.locator('tr[data-campana="30"]').getByRole('button', { name: /^Eliminar definitivamente/ }).click();
+        await expect(page.locator('[data-dialog="confirmar"]')).toBeVisible();
         await sinViolaciones(page);
       });
 
