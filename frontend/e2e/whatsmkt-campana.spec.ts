@@ -116,7 +116,7 @@ test.describe('archivo de carga', () => {
     await expect(filas.nth(1)).toContainText('[$MACRO1$]');
     await expect(filas.nth(1)).toContainText('Nombres del titular');
     // The content reads with the catalogue's label of each variable, never the technical name.
-    await expect(filas.nth(0)).toContainText('Texto: 51Teléfono');
+    await expect(filas.nth(0)).toContainText('Texto: 51[Teléfono]');
     await expect(filas.nth(1)).toContainText('Variable: Titular');
     await expect(filas.nth(2)).toContainText('Variable: Saldo de capital pendiente');
     // A column with no label says «—», as the constructor does.

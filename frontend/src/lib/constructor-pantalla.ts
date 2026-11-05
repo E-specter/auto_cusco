@@ -77,10 +77,16 @@ export type ResumenContenido =
   | { modo: 'variable'; variable: string; funciones: number }
   | { modo: 'texto'; fragmento: string; variables: number; recortado: boolean };
 
+// Private-use marks around a variable while the text is built: the real «[» «]» may be in what the analyst typed.
+const ABRE = '\uE000';
+const CIERRA = '\uE001';
+
 /**
  * A short reading of a column's content for its row: a single variable (with how many functions
- * it carries) or the start of a composed text, each variable by its visible name and with no
- * syntax (the user never sees it, §1.1). The result of evaluating it is the preview's, never this.
+ * it carries) or the start of a composed text, each variable by its visible name between brackets
+ * («51[Teléfono]»), the same name as its pill, and with no other syntax (the user never sees it, §1.1).
+ * A cut that falls inside a bracket keeps that variable whole, so the fragment can pass `maximo` by its name.
+ * The result of evaluating it is the preview's, never this.
  */
 export function resumenDeContenido(
   expresion: Expresion,
@@ -99,12 +105,14 @@ export function resumenDeContenido(
       texto += nodo.valor;
     } else {
       variables += 1;
-      texto += etiquetaVariable(nodo.nombre);
+      texto += ABRE + etiquetaVariable(nodo.nombre) + CIERRA;
     }
   }
   texto = texto.replace(/\s+/g, ' ');
   const recortado = texto.length > maximo;
-  return { modo: 'texto', fragmento: recortado ? texto.slice(0, maximo) : texto, variables, recortado };
+  let fragmento = recortado ? texto.slice(0, maximo) : texto;
+  if (fragmento.lastIndexOf(ABRE) > fragmento.lastIndexOf(CIERRA)) fragmento = texto.slice(0, texto.indexOf(CIERRA, maximo) + 1);
+  return { modo: 'texto', fragmento: fragmento.replaceAll(ABRE, '[').replaceAll(CIERRA, ']'), variables, recortado };
 }
 
 /** How many characters of a text the summary of a column shows before it cuts it. */
@@ -134,10 +142,10 @@ export function textoDeContenido(
       ? t('columnas.contenido.variableConFunciones', { variable: resumen.variable, n: resumen.funciones })
       : t('columnas.contenido.variable', { variable: resumen.variable });
   } else {
-    const fuente = resultado ?? resumen.fragmento;
+    // The preview's result is plain text and is cut here; the fragment of the text came cut (and closed) from `resumenDeContenido`.
     const recortado = resultado !== null ? resultado.length > maximo : resumen.recortado;
     texto = t(recortado ? 'columnas.contenido.textoRecortado' : 'columnas.contenido.texto', {
-      fragmento: fuente.length > maximo ? fuente.slice(0, maximo) : fuente,
+      fragmento: resultado !== null ? resultado.slice(0, maximo) : resumen.fragmento,
     });
   }
   if (columna.variantes.length) {

@@ -58,7 +58,39 @@ describe('un texto compuesto', () => {
 
   it('sin resultado muestra el principio del texto, con el nombre visible de cada variable', () => {
     expect(textoDeContenido({ expresion: texto('Hola'), variantes: [] }, etiqueta)).toEqual({ texto: 'Texto: Hola', vacio: false });
-    expect(textoDeContenido({ expresion: compuesto, variantes: [] }, etiqueta, null).texto).toMatch(/^Texto: Titular te recuerda/);
+    expect(textoDeContenido({ expresion: compuesto, variantes: [] }, etiqueta, null).texto).toMatch(/^Texto: \[Titular\] te recuerda/);
+  });
+
+  it('la variable va entre corchetes, con la etiqueta de su píldora y sin espacios de más: «51[Teléfono]»', () => {
+    const en = (...nodos: Expresion['nodos']) => textoDeContenido({ expresion: { nodos }, variantes: [] }, etiqueta).texto;
+    const v = (nombre: string): Expresion['nodos'][number] => ({ tipo: 'variable', nombre, funciones: [] });
+    const x = (valor: string): Expresion['nodos'][number] => ({ tipo: 'texto', valor });
+    // Texto y variable.
+    expect(en(x('51'), v('telefono'))).toBe('Texto: 51[Teléfono]');
+    // Variable al principio.
+    expect(en(v('titular'), x(' te recuerda'))).toBe('Texto: [Titular] te recuerda');
+    // Dos variables seguidas.
+    expect(en(v('titular'), v('telefono'))).toBe('Texto: [Titular][Teléfono]');
+    // Las funciones no se nombran.
+    expect(en(x('Vence el '), { tipo: 'variable', nombre: 'fecha_vencimiento_cuota', funciones: [{ nombre: 'sumar_dias', args: [3] }] })).toBe(
+      'Texto: Vence el [Vencimiento]',
+    );
+    // Los espacios y saltos del texto se leen como uno, y no se agrega ninguno.
+    expect(en(x('a\n\n b '), v('telefono'), x(' c'))).toBe('Texto: a b [Teléfono] c');
+    // Un corchete que el analista escribió se queda como está.
+    expect(en(x('[nota] '), v('telefono'))).toBe('Texto: [nota] [Teléfono]');
+  });
+
+  it('un recorte que cae dentro de un corchete deja la variable entera, nunca «[Telé…»', () => {
+    const e: Expresion = { nodos: [{ tipo: 'texto', valor: 'abcd' }, { tipo: 'variable', nombre: 'telefono', funciones: [] }, { tipo: 'texto', valor: 'zzzz' }] };
+    // «abcd[Teléfono]zzzz»: con 7 cae dentro de «[Teléfono]».
+    expect(textoDeContenido({ expresion: e, variantes: [] }, etiqueta, null, 7).texto).toBe('Texto: abcd[Teléfono]…');
+    // Con 13 corta justo antes del «]», que se agrega; con 14 el corte cae al cerrar y no hace falta; con 15 corta en el texto.
+    expect(textoDeContenido({ expresion: e, variantes: [] }, etiqueta, null, 13).texto).toBe('Texto: abcd[Teléfono]…');
+    expect(textoDeContenido({ expresion: e, variantes: [] }, etiqueta, null, 14).texto).toBe('Texto: abcd[Teléfono]…');
+    expect(textoDeContenido({ expresion: e, variantes: [] }, etiqueta, null, 15).texto).toBe('Texto: abcd[Teléfono]z…');
+    // Si cabe entero no lleva «…».
+    expect(textoDeContenido({ expresion: e, variantes: [] }, etiqueta, null, 60).texto).toBe('Texto: abcd[Teléfono]zzzz');
   });
 
   it('uno largo se corta en el máximo y termina en «…»', () => {

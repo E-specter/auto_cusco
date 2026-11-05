@@ -150,7 +150,7 @@ describe('cómo se lee el contenido de una columna en la lista', () => {
     expect(resumenDeContenido(e, etiqueta)).toEqual({ modo: 'variable', variable: 'Vencimiento', funciones: 2 });
   });
 
-  it('un texto compuesto muestra el principio, con el nombre visible de cada variable y sin sintaxis', () => {
+  it('un texto compuesto muestra el principio, con el nombre visible de cada variable entre corchetes y sin otra sintaxis', () => {
     const e: Expresion = {
       nodos: [
         { tipo: 'variable', nombre: 'titular', funciones: [] },
@@ -162,8 +162,8 @@ describe('cómo se lee el contenido de una columna en la lista', () => {
     const resumen = resumenDeContenido(e, etiqueta, 30);
 
     expect(resumen).toMatchObject({ modo: 'texto', variables: 2, recortado: true });
-    expect((resumen as { fragmento: string }).fragmento.startsWith('Titular te recuerda')).toBe(true);
-    expect((resumen as { fragmento: string }).fragmento).not.toMatch(/[{}\[\]@|]/);
+    expect((resumen as { fragmento: string }).fragmento.startsWith('[Titular] te recuerda')).toBe(true);
+    expect((resumen as { fragmento: string }).fragmento).not.toMatch(/[{}@|]/);
     expect((resumen as { fragmento: string }).fragmento.length).toBeLessThanOrEqual(30);
   });
 

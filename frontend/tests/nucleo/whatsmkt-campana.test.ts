@@ -283,7 +283,7 @@ describe('cómo se leen las cosas', () => {
     expect(filas[1]).toMatchObject({ encabezado: '[$MACRO1$]', etiqueta: 'Nombres del titular', contenido: 'Variable: titular_nombres' });
     expect(filas[2]).toMatchObject({ etiqueta: null, contenido: 'Sin contenido' });
     // A composed text reads as the builder's list does: «Texto: …».
-    expect(filas[0].contenido).toBe('Texto: 51telefono');
+    expect(filas[0].contenido).toBe('Texto: 51[telefono]');
   });
 
   it('el contenido lee cada variable por la etiqueta que da quien llama, y sin ella por su nombre', () => {
@@ -295,7 +295,7 @@ describe('cómo se leen las cosas', () => {
 
     const conEtiquetas = filasDeColumnas(columnas, (nombre) => etiquetas[nombre] ?? nombre);
 
-    expect(conEtiquetas[0].contenido).toBe('Texto: 51Teléfono');
+    expect(conEtiquetas[0].contenido).toBe('Texto: 51[Teléfono]');
     expect(conEtiquetas[1].contenido).toBe('Variable: Titular');
     expect(filasDeColumnas(columnas)[1].contenido).toBe('Variable: titular');
   });
