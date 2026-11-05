@@ -7,7 +7,7 @@
  */
 import type { Page, Route } from '@playwright/test';
 
-import type { DetalleCampana, ExclusionCampana, ListaCampanas, PaginaExclusiones, ResumenCampana } from '../src/lib/api-whatsmkt';
+import type { DetalleCampana, EstadoInforme, ExclusionCampana, ListaCampanas, PaginaExclusiones, ResumenCampana } from '../src/lib/api-whatsmkt';
 import { json, siguiente } from './apoyo';
 
 /** What the API answers instead of its normal answer: a status with its body, or the connection lost. */
@@ -22,6 +22,8 @@ export interface CampanaGuardada {
   adjuntoId: number | null;
   /** The message as it was frozen when the campaign was created. */
   mensaje: string;
+  /** The report imported and its reconciliation, as `GET .../conciliacion` gives them; `null` while the campaign has none. */
+  informe: EstadoInforme | null;
 }
 
 export interface SeguimientoFalso {
@@ -29,9 +31,11 @@ export interface SeguimientoFalso {
   /** The products left out of every campaign, by lot: the same list from any campaign of the lot. */
   fueraPorLote: Record<number, number>;
   /** Scripted answers to the actions, taken in order (the last repeats; `null` is the normal answer); empty means the fake behaves. */
-  respuestas: { descartar: Array<Guion | null>; restaurar: Array<Guion | null>; eliminar: Array<Guion | null> };
-  /** The same for the reads: the list, one detail, the download of the file. */
-  fallos: { lista: Array<Guion | null>; detalle: Array<Guion | null>; archivo: Array<Guion | null> };
+  respuestas: { descartar: Array<Guion | null>; restaurar: Array<Guion | null>; eliminar: Array<Guion | null>; informe: Array<Guion | null> };
+  /** The same for the reads: the list, one detail, the download of the file, the reconciliation. */
+  fallos: { lista: Array<Guion | null>; detalle: Array<Guion | null>; archivo: Array<Guion | null>; conciliacion: Array<Guion | null> };
+  /** Every report the screen sent: the campaign, the name of the file and whether it asked to replace. */
+  importaciones: Array<{ id: number; archivo: string; reemplazar: boolean }>;
   /** Every action the screen asked: `DESCARTAR 37`, `RESTAURAR 30`, `ELIMINAR 30`. */
   acciones: string[];
   /** The ids whose file was downloaded. */
@@ -41,6 +45,35 @@ export interface SeguimientoFalso {
 }
 
 const horario1 = { nombre: 'horario_1', inicio: '08:00', fin: '14:00' };
+
+/**
+ * The report of a campaign and its reconciliation, with the figures that add up: 97 of the 99 products and the 2 of the supervision were sent, and
+ * two numbers of the report are not in the load. `parcial` changes the report's own fields (the total it says, whether it matches).
+ */
+export function informeFalso(campanaId: number, parcial: Partial<NonNullable<EstadoInforme['informe']>> = {}): EstadoInforme {
+  return {
+    campana_id: campanaId,
+    pendiente: false,
+    informe: {
+      archivo_nombre: `informe-${campanaId}.xlsx`,
+      importado_en: '2026-10-30T11:00:00-05:00',
+      fecha_informada: '2026-10-30',
+      total_informado: 101,
+      filas: 101,
+      coincide_total: true,
+      campana_informada: `CUZCO_Vencida (Preventivo) whatsapp ${campanaId}`,
+      tipo_envio_informado: 'Texto',
+      ...parcial,
+    },
+    conciliacion: {
+      productos: { cargados: 99, enviados: 97, no_enviados: 2 },
+      supervision: { cargados: 2, enviados: 2, no_enviados: 0 },
+      total: { cargados: 101, enviados: 99, no_enviados: 2 },
+      sin_correspondencia: ['900000901', '900000902'],
+      total_sin_correspondencia: 2,
+    },
+  };
+}
 
 export function campanaGuardada(id: number, parcial: Partial<ResumenCampana> = {}, resto: Partial<Omit<CampanaGuardada, 'resumen'>> = {}): CampanaGuardada {
   return {
@@ -63,6 +96,7 @@ export function campanaGuardada(id: number, parcial: Partial<ResumenCampana> = {
     fotoId: null,
     adjuntoId: null,
     mensaje: `Hola [$MACRO1$], tu cuota vence pronto. INFO por https://wa.me/+51900000123 (campaña ${id})`,
+    informe: parcial.con_informe ? informeFalso(id) : null,
     ...resto,
   };
 }
@@ -77,8 +111,9 @@ export function seguimientoFalso(): SeguimientoFalso {
       campanaGuardada(30, { lote_id: 9, fecha_envio: '2026-09-10', descartada_en: '2026-09-12T09:00:00-05:00', nombre: 'CUZCO_Vencida (Preventivo) whatsapp 2026.08.01' }),
     ],
     fueraPorLote: { 12: 15, 11: 0, 10: 3, 9: 0 },
-    respuestas: { descartar: [], restaurar: [], eliminar: [] },
-    fallos: { lista: [], detalle: [], archivo: [] },
+    respuestas: { descartar: [], restaurar: [], eliminar: [], informe: [] },
+    fallos: { lista: [], detalle: [], archivo: [], conciliacion: [] },
+    importaciones: [],
     acciones: [],
     descargas: [],
     pedidosDeLista: [],
@@ -93,14 +128,22 @@ export function conMuchasCampanas(estado: SeguimientoFalso, cantidad: number): S
   return estado;
 }
 
-const exclusion = (fila: number, i: number): ExclusionCampana => ({
-  codigo: i % 2 === 0 ? 'sin_telefono' : 'telefono_invalido',
-  fila,
-  pagare: `00000000000${String(1000 + fila)}`,
-  detalle: i % 2 === 0 ? 'No tiene teléfono' : 'El teléfono no es válido',
-  macro: null,
-  etiqueta: null,
-});
+/**
+ * The exclusions a campaign has of its own: phone problems, and two empty macros, one with its column's label and one without (the third of the
+ * page and the fourth). The sentence is the server's: the screen writes its own by the code, and falls back on this one only for a code with no key.
+ */
+const exclusion = (fila: number, i: number): ExclusionCampana => {
+  const base = { fila, pagare: `00000000000${String(1000 + fila)}` };
+  if (i === 4) return { ...base, codigo: 'macro_vacia', detalle: 'La macro 2 queda vacía', macro: 2, etiqueta: 'Nombres del titular' };
+  if (i === 5) return { ...base, codigo: 'macro_vacia', detalle: 'La macro 3 queda vacía', macro: 3, etiqueta: null };
+  return {
+    ...base,
+    codigo: i % 2 === 0 ? 'sin_telefono' : 'telefono_invalido',
+    detalle: i % 2 === 0 ? 'No tiene teléfono' : 'El teléfono no es válido',
+    macro: null,
+    etiqueta: null,
+  };
+};
 
 /** The products left out of every campaign of a lot have no days overdue (or a segment without products): never a phone problem. */
 const sinDiasDeAtraso = (fila: number, i: number): ExclusionCampana => ({
@@ -178,7 +221,7 @@ export async function montarSeguimientoWhatsmkt(page: Page, estado: SeguimientoF
       if (fallo) return responder(route, fallo);
       return json(route, 200, lista(estado, url.searchParams.get('estado') === 'descartadas'));
     }
-    const de = /^\/whatsmkt\/campanas\/(\d+)(?:\/(descartar|restaurar|archivo))?$/.exec(ruta);
+    const de = /^\/whatsmkt\/campanas\/(\d+)(?:\/(descartar|restaurar|archivo|reportes|conciliacion))?$/.exec(ruta);
     if (!de) return route.fallback();
     const id = Number(de[1]);
     const campana = estado.campanas.find((c) => c.resumen.id === id);
@@ -201,6 +244,29 @@ export async function montarSeguimientoWhatsmkt(page: Page, estado: SeguimientoF
         },
         body: 'contenido sintetico de la campana',
       });
+    }
+    if (de[2] === 'conciliacion' && metodo === 'GET') {
+      const fallo = siguiente(estado.fallos.conciliacion);
+      if (fallo) return responder(route, fallo);
+      return json(route, 200, campana.informe ?? { campana_id: id, pendiente: true, informe: null, conciliacion: null });
+    }
+    if (de[2] === 'reportes' && metodo === 'POST') {
+      // A multipart body: the file's name and the `reemplazar` field are read from its text.
+      const cuerpo = peticion.postData() ?? '';
+      const reemplazar = /name="reemplazar"\r\n\r\ntrue/.test(cuerpo);
+      const archivo = /filename="([^"]+)"/.exec(cuerpo)?.[1] ?? '';
+      estado.importaciones.push({ id, archivo, reemplazar });
+      const guion = siguiente(estado.respuestas.informe);
+      if (guion) return responder(route, guion);
+      if (campana.resumen.descartada_en !== null) {
+        return json(route, 409, { detail: 'La campaña está descartada', codigo: 'campana_descartada' });
+      }
+      if (campana.informe !== null && !reemplazar) {
+        return json(route, 409, { detail: 'La campaña ya tiene un informe', codigo: 'informe_ya_importado' });
+      }
+      campana.informe = informeFalso(id, { archivo_nombre: archivo });
+      campana.resumen.con_informe = true;
+      return json(route, 201, campana.informe);
     }
     if ((de[2] === 'descartar' || de[2] === 'restaurar') && metodo === 'POST') {
       estado.acciones.push(`${de[2].toUpperCase()} ${id}`);

@@ -158,13 +158,14 @@ test.describe('descartar, restaurar y eliminar con error', () => {
 
   test('un código de la API se dice con la frase de ese código', async ({ page }) => {
     const estado = seguimientoFalso();
-    estado.respuestas.descartar = [{ estado: 409, cuerpo: { detail: 'La campaña ya está descartada', codigo: 'campana_descartada' } }];
+    // `campana_descartada` is not here: discarding what is already discarded is not an error (see its own tests below).
+    estado.respuestas.descartar = [{ estado: 409, cuerpo: { detail: 'La campaña está activa', codigo: 'campana_no_descartada' } }];
     await abrir(page, estado);
     await accion(page, 37, /^Descartar/).click();
 
     await dialogo(page).getByRole('button', { name: 'Descartar', exact: true }).click();
 
-    await expect(dialogo(page).locator('[data-confirmar-error]')).toHaveText('La campaña está descartada. Restáurala primero.');
+    await expect(dialogo(page).locator('[data-confirmar-error]')).toHaveText('Solo se puede eliminar una campaña descartada. Descártala primero.');
   });
 
   test('restaurar con un error lo dice en el diálogo y la campaña sigue descartada', async ({ page }) => {
@@ -282,5 +283,93 @@ test.describe('el foco al cerrar una confirmación', () => {
     await expect(estadoLista(page)).toHaveText('Se eliminó la campaña 30.');
     await expect(detalle(page)).toBeHidden();
     await expect(page.locator('[data-tabla]')).toBeFocused();
+  });
+});
+
+test.describe('descartar lo que otro ya descartó', () => {
+  test('el código campana_descartada se dice con la frase propia, y la lista se actualiza', async ({ page }) => {
+    const estado = seguimientoFalso();
+    estado.respuestas.descartar = [{ estado: 409, cuerpo: { detail: 'La campaña ya está descartada', codigo: 'campana_descartada' } }];
+    await abrir(page, estado);
+    // Meanwhile somebody else discarded it: what the list still shows is old.
+    estado.campanas.find((c) => c.resumen.id === 37)!.resumen.descartada_en = '2026-10-15T11:00:00-05:00';
+    await accion(page, 37, /^Descartar/).click();
+
+    await dialogo(page).getByRole('button', { name: 'Descartar', exact: true }).click();
+
+    await expect(dialogo(page)).toBeHidden();
+    await expect(estadoLista(page)).toHaveText('Esta campaña ya estaba descartada: alguien la descartó mientras tanto. Se actualizó la lista.');
+    await expect.poll(() => ids(page)).toEqual([38, 36, 35]);
+  });
+
+  test('con el detalle abierto, el detalle también se actualiza', async ({ page }) => {
+    const estado = seguimientoFalso();
+    estado.respuestas.descartar = [{ estado: 409, cuerpo: { detail: 'La campaña ya está descartada', codigo: 'campana_descartada' } }];
+    await abrir(page, estado, '?campana=37');
+    await expect(detalle(page)).toBeVisible();
+    estado.campanas.find((c) => c.resumen.id === 37)!.resumen.descartada_en = '2026-10-15T11:00:00-05:00';
+    await accion(page, 37, /^Descartar/).click();
+
+    await dialogo(page).getByRole('button', { name: 'Descartar', exact: true }).click();
+
+    await expect(page.locator('[data-detalle-descartada]')).toBeVisible();
+    await expect(page.locator('[data-form-informe]')).toBeHidden();
+  });
+});
+
+test.describe('un servidor que falla al abrir', () => {
+  test('un 500 al pedir la lista deja la sección sin conexión con su «Reintentar», que carga cuando contesta', async ({ page }) => {
+    const estado = seguimientoFalso();
+    estado.fallos.lista = [{ estado: 500, cuerpo: { detail: 'La base de datos no responde' } }, null];
+    await montar(page, estado);
+
+    await expect(page.getByRole('heading', { name: 'Sin conexión con la API', level: 2 })).toBeVisible();
+    await expect(page.locator('[data-contenido]')).toBeHidden();
+    await expect(dialogoError(page)).toBeHidden();
+
+    await page.getByRole('button', { name: 'Reintentar' }).click();
+
+    await expect(page.locator('[data-offline]')).toBeHidden();
+    await expect(page.locator('[data-vista="activas"]')).toHaveText('Activas (4)');
+    expect(await ids(page)).toEqual([38, 37, 36, 35]);
+  });
+
+  test('con ?campana= no abre el detalle mientras la lista no cargó', async ({ page }) => {
+    const estado = seguimientoFalso();
+    estado.fallos.lista = [{ estado: 500, cuerpo: { detail: 'La base de datos no responde' } }, null];
+    await montar(page, estado, '?campana=37');
+    await expect(page.locator('[data-offline]')).toBeVisible();
+    await expect(detalle(page)).toBeHidden();
+
+    await page.getByRole('button', { name: 'Reintentar' }).click();
+
+    await expect(detalle(page)).toBeVisible();
+  });
+});
+
+test.describe('la lista que no se pudo leer otra vez después de una acción', () => {
+  test('no queda vieja en silencio: avisa, ofrece reintentar y se actualiza al lograrlo', async ({ page }) => {
+    const estado = seguimientoFalso();
+    // The first read is the opening one, the second is the refresh after discarding, and the third is the retry.
+    estado.fallos.lista = [null, { estado: 500, cuerpo: { detail: 'La base de datos no responde' } }, null];
+    await abrir(page, estado);
+    await accion(page, 37, /^Descartar/).click();
+
+    await dialogo(page).getByRole('button', { name: 'Descartar', exact: true }).click();
+
+    await expect(dialogoError(page)).toBeVisible();
+    await expect(dialogoError(page).locator('[data-error-body]')).toHaveText('La base de datos no responde');
+    await dialogoError(page).getByRole('button', { name: 'Cerrar' }).click();
+    expect(estado.acciones).toEqual(['DESCARTAR 37']);
+    // The action did work, and the page says what it says and what it could not do.
+    await expect(estadoLista(page)).toHaveText('Se descartó la campaña 37.');
+    await expect(page.locator('[data-lista-vieja]')).toBeVisible();
+    await expect(page.locator('[data-lista-vieja]')).toContainText('No se pudo actualizar la lista: lo que ves puede estar desactualizado.');
+    expect(await ids(page)).toEqual([38, 37, 36, 35]);
+
+    await page.locator('[data-lista-vieja]').getByRole('button', { name: 'Reintentar' }).click();
+
+    await expect(page.locator('[data-lista-vieja]')).toBeHidden();
+    await expect.poll(() => ids(page)).toEqual([38, 36, 35]);
   });
 });

@@ -11,12 +11,15 @@ import {
   descargarAdjunto,
   descartarCampana,
   eliminarCampana,
+  importarInforme,
   listarAdjuntos,
   listarCampanas,
   obtenerCampana,
+  obtenerConciliacion,
   restaurarCampana,
   type AdjuntoWhatsmkt,
   type DetalleCampana,
+  type EstadoInforme,
   type ResumenCampana,
 } from '../lib/api-whatsmkt';
 import { guardarArchivo } from '../lib/descargas';
@@ -31,6 +34,7 @@ import {
   CAMPANAS_POR_PAGINA,
   LIMITE_DE_CAMPANAS,
   SIN_FILTRO,
+  avisoDeTotalDistinto,
   busquedaConVista,
   campanaDeLaUrl,
   cifrasDeDetalle,
@@ -40,15 +44,20 @@ import {
   fechasDeDetalle,
   filtrarCampanas,
   fueraDelLoteVisible,
+  lineaDeInforme,
   lotesDeLista,
   mesesDeLista,
   opcionesDeMeses,
   pendienteDeInforme,
   segmentosDeLista,
+  tablasDeConciliacion,
   textoDeHorarios,
+  textoDeNombreInformado,
   textoDePendientes,
+  textoSinCorrespondencia,
   vistaDeLaUrl,
   type FiltroDeLista,
+  type TablaDeConciliacion,
   type VistaCampanas,
 } from '../lib/whatsmkt-seguimiento';
 import { textoDeCodigo } from '../lib/whatsmkt';
@@ -68,6 +77,9 @@ const estado = {
   /** Every attachment of the library, archived or not: a campaign may have used one that was archived since. */
   adjuntos: [] as AdjuntoWhatsmkt[],
   detalle: null as DetalleCampana | null,
+  /** The report of the campaign open and its reconciliation; `null` while it has none (or while it could not be read: `errorConciliacion` says it). */
+  informe: null as EstadoInforme | null,
+  errorConciliacion: '',
   paginaExclusiones: 1,
   paginaFuera: 1,
 };
@@ -285,20 +297,41 @@ async function cambiarVista(vista: VistaCampanas): Promise<void> {
   window.history.replaceState(null, '', `${window.location.pathname}${antes.busqueda}`);
 }
 
-/** Reads the view from the API and paints it; false when it could not (and the screen says why). */
-async function cargarLista(): Promise<boolean> {
+const listaVieja = $<HTMLElement>('[data-lista-vieja]');
+
+/**
+ * Reads the view from the API and paints it; false when it could not (and the screen says why). At the start (`alArrancar`) any failure, not only
+ * a lost connection, stands the screen down with its «Reintentar»: there is no list to show yet.
+ */
+async function cargarLista(alArrancar = false): Promise<boolean> {
   try {
     const lista = await listarCampanas({ estado: estado.vista, limite: LIMITE_DE_CAMPANAS, desplazamiento: 0 });
     estado.campanas = lista.campanas;
     estado.totales = { activas: lista.total_activas, descartadas: lista.total_descartadas, pendientes: lista.total_pendientes };
+    listaVieja.hidden = true;
     pintarLista();
     return true;
   } catch (caido) {
-    if (caido instanceof NetworkError) sinConexion(true);
+    if (caido instanceof NetworkError || alArrancar) sinConexion(true);
     else mostrarError(caido);
     return false;
   }
 }
+
+/** After an action that worked, the list is read again; if that fails it is not left old in silence: a notice says so and offers to try again. */
+async function refrescarLista(): Promise<void> {
+  if (!(await cargarLista())) listaVieja.hidden = false;
+}
+
+const reintentarLista = $<HTMLButtonElement>('[data-lista-reintentar]');
+reintentarLista.addEventListener('click', async () => {
+  ocupado(reintentarLista, true);
+  try {
+    await cargarLista();
+  } finally {
+    ocupado(reintentarLista, false);
+  }
+});
 
 async function descargarArchivoDeLista(campana: ResumenCampana): Promise<void> {
   try {
@@ -333,9 +366,11 @@ function pintarDetalle(): void {
     ? t('mowaMes.seguimiento.descartadas.el', { fecha: fechaDeDescarte(detalle.descartada_en!) })
     : '';
 
-  const iconoDe = { productos: 'productos', supervision: 'supervision', total: 'total', excluidos: 'excluidos' } as const;
+  const iconoDe = { productos: 'productos', supervision: 'supervision', total: 'total', excluidos: 'excluidos', enviados: 'enviados', noEnviados: 'noEnviados' } as const;
   $<HTMLElement>('[data-detalle-cifras]').replaceChildren(
-    ...cifrasDeDetalle(detalle).map((c) => cifra(t(`whatsmkt.seguimiento.cifra.${c.clave}`), formatNumber(c.valor), undefined, false, icono(iconoDe[c.clave]))),
+    ...cifrasDeDetalle(detalle, estado.informe?.conciliacion ?? null).map((c) =>
+      cifra(t(`whatsmkt.seguimiento.cifra.${c.clave}`), formatNumber(c.valor), undefined, false, icono(iconoDe[c.clave])),
+    ),
   );
 
   // The files in the order they are asked for: the list of contacts, the photo, the attachment.
@@ -359,9 +394,170 @@ function pintarDetalle(): void {
   pintarDatosDeFicha($<HTMLElement>('[data-detalle-datos]'), datosDeFicha(ficha, estado.adjuntos), (texto) => (detalleEstadoCopia.textContent = texto));
   detalleEstadoCopia.textContent = '';
 
+  pintarInforme();
   pintarExclusiones();
   pintarFuera();
 }
+
+// ---- The report and its reconciliation (RF-WM-37 to RF-WM-41) -----------------------------------------------------
+
+const formInforme = $<HTMLFormElement>('[data-form-informe]');
+const inputInforme = $<HTMLInputElement>('#wm-informe');
+const nombreInforme = $<HTMLElement>('[data-informe-nombre]');
+const errorInforme = $<HTMLElement>('[data-informe-error]');
+const estadoInforme = $<HTMLElement>('[data-informe-estado]');
+const bloqueConciliacion = $<HTMLElement>('[data-conciliacion]');
+
+/** The form of the report is for a campaign that is alive; a discarded one says to restore it first. The reconciliation is there only with a report. */
+function pintarInforme(): void {
+  const detalle = estado.detalle;
+  if (!detalle) return;
+  const descartada = detalle.descartada_en !== null;
+  formInforme.hidden = descartada;
+  $<HTMLElement>('[data-informe-descartada]').hidden = !descartada;
+  $<HTMLElement>('[data-conciliacion-error]').textContent = estado.errorConciliacion;
+
+  const informe = estado.informe?.informe ?? null;
+  const conciliacion = estado.informe?.conciliacion ?? null;
+  bloqueConciliacion.hidden = informe === null || conciliacion === null;
+  if (informe === null || conciliacion === null) return;
+
+  $<HTMLElement>('[data-conciliacion-linea]').textContent = lineaDeInforme(informe);
+  const total = avisoDeTotalDistinto(informe);
+  $<HTMLElement>('[data-conciliacion-total]').hidden = total === null;
+  $<HTMLElement>('[data-conciliacion-total-texto]').textContent = total ?? '';
+  $<HTMLElement>('[data-conciliacion-tablas]').replaceChildren(...tablasDeConciliacion(conciliacion).map(tablaDeConciliacionDom));
+  // shortcut: every number with no match is drawn, however many; upgrade with a folded list if a report ever brings thousands.
+  const sin = textoSinCorrespondencia(conciliacion);
+  $<HTMLElement>('[data-conciliacion-sin]').hidden = sin === null;
+  $<HTMLElement>('[data-conciliacion-sin-texto]').textContent = sin ?? '';
+  $<HTMLElement>('[data-conciliacion-sin-lista]').replaceChildren(
+    ...conciliacion.sin_correspondencia.map((numero) => {
+      const nodo = document.createElement('span');
+      nodo.textContent = numero;
+      return nodo;
+    }),
+  );
+  const nombre = textoDeNombreInformado(informe);
+  const lineaNombre = $<HTMLElement>('[data-conciliacion-nombre]');
+  lineaNombre.hidden = nombre === null;
+  lineaNombre.textContent = nombre ?? '';
+}
+
+/** One table, stacked at 360 px, with the loaded, the sent and the not sent of the products or of the supervision. */
+function tablaDeConciliacionDom(fila: TablaDeConciliacion): HTMLElement {
+  const titulo = t(`whatsmkt.conciliacion.${fila.clave}`);
+  const columnas = (['cargados', 'enviados', 'noEnviados'] as const).map((c) => t(`whatsmkt.conciliacion.col.${c}`));
+  const { envoltorio, cuerpo } = tabla('wm-conciliacion', columnas.map((c) => [c, false] as [string, boolean]), { apilable: true });
+  envoltorio.querySelector('table')!.setAttribute('aria-label', titulo);
+  const cifras = [fila.cargados, fila.enviados, fila.noEnviados];
+  const tr = document.createElement('tr');
+  tr.append(...cifras.map((valor, i) => celda('td', formatNumber(valor), 'mono', columnas[i])));
+  cuerpo.append(tr);
+  // The same column as the sections of the detail (`wm-form`), so its subtitle has the room that “Exclusiones” has.
+  const bloque = document.createElement('div');
+  bloque.className = 'wm-form';
+  const encabezado = document.createElement('h4');
+  encabezado.className = 'wm-subtitulo';
+  encabezado.textContent = titulo;
+  bloque.append(encabezado, envoltorio);
+  return bloque;
+}
+
+function limpiarErrorInforme(): void {
+  errorInforme.textContent = '';
+  inputInforme.removeAttribute('aria-invalid');
+  inputInforme.setAttribute('aria-describedby', 'wm-informe-hint');
+}
+
+function fallarInforme(texto: string): void {
+  errorInforme.textContent = texto;
+  inputInforme.setAttribute('aria-invalid', 'true');
+  inputInforme.setAttribute('aria-describedby', 'wm-informe-hint wm-informe-error');
+}
+
+function reiniciarInforme(): void {
+  formInforme.reset();
+  nombreInforme.dataset.i18n = 'mowaMes.seguimiento.reporte.sinArchivo';
+  nombreInforme.textContent = t('mowaMes.seguimiento.reporte.sinArchivo');
+  limpiarErrorInforme();
+  estadoInforme.textContent = '';
+}
+
+inputInforme.addEventListener('change', () => {
+  limpiarErrorInforme();
+  const archivo = inputInforme.files?.[0];
+  if (!archivo) return;
+  nombreInforme.textContent = archivo.name;
+  delete nombreInforme.dataset.i18n;
+});
+
+$<HTMLButtonElement>('[data-ir-informe]').addEventListener('click', () => {
+  inputInforme.scrollIntoView({ block: 'center' });
+  inputInforme.focus();
+});
+
+/**
+ * Imports the file chosen. A campaign that already has a report answers 409 `informe_ya_importado`: the confirmation asks to replace it and, once
+ * confirmed, sends it again with `reemplazar`. Any other refusal (the headers, no numbers, a discarded campaign, a file too big) goes under the
+ * field by its code, with the server's sentence as the fallback.
+ */
+async function importar(): Promise<void> {
+  const detalle = estado.detalle;
+  if (!detalle) return;
+  limpiarErrorInforme();
+  const archivo = inputInforme.files?.[0];
+  if (!archivo) {
+    fallarInforme(t('whatsmkt.informe.sinArchivo'));
+    inputInforme.focus();
+    return;
+  }
+  const id = detalle.id;
+  const boton = $<HTMLButtonElement>('[data-informe-importar]');
+  ocupado(boton, true);
+  try {
+    await importarInforme(id, archivo, false);
+  } catch (caido) {
+    if (caido instanceof ApiError && caido.status === 409 && caido.codigo === 'informe_ya_importado') {
+      pedirConfirmacion({
+        titulo: t('whatsmkt.informe.yaImportado'),
+        // What will happen, not the sentence of the code (that one stays as the fallback of the error): it is also asked when the file is another.
+        cuerpo: t('whatsmkt.informe.reemplazarCuerpo'),
+        aceptar: t('whatsmkt.informe.reemplazar'),
+        cancelar: t('mowaMes.seguimiento.reemplazar.cancelar'),
+        peligrosa: true,
+        hecho: t('whatsmkt.informe.importado'),
+        anunciar: estadoInforme,
+        enfocar: () => bloqueConciliacion,
+        accion: async () => {
+          await importarInforme(id, archivo, true);
+          await terminarImportacion(id);
+        },
+      });
+    } else {
+      fallarInforme(textoDeFallo(caido));
+    }
+    return;
+  } finally {
+    ocupado(boton, false);
+  }
+  await terminarImportacion(id);
+  await refrescarLista();
+  estadoInforme.textContent = t('whatsmkt.informe.importado');
+  bloqueConciliacion.setAttribute('tabindex', '-1');
+  bloqueConciliacion.focus();
+}
+
+/** The report is in: the form starts over and the detail is read again, so the notice of pending, the figures and the reconciliation are the new ones. */
+async function terminarImportacion(id: number): Promise<void> {
+  reiniciarInforme();
+  if (estado.detalle?.id === id) await abrir(id, true);
+}
+
+formInforme.addEventListener('submit', (evento) => {
+  evento.preventDefault();
+  void importar();
+});
 
 function pintarExclusiones(): void {
   const detalle = estado.detalle;
@@ -409,16 +605,29 @@ for (const [pager, campo, pintar] of [
 
 /** Opens a campaign: its detail comes from the API, and a new one starts on the first page of each list with «fuera del lote» closed. */
 async function abrir(id: number, mantener = false): Promise<void> {
+  let detalle: DetalleCampana;
   try {
-    estado.detalle = await obtenerCampana(id, { limite: EXCLUSIONES_POR_PEDIDO });
+    detalle = await obtenerCampana(id, { limite: EXCLUSIONES_POR_PEDIDO });
   } catch (caido) {
     estadoLista.textContent = textoDeFallo(caido);
     return;
   }
+  // The reconciliation is asked only of a campaign with a report; if it cannot be read, its place says so and the rest of the detail stands.
+  estado.informe = null;
+  estado.errorConciliacion = '';
+  if (detalle.con_informe) {
+    try {
+      estado.informe = await obtenerConciliacion(id);
+    } catch (caido) {
+      estado.errorConciliacion = textoDeFallo(caido);
+    }
+  }
+  estado.detalle = detalle;
   if (!mantener) {
     estado.paginaExclusiones = 1;
     estado.paginaFuera = 1;
     cajaFuera.open = false;
+    reiniciarInforme();
   }
   estadoLista.textContent = '';
   window.history.replaceState(null, '', `${window.location.pathname}${busquedaConCampana(id)}`);
@@ -438,6 +647,8 @@ function busquedaConCampana(id: number): string {
 
 function cerrarDetalle(): void {
   estado.detalle = null;
+  estado.informe = null;
+  estado.errorConciliacion = '';
   pintarDetalle();
   const parametros = new URLSearchParams(window.location.search);
   parametros.delete('campana');
@@ -455,6 +666,7 @@ const confirmar = {
   error: $<HTMLElement>('[data-confirmar-error]'),
   aceptar: $<HTMLButtonElement>('[data-confirmar-aceptar]'),
   aceptarTexto: $<HTMLElement>('[data-confirmar-aceptar-texto]'),
+  cancelar: $<HTMLButtonElement>('[data-confirmar-cancelar]'),
 };
 
 interface Confirmacion {
@@ -464,9 +676,16 @@ interface Confirmacion {
   /** Deleting asks to tick that it cannot be undone. */
   conCasilla?: boolean;
   peligrosa?: boolean;
-  accion: () => Promise<void>;
+  /** What the cancel button says, if not «Cancelar» («No reemplazar»). */
+  cancelar?: string;
+  /** It may answer what to say instead of `hecho` (discarding what somebody discarded first says so). */
+  accion: () => Promise<string | void>;
   /** What the status line says once it was done. */
   hecho: string;
+  /** Where it is said, if not on the status line of the list. */
+  anunciar?: HTMLElement;
+  /** Where the focus goes when it closes, if not the list. */
+  enfocar?: () => HTMLElement;
 }
 
 let pendiente: Confirmacion | null = null;
@@ -476,6 +695,7 @@ function pedirConfirmacion(confirmacion: Confirmacion): void {
   confirmar.titulo.textContent = confirmacion.titulo;
   confirmar.cuerpo.textContent = confirmacion.cuerpo;
   confirmar.aceptarTexto.textContent = confirmacion.aceptar;
+  confirmar.cancelar.textContent = confirmacion.cancelar ?? t('mowaMes.confirmar.cancelar');
   confirmar.casillaCaja.hidden = !confirmacion.conCasilla;
   confirmar.casilla.checked = false;
   confirmar.error.textContent = '';
@@ -493,8 +713,9 @@ confirmar.aceptar.addEventListener('click', async () => {
   if (!actual) return;
   confirmar.error.textContent = '';
   ocupado(confirmar.aceptar, true);
+  let dicho: string | void;
   try {
-    await actual.accion();
+    dicho = await actual.accion();
   } catch (caido) {
     // A refusal stays in the dialog, by its code, and nothing changes behind it.
     confirmar.error.textContent = textoDeFallo(caido);
@@ -507,10 +728,11 @@ confirmar.aceptar.addEventListener('click', async () => {
   }
   dialogoConfirmar.close();
   pendiente = null;
-  await cargarLista();
-  estadoLista.textContent = actual.hecho;
-  contenedorTabla.setAttribute('tabindex', '-1');
-  contenedorTabla.focus();
+  await refrescarLista();
+  (actual.anunciar ?? estadoLista).textContent = dicho || actual.hecho;
+  const destino = actual.enfocar?.() ?? contenedorTabla;
+  destino.setAttribute('tabindex', '-1');
+  destino.focus();
 });
 
 function confirmarDescartar(campana: Pick<ResumenCampana, 'id'>): void {
@@ -520,8 +742,16 @@ function confirmarDescartar(campana: Pick<ResumenCampana, 'id'>): void {
     aceptar: t('mowaMes.accion.descartar'),
     hecho: t('whatsmkt.seguimiento.descartada', { id: campana.id }),
     accion: async () => {
-      await descartarCampana(campana.id);
+      let yaEstaba = false;
+      try {
+        await descartarCampana(campana.id);
+      } catch (caido) {
+        // Somebody discarded it first: it is where it was asked to go, and the list that follows says so (it says so, not the code's own sentence).
+        if (!(caido instanceof ApiError && caido.codigo === 'campana_descartada')) throw caido;
+        yaEstaba = true;
+      }
       if (estado.detalle?.id === campana.id) await abrir(campana.id, true);
+      return yaEstaba ? t('whatsmkt.seguimiento.yaDescartada') : undefined;
     },
   });
 }
@@ -576,7 +806,7 @@ async function arrancar(): Promise<void> {
     estado.adjuntos = await leerAdjuntos();
     const pedida = campanaDeLaUrl(window.location.search);
     sinConexion(false);
-    await cargarLista();
+    if (!(await cargarLista(true))) return;
     if (pedida !== null) {
       await abrir(pedida);
       // A discarded campaign is in the other view: the list follows it, so what is open is also in the list.

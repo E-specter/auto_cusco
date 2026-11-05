@@ -10,7 +10,7 @@
 import { ApiError } from './api';
 import type { ErrorWhatsmkt, SegmentoWhatsmktEntrada } from './api-whatsmkt';
 import { formatNumber } from './format';
-import { t } from './i18n';
+import { t, traducirPorPrefijo } from './i18n';
 
 // ---- Limits (RF-WM-26, RF-WM-31) ---------------------------------------------------------------
 
@@ -239,4 +239,19 @@ export function textoDeErrorAdjunto(error: ErrorWhatsmkt): string {
     maximo: error.maximo === null ? null : tamanoLegible(error.maximo),
     tipo: error.tipo === null ? null : tipoEnFrase(error.tipo),
   });
+}
+
+/**
+ * The Detalle column of an exclusion: the sentence of its code (`whatsmkt.exclusiones.<codigo>`), with the server's own as the fallback for a code
+ * with no key. `macro_vacia` names the macro and its column's label (`{n}` is the `macro` field); without a label, a sentence that does not invent one.
+ */
+export function detalleDeExclusion(exclusion: { codigo: string; detalle: string; macro?: number | null; etiqueta?: string | null }): string {
+  if (exclusion.codigo === 'macro_vacia') {
+    // Its key is a template: without the number of the macro there is nothing to fill it with, and the server's sentence says it.
+    if (exclusion.macro == null) return exclusion.detalle;
+    return exclusion.etiqueta
+      ? t('whatsmkt.exclusiones.macro_vacia', { n: exclusion.macro, etiqueta: exclusion.etiqueta })
+      : t('whatsmkt.exclusiones.macro_vacia_sinEtiqueta', { n: exclusion.macro });
+  }
+  return traducirPorPrefijo('whatsmkt.exclusiones', exclusion.codigo, exclusion.detalle);
 }

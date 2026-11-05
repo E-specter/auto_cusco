@@ -6,10 +6,10 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-import { apiWhatsmkt, montarApiWhatsmkt } from './api-falsa-whatsmkt';
+import { apiWhatsmkt, errorWhatsmkt, montarApiWhatsmkt } from './api-falsa-whatsmkt';
 import { mensajesFalsos, montarMensajesWhatsmkt } from './api-falsa-whatsmkt-mensajes';
 import { campanaFalsa, montarCampanaWhatsmkt } from './api-falsa-whatsmkt-campana';
-import { montarSeguimientoWhatsmkt, seguimientoFalso } from './api-falsa-whatsmkt-seguimiento';
+import { informeFalso, montarSeguimientoWhatsmkt, seguimientoFalso } from './api-falsa-whatsmkt-seguimiento';
 import { montarSeleccion } from './apoyo-seleccion';
 
 const REGLAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
@@ -128,6 +128,54 @@ for (const tema of ['light', 'dark'] as const) {
       test('configuración, de vuelta con una definición que no es de WhatsMKT, con su error', async ({ page }) => {
         await page.goto('/whatsmkt/configuracion?definicion=13&version=1');
         await expect(page.locator('[data-definicion-error]')).toHaveText('La definición elegida no es de WhatsMKT.');
+        await sinViolaciones(page);
+      });
+
+      // The report (T-WM-F3b): the reconciliation with a total that differs, the refusal under the field, and the confirmation to replace one.
+      test('seguimiento, con la conciliación y el aviso de que el total del informe no coincide', async ({ page }) => {
+        const estado = seguimientoFalso();
+        estado.campanas.find((c) => c.resumen.id === 36)!.informe = informeFalso(36, { total_informado: 101, filas: 99, coincide_total: false });
+        await montarSeguimientoWhatsmkt(page, estado);
+        await page.goto('/whatsmkt/seguimiento?campana=36');
+        await expect(page.locator('[data-conciliacion-total]')).toBeVisible();
+        await expect(page.locator('[data-conciliacion-tablas] table')).toHaveCount(2);
+        await sinViolaciones(page);
+      });
+
+      test('seguimiento, con el error del informe bajo su campo y el aviso de pendiente', async ({ page }) => {
+        const estado = seguimientoFalso();
+        estado.respuestas.informe = [{ estado: 422, cuerpo: errorWhatsmkt('informe_sin_encabezados') }];
+        await montarSeguimientoWhatsmkt(page, estado);
+        await page.goto('/whatsmkt/seguimiento?campana=37');
+        // The detail resets the form when it opens: the file is chosen once it is there.
+        await expect(page.locator('[data-detalle]')).toBeVisible();
+        await page.locator('#wm-informe').setInputFiles({ name: 'informe.xlsx', mimeType: 'application/octet-stream', buffer: Buffer.from('sintetico') });
+        await page.getByRole('button', { name: 'Importar informe', exact: true }).click();
+        await expect(page.locator('[data-informe-error]')).not.toBeEmpty();
+        await expect(page.locator('[data-detalle-pendiente]')).toBeVisible();
+        await sinViolaciones(page);
+      });
+
+      test('seguimiento, con la confirmación de reemplazar un informe', async ({ page }) => {
+        await montarSeguimientoWhatsmkt(page, seguimientoFalso());
+        await page.goto('/whatsmkt/seguimiento?campana=36');
+        // The detail resets the form when it opens: the file is chosen once it is there.
+        await expect(page.locator('[data-detalle]')).toBeVisible();
+        await page.locator('#wm-informe').setInputFiles({ name: 'informe.xlsx', mimeType: 'application/octet-stream', buffer: Buffer.from('sintetico') });
+        await page.getByRole('button', { name: 'Importar informe', exact: true }).click();
+        await expect(page.locator('[data-dialog="confirmar"]')).toBeVisible();
+        await sinViolaciones(page);
+      });
+
+      test('seguimiento, con la lista que no se pudo actualizar y su aviso para reintentar', async ({ page }) => {
+        const estado = seguimientoFalso();
+        estado.fallos.lista = [null, { estado: 500, cuerpo: { detail: 'No responde' } }, { estado: 500, cuerpo: { detail: 'No responde' } }];
+        await montarSeguimientoWhatsmkt(page, estado);
+        await page.goto('/whatsmkt/seguimiento');
+        await page.locator('tr[data-campana="37"]').getByRole('button', { name: /^Descartar/ }).click();
+        await page.locator('[data-dialog="confirmar"]').getByRole('button', { name: 'Descartar', exact: true }).click();
+        await page.locator('[data-dialog="error"]').getByRole('button', { name: 'Cerrar' }).click();
+        await expect(page.locator('[data-lista-vieja]')).toBeVisible();
         await sinViolaciones(page);
       });
 

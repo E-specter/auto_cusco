@@ -185,3 +185,25 @@ export function restaurarCampana(id: number): Promise<ResumenCampana> {
 export function eliminarCampana(id: number): Promise<void> {
   return request<void>(`/whatsmkt/campanas/${id}`, { method: 'DELETE' });
 }
+
+// ---- The WhatsMKT report and its reconciliation (RF-WM-37 to RF-WM-39) ---------------------------------
+
+export type EstadoInforme = Esquemas['EstadoInformeWhatsmktRespuesta'];
+export type InformeCampana = Esquemas['InformeWhatsmktRespuesta'];
+export type ConciliacionCampana = Esquemas['ConciliacionWhatsmktRespuesta'];
+
+/**
+ * Saves the report as the campaign's current one (201). One that is already there answers 409 `informe_ya_importado` unless `reemplazar` is
+ * true; a discarded campaign answers 409 `campana_descartada`; a file without the headers or without numbers is a 422, and one too big a 413.
+ */
+export function importarInforme(id: number, archivo: File, reemplazar = false): Promise<EstadoInforme> {
+  const cuerpo = new FormData();
+  cuerpo.set('archivo', archivo);
+  cuerpo.set('reemplazar', String(reemplazar));
+  return request<EstadoInforme>(`/whatsmkt/campanas/${id}/reportes`, { method: 'POST', body: cuerpo });
+}
+
+/** The campaign against its report; without one it is not an error: `pendiente` is true and there is nothing else. */
+export function obtenerConciliacion(id: number): Promise<EstadoInforme> {
+  return request<EstadoInforme>(`/whatsmkt/campanas/${id}/conciliacion`);
+}

@@ -8,8 +8,8 @@
  * in the API, and ask for each page.
  */
 
-import type { DetalleCampana, ResumenCampana } from './api-whatsmkt';
-import { formatDate } from './format';
+import type { ConciliacionCampana, DetalleCampana, InformeCampana, ResumenCampana } from './api-whatsmkt';
+import { formatDate, formatNumber, toApiDate } from './format';
 import { t } from './i18n';
 import { ordenarMeses } from './mowa-mes-seguimiento';
 import { nombreDeFranja, type Franja } from './whatsmkt';
@@ -104,19 +104,81 @@ export const fechasDeDetalle = (detalle: Pick<DetalleCampana, 'fecha_corte' | 'f
   });
 
 export interface CifraDeDetalle {
-  clave: 'productos' | 'supervision' | 'total' | 'excluidos';
+  clave: 'productos' | 'supervision' | 'total' | 'excluidos' | 'enviados' | 'noEnviados';
   valor: number;
 }
 
-/** The figures of a campaign without a report: the products loaded, the supervision rows, the total loaded and the ones left out. */
-export function cifrasDeDetalle(detalle: Pick<DetalleCampana, 'productos' | 'supervisores' | 'archivo' | 'exclusiones'>): CifraDeDetalle[] {
-  return [
+/**
+ * The figures of a campaign: the products loaded, the supervision rows, the total loaded and the ones left out; with a report, also how many of the
+ * total were sent and how many were not (the products and the supervision together).
+ */
+export function cifrasDeDetalle(
+  detalle: Pick<DetalleCampana, 'productos' | 'supervisores' | 'archivo' | 'exclusiones'>,
+  conciliacion: Pick<ConciliacionCampana, 'total'> | null = null,
+): CifraDeDetalle[] {
+  const cifras: CifraDeDetalle[] = [
     { clave: 'productos', valor: detalle.productos },
     { clave: 'supervision', valor: detalle.supervisores },
     { clave: 'total', valor: detalle.archivo.filas },
     { clave: 'excluidos', valor: detalle.exclusiones.total },
   ];
+  if (conciliacion) {
+    cifras.push({ clave: 'enviados', valor: conciliacion.total.enviados }, { clave: 'noEnviados', valor: conciliacion.total.no_enviados });
+  }
+  return cifras;
 }
+
+// ---- The report and its reconciliation (RF-WM-37 to RF-WM-39) -----------------------------------------------
+
+/**
+ * «Informe del 30 oct 2026 · total informado 101 · 101 filas». The date and the total are what the report said, and it may not have said them:
+ * then a dash stands in (the date falls back to the day it was imported).
+ */
+export function lineaDeInforme(informe: Pick<InformeCampana, 'fecha_informada' | 'importado_en' | 'total_informado' | 'filas'>): string {
+  return t('whatsmkt.informe.linea', {
+    // `importado_en` is an instant (a timestamptz, in UTC or not): its day is the one of the browser, not the first ten characters of its text, which
+    // at 20:00 in Lima are already the next day in UTC. `formatDate` reads a date alone, so the local day goes through `toApiDate`.
+    fecha: formatDate(informe.fecha_informada ?? toApiDate(new Date(informe.importado_en))),
+    total: informe.total_informado === null ? '—' : formatNumber(informe.total_informado),
+    filas: formatNumber(informe.filas),
+  });
+}
+
+/**
+ * DU-WM-7 (provisional): the total the report says is not its number of rows. It does not reject: the notice says both, and the reconciliation
+ * goes by the rows. `null` when they match, or when the report did not say (`coincide_total` is null).
+ */
+export function avisoDeTotalDistinto(informe: Pick<InformeCampana, 'coincide_total' | 'total_informado' | 'filas'>): string | null {
+  if (informe.coincide_total !== false || informe.total_informado === null) return null;
+  return t('whatsmkt.informe.totalDistinto', { total: formatNumber(informe.total_informado), filas: formatNumber(informe.filas) });
+}
+
+export interface TablaDeConciliacion {
+  clave: 'productos' | 'supervision';
+  cargados: number;
+  enviados: number;
+  noEnviados: number;
+}
+
+/** The products and the supervision, each its own table (RF-41): the supervision is never added to the products. */
+export function tablasDeConciliacion(conciliacion: Pick<ConciliacionCampana, 'productos' | 'supervision'>): TablaDeConciliacion[] {
+  return (['productos', 'supervision'] as const).map((clave) => ({
+    clave,
+    cargados: conciliacion[clave].cargados,
+    enviados: conciliacion[clave].enviados,
+    noEnviados: conciliacion[clave].no_enviados,
+  }));
+}
+
+/** «Números del informe que no están en la carga: 2», or `null` when every number of the report is in the load. */
+export const textoSinCorrespondencia = (conciliacion: Pick<ConciliacionCampana, 'total_sin_correspondencia'>): string | null =>
+  conciliacion.total_sin_correspondencia > 0
+    ? t('whatsmkt.conciliacion.sinCorrespondencia', { n: formatNumber(conciliacion.total_sin_correspondencia) })
+    : null;
+
+/** «Nombre en el informe: …», only to read (it is not compared); `null` when the report did not carry one. */
+export const textoDeNombreInformado = (informe: Pick<InformeCampana, 'campana_informada'>): string | null =>
+  informe.campana_informada ? t('whatsmkt.conciliacion.nombreInforme', { nombre: informe.campana_informada }) : null;
 
 /**
  * Whether the products left out of every campaign of the lot are shown: only when there are some, and never in a global lot (there every

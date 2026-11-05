@@ -235,11 +235,21 @@ test.describe('el detalle', () => {
 
     await expect(filasDeExclusiones).toHaveCount(10);
     await expect(filasDeExclusiones.first().locator('.tag')).toHaveText('Sin teléfono');
-    await expect(filasDeExclusiones.first()).toContainText('No tiene teléfono');
+    await expect(filasDeExclusiones.first()).toContainText('No tiene un teléfono registrado.');
     await page.locator('[data-pager-exclusiones] [data-page-next]').click();
 
     await expect(filasDeExclusiones).toHaveCount(2);
     await expect(page.locator('[data-pager-exclusiones] [data-page-next]')).toBeDisabled();
+  });
+
+  test('una macro vacía nombra la macro y la etiqueta de su columna, y sin etiqueta no inventa una', async ({ page }) => {
+    await abrir(page, seguimientoFalso(), '?campana=37');
+    const filasDeExclusiones = page.locator('[data-detalle-exclusiones] tbody tr');
+
+    await expect(filasDeExclusiones.nth(4).locator('.tag')).toHaveText('Macro vacía');
+    await expect(filasDeExclusiones.nth(4)).toContainText('La macro 2 (Nombres del titular) queda vacía y su columna no tiene valor por defecto.');
+    await expect(filasDeExclusiones.nth(5)).toContainText('La macro 3 queda vacía y su columna no tiene valor por defecto.');
+    await expect(filasDeExclusiones.nth(5)).not.toContainText('(');
   });
 });
 
@@ -274,8 +284,6 @@ test.describe('los productos fuera de las campañas del lote', () => {
     const primera = page.locator('[data-detalle-fuera-tabla] tbody tr').first();
     await expect(primera.locator('.tag')).toHaveText('Sin días de atraso');
     await expect(primera).toContainText('No tiene días de atraso, así que no cae en ningún segmento. En el modo «Global» sí entraría.');
-    // A code with no key of its own keeps the sentence the server gave.
-    await expect(detalle(page).locator('[data-detalle-exclusiones] tbody tr').first()).toContainText('No tiene teléfono');
   });
 
   test('no aparece con cero, ni en una campaña global', async ({ page }) => {

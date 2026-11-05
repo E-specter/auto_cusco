@@ -76,6 +76,18 @@ import '../../styles/whatsmkt.css';
             </button>
           </div>
           <p class="field__hint" data-lista-estado role="status"></p>
+          <!-- An action worked but the list could not be read again: it does not stay old in silence. -->
+          <div class="notice notice--warning" data-lista-vieja hidden role="alert">
+            <Icon name="triangle-alert" size={20} />
+            <div class="wm-aviso">
+              <span data-i18n="whatsmkt.seguimiento.listaVieja">No se pudo actualizar la lista: lo que ves puede estar desactualizado.</span>
+              <button type="button" class="btn btn--sm" data-lista-reintentar>
+                <span class="btn__spinner" aria-hidden="true"></span>
+                <Icon name="rotate-cw" size={16} />
+                <span class="btn__label" data-i18n="console.offline.retry">Reintentar</span>
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -86,12 +98,18 @@ import '../../styles/whatsmkt.css';
           <p class="mono muted wm__meta" data-detalle-fechas></p>
         </div>
         <div class="panel__body wm-form">
-          <p class="notice notice--warning" data-detalle-pendiente hidden>
+          <div class="notice notice--warning" data-detalle-pendiente hidden>
             <Icon name="hourglass" size={20} />
-            <span data-i18n="whatsmkt.seguimiento.pendiente.aviso">
-              Falta importar el informe de WhatsMKT. Cuando la campaña se haya enviado, descárgalo de WhatsMKT e impórtalo aquí.
-            </span>
-          </p>
+            <div class="wm-aviso">
+              <span data-i18n="whatsmkt.seguimiento.pendiente.aviso">
+                Falta importar el informe de WhatsMKT. Cuando la campaña se haya enviado, descárgalo de WhatsMKT e impórtalo aquí.
+              </span>
+              <button type="button" class="btn btn--sm" data-ir-informe>
+                <Icon name="upload" size={16} />
+                <span data-i18n="whatsmkt.seguimiento.importar">Importar el informe</span>
+              </button>
+            </div>
+          </div>
           <p class="notice notice--info" data-detalle-descartada hidden>
             <Icon name="archive" size={20} />
             <span data-detalle-descartada-texto></span>
@@ -106,6 +124,62 @@ import '../../styles/whatsmkt.css';
           <h3 class="wm-subtitulo" data-i18n="whatsmkt.seguimiento.ficha">Datos del formulario de WhatsMKT</h3>
           <dl class="wm-ficha__datos" data-detalle-datos></dl>
           <p class="field__hint" data-detalle-copia-estado role="status"></p>
+
+          <!-- ---- The WhatsMKT report (RF-WM-37, RF-WM-38) and its reconciliation (RF-WM-39 to RF-WM-41) ---------------- -->
+          <h3 class="wm-subtitulo" data-informe-titulo data-i18n="whatsmkt.informe.titulo">Informe de WhatsMKT</h3>
+          <p class="field__hint" data-informe-descartada hidden data-i18n="whatsmkt.informe.descartada">
+            Esta campaña está descartada: restáurala para importar su informe.
+          </p>
+          <form class="wm-form" data-form-informe novalidate>
+            <div class="field">
+              <span class="field__label" id="wm-informe-label" data-i18n="whatsmkt.informe.archivo">Archivo del informe</span>
+              <div class="filepick">
+                <input
+                  class="filepick__input"
+                  id="wm-informe"
+                  name="archivo"
+                  type="file"
+                  accept=".xlsx,.xlsb,.xls,.ods,.csv,.tsv,.txt,.json"
+                  aria-labelledby="wm-informe-label"
+                  aria-describedby="wm-informe-hint"
+                />
+                <label class="filepick__button" for="wm-informe" data-i18n="mowaMes.seguimiento.reporte.elegir">Elegir archivo</label>
+                <span class="filepick__name mono" data-informe-nombre data-i18n="mowaMes.seguimiento.reporte.sinArchivo">Ningún archivo elegido</span>
+              </div>
+              <p class="field__hint" id="wm-informe-hint" data-i18n="whatsmkt.informe.hint">
+                El informe que descargas de WhatsMKT al terminar el envío (hoja «Informe»), en Excel, CSV o JSON, hasta 32 MB.
+              </p>
+            </div>
+            <p class="field__error" id="wm-informe-error" data-informe-error role="alert"></p>
+            <div class="wm-form__foot">
+              <button type="submit" class="btn btn--primary" data-informe-importar>
+                <span class="btn__spinner" aria-hidden="true"></span>
+                <Icon name="upload" size={16} />
+                <span class="btn__label" data-i18n="whatsmkt.informe.importar">Importar informe</span>
+              </button>
+              <p class="mono muted" data-informe-estado role="status"></p>
+            </div>
+          </form>
+          <p class="field__error" data-conciliacion-error role="alert"></p>
+
+          <!-- With a report: its line, the notice of totals that differ, the products and the supervision apart, and the numbers with no match. -->
+          <div class="wm-form" data-conciliacion hidden>
+            <h3 class="wm-subtitulo" data-i18n="whatsmkt.conciliacion.titulo">Conciliación</h3>
+            <p class="mono muted wm-linea" data-conciliacion-linea></p>
+            <p class="notice notice--warning" data-conciliacion-total hidden>
+              <Icon name="triangle-alert" size={20} />
+              <span data-conciliacion-total-texto></span>
+            </p>
+            <div class="wm-form" data-conciliacion-tablas></div>
+            <div class="wm-form" data-conciliacion-sin hidden>
+              <h4 class="wm-subtitulo" data-conciliacion-sin-texto></h4>
+              <p class="mono wm-numeros" data-conciliacion-sin-lista></p>
+            </div>
+            <p class="field__hint mono" data-conciliacion-nombre hidden></p>
+            <p class="field__hint" data-i18n="whatsmkt.conciliacion.nota">
+              Un producto cuenta como enviado si su número aparece en el informe. Si dos productos comparten número, el envío cuenta para los dos.
+            </p>
+          </div>
 
           <h3 class="wm-subtitulo" data-i18n="whatsmkt.seguimiento.exclusiones">Exclusiones</h3>
           <div data-detalle-exclusiones></div>
@@ -158,6 +232,8 @@ import '../../styles/whatsmkt.css';
   <template data-icono-supervision><Icon name="user-check" size={16} /></template>
   <template data-icono-total><Icon name="file-up" size={16} /></template>
   <template data-icono-excluidos><Icon name="ban" size={16} /></template>
+  <template data-icono-enviados><Icon name="send" size={16} /></template>
+  <template data-icono-noEnviados><Icon name="circle-x" size={16} /></template>
 
   <!-- ---- Confirming: discarding, restoring and deleting one campaign ---------------------------------------- -->
   <dialog class="dialog" data-dialog="confirmar" aria-labelledby="wm-seg-confirmar-title">
@@ -175,7 +251,7 @@ import '../../styles/whatsmkt.css';
       <p class="field__error" data-confirmar-error role="alert"></p>
     </div>
     <div class="dialog__foot">
-      <button type="button" class="btn" data-close data-i18n="mowaMes.confirmar.cancelar">Cancelar</button>
+      <button type="button" class="btn" data-close data-confirmar-cancelar data-i18n="mowaMes.confirmar.cancelar">Cancelar</button>
       <button type="button" class="btn btn--primary" data-confirmar-aceptar>
         <span class="btn__spinner" aria-hidden="true"></span>
         <span class="btn__label" data-confirmar-aceptar-texto></span>

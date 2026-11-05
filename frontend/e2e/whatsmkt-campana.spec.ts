@@ -526,7 +526,8 @@ test.describe('previsualización', () => {
     const filas = page.locator('[data-exclusiones] tbody tr');
     await expect(filas).toHaveCount(10);
     await expect(filas.first().locator('.tag')).toHaveText('Sin teléfono');
-    await expect(filas.first()).toContainText('No tiene teléfono');
+    // The sentence is the one of its code, not the server's own (that one is the fallback for a code with no key).
+    await expect(filas.first()).toContainText('No tiene un teléfono registrado.');
     await expect(page.locator('[data-exclusiones-pager] [data-page-range]')).toContainText('1');
     // The detail of a product out of every campaign reads whole, with its two sentences.
     await expect(page.locator('[data-fuera-tabla] tbody tr').first()).toContainText('No tiene días de atraso, así que no cae en ningún segmento. En el modo «Global» sí entraría.');

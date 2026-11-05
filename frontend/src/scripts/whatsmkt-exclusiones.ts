@@ -5,8 +5,11 @@
 
 import { t, traducirPorPrefijo } from '../lib/i18n';
 import { celda, tabla } from '../lib/tabla-dom';
+import { detalleDeExclusion } from '../lib/whatsmkt';
 
-export function tablaDeExclusiones(filas: ReadonlyArray<{ pagare: string | null; codigo: string; detalle: string }>): HTMLElement {
+export function tablaDeExclusiones(
+  filas: ReadonlyArray<{ pagare: string | null; codigo: string; detalle: string; macro?: number | null; etiqueta?: string | null }>,
+): HTMLElement {
   const { envoltorio, cuerpo } = tabla(
     'wm-exclusiones',
     [
@@ -26,7 +29,7 @@ export function tablaDeExclusiones(filas: ReadonlyArray<{ pagare: string | null;
     fila.append(
       celda('td', exclusion.pagare ?? '—', 'mono', t('whatsmkt.previa.col.pagare')),
       motivo,
-      celda('td', traducirPorPrefijo('whatsmkt.exclusiones', exclusion.codigo, exclusion.detalle), '', t('whatsmkt.previa.col.detalle')),
+      celda('td', detalleDeExclusion(exclusion), '', t('whatsmkt.previa.col.detalle')),
     );
     cuerpo.append(fila);
   });
