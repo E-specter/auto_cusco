@@ -720,7 +720,9 @@ A1 no depende de nada. A2 y A3 van después de A1.
 
 ### 13.2 El disparador `[@` (A1)
 
-- **Gesto:** en un tramo de texto, escribir `[@` abre el buscador de variables **en el lugar del cursor**, como un desplegable bajo la línea, alineado al cursor. Lo que se escribe después de `[@` filtra la lista, igual que el campo de búsqueda.
+- **Gesto:** en un tramo de texto, escribir `[@` abre el buscador de variables como un desplegable bajo la línea. Lo que se escribe después de `[@` filtra la lista, igual que el campo de búsqueda.
+  - **Posición:** en T-HI-F8, bajo la línea y a la izquierda; en T-HI-F11, alineado al cursor. A 360 px ocupa siempre el ancho de la línea, sin desbordar: en un teléfono no se alinea al cursor.
+  - **Al insertar desde `[@`,** la píldora no abre su panel: quien escribe sigue escribiendo. El panel se abre con Enter o clic sobre la píldora, como siempre.
 - **Teclado:**
   - flechas arriba y abajo para moverse;
   - Enter o Tab insertan la variable resaltada **en lugar** de `[@` y lo escrito después, y el cursor queda después de la píldora;
@@ -732,7 +734,11 @@ A1 no depende de nada. A2 y A3 van después de A1.
   - el tramo pasa a `role="combobox"`, con `aria-expanded`, `aria-controls` y `aria-autocomplete="list"`, mientras el buscador está abierto;
   - al abrir, se anuncia en la región `polite` del editor: «Buscador de variables. Escribe para filtrar, Enter inserta y Escape cancela.»;
   - al insertar: «Se insertó {variable}.».
-- **El botón sigue,** para quien usa el mouse: «Insertar variable» (`plus`), ahora **arriba** de la línea, al inicio de una barra propia, y no debajo. Abre el mismo buscador en el cursor (en el último tramo enfocado o, si no hubo ninguno, al final, y el anuncio lo dice: «Se insertará al final del texto.»).
+- **El botón sigue,** para quien usa el mouse: «Insertar variable» (`plus`), ahora **arriba** de la línea, al inicio de una barra propia, y no debajo. Abre la misma lista, pero **con su propio campo** de búsqueda arriba (`editorTexto.variable.buscar`, «Buscar una variable», la clave de hoy), con el foco en él. Ese campo es el combobox (`aria-controls` y `aria-activedescendant` sobre la lista). No se inserta `[@` en el texto, porque al cancelar dejaría restos en la frase.
+  - Inserta en el último tramo enfocado o, si no hubo ninguno, al final, y el anuncio lo dice: «Se insertará al final del texto.».
+  - Escape cierra sin insertar y el foco vuelve al botón.
+  - Al insertar desde el botón, la píldora abre su panel (§2.2): quien usa el mouse suele querer aplicar una función.
+  - Las opciones son `role="option"` en las dos entradas.
 - **Pista visible,** bajo la línea, en `.field__hint`: «Escribe [@ para insertar una variable».
 - **En una columna de variable directa** (§5.3) no hay línea ni disparador: sigue el `select`.
 
