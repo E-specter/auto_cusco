@@ -195,13 +195,14 @@ Es el seguimiento de MOWA ([mowa-mes-interfaz.md](mowa-mes-interfaz.md) §4.2 y 
   - El selector de archivo propio, con el hint «El informe que descargas de WhatsMKT al terminar el envío (hoja «Informe»), en Excel, CSV o JSON, hasta 32 MB».
   - «Importar informe» (`upload`, `.btn--primary`).
   - En una descartada, el formulario se oculta y va el hint «Esta campaña está descartada: restáurala para importar su informe».
-  - Si ya tiene informe, la confirmación «Este informe ya estaba importado», como en MOWA.
+  - Si ya tiene informe, una confirmación que dice lo que va a pasar: título «Esta campaña ya tiene un informe» (`whatsmkt.informe.yaImportado`), cuerpo «Si lo reemplazas, la conciliación se recalcula con el archivo nuevo.» (`whatsmkt.informe.reemplazarCuerpo`), y los botones de MOWA: «No reemplazar» y «Reemplazar» (`.btn--danger`). El texto del código `informe_ya_importado` queda solo como respaldo del error.
 - **Conciliación (RF-WM-39),** con informe:
-  - La línea del informe: «Informe del 30/10/2026 · total informado 101 · 101 filas».
+  - El subtítulo «Conciliación» y la línea del informe en mono, muted y `text-sm`: «Informe del 30 oct. 2026 · total informado 101 · 99 filas».
   - **DU-WM-7, provisional:** si el total informado no coincide con las filas, un `.notice--warning`: «El informe dice 101 enviados y trae 99 filas. La conciliación usa las filas». No bloquea.
   - Tabla **Productos**, apilable: cargados, enviados y no enviados.
   - Tabla **Supervisión**, aparte (RF-41), apilable, con las mismas columnas.
-  - **Números sin correspondencia:** «Números del informe que no están en la carga: 2», con la lista en mono. Si no hay, la línea no se muestra.
+  - **Números sin correspondencia:** un subtítulo como «Productos» y «Supervisión», «Números del informe que no están en la carga: 2», con los números en mono debajo. Si no hay, el bloque no se muestra.
+  - Los tres bloques (Productos, Supervisión y Números) llevan el mismo margen superior que «Exclusiones», para que ningún subtítulo quede pegado a la tabla de arriba.
   - El nombre que trae el informe, solo para leer: «Nombre en el informe: CUZCO_Vencida…». No se compara.
   - Nota bajo la tabla: «Un producto cuenta como enviado si su número aparece en el informe. Si dos productos comparten número, el envío cuenta para los dos».
 - **Exclusiones de la campaña:** la tabla de la previsualización (Pagaré, Motivo y Detalle), apilable y paginada, ahora con la lista completa.
@@ -501,6 +502,9 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.seguimiento.cifra.supervision` | Supervisión | Supervision |
 | `whatsmkt.seguimiento.cifra.total` | Total cargados | Total loaded |
 | `whatsmkt.seguimiento.cifra.excluidos` | Excluidos | Excluded |
+| `whatsmkt.seguimiento.cifra.enviados` | Enviados | Sent |
+| `whatsmkt.seguimiento.cifra.noEnviados` | No enviados | Not sent |
+| `whatsmkt.seguimiento.listaVieja` | No se pudo actualizar la lista: lo que ves puede estar desactualizado. | The list could not be refreshed: what you see may be out of date. |
 | `whatsmkt.seguimiento.archivos` | Archivos | Files |
 | `whatsmkt.seguimiento.ficha` | Datos del formulario de WhatsMKT | WhatsMKT form data |
 | `whatsmkt.seguimiento.descartada` | Se descartó la campaña {id}. | Campaign {id} was discarded. |
@@ -512,11 +516,23 @@ Los de las confirmaciones, estados y acciones repiten los de MOWA con «WhatsMKT
 | `whatsmkt.estado.pendienteInforme` | Pendiente del informe | Report pending |
 | `whatsmkt.seguimiento.pendiente.aviso` | Falta importar el informe de WhatsMKT. Cuando la campaña se haya enviado, descárgalo de WhatsMKT e impórtalo aquí. | The WhatsMKT report has not been imported yet. Once the campaign is sent, download it from WhatsMKT and import it here. |
 | `whatsmkt.seguimiento.importar` | Importar el informe | Import the report |
+| `whatsmkt.informe.titulo` | Informe de WhatsMKT | WhatsMKT report |
+| `whatsmkt.informe.archivo` | Archivo del informe | Report file |
+| `whatsmkt.informe.importar` | Importar informe | Import report |
+| `whatsmkt.informe.importado` | Informe importado. | Report imported. |
+| `whatsmkt.informe.sinArchivo` | Elige el archivo del informe. | Choose the report file. |
+| `whatsmkt.informe.yaImportado` | Esta campaña ya tiene un informe | This campaign already has a report |
+| `whatsmkt.informe.reemplazarCuerpo` | Si lo reemplazas, la conciliación se recalcula con el archivo nuevo. | If you replace it, the reconciliation is recalculated with the new file. |
+| `whatsmkt.informe.reemplazar` | Reemplazar | Replace |
 | `whatsmkt.informe.hint` | El informe que descargas de WhatsMKT al terminar el envío (hoja «Informe»), en Excel, CSV o JSON, hasta 32 MB. | The report you download from WhatsMKT when the sending ends (“Informe” sheet), in Excel, CSV or JSON, up to 32 MB. |
 | `whatsmkt.informe.descartada` | Esta campaña está descartada: restáurala para importar su informe. | This campaign is discarded: restore it to import its report. |
 | `whatsmkt.informe.linea` | Informe del {fecha} · total informado {total} · {filas} filas | Report of {fecha} · reported total {total} · {filas} rows |
 | `whatsmkt.informe.totalDistinto` | El informe dice {total} enviados y trae {filas} filas. La conciliación usa las filas. | The report says {total} sent and has {filas} rows. The reconciliation uses the rows. |
+| `whatsmkt.conciliacion.titulo` | Conciliación | Reconciliation |
 | `whatsmkt.conciliacion.productos` | Productos | Products |
+| `whatsmkt.conciliacion.col.cargados` | Cargados | Loaded |
+| `whatsmkt.conciliacion.col.enviados` | Enviados | Sent |
+| `whatsmkt.conciliacion.col.noEnviados` | No enviados | Not sent |
 | `whatsmkt.conciliacion.supervision` | Supervisión | Supervision |
 | `whatsmkt.conciliacion.sinCorrespondencia` | Números del informe que no están en la carga: {n} | Report numbers that are not in the load: {n} |
 | `whatsmkt.conciliacion.nombreInforme` | Nombre en el informe: {nombre} | Name in the report: {nombre} |
