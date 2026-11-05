@@ -131,6 +131,12 @@ export async function montarMensajes(opciones: OpcionesMensajes): Promise<Contro
       area.setAttribute('aria-describedby', `${prefijo}-contador ${prefijo}-error`);
       const contador = nodo('p', 'wm-contador');
       contador.id = `${prefijo}-contador`;
+      // The counter and, over the limit, its tag (the same as the common editor's). No «Cerca del tope»: this limit has no threshold.
+      const etiquetaTope = nodo('span', 'tag tag--error');
+      etiquetaTope.textContent = t('editorTexto.largo.pasa');
+      etiquetaTope.hidden = true;
+      const filaContador = nodo('div', 'wm-contador-fila');
+      filaContador.append(contador, etiquetaTope);
       const anuncio = nodo('p', 'visually-hidden');
       anuncio.setAttribute('role', 'status');
       // One line per problem, in the order of the interface rules (§5.1): the macro, the emoji, the length.
@@ -151,7 +157,7 @@ export async function montarMensajes(opciones: OpcionesMensajes): Promise<Contro
       const notaVista = nodo('p', 'field__hint');
       vista.append(tituloVista, campoFila, cuerpoVista, notaVista);
       const raiz = nodo('div', 'wm-editor');
-      raiz.append(barra, rotulo, area, contador, anuncio, errores, vista);
+      raiz.append(barra, rotulo, area, filaContador, anuncio, errores, vista);
       anfitrion.replaceChildren(raiz);
 
       let soloLectura = false;
@@ -206,6 +212,7 @@ export async function montarMensajes(opciones: OpcionesMensajes): Promise<Contro
         const excede = largo > tope();
         contador.textContent = t('whatsmkt.mensaje.largo', { largo, maximo: tope() });
         contador.dataset.excede = String(excede);
+        etiquetaTope.hidden = !excede;
         // The announcement is said only when the limit is crossed, not at every key.
         if (excede !== paso) {
           paso = excede;

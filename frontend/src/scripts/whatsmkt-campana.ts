@@ -330,8 +330,22 @@ async function pintarTextoDeMensaje(destino: HTMLElement, id: number | null): Pr
   });
   const largo = document.createElement('p');
   largo.className = 'wm-contador';
-  largo.textContent = t('whatsmkt.mensaje.largo', { largo: largoDelMensaje(texto), maximo: estado.configuracion?.tope_mensaje ?? 0 });
-  destino.replaceChildren(cuerpo, largo);
+  const tope = estado.configuracion?.tope_mensaje ?? 0;
+  const largoTexto = largoDelMensaje(texto);
+  largo.textContent = t('whatsmkt.mensaje.largo', { largo: largoTexto, maximo: tope });
+  // With the configuration not loaded yet the limit is 0 and nothing is «over» it.
+  const excede = tope > 0 && largoTexto > tope;
+  largo.dataset.excede = String(excede);
+  const fila = document.createElement('div');
+  fila.className = 'wm-contador-fila';
+  fila.append(largo);
+  if (excede) {
+    const etiqueta = document.createElement('span');
+    etiqueta.className = 'tag tag--error';
+    etiqueta.textContent = t('editorTexto.largo.pasa');
+    fila.append(etiqueta);
+  }
+  destino.replaceChildren(cuerpo, fila);
   destino.hidden = false;
 }
 

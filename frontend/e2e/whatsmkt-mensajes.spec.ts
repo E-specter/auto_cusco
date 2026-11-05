@@ -42,6 +42,7 @@ const vinculo = (page: Page) => page.locator('[data-vinculo-texto]');
 const selectDe = (raiz: ReturnType<typeof segmentos>) => raiz.locator('[data-textos-select]');
 const area = (page: Page) => page.locator('#wm-msg-segmento-texto');
 const contador = (page: Page) => page.locator('#wm-msg-segmento-contador');
+const etiquetaTope = (page: Page) => page.locator('#wm-msg-segmento-contador + .tag');
 const errorDelEditor = (page: Page) => page.locator('#wm-msg-segmento-error');
 const lineasDeError = (page: Page) => errorDelEditor(page).locator('p');
 const vista = (page: Page) => segmentos(page).locator('.wm-vista__texto');
@@ -189,6 +190,10 @@ test.describe('el editor del mensaje', () => {
 
     await expect(contador(page)).toHaveText('35 / 30 caracteres');
     await expect(contador(page)).toHaveAttribute('data-excede', 'true');
+    // Over the limit the counter's tag says so, as in the common editor; and there is no «Cerca del tope» here.
+    await expect(etiquetaTope(page)).toBeVisible();
+    await expect(etiquetaTope(page)).toHaveText('Pasa el tope');
+    await expect(etiquetaTope(page)).toHaveClass(/tag--error/);
     await expect(anuncio).toHaveText('El mensaje pasó el tope: 35 / 30 caracteres.');
     await area(page).pressSequentially(' x');
     await expect(contador(page)).toHaveText('37 / 30 caracteres');
@@ -198,6 +203,18 @@ test.describe('el editor del mensaje', () => {
     await area(page).fill('corto');
     await expect(anuncio).toBeEmpty();
     await expect(contador(page)).toHaveAttribute('data-excede', 'false');
+    await expect(etiquetaTope(page)).toBeHidden();
+  });
+
+  test('el contador de WhatsMKT no tiene «Cerca del tope»: ni cerca del tope ni a mitad hay otro tag que «Pasa el tope»', async ({ page }) => {
+    const api = apiConfigurada();
+    api.configuracion.tope_mensaje = 100;
+    await abrir(page, api);
+    // 99 / 100: lo más cerca que se puede estar sin pasarlo.
+    await area(page).fill('x'.repeat(99));
+    await expect(contador(page)).toHaveText('99 / 100 caracteres');
+    await expect(segmentos(page).locator('.wm-contador-fila .tag:visible')).toHaveCount(0);
+    await expect(segmentos(page).locator('.tag--advertencia')).toHaveCount(0);
   });
 
   test('un tope guardado en el panel de Topes lo toma el contador sin recargar', async ({ page }) => {

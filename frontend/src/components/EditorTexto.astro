@@ -137,6 +137,6 @@ const { id, etiqueta, claveEtiqueta } = Astro.props;
       <Icon name="triangle-alert" size={20} />
       <p data-i18n="editorTexto.sinConexion">No se pudo comprobar el texto. Se vuelve a intentar al editarlo.</p>
     </div>
-    <ul class="editor-texto__datos" data-problemas-fila hidden></ul>
+    <ul class="editor-texto__datos" data-problemas-fila aria-live="polite"></ul>
   </section>
 </div>

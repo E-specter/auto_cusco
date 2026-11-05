@@ -29,6 +29,22 @@
   margin: 0;
   font-weight: 600;
 }
+/* «Ir al problema»: it acts (a button) but it reads as a link: underlined, in the notice's own colour (the accent colour
+   does not reach the contrast it needs on the notice's wash, as the links of the other notices). */
+.editor-texto__ir {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.editor-texto__ir:hover {
+  text-underline-offset: 0.35em;
+}
 .editor-texto__resumenLista {
   display: grid;
   gap: var(--space-1);
@@ -393,6 +409,9 @@
   gap: var(--space-2);
   margin: 0;
   font-size: var(--text-sm);
+}
+.editor-texto__largo--error {
+  color: var(--color-danger-text);
 }
 
 .editor-texto__datos {

@@ -270,6 +270,8 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     /** The summary speaks up only after a refused save, until the next edit. */
     alertar: false,
     nivelAnunciado: null as NivelLargo | null,
+    /** What the sample's hints said last, so a repaint that changes nothing does not make a screen reader say it again. */
+    pistas: '',
   };
 
   const resumenPropio = (opciones.resumen ?? 'propio') === 'propio';
@@ -1375,7 +1377,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
         texto.textContent = `${lugarProblema(problema)}: ${mensajeDe(problema)}`;
         const ir = document.createElement('button');
         ir.type = 'button';
-        ir.className = 'btn btn--sm btn--quiet';
+        ir.className = 'editor-texto__ir';
         ir.textContent = t('editorTexto.resumen.ir');
         ir.setAttribute('aria-describedby', texto.id);
         ir.addEventListener('click', () => irAProblema(indice));
@@ -1449,19 +1451,34 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     pintarLargo();
 
     el.sinConexion.hidden = !s.sinConexion;
+    // What the sample says about its data is not an error of what was written: it goes under the preview as hints (§13.6),
+    // first «Con este producto, falta el dato de {variable}.» for each variable that came empty, then the row's own reasons.
+    const vacias = (columna?.nodos ?? [])
+      .filter((nodo) => nodo.vacio && nodo.tipo === 'variable')
+      .map((nodo) => {
+        const idPieza = [...(s.vista?.nodos ?? [])].find(([, indice]) => indice === nodo.indice)?.[0];
+        const pieza = s.piezas.find((p): p is PiezaVariable => p.tipo === 'variable' && p.id === idPieza);
+        return pieza ? t('editorTexto.muestra.vacia', { variable: nombreVariable(pieza.nombre) }) : null;
+      })
+      .filter((texto): texto is string => texto !== null);
     const datos = [
-      ...(s.vista?.excluida ? [s.vista.excluida] : []),
-      ...(columna?.problemas ?? []),
+      ...vacias,
+      ...[...(s.vista?.excluida ? [s.vista.excluida] : []), ...(columna?.problemas ?? [])].map((problema) => mensajeProblema(problema)),
     ];
-    el.problemasFila.hidden = datos.length === 0;
-    el.problemasFila.replaceChildren(
-      ...datos.map((problema) => {
-        const item = document.createElement('li');
-        item.className = 'notice notice--info';
-        item.textContent = mensajeProblema(problema);
-        return item;
-      }),
-    );
+    // The list is a polite live region that is never hidden (an empty list takes no room): content that appears in a region
+    // that was hidden is not announced reliably. It is rewritten only when what it says changes.
+    const pistas = datos.join('\n');
+    if (pistas !== s.pistas) {
+      s.pistas = pistas;
+      el.problemasFila.replaceChildren(
+        ...datos.map((texto) => {
+          const item = document.createElement('li');
+          item.className = 'field__hint';
+          item.textContent = texto;
+          return item;
+        }),
+      );
+    }
   }
 
   function pintarLargo(): void {
@@ -1471,26 +1488,26 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
       el.largoNivel.hidden = true;
       return;
     }
-    const partes = [t('editorTexto.largo.actual', { n: actual })];
+    // One form in every place (interface rules §13.6): «{n} / {tope} caracteres», or «{n} caracteres» with no limit; and when the
+    // data can make it longer, «· hasta {maximo} con los datos más largos».
+    const partes = [limite === null ? t('editorTexto.largo.actual', { n: actual }) : t('editorTexto.largo.deTope', { n: actual, tope: limite })];
     if (maximo !== null) {
-      partes.push(
-        limite === null
-          ? t('editorTexto.largo.maximo', { maximo })
-          : t('editorTexto.largo.maximoDe', { maximo, limite }),
-      );
+      if (maximo > actual) partes.push(t('editorTexto.largo.hasta', { maximo }));
     } else if (sinCota) {
-      partes.push(t('editorTexto.largo.sinCota', { motivo: mensajeProblema(sinCota) }));
-    } else if (limite !== null) {
-      partes.push(t('editorTexto.largo.limite', { limite }));
+      partes.push(`· ${t('editorTexto.largo.sinCota', { motivo: mensajeProblema(sinCota) })}`);
     }
-    el.largoTexto.textContent = partes.join(' · ');
+    el.largoTexto.textContent = partes.join(' ');
 
+    // Only two tags, and only when there is something to say: near the limit (the context's threshold) and over it.
     const nivel = nivelDeLargo(maximo ?? actual, limite, catalogo.contexto.umbral_advertencia);
-    el.largoNivel.hidden = nivel === 'sin_limite';
-    el.largoNivel.className = `tag tag--${{ sin_limite: 'neutral', dentro: 'vigente', cerca: 'advertencia', excedido: 'error' }[nivel]}`;
-    el.largoNivel.textContent = nivel === 'sin_limite' ? '' : t(`editorTexto.largo.nivel.${nivel}`);
-    // Said once per change of level, never on every key; the first paint is silent.
-    if (s.nivelAnunciado !== null && nivel !== s.nivelAnunciado && nivel !== 'sin_limite') {
+    const conAviso = nivel === 'cerca' || nivel === 'excedido';
+    // Over the limit the counter turns the error colour, with no box of its own (the tag says it too).
+    el.largoTexto.classList.toggle('editor-texto__largo--error', nivel === 'excedido');
+    el.largoNivel.hidden = !conAviso;
+    el.largoNivel.className = `tag tag--${nivel === 'excedido' ? 'error' : 'advertencia'}`;
+    el.largoNivel.textContent = conAviso ? t(nivel === 'excedido' ? 'editorTexto.largo.pasa' : 'editorTexto.largo.cerca') : '';
+    // Said once when the threshold or the limit is crossed, never on every key; the first paint is silent.
+    if (s.nivelAnunciado !== null && nivel !== s.nivelAnunciado && conAviso) {
       el.largoAnuncio.textContent = el.largoNivel.textContent;
     }
     s.nivelAnunciado = nivel;

@@ -254,7 +254,37 @@ test.describe('vista previa', () => {
     await expect(resultado(page).getByRole('img', { name: 'vacío' })).toBeVisible();
   });
 
-  test('el largo excedido se dice con su nivel y se anuncia una vez', async ({ page }) => {
+  test('el contador tiene una sola forma: con tope «n / tope», con «hasta» si los datos lo alargan, sin tag mientras no hay nada que decir', async ({ page }) => {
+    await abrir(page, {
+      expresion: SPEECH,
+      ajustar: (motor) => {
+        motor.validacion = () => ({ problemas: [], tipo: 'texto', cota: 120, sin_cota: null, variables: [] });
+      },
+    });
+    const largo = editor(page).locator('.editor-texto__largo');
+    // El largo del texto de ejemplo, contra el tope de 160, y lo que puede llegar a medir con los datos más largos.
+    await expect(largo.locator('[data-largo-texto]')).toHaveText(/^\d+ \/ 160 caracteres · hasta 120 con los datos más largos$/);
+    // Dentro del tope y por debajo del umbral (150): ningún tag.
+    await expect(largo.locator('.tag')).toBeHidden();
+    await expect(largo.locator('[data-largo-texto]')).not.toHaveClass(/editor-texto__largo--error/);
+    await expect(editor(page).locator('[data-largo-anuncio]')).toBeEmpty();
+  });
+
+  test('sin «hasta» cuando el máximo no supera lo escrito, y sin tope (Columnas) solo «n caracteres»', async ({ page }) => {
+    await abrir(page, {
+      expresion: SPEECH,
+      ajustar: (motor) => {
+        motor.validacion = () => ({ problemas: [], tipo: 'texto', cota: 1, sin_cota: null, variables: [] });
+      },
+    });
+    await expect(editor(page).locator('[data-largo-texto]')).toHaveText(/^\d+ \/ 160 caracteres$/);
+
+    await abrir(page, { extra: '&contexto=cartera', expresion: SPEECH });
+    await expect(editor(page).locator('[data-largo-texto]')).toHaveText(/^\d+ caracteres$/);
+    await expect(editor(page).locator('.editor-texto__largo .tag')).toBeHidden();
+  });
+
+  test('«Cerca del tope» al llegar al umbral y «Pasa el tope» al pasarlo, cada uno en su tag y anunciado una sola vez', async ({ page }) => {
     let cota = 120;
     await abrir(page, {
       expresion: SPEECH,
@@ -263,15 +293,160 @@ test.describe('vista previa', () => {
       },
     });
     const largo = editor(page).locator('.editor-texto__largo');
-    await expect(largo).toContainText('máximo posible 120 de 160');
-    await expect(largo.locator('.tag')).toHaveText('Dentro del límite');
+    const anuncio = editor(page).locator('[data-largo-anuncio]');
+    await expect(largo.locator('[data-largo-texto]')).toContainText('· hasta 120');
 
-    cota = 170;
+    // Pasa el umbral del contexto (150) sin pasar el tope (160).
+    cota = 155;
     await editor(page).getByRole('textbox', { name: 'Texto al final' }).fill('. Gracias.');
-    await expect(largo).toContainText('máximo posible 170 de 160');
-    await expect(largo.locator('.tag')).toHaveText('Excede el límite');
+    await expect(largo.locator('.tag')).toHaveText('Cerca del tope');
+    await expect(largo.locator('.tag')).toHaveClass(/tag--advertencia/);
+    await expect(largo.locator('[data-largo-texto]')).not.toHaveClass(/editor-texto__largo--error/);
+    await expect(anuncio).toHaveText('Cerca del tope');
+
+    // Pasa el tope: el contador se marca como error y el tag cambia.
+    cota = 170;
+    await editor(page).getByRole('textbox', { name: 'Texto al final' }).fill('. Gracias de nuevo.');
+    await expect(largo.locator('[data-largo-texto]')).toContainText('· hasta 170');
+    await expect(largo.locator('.tag')).toHaveText('Pasa el tope');
     await expect(largo.locator('.tag')).toHaveClass(/tag--error/);
-    await expect(editor(page).locator('[data-largo-anuncio]')).toHaveText('Excede el límite');
+    await expect(largo.locator('[data-largo-texto]')).toHaveClass(/editor-texto__largo--error/);
+    // En el color de error y sin caja: ni borde ni fondo propios.
+    await expect(largo.locator('[data-largo-texto]')).toHaveCSS('border-top-width', '0px');
+    await expect(largo.locator('[data-largo-texto]')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    const colorError = await page.evaluate(() => {
+      const prueba = document.createElement('span');
+      prueba.style.color = 'var(--color-danger-text)';
+      document.body.append(prueba);
+      const color = getComputedStyle(prueba).color;
+      prueba.remove();
+      return color;
+    });
+    await expect(largo.locator('[data-largo-texto]')).toHaveCSS('color', colorError);
+    await expect(anuncio).toHaveText('Pasa el tope');
+
+    // Vuelve por debajo del umbral: el tag y el error se van, y no se anuncia nada nuevo.
+    cota = 120;
+    await editor(page).getByRole('textbox', { name: 'Texto al final' }).fill('.');
+    await expect(largo.locator('.tag')).toBeHidden();
+    await expect(largo.locator('[data-largo-texto]')).not.toHaveClass(/editor-texto__largo--error/);
+    await expect(anuncio).toHaveText('Pasa el tope');
+  });
+
+  test('«Ir al problema» se ve como un enlace y lleva a su lugar: el tramo, el parámetro y la píldora', async ({ page }) => {
+    const conProblemaEn = (ubicacion: Problema['ubicacion']) => (motor: ApiFalsaTextoEnriquecido) => {
+      motor.validacion = () => ({
+        problemas: [problema('parametro_invalido', ubicacion)],
+        tipo: 'texto', cota: 170, sin_cota: null, variables: [],
+      });
+    };
+    const ir = (p: Page) => editor(p).locator('[data-resumen]').getByRole('button', { name: 'Ir al problema' });
+
+    // Un enlace: subrayado, del color del aviso (el de los enlaces de los otros avisos) y sin la caja de un botón.
+    await abrir(page, { expresion: SPEECH, ajustar: conProblemaEn({ nodo: 0, funcion: null, parametro: null }) });
+    await expect(ir(page)).toHaveCSS('text-decoration-line', 'underline');
+    await expect(ir(page)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(ir(page)).toHaveCSS('border-top-width', '0px');
+    const colorDelAviso = await editor(page).locator('[data-resumen]').evaluate((aviso) => getComputedStyle(aviso.querySelector('[data-resumen-lista]')!).color);
+    await expect(ir(page)).toHaveCSS('color', colorDelAviso);
+
+    // El tramo (nodo 0 es el texto «Hola »).
+    await ir(page).click();
+    await expect(editor(page).locator('[data-tramo="0"]')).toBeFocused();
+
+    // La píldora (nodo 1 es la variable, sin función).
+    await abrir(page, { expresion: SPEECH, ajustar: conProblemaEn({ nodo: 1, funcion: null, parametro: null }) });
+    await ir(page).click();
+    await expect(pieza(page, /^Variable Titular/)).toBeFocused();
+
+    // El parámetro (nodo 1, función 0, parámetro n).
+    await abrir(page, { expresion: SPEECH, ajustar: conProblemaEn({ nodo: 1, funcion: 0, parametro: 'n' }) });
+    await ir(page).click();
+    await expect(editor(page).getByRole('textbox', { name: 'Cantidad de caracteres' })).toBeFocused();
+  });
+
+  test('un dato vacío de la muestra es un hint bajo la vista previa, «Con este producto, falta el dato de …», y no entra al resumen', async ({ page }) => {
+    await abrir(page, {
+      expresion: SPEECH,
+      ajustar: (motor) => {
+        delete motor.catalogos['mowa_mes.speech'].contexto.ejemplo.fecha_vencimiento_cuota;
+      },
+    });
+    const hint = editor(page).locator('.editor-texto__datos .field__hint');
+    await expect(hint).toHaveText('Con este producto, falta el dato de Vencimiento de la cuota.');
+    // Es un hint, no un aviso, y no cuenta como problema del texto.
+    await expect(editor(page).locator('.editor-texto__datos .notice')).toHaveCount(0);
+    await expect(editor(page).locator('[data-resumen]')).toBeHidden();
+    // Está en la vista previa, después del resultado y del contador.
+    const abajo = await page.evaluate(() => {
+      const hint = document.querySelector('#editor-prueba .editor-texto__datos')!.getBoundingClientRect();
+      const resultado = document.querySelector('#editor-prueba [data-resultado]')!.getBoundingClientRect();
+      return hint.top >= resultado.bottom;
+    });
+    expect(abajo).toBe(true);
+  });
+
+  test('sin datos vacíos no hay hints, y la lista es una región viva que no se esconde', async ({ page }) => {
+    await abrir(page, { expresion: SPEECH });
+    await expect(editor(page).locator('.editor-texto__datos')).toBeEmpty();
+    await expect(editor(page).locator('.editor-texto__datos')).toHaveAttribute('aria-live', 'polite');
+    await expect(editor(page).locator('.editor-texto__datos')).not.toHaveAttribute('hidden');
+  });
+
+  test('los hints de la muestra se anuncian: están en una región viva, y se reescriben solo si cambia lo que dicen', async ({ page }) => {
+    await abrir(page, {
+      expresion: SPEECH,
+      ajustar: (motor) => {
+        delete motor.catalogos['mowa_mes.speech'].contexto.ejemplo.fecha_vencimiento_cuota;
+      },
+    });
+    const region = editor(page).locator('.editor-texto__datos');
+    await expect(region.locator('.field__hint')).toHaveText('Con este producto, falta el dato de Vencimiento de la cuota.');
+    await expect(region).toHaveAttribute('aria-live', 'polite');
+    // Se marca el nodo del hint y se escribe en el texto sin tocar lo vacío: la vista se repinta, el hint es el mismo nodo.
+    await region.locator('.field__hint').evaluate((nodo) => ((nodo as HTMLElement).dataset.visto = 'si'));
+    await editor(page).getByRole('textbox', { name: 'Texto al final' }).fill('. Gracias.');
+    await expect(resultado(page)).toContainText('Gracias');
+    await expect(region.locator('.field__hint')).toHaveAttribute('data-visto', 'si');
+  });
+
+  test('en el speech de MOWA, un adicional obligatorio que viene vacío da primero «falta el dato» y después el motivo de exclusión de la fila', async ({ page }) => {
+    await abrir(page, {
+      expresion: { nodos: [{ tipo: 'texto', valor: 'Zona: ' }, { tipo: 'variable', nombre: 'ad_zona', funciones: [], obligatoria: true }] },
+      ajustar: (motor) => {
+        motor.catalogos['mowa_mes.speech'].contexto.variables.push(...variablesAdicionalesSinteticas());
+        const original = motor.previsualizacion;
+        motor.previsualizacion = (cuerpo, catalogo) => {
+          const respuesta = original(cuerpo, catalogo);
+          if ('estado' in respuesta) return respuesta;
+          // La fila de la muestra queda excluida por el dato obligatorio vacío, como lo hace el backend.
+          respuesta.filas[0].excluida = { codigo: 'variable_obligatoria_vacia', detalle: 'Falta un dato obligatorio.' };
+          return respuesta;
+        };
+      },
+    });
+    const hints = editor(page).locator('.editor-texto__datos .field__hint');
+    await expect(hints).toHaveText([
+      'Con este producto, falta el dato de Zona.',
+      'Falta en este producto un dato marcado como obligatorio.',
+    ]);
+    // Ninguno de los dos es un error de lo escrito: el resumen no aparece.
+    await expect(editor(page).locator('[data-resumen]')).toBeHidden();
+  });
+
+  test('un error de verdad sigue en el resumen: el dato vacío no lo infla', async ({ page }) => {
+    await abrir(page, {
+      expresion: SPEECH,
+      ajustar: (motor) => {
+        delete motor.catalogos['mowa_mes.speech'].contexto.ejemplo.fecha_vencimiento_cuota;
+        motor.validacion = () => ({
+          problemas: [problema('parametro_invalido', { nodo: 1, funcion: 0, parametro: 'n' })],
+          tipo: 'texto', cota: 170, sin_cota: null, variables: [],
+        });
+      },
+    });
+    await expect(editor(page).locator('[data-resumen]')).toContainText('Hay 1 problema en el texto.');
+    await expect(editor(page).locator('.editor-texto__datos .field__hint')).toHaveCount(1);
   });
 
   test('un pagaré que no existe se dice bajo su campo y la vista anterior se queda', async ({ page }) => {

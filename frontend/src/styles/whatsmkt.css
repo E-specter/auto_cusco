@@ -361,6 +361,17 @@
   color: var(--color-danger-text);
 }
 
+/* The counter and, over the limit, its tag. */
+.wm-contador-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.wm-contador-fila > .wm-contador {
+  margin: 0;
+}
+
 /* The names a template gives, one per segment: the segment in sans and muted, the name under it in mono and
    free to wrap anywhere, so at 360 px a label is never cut in the middle of a segment's name. */
 .wm-nombre {
