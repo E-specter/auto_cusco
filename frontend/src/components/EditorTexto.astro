@@ -52,17 +52,6 @@ const { id, etiqueta, claveEtiqueta } = Astro.props;
     </p>
   </div>
 
-  <div
-    class="input editor-texto__linea"
-    id={`${id}-linea`}
-    role="group"
-    aria-labelledby={`${id}-etiqueta`}
-    data-linea
-  >
-    <span class="skeleton editor-texto__esqueleto" aria-hidden="true"></span>
-  </div>
-  <p class="field__error editor-texto__errorTramo" id={`${id}-error-tramo`} data-error-tramo></p>
-
   <div class="editor-texto__barra" data-barra>
     <button
       type="button"
@@ -74,9 +63,25 @@ const { id, etiqueta, claveEtiqueta } = Astro.props;
       disabled
     >
       <Icon name="plus" size={16} />
-      <span data-i18n="editorTexto.variable.agregar">Variable</span>
+      <span data-i18n="editorTexto.variable.insertar">Insertar variable</span>
     </button>
   </div>
+
+  <div
+    class="input editor-texto__linea"
+    id={`${id}-linea`}
+    role="group"
+    aria-labelledby={`${id}-etiqueta`}
+    aria-describedby={`${id}-pista`}
+    data-linea
+  >
+    <span class="skeleton editor-texto__esqueleto" aria-hidden="true"></span>
+  </div>
+  <p class="field__error editor-texto__errorTramo" id={`${id}-error-tramo`} data-error-tramo></p>
+  <p class="field__hint" id={`${id}-pista`} data-pista-disparador data-i18n="editorTexto.disparador.pista">
+    Escribe [@ para insertar una variable
+  </p>
+  <p class="visually-hidden" aria-live="polite" data-disparador-anuncio></p>
 
   <div id={`${id}-variables`} data-selector-hueco></div>
   <div id={`${id}-panel`} data-panel-hueco></div>

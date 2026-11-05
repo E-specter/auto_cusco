@@ -553,19 +553,19 @@ test.describe('el editor de texto', () => {
     await abrirEditor(page);
     const editor = page.locator('#editor-prueba');
 
-    await editor.getByRole('button', { name: 'Variable', exact: true }).click();
+    await editor.getByRole('button', { name: 'Insertar variable', exact: true }).click();
 
-    const opcion = editor.getByRole('button', { name: /^Zona de cobranza/ });
+    const opcion = editor.getByRole('option', { name: /^Zona de cobranza/ });
     await expect(opcion.locator('.tag')).toContainText(['texto', 'Adicional']);
     await expect(opcion.locator('.selector-variable__tecnico')).toHaveText('ad_zona');
-    await expect(editor.getByRole('button', { name: /^Campo antiguo/ })).toHaveCount(0);
+    await expect(editor.getByRole('option', { name: /^Campo antiguo/ })).toHaveCount(0);
   });
 
   test('una ficha con el adicional dice solo su nombre', async ({ page }) => {
     await abrirEditor(page);
     const editor = page.locator('#editor-prueba');
-    await editor.getByRole('button', { name: 'Variable', exact: true }).click();
-    await editor.getByRole('button', { name: /^Zona de cobranza/ }).click();
+    await editor.getByRole('button', { name: 'Insertar variable', exact: true }).click();
+    await editor.getByRole('option', { name: /^Zona de cobranza/ }).click();
 
     await expect(editor.getByRole('button', { name: /^Variable Zona de cobranza/ })).toHaveText('Zona de cobranza');
   });

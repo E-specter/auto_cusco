@@ -443,13 +443,13 @@ test.describe('configuración: el editor v2 con campos adicionales', () => {
     await abrir(page, (api) => versionConSegmento(api, 'Speech v2 limpio', 31, SIN_ARCHIVADO));
     await abrirV2(page, 'Speech v2 limpio');
 
-    await editor(page).getByRole('button', { name: 'Variable', exact: true }).click();
+    await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
 
-    const opcion = editor(page).getByRole('button', { name: /^Zona/ });
+    const opcion = editor(page).getByRole('option', { name: /^Zona/ });
     await expect(opcion.locator('.tag')).toContainText(['texto', 'Adicional']);
     await expect(opcion.locator('.selector-variable__tecnico')).toHaveText('ad_zona');
-    await expect(editor(page).getByRole('button', { name: /^Monto en mora/ }).locator('.tag')).toContainText(['número', 'Adicional']);
-    await expect(editor(page).getByRole('button', { name: /^Región/ })).toHaveCount(0);
+    await expect(editor(page).getByRole('option', { name: /^Monto en mora/ }).locator('.tag')).toContainText(['número', 'Adicional']);
+    await expect(editor(page).getByRole('option', { name: /^Región/ })).toHaveCount(0);
   });
 
   test('un adicional sin «primeros» no tiene largo máximo (sin_cota_variable); con «primeros» sí', async ({ page }) => {

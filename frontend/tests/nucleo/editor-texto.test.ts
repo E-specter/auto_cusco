@@ -12,6 +12,8 @@ import {
   argumentosIniciales,
   cambiarVariableDirecta,
   conArgumento,
+  consultaDelBuscador,
+  disparadorEn,
   esReferencia,
   filtrarVariables,
   leerArgumento,
@@ -186,5 +188,41 @@ describe('variable directa', () => {
     ]);
     expect(cambiarVariableDirecta({ nodos: [] }, 'titular').nodos).toEqual([{ tipo: 'variable', nombre: 'titular', funciones: [] }]);
     expect(cambiarVariableDirecta(speech, '').nodos).toEqual([]);
+  });
+});
+
+describe('el disparador [@ (§13.2)', () => {
+  it('se detecta cuando el cursor queda justo después de [@, y dice dónde empieza', () => {
+    expect(disparadorEn('Hola [@', 7)).toBe(5);
+    expect(disparadorEn('[@', 2)).toBe(0);
+    expect(disparadorEn('Hola [@ mundo', 7)).toBe(5);
+  });
+
+  it('no se detecta con solo uno de los dos caracteres, ni con el cursor en otro lado', () => {
+    expect(disparadorEn('Hola [', 6)).toBeNull();
+    expect(disparadorEn('Hola @', 6)).toBeNull();
+    expect(disparadorEn('[@', 1)).toBeNull();
+    expect(disparadorEn('Hola [@', 3)).toBeNull();
+    expect(disparadorEn('', 0)).toBeNull();
+  });
+
+  it('lo escrito después del disparador es la consulta', () => {
+    expect(consultaDelBuscador('Hola [@', 5, 7)).toBe('');
+    expect(consultaDelBuscador('Hola [@titu', 5, 11)).toBe('titu');
+    // El cursor a media consulta filtra solo con lo que queda a su izquierda.
+    expect(consultaDelBuscador('Hola [@titular', 5, 9)).toBe('ti');
+    // Una consulta con espacios es válida: las variables se buscan por varias palabras.
+    expect(consultaDelBuscador('[@monto cuo', 0, 11)).toBe('monto cuo');
+  });
+
+  it('se cierra (null) al borrar la @ o el [, o al llevar el cursor antes del final del disparador', () => {
+    expect(consultaDelBuscador('Hola [', 5, 6)).toBeNull();
+    expect(consultaDelBuscador('Hola x@titu', 5, 11)).toBeNull();
+    expect(consultaDelBuscador('Hola [@titu', 5, 6)).toBeNull();
+    expect(consultaDelBuscador('Hola [@titu', 5, 3)).toBeNull();
+  });
+
+  it('se cierra con un salto de línea en la consulta', () => {
+    expect(consultaDelBuscador('[@ti\ntu', 0, 7)).toBeNull();
   });
 });

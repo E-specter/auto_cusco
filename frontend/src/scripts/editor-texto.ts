@@ -30,6 +30,8 @@ import {
   argumentosIniciales,
   cambiarVariableDirecta,
   conArgumento,
+  consultaDelBuscador,
+  disparadorEn,
   esReferencia,
   leerArgumento,
   nivelDeLargo,
@@ -65,7 +67,7 @@ import {
 } from '../lib/expresion';
 import { t, traducirPorPrefijo } from '../lib/i18n';
 import { crearSelectorPatronFecha } from './selector-patron-fecha';
-import { crearSelectorVariable, etiquetaTipo } from './selector-variable';
+import { crearBuscadorVariables, etiquetaTipo, type BuscadorVariables } from './selector-variable';
 import type { components } from '../lib/contrato-api';
 
 type Esquemas = components['schemas'];
@@ -74,6 +76,13 @@ type ParametroCatalogo = Esquemas['ParametroRespuesta'];
 type Columna = Esquemas['ColumnaRespuesta'];
 
 export const EVENTO_EXPRESION = 'expresioncambiada';
+
+/**
+ * The variable search while it is open: where in which text run it will insert and what was typed to filter it. From `[@`
+ * (`desdeBoton` false) `inicio` is where the trigger starts and the text run drives the search; from the button it is the
+ * caret, and the search has a field of its own.
+ */
+type Disparo = { indice: number; inicio: number; desdeBoton: boolean; consulta: string; buscador: BuscadorVariables };
 
 /** Same wait as the portfolio summary: long enough not to fire on every key. */
 const ESPERA = 500;
@@ -187,6 +196,8 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     linea: q<HTMLElement>('[data-linea]'),
     errorTramo: q<HTMLElement>('[data-error-tramo]'),
     agregar: q<HTMLButtonElement>('[data-agregar-variable]'),
+    pista: q<HTMLElement>('[data-pista-disparador]'),
+    disparadorAnuncio: q<HTMLElement>('[data-disparador-anuncio]'),
     selectorHueco: q<HTMLElement>('[data-selector-hueco]'),
     panelHueco: q<HTMLElement>('[data-panel-hueco]'),
     controlMuestra: q<HTMLElement>('[data-control-muestra]'),
@@ -234,8 +245,9 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     piezas: piezasDe(opciones.expresion),
     /** Id of the variable whose panel is open. */
     abierta: null as string | null,
-    selectorAbierto: false,
-    /** Last text run with focus and its caret: where `+ Variable` inserts. */
+    /** The variable search, open from `[@` or from the button; `null` when closed. */
+    disparo: null as Disparo | null,
+    /** Last text run with focus and its caret: where «Insertar variable» opens the search. */
     ultimoTramo: null as { indice: number; cursor: number } | null,
     /** Piece whose part of the result is highlighted (hover or focus). */
     resaltada: null as string | null,
@@ -470,17 +482,27 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     const recordar = () => {
       s.ultimoTramo = { indice, cursor: area.selectionStart ?? area.value.length };
     };
+    const alMoverElCursor = () => {
+      recordar();
+      revisarBuscador(area, indice, false);
+    };
     area.addEventListener('focus', recordar);
-    area.addEventListener('keyup', recordar);
-    area.addEventListener('pointerup', recordar);
-    area.addEventListener('select', recordar);
+    area.addEventListener('keyup', alMoverElCursor);
+    area.addEventListener('pointerup', alMoverElCursor);
+    area.addEventListener('select', alMoverElCursor);
+    area.addEventListener('blur', () => {
+      if (disparoDelTramo(indice)) cerrarBuscador();
+    });
     area.addEventListener('input', () => {
       s.piezas = editarTramo(s.piezas, indice, area.value);
       recordar();
       ajustar(area);
+      revisarBuscador(area, indice, true);
       cambio();
     });
     area.addEventListener('keydown', (evento) => {
+      const disparo = disparoDelTramo(indice);
+      if (disparo && teclaDelBuscador(evento, area, disparo)) return;
       const alInicio = area.selectionStart === 0 && area.selectionEnd === 0;
       const alFinal = area.selectionStart === area.value.length && area.selectionEnd === area.value.length;
       if (evento.key === 'Backspace' && alInicio && indice > 0) {
@@ -561,39 +583,152 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
 
   // ---- Inserting and removing variables ------------------------------------------------------
 
-  function abrirSelector(): void {
-    s.selectorAbierto = true;
-    el.agregar.setAttribute('aria-expanded', 'true');
-    const selector = crearSelectorVariable({
+  const areaDe = (indice: number) => el.linea.querySelector<HTMLTextAreaElement>(`[data-tramo="${indice}"]`);
+
+  function anunciarBuscador(texto: string): void {
+    el.disparadorAnuncio.textContent = texto;
+  }
+
+  /** The search a text run drives, if it is the run `indice` (the button's search has a field of its own). */
+  const disparoDelTramo = (indice: number): Disparo | null =>
+    s.disparo && !s.disparo.desdeBoton && s.disparo.indice === indice ? s.disparo : null;
+
+  /**
+   * Opens the search that will insert at `inicio` of a text run (interface rules §13.2). From `[@` the focus stays in the run,
+   * which becomes a combobox over the list until the search closes. From the button the search brings its own field,
+   * which takes the focus and is the combobox; Escape closes it and gives the focus back to the button.
+   */
+  function abrirBuscador(indice: number, inicio: number, desdeBoton: boolean, aviso = ''): void {
+    const area = areaDe(indice);
+    if (!area || s.soloLectura) return;
+    cerrarBuscador();
+    const buscador = crearBuscadorVariables({
       id: `${id}-variable`,
       variables: catalogo.contexto.variables.filter((v) => !v.archivado),
       contextos: catalogo.contextos,
-      onElegir: (nombre) => insertar(nombre),
-      onCerrar: () => {
-        cerrarSelector();
-        el.agregar.focus();
+      onElegir: insertar,
+      conCampo: desdeBoton,
+      onCerrar: (porEscape) => {
+        cerrarBuscador();
+        if (porEscape) el.agregar.focus();
       },
     });
-    el.selectorHueco.replaceChildren(selector);
-    selector.querySelector<HTMLInputElement>('input[type="search"]')?.focus();
+    s.disparo = { indice, inicio, desdeBoton, consulta: '', buscador };
+    if (!desdeBoton) {
+      area.setAttribute('role', 'combobox');
+      area.setAttribute('aria-expanded', 'true');
+      area.setAttribute('aria-controls', buscador.listaId);
+      area.setAttribute('aria-autocomplete', 'list');
+      apuntarActiva(area, s.disparo);
+    }
+    el.agregar.setAttribute('aria-expanded', 'true');
+    el.selectorHueco.replaceChildren(buscador.raiz);
+    buscador.campo?.focus();
+    anunciarBuscador([t('editorTexto.disparador.abierto'), aviso].filter(Boolean).join(' '));
   }
 
-  function cerrarSelector(): void {
-    s.selectorAbierto = false;
+  function cerrarBuscador(): void {
+    const disparo = s.disparo;
+    if (!disparo) return;
+    s.disparo = null;
+    const area = areaDe(disparo.indice);
+    for (const atributo of ['role', 'aria-expanded', 'aria-controls', 'aria-autocomplete', 'aria-activedescendant']) {
+      area?.removeAttribute(atributo);
+    }
     el.agregar.setAttribute('aria-expanded', 'false');
     el.selectorHueco.replaceChildren();
   }
 
+  function apuntarActiva(area: HTMLTextAreaElement, disparo: Disparo): void {
+    const activa = disparo.buscador.idActiva();
+    if (activa) area.setAttribute('aria-activedescendant', activa);
+    else area.removeAttribute('aria-activedescendant');
+  }
+
+  /** After the caret or the text of a run changed: filter, close, or (only when typing) open the search. */
+  function revisarBuscador(area: HTMLTextAreaElement, indice: number, tecleando: boolean): void {
+    const cursor = area.selectionStart ?? area.value.length;
+    const disparo = disparoDelTramo(indice);
+    if (disparo) {
+      const consulta = consultaDelBuscador(area.value, disparo.inicio, cursor);
+      if (consulta !== null) {
+        if (consulta !== disparo.consulta) {
+          disparo.consulta = consulta;
+          disparo.buscador.filtrar(consulta);
+          apuntarActiva(area, disparo);
+        }
+        return;
+      }
+      cerrarBuscador();
+    }
+    const inicio = tecleando ? disparadorEn(area.value, cursor) : null;
+    if (inicio !== null) abrirBuscador(indice, inicio, false);
+  }
+
+  /** The keys of the open search; `true` when it took the key. Enter and Tab insert, Escape leaves the text as typed. */
+  function teclaDelBuscador(evento: KeyboardEvent, area: HTMLTextAreaElement, disparo: Disparo): boolean {
+    if (evento.isComposing) return false;
+    if (evento.key === 'ArrowDown' || evento.key === 'ArrowUp') {
+      evento.preventDefault();
+      disparo.buscador.mover(evento.key === 'ArrowDown' ? 1 : -1);
+      apuntarActiva(area, disparo);
+      return true;
+    }
+    if (evento.key === 'Escape') {
+      evento.preventDefault();
+      evento.stopPropagation();
+      cerrarBuscador();
+      return true;
+    }
+    if (evento.key === 'Enter' || (evento.key === 'Tab' && !evento.shiftKey)) {
+      const nombre = disparo.buscador.activa();
+      // With no match Enter does nothing, and Tab moves on (leaving the run closes the search).
+      if (nombre === null && evento.key === 'Tab') return false;
+      evento.preventDefault();
+      if (nombre !== null) insertar(nombre);
+      return true;
+    }
+    return false;
+  }
+
+  /** «Insertar variable»: the search with its own field, to insert at the last caret or, if there was none, at the end of the text. */
+  function abrirDesdeElBoton(): void {
+    const ultimo = s.ultimoTramo;
+    const hayTramo = ultimo !== null && s.piezas[ultimo.indice]?.tipo === 'texto';
+    const indice = hayTramo ? ultimo.indice : s.piezas.length - 1;
+    const area = areaDe(indice);
+    if (!area) return;
+    const cursor = hayTramo ? Math.min(ultimo.cursor, area.value.length) : area.value.length;
+    abrirBuscador(indice, cursor, true, hayTramo ? '' : t('editorTexto.disparador.alFinal'));
+  }
+
+  /**
+   * Puts the variable where the search opened, in place of what was typed to find it. From `[@` the caret ends after the
+   * piece, so the analyst keeps typing; from the button the piece opens its panel (§2.2), to add functions.
+   */
   function insertar(nombre: string): void {
-    const destino = s.ultimoTramo ?? { indice: s.piezas.length - 1, cursor: Number.MAX_SAFE_INTEGER };
-    const { piezas, indiceVariable } = insertarVariable(s.piezas, destino.indice, destino.cursor, nombre);
+    const disparo = s.disparo;
+    if (!disparo) return;
+    const area = areaDe(disparo.indice);
+    const tecleando = !disparo.desdeBoton;
+    // From `[@` what was typed to find the variable goes away with the trigger; from the button nothing was typed in the text.
+    if (tecleando && area) {
+      const fin = area.selectionStart ?? area.value.length;
+      s.piezas = editarTramo(s.piezas, disparo.indice, area.value.slice(0, disparo.inicio) + area.value.slice(fin));
+    }
+    const { piezas, indiceVariable } = insertarVariable(s.piezas, disparo.indice, disparo.inicio, nombre);
     s.piezas = piezas;
     s.ultimoTramo = { indice: indiceVariable + 1, cursor: 0 };
-    s.abierta = (piezas[indiceVariable] as PiezaVariable).id;
-    cerrarSelector();
+    if (!tecleando) s.abierta = (piezas[indiceVariable] as PiezaVariable).id;
+    cerrarBuscador();
     pintarLinea();
-    pintarPanel();
-    enfocarEnPanel('agregar-funcion');
+    anunciarBuscador(t('editorTexto.disparador.insertada', { variable: nombreVariable(nombre) }));
+    if (tecleando) {
+      enfocarTramo(indiceVariable + 1, 0);
+    } else {
+      pintarPanel();
+      enfocarEnPanel('agregar-funcion');
+    }
     cambio();
   }
 
@@ -1327,25 +1462,26 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
 
   // ---- Wiring -----------------------------------------------------------------------------------
 
-  el.agregar.addEventListener('click', () => (s.selectorAbierto ? cerrarSelector() : abrirSelector()));
+  el.agregar.addEventListener('click', abrirDesdeElBoton);
 
   function fijarSoloLectura(soloLectura: boolean): void {
     s.soloLectura = soloLectura;
     el.agregar.disabled = soloLectura;
     el.directaSelect.disabled = soloLectura;
-    if (soloLectura) cerrarSelector();
+    el.pista.hidden = soloVariable || soloLectura;
+    if (soloLectura) cerrarBuscador();
     raiz.classList.toggle('editor-texto--soloLectura', soloLectura);
     pintarLinea();
     pintarPanel();
   }
 
   function alCambiarIdioma(): void {
+    cerrarBuscador();
     pintarDirecta();
     pintarLinea();
     pintarPanel();
     pintarResumen();
     pintarVista();
-    if (s.selectorAbierto) abrirSelector();
   }
   document.addEventListener('languagechange', alCambiarIdioma);
 
@@ -1368,7 +1504,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
       s.validada = false;
       s.origen = 'externo';
       s.alertar = false;
-      cerrarSelector();
+      cerrarBuscador();
       pintarDirecta();
       pintarLinea();
       pintarPanel();

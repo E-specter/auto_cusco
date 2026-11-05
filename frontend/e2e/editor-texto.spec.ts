@@ -75,9 +75,9 @@ test.describe('armar un texto', () => {
     const linea = editor(page).getByRole('group', { name: 'Texto del mensaje' });
 
     await linea.getByRole('textbox', { name: 'Texto' }).fill('Hola ');
-    await editor(page).getByRole('button', { name: 'Variable', exact: true }).click();
-    await editor(page).getByRole('searchbox', { name: 'Buscar una variable' }).fill('titu');
-    await editor(page).getByRole('button', { name: /^Titular/ }).click();
+    await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
+    await page.keyboard.type('titu');
+    await editor(page).getByRole('option', { name: /^Titular/ }).click();
 
     // The piece opens with the focus on «Agregar función».
     const agregar = editor(page).getByRole('combobox', { name: 'Agregar función' });
@@ -99,7 +99,7 @@ test.describe('armar un texto', () => {
     });
     await expect(pieza(page, /^Variable Titular/)).toHaveText('Titular · primeros caracteres 8');
     // No syntax anywhere on screen.
-    await expect(editor(page)).not.toContainText('[@');
+    await expect(linea).not.toContainText('[@');
     await expect(editor(page)).not.toContainText('|');
   });
 
@@ -111,8 +111,8 @@ test.describe('armar un texto', () => {
       area.setSelectionRange(4, 4);
       area.dispatchEvent(new Event('select'));
     });
-    await editor(page).getByRole('button', { name: 'Variable', exact: true }).click();
-    await editor(page).getByRole('button', { name: /^Titular/ }).click();
+    await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
+    await editor(page).getByRole('option', { name: /^Titular/ }).click();
 
     await expect.poll(() => ultimaValidacion(motor)).toEqual({
       nodos: [
@@ -337,25 +337,287 @@ test.describe('teclado (§2.4)', () => {
     await expect(medio).toHaveValue(', vence el ');
   });
 
-  test('Escape en el selector de variables lo cierra y vuelve a + Variable', async ({ page }) => {
+  test('Escape en el buscador del botón lo cierra sin insertar y devuelve el foco al botón', async ({ page }) => {
     await abrir(page);
-    const agregar = editor(page).getByRole('button', { name: 'Variable', exact: true });
+    const agregar = editor(page).getByRole('button', { name: 'Insertar variable', exact: true });
     await agregar.click();
-    await expect(editor(page).getByRole('searchbox', { name: 'Buscar una variable' })).toBeFocused();
+    await expect(editor(page).getByRole('combobox', { name: 'Buscar una variable' })).toBeFocused();
+    await expect(editor(page).getByRole('listbox', { name: 'Elegir una variable' })).toBeVisible();
+    await expect(agregar).toHaveAttribute('aria-expanded', 'true');
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Escape');
-    await expect(editor(page).getByRole('searchbox')).toHaveCount(0);
+    await expect(editor(page).getByRole('listbox')).toHaveCount(0);
     await expect(agregar).toBeFocused();
     await expect(agregar).toHaveAttribute('aria-expanded', 'false');
+    await expect(editor(page).locator('[data-pieza]')).toHaveCount(0);
   });
 });
 
 test('una versión de solo lectura no se puede editar', async ({ page }) => {
   await abrir(page, { expresion: SPEECH, extra: '&soloLectura=1' });
   await expect(editor(page).getByRole('textbox', { name: 'Texto al inicio' })).not.toBeEditable();
-  await expect(editor(page).getByRole('button', { name: 'Variable', exact: true })).toBeDisabled();
+  await expect(editor(page).getByRole('button', { name: 'Insertar variable', exact: true })).toBeDisabled();
+  await expect(editor(page).locator('[data-pista-disparador]')).toBeHidden();
   await pieza(page, /^Variable Titular/).click();
   await expect(editor(page).getByRole('button', { name: 'Quitar variable' })).toBeDisabled();
+});
+
+test.describe('el disparador [@ (§13.2)', () => {
+  const tramo = (page: Page, indice: number) => editor(page).locator(`[data-tramo="${indice}"]`);
+  const buscador = (page: Page) => editor(page).getByRole('listbox', { name: 'Elegir una variable' });
+  const anuncio = (page: Page) => editor(page).locator('[data-disparador-anuncio]');
+
+  test('escribir [@ abre el buscador en el texto sin sacar el foco, con los atributos de combobox y el anuncio', async ({ page }) => {
+    await abrir(page);
+    await tramo(page, 0).click();
+    await expect(tramo(page, 0)).not.toHaveAttribute('role', 'combobox');
+
+    await page.keyboard.type('Hola [@');
+
+    await expect(buscador(page)).toBeVisible();
+    await expect(tramo(page, 0)).toBeFocused();
+    await expect(tramo(page, 0)).toHaveAttribute('role', 'combobox');
+    await expect(tramo(page, 0)).toHaveAttribute('aria-expanded', 'true');
+    await expect(tramo(page, 0)).toHaveAttribute('aria-autocomplete', 'list');
+    await expect(tramo(page, 0)).toHaveAttribute('aria-controls', (await buscador(page).getAttribute('id')) ?? '');
+    const primera = (await buscador(page).getByRole('option').first().getAttribute('id')) ?? '';
+    await expect(tramo(page, 0)).toHaveAttribute('aria-activedescendant', primera);
+    await expect(anuncio(page)).toHaveText('Buscador de variables. Escribe para filtrar, Enter inserta y Escape cancela.');
+  });
+
+  test('lo que se escribe filtra; Enter inserta en lugar de [@… y el cursor queda después de la pieza', async ({ page }) => {
+    const { motor } = await abrir(page);
+    await tramo(page, 0).click();
+    await page.keyboard.type('Hola [@titu');
+
+    await expect(buscador(page).getByRole('option')).toHaveCount(1);
+    await expect(buscador(page).getByRole('option', { name: /^Titular/ })).toBeVisible();
+    await page.keyboard.press('Enter');
+
+    await expect(buscador(page)).toHaveCount(0);
+    await expect(tramo(page, 0)).toHaveValue('Hola ');
+    await expect(pieza(page, /^Variable Titular/)).toHaveAttribute('aria-expanded', 'false');
+    await expect(tramo(page, 2)).toBeFocused();
+    await expect(tramo(page, 0)).not.toHaveAttribute('role', 'combobox');
+    await expect(anuncio(page)).toHaveText('Se insertó Titular.');
+
+    await page.keyboard.type(' paga');
+    await expect(tramo(page, 2)).toHaveValue(' paga');
+    await expect.poll(() => ultimaValidacion(motor)).toEqual({
+      nodos: [
+        { tipo: 'texto', valor: 'Hola ' },
+        { tipo: 'variable', nombre: 'titular', funciones: [] },
+        { tipo: 'texto', valor: ' paga' },
+      ],
+    });
+  });
+
+  test('en medio de un texto lo parte en dos y borra solo [@ y lo escrito para buscar', async ({ page }) => {
+    const { motor } = await abrir(page, { expresion: { nodos: [{ tipo: 'texto', valor: 'Hola mundo' }] } });
+    await tramo(page, 0).click();
+    await tramo(page, 0).evaluate((area: HTMLTextAreaElement) => area.setSelectionRange(4, 4));
+    await page.keyboard.type('[@sal');
+    await page.keyboard.press('Enter');
+
+    await expect.poll(() => ultimaValidacion(motor)).toEqual({
+      nodos: [
+        { tipo: 'texto', valor: 'Hola' },
+        { tipo: 'variable', nombre: 'saldo_capital_pendiente', funciones: [] },
+        { tipo: 'texto', valor: ' mundo' },
+      ],
+    });
+  });
+
+  test('las flechas mueven la opción resaltada y Tab inserta la resaltada', async ({ page }) => {
+    const { motor } = await abrir(page);
+    await tramo(page, 0).click();
+    await page.keyboard.type('[@');
+    const primera = (await buscador(page).getByRole('option').first().getAttribute('id')) ?? '';
+
+    await page.keyboard.press('ArrowDown');
+    const segunda = (await buscador(page).getByRole('option').nth(1).getAttribute('id')) ?? '';
+    await expect(tramo(page, 0)).toHaveAttribute('aria-activedescendant', segunda);
+    await expect(page.locator(`#${segunda}`)).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator(`#${primera}`)).toHaveAttribute('aria-selected', 'false');
+    await page.keyboard.press('ArrowUp');
+    await expect(tramo(page, 0)).toHaveAttribute('aria-activedescendant', primera);
+
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Tab');
+    const nombre = segunda.split('-opcion-')[1];
+    await expect.poll(() => ultimaValidacion(motor)).toMatchObject({ nodos: [{ tipo: 'variable', nombre }] });
+    await expect(tramo(page, 2)).toBeFocused();
+  });
+
+  test('Escape deja el texto tal como se escribió, y quien quería [@ literal no pierde nada', async ({ page }) => {
+    await abrir(page);
+    await tramo(page, 0).click();
+    await page.keyboard.type('a [@tit');
+    await expect(buscador(page)).toBeVisible();
+
+    await page.keyboard.press('Escape');
+
+    await expect(buscador(page)).toHaveCount(0);
+    await expect(tramo(page, 0)).toHaveValue('a [@tit');
+    await expect(tramo(page, 0)).toBeFocused();
+    await expect(tramo(page, 0)).not.toHaveAttribute('role', 'combobox');
+    // Seguir escribiendo no lo reabre.
+    await page.keyboard.type('x');
+    await expect(buscador(page)).toHaveCount(0);
+  });
+
+  test('borrar la @ cierra el buscador', async ({ page }) => {
+    await abrir(page);
+    await tramo(page, 0).click();
+    await page.keyboard.type('[@');
+    await expect(buscador(page)).toBeVisible();
+
+    await page.keyboard.press('Backspace');
+
+    await expect(buscador(page)).toHaveCount(0);
+    await expect(tramo(page, 0)).toHaveValue('[');
+    // Volver a escribir la @ lo abre de nuevo.
+    await page.keyboard.type('@');
+    await expect(buscador(page)).toBeVisible();
+  });
+
+  test('sin coincidencias lo dice con lo escrito, y Enter no inserta nada', async ({ page }) => {
+    const { motor } = await abrir(page);
+    await tramo(page, 0).click();
+    await page.keyboard.type('[@zzzz');
+
+    await expect(editor(page).getByText('Ninguna variable coincide con «zzzz».')).toBeVisible();
+    await expect(buscador(page).getByRole('option')).toHaveCount(0);
+    await expect(tramo(page, 0)).not.toHaveAttribute('aria-activedescendant', /.+/);
+    await page.keyboard.press('Enter');
+
+    await expect(tramo(page, 0)).toHaveValue('[@zzzz');
+    // La lista vacía no tiene alto: sigue abierta si su mensaje sigue ahí.
+    await expect(editor(page).getByText('Ninguna variable coincide con «zzzz».')).toBeVisible();
+    await expect.poll(() => ultimaValidacion(motor)).toEqual({ nodos: [{ tipo: 'texto', valor: '[@zzzz' }] });
+  });
+
+  test('un clic en una opción inserta igual, sin que el texto pierda el foco antes', async ({ page }) => {
+    const { motor } = await abrir(page);
+    await tramo(page, 0).click();
+    await page.keyboard.type('[@tele');
+    await buscador(page).getByRole('option', { name: /^Teléfono/ }).click();
+
+    await expect.poll(() => ultimaValidacion(motor)).toMatchObject({ nodos: [{ tipo: 'variable', nombre: 'telefono' }] });
+    await expect(tramo(page, 2)).toBeFocused();
+  });
+
+  test('«Insertar variable» va arriba de la línea, con la pista debajo', async ({ page }) => {
+    await abrir(page);
+    const boton = editor(page).getByRole('button', { name: 'Insertar variable', exact: true });
+    const linea = editor(page).getByRole('group', { name: 'Texto del mensaje' });
+    const pista = editor(page).locator('[data-pista-disparador]');
+    await expect(pista).toHaveText('Escribe [@ para insertar una variable');
+    await expect(linea).toHaveAccessibleDescription('Escribe [@ para insertar una variable');
+
+    const cajas = await Promise.all([boton, linea, pista].map((l) => l.boundingBox()));
+    const [cajaBoton, cajaLinea, cajaPista] = cajas as NonNullable<(typeof cajas)[number]>[];
+    expect(cajaBoton.y + cajaBoton.height).toBeLessThanOrEqual(cajaLinea.y);
+    expect(cajaPista.y).toBeGreaterThanOrEqual(cajaLinea.y + cajaLinea.height);
+  });
+
+  test('el botón abre el buscador con su campo y el foco ahí; sin foco previo avisa «al final», con foco no', async ({ page }) => {
+    await abrir(page);
+    const agregar = editor(page).getByRole('button', { name: 'Insertar variable', exact: true });
+    await agregar.click();
+    const campo = editor(page).getByRole('combobox', { name: 'Buscar una variable' });
+    await expect(buscador(page)).toBeVisible();
+    await expect(campo).toBeFocused();
+    await expect(campo).toHaveAttribute('aria-expanded', 'true');
+    await expect(campo).toHaveAttribute('aria-autocomplete', 'list');
+    await expect(campo).toHaveAttribute('aria-controls', (await buscador(page).getAttribute('id')) ?? '');
+    const primera = (await buscador(page).getByRole('option').first().getAttribute('id')) ?? '';
+    await expect(campo).toHaveAttribute('aria-activedescendant', primera);
+    // El texto no es el combobox: el campo lo es.
+    await expect(tramo(page, 0)).not.toHaveAttribute('role', 'combobox');
+    await expect(anuncio(page)).toContainText('Se insertará al final del texto.');
+    await page.keyboard.press('Escape');
+
+    await tramo(page, 0).click();
+    await page.keyboard.type('ab');
+    await agregar.click();
+    await expect(campo).toBeFocused();
+    await expect(anuncio(page)).not.toContainText('al final');
+  });
+
+  test('escribir en el campo del botón filtra la lista y no toca el texto; Enter inserta donde estaba el cursor', async ({ page }) => {
+    const { motor } = await abrir(page, { expresion: { nodos: [{ tipo: 'texto', valor: 'Hola mundo' }] } });
+    await tramo(page, 0).click();
+    await tramo(page, 0).evaluate((area: HTMLTextAreaElement) => {
+      area.setSelectionRange(4, 4);
+      area.dispatchEvent(new Event('select'));
+    });
+    await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
+    await page.keyboard.type('sal');
+
+    await expect(buscador(page).getByRole('option')).toHaveCount(1);
+    await expect(tramo(page, 0)).toHaveValue('Hola mundo');
+    await page.keyboard.press('Enter');
+
+    await expect.poll(() => ultimaValidacion(motor)).toEqual({
+      nodos: [
+        { tipo: 'texto', valor: 'Hola' },
+        { tipo: 'variable', nombre: 'saldo_capital_pendiente', funciones: [] },
+        { tipo: 'texto', valor: ' mundo' },
+      ],
+    });
+  });
+
+  test('el campo del botón sin coincidencias lo dice, y Enter no inserta', async ({ page }) => {
+    await abrir(page);
+    await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
+    await page.keyboard.type('zzzz');
+    await expect(editor(page).getByText('Ninguna variable coincide con «zzzz».')).toBeVisible();
+    await page.keyboard.press('Enter');
+    await expect(editor(page).getByText('Ninguna variable coincide con «zzzz».')).toBeVisible();
+    await expect(editor(page).locator('[data-pieza]')).toHaveCount(0);
+  });
+
+  test('desde el botón la pieza abre su panel, como siempre', async ({ page }) => {
+    await abrir(page);
+    await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
+    await page.keyboard.type('titu');
+    await page.keyboard.press('Enter');
+    await expect(editor(page).getByRole('combobox', { name: 'Agregar función' })).toBeFocused();
+  });
+
+  test('a 360 px el buscador ocupa el ancho de la línea, abierto por [@ o por el botón, y la página no desborda', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 780 });
+    await abrir(page, { expresion: SPEECH });
+
+    const medir = () =>
+      page.evaluate(() => {
+        const linea = document.querySelector('#editor-prueba [data-linea]')!.getBoundingClientRect();
+        const lista = document.querySelector('#editor-prueba [role="listbox"]')!.closest('.selector-variable')!.getBoundingClientRect();
+        return {
+          izquierda: lista.left - linea.left,
+          derecha: linea.right - lista.right,
+          pagina: document.documentElement.scrollWidth,
+          vista: window.innerWidth,
+        };
+      });
+
+    await tramo(page, 4).click();
+    await page.keyboard.type('[@');
+    await expect(buscador(page)).toBeVisible();
+    const porDisparador = await medir();
+    expect(Math.abs(porDisparador.izquierda)).toBeLessThanOrEqual(1);
+    expect(Math.abs(porDisparador.derecha)).toBeLessThanOrEqual(1);
+    expect(porDisparador.pagina).toBeLessThanOrEqual(porDisparador.vista);
+    await page.keyboard.press('Escape');
+
+    await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
+    await expect(buscador(page)).toBeVisible();
+    const porBoton = await medir();
+    expect(Math.abs(porBoton.izquierda)).toBeLessThanOrEqual(1);
+    expect(Math.abs(porBoton.derecha)).toBeLessThanOrEqual(1);
+    expect(porBoton.pagina).toBeLessThanOrEqual(porBoton.vista);
+  });
 });
 
 test.describe('variantes por segmento', () => {
@@ -626,7 +888,8 @@ test.describe('variable directa (§5.3)', () => {
   test('se elige de un select y su cadena se arma en el mismo panel', async ({ page }) => {
     const { motor } = await abrir(page, { extra: '&soloVariable=1' });
     await expect(editor(page).getByRole('group', { name: 'Texto del mensaje' })).toBeHidden();
-    await expect(editor(page).getByRole('button', { name: 'Variable', exact: true })).toBeHidden();
+    await expect(editor(page).getByRole('button', { name: 'Insertar variable', exact: true })).toBeHidden();
+    await expect(editor(page).locator('[data-pista-disparador]')).toBeHidden();
 
     const variable = editor(page).getByRole('combobox', { name: 'Texto del mensaje' });
     await expect(variable).toHaveAccessibleDescription('Conserva el valor original, sin pasarlo por texto.');
@@ -694,10 +957,10 @@ for (const tema of ['light', 'dark'] as const) {
       await sinViolaciones(page);
     });
 
-    test('editor con el selector de variables abierto', async ({ page }) => {
+    test('editor con el buscador de variables abierto por [@', async ({ page }) => {
       await abrir(page, { expresion: SPEECH });
-      await editor(page).getByRole('button', { name: 'Variable', exact: true }).click();
-      await expect(editor(page).getByRole('searchbox')).toBeVisible();
+      await editor(page).getByRole('textbox', { name: 'Texto al final' }).pressSequentially('[@');
+      await expect(editor(page).getByRole('listbox', { name: 'Elegir una variable' })).toBeVisible();
       await pieza(page, /^Variable Vencimiento/).hover();
       await sinViolaciones(page);
     });
@@ -738,5 +1001,29 @@ for (const tema of ['light', 'dark'] as const) {
       const ancho = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(ancho).toBeLessThanOrEqual(360);
     });
+
+    test('editor con el buscador de variables abierto desde el botón, con su campo', async ({ page }) => {
+      await abrir(page, { expresion: SPEECH });
+      await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
+      await expect(editor(page).getByRole('combobox', { name: 'Buscar una variable' })).toBeFocused();
+      await expect(editor(page).getByRole('listbox', { name: 'Elegir una variable' })).toBeVisible();
+      await pieza(page, /^Variable Vencimiento/).hover();
+      await sinViolaciones(page);
+    });
+
+    for (const [nombre, abrirBuscador] of [
+      ['por [@', async (page: Page) => { await editor(page).locator('[data-tramo="4"]').pressSequentially('[@'); }],
+      ['desde el botón', async (page: Page) => { await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click(); }],
+    ] as const) {
+      test(`editor a 360 px con el buscador abierto ${nombre}`, async ({ page }) => {
+        await page.setViewportSize({ width: 360, height: 740 });
+        await abrir(page, { expresion: SPEECH });
+        await abrirBuscador(page);
+        await expect(editor(page).getByRole('listbox', { name: 'Elegir una variable' })).toBeVisible();
+        await sinViolaciones(page);
+        const ancho = await page.evaluate(() => document.documentElement.scrollWidth);
+        expect(ancho).toBeLessThanOrEqual(360);
+      });
+    }
   });
 }

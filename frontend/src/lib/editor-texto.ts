@@ -43,6 +43,28 @@ export function agruparPorOrigen<V extends VariableConEtiqueta>(variables: reado
   return [...grupos].sort(([a], [b]) => (a === 'cartera' ? 1 : 0) - (b === 'cartera' ? 1 : 0));
 }
 
+// ---- The `[@` trigger (interface rules §13.2) ------------------------------------------------
+
+/** What the analyst types in a text run to open the variable search at the caret. */
+export const DISPARADOR = '[@';
+
+/** Where the trigger starts when the caret sits right after one, else `null`. */
+export function disparadorEn(valor: string, cursor: number): number | null {
+  return cursor >= DISPARADOR.length && valor.slice(cursor - DISPARADOR.length, cursor) === DISPARADOR
+    ? cursor - DISPARADOR.length
+    : null;
+}
+
+/**
+ * What the analyst typed after the trigger to filter the search, or `null` when the search must close: the `@` was erased,
+ * the caret went back before it, or the text broke into a new line. `inicio` is where the trigger starts.
+ */
+export function consultaDelBuscador(valor: string, inicio: number, cursor: number): string | null {
+  if (!valor.startsWith(DISPARADOR, inicio) || cursor < inicio + DISPARADOR.length) return null;
+  const consulta = valor.slice(inicio + DISPARADOR.length, cursor);
+  return consulta.includes('\n') ? null : consulta;
+}
+
 export type NivelLargo = 'sin_limite' | 'dentro' | 'cerca' | 'excedido';
 
 /**
