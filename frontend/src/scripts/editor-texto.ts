@@ -82,6 +82,12 @@ type Columna = Esquemas['ColumnaRespuesta'];
 export const EVENTO_EXPRESION = 'expresioncambiada';
 
 /**
+ * The variables that are the contact's WhatsApp link, in MOWA and in WhatsMKT: their pill carries the message-circle icon.
+ * shortcut: los nombres de las variables de WhatsApp van fijos; pasar a un dato del catálogo si aparece un tercero.
+ */
+const VARIABLES_WHATSAPP = new Set(['whatsapp_contacto', 'whatsapp']);
+
+/**
  * The variable search while it is open: where in which text run it will insert and what was typed to filter it. From `[@`
  * (`desdeBoton` false) `inicio` is where the trigger starts and the text run drives the search; from the button it is the
  * caret, and the search has a field of its own.
@@ -594,7 +600,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     boton.querySelector('svg')?.remove();
     // The problem's icon wins; the contact WhatsApp is the one pill that carries its own (message-circle).
     if (conProblema) boton.prepend(icono('triangle-alert'));
-    else if (pieza.nombre === 'whatsapp_contacto') boton.prepend(icono('message-circle'));
+    else if (VARIABLES_WHATSAPP.has(pieza.nombre)) boton.prepend(icono('message-circle'));
   }
 
   function pintarLinea(): void {

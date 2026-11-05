@@ -187,6 +187,59 @@ test.describe('crear, guardar una versión y ver una anterior', () => {
     expect(api.textos[1].versiones).toHaveLength(1);
   });
 
+  test('sin la opción alRechazar, un rechazo lleva la lista a la vista, como siempre', async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as { desplazados: string[] };
+      w.desplazados = [];
+      const original = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = function (this: Element, ...args: Parameters<Element['scrollIntoView']>) {
+        w.desplazados.push(this.getAttribute('data-textos-problemas') === null ? 'otro' : 'problemas');
+        return original.apply(this, args);
+      };
+    });
+    await abrir(page, conDosTextos());
+    await contenido(page).fill('   ');
+    await guardar(page).click();
+    await expect(raiz(page).locator('[data-textos-problemas]')).toContainText('El texto no tiene una forma válida');
+    expect(await page.evaluate(() => (window as unknown as { desplazados: string[] }).desplazados)).toContain('problemas');
+  });
+
+  test('con la opción alRechazar, se llama con los problemas del contenido después de pintarlos, sin desplazar: el foco lo lleva la página', async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as { desplazados: string[] };
+      w.desplazados = [];
+      const original = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = function (this: Element, ...args: Parameters<Element['scrollIntoView']>) {
+        w.desplazados.push(this.getAttribute('data-textos-problemas') === null ? 'otro' : 'problemas');
+        return original.apply(this, args);
+      };
+    });
+    await abrir(page, conDosTextos(), '?alRechazar=1');
+    await contenido(page).fill('   ');
+    await guardar(page).click();
+
+    // La lista ya está pintada cuando la página recibe el aviso, y lo escrito se conserva.
+    await expect(raiz(page).locator('[data-textos-problemas]')).toContainText('El texto no tiene una forma válida');
+    const rechazos = await page.evaluate(() => (window as unknown as { rechazosPrueba: string[][] }).rechazosPrueba);
+    expect(rechazos).toHaveLength(1);
+    expect(rechazos[0].length).toBeGreaterThan(0);
+    await expect(page.locator('[data-resumen-prueba]')).toBeFocused();
+    // El componente no desplazó la lista: eso lo maneja la página.
+    expect(await page.evaluate(() => (window as unknown as { desplazados: string[] }).desplazados)).not.toContain('problemas');
+    await expect(contenido(page)).toHaveValue('   ');
+  });
+
+  test('con alRechazar, un problema del nombre sigue llevando el foco al campo del nombre y no llama a la página', async ({ page }) => {
+    await abrir(page, conDosTextos(), '?alRechazar=1');
+    await page.getByRole('button', { name: 'Nuevo' }).click();
+    await page.getByLabel('Nombre', { exact: true }).fill('cobranza');
+    await contenido(page).fill('algo');
+    await guardar(page).click();
+    await expect(raiz(page).locator('[data-textos-nombre-error]')).toHaveText('Ya existe un texto con ese nombre. Elige otro.');
+    await expect(page.getByLabel('Nombre', { exact: true })).toBeFocused();
+    expect(await page.evaluate(() => (window as unknown as { rechazosPrueba?: string[][] }).rechazosPrueba ?? [])).toEqual([]);
+  });
+
   test('un nombre repetido al crear se explica bajo el campo, sin cerrar nada', async ({ page }) => {
     await abrir(page, conDosTextos());
     await page.getByRole('button', { name: 'Nuevo' }).click();

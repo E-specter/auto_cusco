@@ -37,9 +37,20 @@ export function obtenerCatalogo(contexto: string): Promise<CatalogoTexto> {
   return pedido;
 }
 
-/** Drop every cached catalogue. Tests use it; a page never needs it. */
+/**
+ * Drop every cached catalogue. Tests use it; a page rarely needs it: use `olvidarCatalogo` when only one context changed.
+ */
 export function olvidarCatalogos(): void {
   catalogos.clear();
+}
+
+/**
+ * Drop the cached catalogue of one context, so the next editor mounted on it asks again. For a context whose catalogue follows
+ * something the page can change (the message of a channel takes its macros and its limit from the configuration): the page
+ * calls this before mounting the editor again. The other contexts keep theirs.
+ */
+export function olvidarCatalogo(contexto: string): void {
+  catalogos.delete(contexto);
 }
 
 export function validarTexto(

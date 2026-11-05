@@ -389,13 +389,15 @@
   background-color: var(--color-surface-sunken);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  transition: opacity var(--duration-default) var(--ease-default);
+  transition: color var(--duration-default) var(--ease-default);
 }
 .editor-texto__nota {
   margin: 0;
 }
+/* Waiting for the answer: the text steps back to the muted colour. It does not fade (opacity 0.6 left it at 4.34 against the
+   sunken wash in the light theme, under the 4.5 it needs): the muted colour already passes everywhere it is used. */
 .editor-texto__resultado--pendiente {
-  opacity: 0.6;
+  color: var(--color-text-muted);
 }
 .editor-texto__parte--resaltada {
   background-color: var(--color-accent-wash);

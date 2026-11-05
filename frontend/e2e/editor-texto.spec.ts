@@ -877,6 +877,21 @@ test.describe('las píldoras (§13.5)', () => {
     await expect(pieza(page, /^Variable Titular/).locator('svg')).toHaveCount(0);
   });
 
+  test('la variable «whatsapp» de WhatsMKT también lleva el ícono message-circle', async ({ page }) => {
+    await abrir(page, {
+      expresion: { nodos: [{ tipo: 'variable', nombre: 'whatsapp', funciones: [] }, { tipo: 'texto', valor: ' ' }, { tipo: 'variable', nombre: 'titular', funciones: [] }] },
+      ajustar: (motor) => {
+        motor.catalogos['mowa_mes.speech'].contexto.variables.push({
+          nombre: 'whatsapp', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: 'Enlace de WhatsApp', adicional: false, archivado: false, tema: 'persona',
+        });
+      },
+    });
+    const pildoras = editor(page).locator('[data-pieza]');
+    await expect(pildoras.nth(0)).toHaveAccessibleName(/^Variable Enlace de WhatsApp/);
+    await expect(pildoras.nth(0).locator('svg path[d^="M2.992 16.342"]')).toHaveCount(1);
+    await expect(pildoras.nth(1).locator('svg')).toHaveCount(0);
+  });
+
   test('con un problema, el ícono es el del problema y no el de WhatsApp', async ({ page }) => {
     await abrir(page, {
       expresion: { nodos: [{ tipo: 'variable', nombre: 'whatsapp_contacto', funciones: [{ nombre: 'primeros', args: [0] }] }] },
@@ -2017,6 +2032,19 @@ for (const tema of ['light', 'dark'] as const) {
         expect(pagina).toBeLessThanOrEqual(ancho);
       });
     }
+
+    test('editor con la vista previa pendiente: la respuesta no llega y el texto conserva su contraste', async ({ page }) => {
+      const { motor } = await abrir(page, { expresion: SPEECH });
+      await expect(resultado(page)).toContainText('Hola NOMBRE S');
+      // Desde aquí la previsualización no responde: la petición queda abierta y la vista, en espera.
+      await page.route('**/texto-enriquecido/previsualizacion', () => undefined);
+      await editor(page).getByRole('textbox', { name: 'Texto al final' }).fill('. Gracias.');
+      await expect(resultado(page)).toHaveClass(/editor-texto__resultado--pendiente/);
+      await expect.poll(() => motor.pedidos.filter((p) => p.ruta === '/texto-enriquecido/validacion').length).toBeGreaterThan(1);
+      await page.waitForTimeout(600);
+      await expect(resultado(page)).toHaveClass(/editor-texto__resultado--pendiente/);
+      await sinViolaciones(page);
+    });
 
     test('editor con un error de rango en un parámetro', async ({ page }) => {
       await abrir(page, {

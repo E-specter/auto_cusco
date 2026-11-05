@@ -12,6 +12,8 @@
  *   &etiqueta=1         the option of each text carries «· versión N», as a module that adds its own data would
  *   &filtrar=1          a module's filter: the texts named in `window.ocultosPrueba` (a Set, from `&ocultos=a,b`) are not offered;
  *                       a test changes the Set and calls `controladorPrueba.repintar()`
+ *   &alRechazar=1       a module that handles a refused save itself: the problems are kept in `window.rechazosPrueba`
+ *                       (one array of codes per refusal) and the focus goes to `[data-resumen-prueba]`
  *
  * The mounted controller is left on `window.controladorPrueba`, so a test can call what a screen would
  * (`hayCambios`, `confirmarSalida`, `recargar`, `destruir`); the last event, on `[data-ultimo-evento]`.
@@ -24,6 +26,7 @@ import TextosGuardados from '../components/TextosGuardados.astro';
   <div class="prueba" data-ruta-prueba>
     <h1>Prueba de textos guardados</h1>
     <TextosGuardados id="textos-prueba" />
+    <p class="mono" tabindex="-1" data-resumen-prueba hidden>Resumen de la página</p>
     <details class="prueba__evento">
       <summary>Último evento</summary>
       <pre class="mono" data-ultimo-evento></pre>
@@ -97,6 +100,16 @@ import TextosGuardados from '../components/TextosGuardados.astro';
     etiquetaDe: parametros.get('etiqueta') === '1' ? (texto) => `${texto.nombre} · versión ${texto.version_vigente}` : undefined,
     usos: parametros.get('usos') === '1' ? () => 3 : undefined,
     filtrar: parametros.get('filtrar') === '1' ? (texto) => !ocultos.has(texto.nombre) : undefined,
+    alRechazar:
+      parametros.get('alRechazar') === '1'
+        ? (problemas) => {
+            const w = window as unknown as { rechazosPrueba?: string[][] };
+            (w.rechazosPrueba ??= []).push(problemas.map((p) => p.codigo));
+            const resumen = document.querySelector<HTMLElement>('[data-resumen-prueba]')!;
+            resumen.hidden = false;
+            resumen.focus();
+          }
+        : undefined,
   }).then((controlador) => {
     expuesta.controladorPrueba = controlador;
     document.body.dataset.montado = 'true';

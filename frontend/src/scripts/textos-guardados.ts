@@ -109,6 +109,12 @@ export interface OpcionesTextos {
    * stops passing it stays open until another one is chosen; it only leaves the `select`. Without it, every text is offered.
    */
   filtrar?: (texto: ResumenTexto) => boolean;
+  /**
+   * Called when a save is refused with problems in the content, after the list under the editor is drawn and instead of
+   * scrolling to it: the module moves the focus to its own summary. A problem of the name keeps the focus on the name field.
+   * Without it, the list scrolls into view as it always did.
+   */
+  alRechazar?: (problemas: ProblemaTexto[]) => void;
 }
 
 export interface ControladorTextos {
@@ -642,7 +648,10 @@ export async function montarTextosGuardados(raiz: HTMLElement, opciones: Opcione
       pintarProblemas();
       pintarPie();
       if (s.nombreRepetido || s.problemas.nombre.length > 0) el.nombre.focus();
-      else if (s.problemas.contenido.length > 0) el.problemas.scrollIntoView({ block: 'nearest' });
+      else if (s.problemas.contenido.length > 0) {
+        if (opciones.alRechazar) opciones.alRechazar(s.problemas.contenido);
+        else el.problemas.scrollIntoView({ block: 'nearest' });
+      }
     }
   }
   el.guardar.addEventListener('click', () => void guardar(), escucha);

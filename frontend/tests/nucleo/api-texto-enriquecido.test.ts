@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../src/lib/api';
 import {
   obtenerCatalogo,
+  olvidarCatalogo,
   olvidarCatalogos,
   previsualizarTexto,
   validarTexto,
@@ -61,6 +62,52 @@ describe('catálogo', () => {
     expect((fallo as ApiError).codigo).toBe('contexto_desconocido');
     expect(segundo).toEqual({ contexto: { nombre: 'cartera' } });
     expect(falso).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('olvidar el catálogo de un contexto', () => {
+  const catalogo = (contexto: string) => ({ contexto: { nombre: contexto } });
+
+  it('olvidarCatalogo hace que ese contexto vuelva a pedirse, con lo que cambió', async () => {
+    const falso = responderCon({ estado: 200, cuerpo: catalogo('whatsmkt.mensaje') });
+    await obtenerCatalogo('whatsmkt.mensaje');
+    await obtenerCatalogo('whatsmkt.mensaje');
+    expect(falso).toHaveBeenCalledTimes(1);
+
+    olvidarCatalogo('whatsmkt.mensaje');
+    await obtenerCatalogo('whatsmkt.mensaje');
+    expect(falso).toHaveBeenCalledTimes(2);
+  });
+
+  it('solo ese: los demás contextos conservan el suyo', async () => {
+    const falso = responderCon({ estado: 200, cuerpo: catalogo('x') });
+    await obtenerCatalogo('whatsmkt.mensaje');
+    await obtenerCatalogo('mowa_mes.speech');
+    expect(falso).toHaveBeenCalledTimes(2);
+
+    olvidarCatalogo('whatsmkt.mensaje');
+    await obtenerCatalogo('mowa_mes.speech');
+    expect(falso).toHaveBeenCalledTimes(2);
+    await obtenerCatalogo('whatsmkt.mensaje');
+    expect(falso).toHaveBeenCalledTimes(3);
+  });
+
+  it('olvidar uno que no se pidió no hace nada ni falla', async () => {
+    const falso = responderCon({ estado: 200, cuerpo: catalogo('x') });
+    expect(() => olvidarCatalogo('nunca_pedido')).not.toThrow();
+    await obtenerCatalogo('mowa_mes.speech');
+    expect(falso).toHaveBeenCalledTimes(1);
+  });
+
+  it('el pedido que ya estaba en vuelo no se mezcla con el nuevo: cada uno trae su respuesta', async () => {
+    let n = 0;
+    const falso = vi.fn(async () => new Response(JSON.stringify({ contexto: { nombre: `respuesta ${++n}` } }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', falso);
+    const primero = obtenerCatalogo('whatsmkt.mensaje');
+    olvidarCatalogo('whatsmkt.mensaje');
+    const segundo = obtenerCatalogo('whatsmkt.mensaje');
+    expect(await primero).toEqual({ contexto: { nombre: 'respuesta 1' } });
+    expect(await segundo).toEqual({ contexto: { nombre: 'respuesta 2' } });
   });
 });
 
