@@ -871,6 +871,7 @@ Quedan fuera, como dijo el coordinador: pegar texto con marcadores, el producto 
 | `editorTexto.largo.cerca` | Cerca del tope | Near the limit |
 | `editorTexto.largo.pasa` | Pasa el tope | Over the limit |
 | `editorTexto.muestra.vacia` | Con este producto, {variable} viene vacía. | With this product, {variable} is empty. |
+| `textoEnriquecido.codigo.funcion_no_admitida` | Este texto no admite funciones en sus variables. Quita la función de esta pieza. | This text does not allow functions on its variables. Remove the function from this piece. |
 | `editorTexto.whatsmkt.sinFunciones` | En WhatsMKT las funciones van en la columna, en Columnas de carga. | In WhatsMKT functions go in the column, in Load columns. |
 
 - `editorTexto.variable.agregar` («Variable») se reemplaza por `editorTexto.variable.insertar`.
