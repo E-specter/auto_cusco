@@ -1017,6 +1017,7 @@
   "editorTexto.tramo.inicio": "Texto al inicio",
   "editorTexto.tramo.despues": "Texto después de {variable}",
   "editorTexto.tramo.final": "Texto al final",
+  "editorTexto.pildora.funciones": "{variable} · {n} funciones",
   "editorTexto.pieza.variable": "Variable {variable}",
   "editorTexto.pieza.conProblema": ", con un problema",
   "editorTexto.pieza.abre": "Abre sus funciones",

@@ -44,6 +44,25 @@ export function agruparPorOrigen<V extends VariableConEtiqueta>(variables: reado
   return [...grupos].sort(([a], [b]) => (a === 'cartera' ? 1 : 0) - (b === 'cartera' ? 1 : 0));
 }
 
+// ---- The compact line (interface rules §13.5) ------------------------------------------------
+
+/**
+ * How wide, in characters (`ch`), a text run must be to show its text on its own lines: the longest line plus one for the caret,
+ * and never under two. It is what a browser without `field-sizing: content` (Firefox) is told, measured by characters and not by
+ * UTF-16 units, so an emoji counts as one.
+ */
+export function anchoDeTramo(valor: string): number {
+  return Math.max(2, ...valor.split('\n').map((linea) => [...linea].length + 1));
+}
+
+/**
+ * Whether a text run, after a pill, stays glued to it instead of taking a row of its own: an empty one (or only blanks) or a
+ * single punctuation sign or symbol («.», «,», «)»). Anything with a letter or a number, or longer, flows on its own.
+ */
+export function tramoPegado(valor: string): boolean {
+  return /^\s*[\p{P}\p{S}]?\s*$/u.test(valor);
+}
+
 // ---- The `[@` trigger (interface rules §13.2) ------------------------------------------------
 
 /** What the analyst types in a text run to open the variable search at the caret. */

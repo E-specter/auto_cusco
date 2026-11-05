@@ -27,6 +27,7 @@ import {
   aVariableDirecta,
   agruparPorOrigen,
   anclaDe,
+  anchoDeTramo,
   argumentosIniciales,
   cambiarVariableDirecta,
   conArgumento,
@@ -40,6 +41,7 @@ import {
   piezaDeAncla,
   resumenFunciones,
   textoArgumento,
+  tramoPegado,
   type Ancla,
   type NivelLargo,
 } from '../lib/editor-texto';
@@ -466,17 +468,22 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
   /** Browsers without `field-sizing` (Firefox): size the run to its text. */
   function ajustar(area: HTMLTextAreaElement): void {
     if (soportaAjuste) return;
-    const lineas = area.value.split('\n');
-    const ancho = Math.max(2, ...lineas.map((l) => [...l].length + 1));
-    area.style.inlineSize = `${ancho}ch`;
+    area.style.inlineSize = `${anchoDeTramo(area.value)}ch`;
     area.style.blockSize = 'auto';
     area.style.blockSize = `${area.scrollHeight}px`;
   }
 
-  function etiquetaPieza(pieza: PiezaVariable, conProblema: boolean): { visible: string; accesible: string } {
+  function etiquetaPieza(pieza: PiezaVariable, conProblema: boolean): { visible: string; titulo: string; accesible: string } {
     const variable = nombreVariable(pieza.nombre);
     const resumen = resumenFunciones(pieza.funciones, nombreFuncion, nombreVariable);
-    const visible = resumen ? `${variable} · ${resumen}` : variable;
+    // The whole chain goes in the tooltip and in the accessible name; the pill itself reads short (interface rules §13.5).
+    const titulo = resumen ? `${variable} · ${resumen}` : variable;
+    const visible =
+      pieza.funciones.length === 0
+        ? variable
+        : pieza.funciones.length === 1
+          ? `${variable} · ${nombreFuncion(pieza.funciones[0].nombre).toLowerCase()}`
+          : t('editorTexto.pildora.funciones', { variable, n: pieza.funciones.length });
     const accesible = [
       t('editorTexto.pieza.variable', { variable }),
       resumen ? `, ${resumen}` : '',
@@ -485,7 +492,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
       '. ',
       t('editorTexto.pieza.abre'),
     ].join('');
-    return { visible, accesible };
+    return { visible, titulo, accesible };
   }
 
   function crearTramo(indice: number, valor: string): HTMLTextAreaElement {
@@ -515,6 +522,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
       s.piezas = editarTramo(s.piezas, indice, area.value);
       recordar();
       ajustar(area);
+      area.closest('.editor-texto__par')?.classList.toggle('editor-texto__par--junto', tramoPegado(area.value));
       revisarBuscador(area, indice, true);
       cambio();
     });
@@ -561,7 +569,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
   }
 
   function pintarPildora(boton: HTMLButtonElement, pieza: PiezaVariable, conProblema: boolean): void {
-    const { visible, accesible } = etiquetaPieza(pieza, conProblema);
+    const { visible, titulo, accesible } = etiquetaPieza(pieza, conProblema);
     const texto = boton.querySelector<HTMLElement>('.editor-texto__piezaTexto')!;
     texto.textContent = visible;
     if (variableDe(pieza.nombre)?.archivado) {
@@ -571,18 +579,37 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
       texto.append(' ', marca);
     }
     boton.setAttribute('aria-label', accesible);
-    boton.title = visible;
+    boton.title = titulo;
     boton.classList.toggle('editor-texto__pieza--problema', conProblema);
     boton.querySelector('svg')?.remove();
+    // The problem's icon wins; the contact WhatsApp is the one pill that carries its own (message-circle).
     if (conProblema) boton.prepend(icono('triangle-alert'));
+    else if (pieza.nombre === 'whatsapp_contacto') boton.prepend(icono('message-circle'));
   }
 
   function pintarLinea(): void {
-    el.linea.replaceChildren(
-      ...s.piezas.map((pieza, indice) =>
-        pieza.tipo === 'texto' ? crearTramo(indice, pieza.valor) : crearPildora(indice, pieza),
-      ),
-    );
+    // A pill and the run after it go in a pair: while the run is short (empty, or one sign) the pair stays together on a row;
+    // otherwise the pair dissolves (`display: contents`) and pill and run flow as items of the line.
+    const hijos: HTMLElement[] = [];
+    let pildora: HTMLButtonElement | null = null;
+    s.piezas.forEach((pieza, indice) => {
+      if (pieza.tipo === 'variable') {
+        pildora = crearPildora(indice, pieza);
+        return;
+      }
+      const tramo = crearTramo(indice, pieza.valor);
+      if (pildora) {
+        const par = document.createElement('span');
+        par.className = 'editor-texto__par';
+        par.classList.toggle('editor-texto__par--junto', tramoPegado(pieza.valor));
+        par.append(pildora, tramo);
+        hijos.push(par);
+        pildora = null;
+      } else {
+        hijos.push(tramo);
+      }
+    });
+    el.linea.replaceChildren(...hijos);
     el.linea.querySelectorAll('textarea').forEach(ajustar);
     pintarProblemasLinea();
   }
@@ -612,6 +639,46 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     const clave = catalogo.contexto.clave_alcance;
     const texto = clave ? t(clave) : '';
     return texto && texto !== clave ? texto : undefined;
+  }
+
+  /** Where, from the viewport's left edge, the character `indice` of a text run starts (a mirror of the run measures it). */
+  function xDelCaracter(area: HTMLTextAreaElement, indice: number): number {
+    const espejo = document.createElement('div');
+    const estilo = getComputedStyle(area);
+    Object.assign(espejo.style, {
+      position: 'absolute',
+      visibility: 'hidden',
+      whiteSpace: 'pre-wrap',
+      overflowWrap: 'break-word',
+      width: `${area.offsetWidth + 4}px`,
+      font: estilo.font,
+      letterSpacing: estilo.letterSpacing,
+      padding: estilo.padding,
+      border: estilo.border,
+      boxSizing: estilo.boxSizing,
+    });
+    espejo.textContent = area.value.slice(0, indice);
+    const marca = document.createElement('span');
+    marca.textContent = '\u200b';
+    espejo.append(marca);
+    document.body.append(espejo);
+    const x = area.getBoundingClientRect().left + marca.offsetLeft - area.scrollLeft;
+    espejo.remove();
+    return x;
+  }
+
+  /**
+   * Puts the search under the line, at the caret's column, as wide as a search needs (interface rules §13.2); where the line is
+   * about as narrow as the search (a phone) it keeps the whole width of the line. The search opened from the button has no
+   * caret to follow and stays at the left.
+   */
+  function alinearAlCursor(panel: HTMLElement, area: HTMLTextAreaElement, desde: number): void {
+    const ANCHO = 448;
+    const linea = el.linea.getBoundingClientRect();
+    if (linea.width <= ANCHO + 32) return;
+    const sangria = Math.max(0, Math.min(xDelCaracter(area, desde) - linea.left, linea.width - ANCHO));
+    panel.style.inlineSize = `${ANCHO}px`;
+    panel.style.marginInlineStart = `${sangria}px`;
   }
 
   /** The search a text run drives, if it is the run `indice` (the button's search has a field of its own). */
@@ -649,6 +716,7 @@ export async function montarEditor(raiz: HTMLElement, opciones: OpcionesEditor):
     }
     el.agregar.setAttribute('aria-expanded', 'true');
     el.selectorHueco.replaceChildren(buscador.raiz);
+    if (!desdeBoton) alinearAlCursor(buscador.raiz, area, inicio);
     buscador.campo?.focus();
     anunciarBuscador([t('editorTexto.disparador.abierto'), aviso].filter(Boolean).join(' '));
   }

@@ -105,7 +105,7 @@ test.describe('armar un texto', () => {
         { tipo: 'texto', valor: ', paga.' },
       ],
     });
-    await expect(pieza(page, /^Variable Titular/)).toHaveText('Titular · primeros caracteres 8');
+    await expect(pieza(page, /^Variable Titular/)).toHaveText('Titular · primeros caracteres');
     // No syntax anywhere on screen.
     await expect(linea).not.toContainText('[@');
     await expect(editor(page)).not.toContainText('|');
@@ -146,7 +146,7 @@ test.describe('armar un texto', () => {
     });
 
     await editor(page).getByRole('button', { name: 'Quitar Mayúsculas' }).click();
-    await expect(pieza(page, /^Variable Titular/)).toHaveText('Titular · primeros caracteres 8');
+    await expect(pieza(page, /^Variable Titular/)).toHaveText('Titular · primeros caracteres');
     await expect.poll(() => ultimaValidacion(motor)).toEqual({
       nodos: [{ tipo: 'variable', nombre: 'titular', funciones: [{ nombre: 'primeros', args: [8] }] }],
     });
@@ -636,6 +636,297 @@ test.describe('el disparador [@ (§13.2)', () => {
     expect(Math.abs(porBoton.izquierda)).toBeLessThanOrEqual(1);
     expect(Math.abs(porBoton.derecha)).toBeLessThanOrEqual(1);
     expect(porBoton.pagina).toBeLessThanOrEqual(porBoton.vista);
+  });
+});
+
+test.describe('las píldoras (§13.5)', () => {
+  const dePieza = (funciones: unknown[] = [], nombre = 'titular') => ({
+    expresion: { nodos: [{ tipo: 'variable', nombre, funciones }] },
+  });
+
+  test('con una función dice su nombre corto, con dos o más cuántas, y la cadena completa va en el title y en el nombre accesible', async ({ page }) => {
+    await abrir(page, dePieza([{ nombre: 'mayusculas', args: [] }]));
+    const una = pieza(page, /^Variable Titular/);
+    await expect(una).toHaveText('Titular · mayúsculas');
+    await expect(una).toHaveAttribute('title', 'Titular · mayúsculas');
+
+    await abrir(page, dePieza([{ nombre: 'primeros', args: [8] }, { nombre: 'mayusculas', args: [] }, { nombre: 'sin_tildes', args: [] }]));
+    const varias = pieza(page, /^Variable Titular/);
+    await expect(varias).toHaveText('Titular · 3 funciones');
+    // La cadena completa, sin cortar, en el title y en el nombre accesible.
+    await expect(varias).toHaveAttribute('title', 'Titular · primeros caracteres 8 · mayúsculas · quitar tildes');
+    await expect(varias).toHaveAccessibleName(/primeros caracteres 8 · mayúsculas · quitar tildes/);
+  });
+
+  test('sin funciones dice solo el nombre; con dos, «2 funciones»', async ({ page }) => {
+    await abrir(page, dePieza());
+    await expect(pieza(page, /^Variable Titular/)).toHaveText('Titular');
+    await abrir(page, dePieza([{ nombre: 'mayusculas', args: [] }, { nombre: 'sin_tildes', args: [] }]));
+    await expect(pieza(page, /^Variable Titular/)).toHaveText('Titular · 2 funciones');
+  });
+
+  test('se lee como una palabra de la frase: en la sans del cuerpo, no en mono, y con un ancho máximo de unas 24 letras', async ({ page }) => {
+    await abrir(page, dePieza([], 'dias_atraso_ajustados'));
+    const p = pieza(page, /^Variable Días de atraso ajustados/);
+    const medidas = await p.evaluate((boton) => {
+      const texto = boton.querySelector('.editor-texto__piezaTexto') as HTMLElement;
+      return {
+        fuente: getComputedStyle(boton).fontFamily,
+        cortado: texto.scrollWidth > texto.clientWidth,
+        ancho: texto.clientWidth,
+        tamanoLetra: parseFloat(getComputedStyle(texto).fontSize),
+      };
+    });
+    expect(medidas.fuente).toMatch(/Inter/);
+    expect(medidas.fuente).not.toMatch(/JetBrains|monospace/);
+    // «Días de atraso ajustados al envío» (33 letras) se corta con puntos suspensivos; su nombre accesible, completo.
+    expect(medidas.cortado).toBe(true);
+    expect(medidas.ancho).toBeLessThanOrEqual(medidas.tamanoLetra * 24);
+    await expect(p).toHaveAccessibleName(/^Variable Días de atraso ajustados al envío/);
+    await expect(p).toHaveAttribute('title', 'Días de atraso ajustados al envío');
+  });
+
+  test('el WhatsApp de contacto lleva el ícono message-circle y las demás píldoras no', async ({ page }) => {
+    await abrir(page, {
+      expresion: {
+        nodos: [
+          { tipo: 'variable', nombre: 'whatsapp_contacto', funciones: [] },
+          { tipo: 'texto', valor: ' ' },
+          { tipo: 'variable', nombre: 'titular', funciones: [] },
+        ],
+      },
+    });
+    const whatsapp = pieza(page, /^Variable WhatsApp de contacto/);
+    await expect(whatsapp.locator('svg')).toHaveCount(1);
+    await expect(whatsapp.locator('svg path[d^="M2.992 16.342"]')).toHaveCount(1);
+    await expect(pieza(page, /^Variable Titular/).locator('svg')).toHaveCount(0);
+  });
+
+  test('con un problema, el ícono es el del problema y no el de WhatsApp', async ({ page }) => {
+    await abrir(page, {
+      expresion: { nodos: [{ tipo: 'variable', nombre: 'whatsapp_contacto', funciones: [{ nombre: 'primeros', args: [0] }] }] },
+      ajustar: (motor) => {
+        motor.validacion = () => ({
+          problemas: [problema('parametro_invalido', { nodo: 0, funcion: 0, parametro: 'n' })],
+          tipo: 'texto', cota: 170, sin_cota: null, variables: [],
+        });
+      },
+    });
+    const whatsapp = pieza(page, /^Variable WhatsApp de contacto/);
+    await expect(whatsapp).toHaveAccessibleName(/con un problema/);
+    await expect(whatsapp.locator('svg')).toHaveCount(1);
+    await expect(whatsapp.locator('svg path[d^="M2.992 16.342"]')).toHaveCount(0);
+  });
+});
+
+test.describe('la línea compacta (§13.5)', () => {
+  const FRASE = {
+    nodos: [
+      { tipo: 'texto', valor: 'Hola ' },
+      { tipo: 'variable', nombre: 'titular', funciones: [{ nombre: 'mayusculas', args: [] }] },
+      { tipo: 'texto', valor: ', vence el ' },
+      { tipo: 'variable', nombre: 'fecha_vencimiento_cuota', funciones: [] },
+      { tipo: 'texto', valor: '.' },
+    ],
+  };
+  const linea = (page: Page) => editor(page).locator('[data-linea]');
+
+  /** Rows of the line: the top of each piece with something to show, grouped; and what each row holds. */
+  const renglones = (page: Page) =>
+    linea(page).evaluate((contenedor) => {
+      const piezas = [...contenedor.querySelectorAll<HTMLElement>('[data-pieza], textarea')]
+        .filter((e) => !(e instanceof HTMLTextAreaElement) || e.value !== '')
+        .map((e) => {
+          const caja = e.getBoundingClientRect();
+          return { medio: caja.top + caja.height / 2, texto: e instanceof HTMLTextAreaElement ? e.value : '[pieza]' };
+        })
+        .sort((a, b) => a.medio - b.medio);
+      // Pills and runs differ in height, so their tops differ: a new row starts when the middle drops by more than half a row.
+      const filas: string[][] = [];
+      let ultimo = -Infinity;
+      for (const p of piezas) {
+        if (p.medio - ultimo > 12) filas.push([]);
+        filas[filas.length - 1].push(p.texto);
+        ultimo = p.medio;
+      }
+      return filas;
+    });
+
+  test('a 1280 px «Hola [Titular · mayúsculas], vence el [Vencimiento de la cuota].» cabe en un renglón', async ({ page }) => {
+    await abrir(page, { expresion: FRASE });
+    const filas = await renglones(page);
+    expect(filas).toHaveLength(1);
+  });
+
+  test('a 360 px cabe en tres renglones como máximo, y ningún renglón queda con solo un signo', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 900 });
+    await abrir(page, { expresion: FRASE });
+    const filas = await renglones(page);
+    expect(filas.length).toBeLessThanOrEqual(3);
+    for (const fila of filas) expect(fila.every((t) => /^\s*[.,;:]\s*$/.test(t))).toBe(false);
+    // El punto final va en el mismo renglón que la píldora de antes.
+    expect([...filas.at(-1)!].sort()).toEqual(['.', '[pieza]']);
+    const pagina = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(pagina).toBeLessThanOrEqual(360);
+  });
+
+  test('un tramo vacío conserva un blanco de 24 px donde hacer clic para poner el cursor', async ({ page }) => {
+    await abrir(page, {
+      expresion: { nodos: [{ tipo: 'variable', nombre: 'titular', funciones: [] }, { tipo: 'variable', nombre: 'telefono', funciones: [] }] },
+    });
+    for (const indice of [0, 2, 4]) {
+      const caja = (await editor(page).locator(`[data-tramo="${indice}"]`).boundingBox())!;
+      expect(caja.width, `tramo ${indice}`).toBeGreaterThanOrEqual(24);
+      expect(caja.height, `tramo ${indice}`).toBeGreaterThanOrEqual(20);
+    }
+    await editor(page).locator('[data-tramo="2"]').click();
+    await expect(editor(page).locator('[data-tramo="2"]')).toBeFocused();
+    await page.keyboard.type('y');
+    await expect(editor(page).locator('[data-tramo="2"]')).toHaveValue('y');
+  });
+
+  test('un tramo largo ocupa su renglón y se parte; uno corto sigue pegado a su píldora al escribir', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 900 });
+    await abrir(page, { expresion: { nodos: [{ tipo: 'variable', nombre: 'titular', funciones: [] }, { tipo: 'texto', valor: '.' }] } });
+    const par = editor(page).locator('.editor-texto__par');
+    await expect(par).toHaveClass(/editor-texto__par--junto/);
+
+    await editor(page).locator('[data-tramo="2"]').click();
+    await page.keyboard.press('End');
+    await page.keyboard.type(' y un texto bastante largo que no cabe junto a la píldora en un teléfono');
+    await expect(par).not.toHaveClass(/editor-texto__par--junto/);
+    const g = await linea(page).evaluate((contenedor) => {
+      const area = contenedor.querySelector<HTMLElement>('[data-tramo="2"]')!.getBoundingClientRect();
+      const caja = contenedor.getBoundingClientRect();
+      return { derecha: area.right, limite: caja.right, pagina: document.documentElement.scrollWidth };
+    });
+    expect(g.derecha).toBeLessThanOrEqual(g.limite + 1);
+    expect(g.pagina).toBeLessThanOrEqual(360);
+
+    // Y vuelve a pegarse al borrar hasta dejar un signo.
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type(',');
+    await expect(par).toHaveClass(/editor-texto__par--junto/);
+  });
+
+  test('la línea mide al menos tres renglones aunque esté vacía, y desde unos diez hace scroll en vez de crecer', async ({ page }) => {
+    await abrir(page);
+    const vacia = await linea(page).evaluate((c) => ({ alto: c.getBoundingClientRect().height, renglon: parseFloat(getComputedStyle(c).lineHeight) }));
+    expect(vacia.alto).toBeGreaterThanOrEqual(vacia.renglon * 3);
+
+    await editor(page).locator('[data-tramo="0"]').fill(Array.from({ length: 40 }, (_, i) => `renglón ${i + 1}`).join('\n'));
+    const llena = await linea(page).evaluate((c) => ({
+      alto: c.getBoundingClientRect().height,
+      renglon: parseFloat(getComputedStyle(c).lineHeight),
+      scroll: c.scrollHeight > c.clientHeight,
+    }));
+    expect(llena.alto).toBeLessThanOrEqual(llena.renglon * 10 + 40);
+    expect(llena.scroll).toBe(true);
+  });
+
+  test('quitar una variable une los tramos y la línea sigue en orden', async ({ page }) => {
+    const { motor } = await abrir(page, { expresion: FRASE });
+    await pieza(page, /^Variable Titular/).click();
+    await editor(page).getByRole('button', { name: 'Quitar variable' }).click();
+    await expect.poll(() => ultimaValidacion(motor)).toEqual({
+      nodos: [
+        { tipo: 'texto', valor: 'Hola , vence el ' },
+        { tipo: 'variable', nombre: 'fecha_vencimiento_cuota', funciones: [] },
+        { tipo: 'texto', valor: '.' },
+      ],
+    });
+    await expect(editor(page).locator('[data-pieza]')).toHaveCount(1);
+  });
+});
+
+test.describe('un navegador sin field-sizing: content (Firefox)', () => {
+  test('el ancho del tramo lo pone el script, por caracteres, y sigue al texto mientras se escribe', async ({ page }) => {
+    // El navegador de la prueba sí tiene field-sizing: se le dice que no, antes de que monte el editor.
+    await page.addInitScript(() => {
+      const original = CSS.supports.bind(CSS);
+      CSS.supports = ((propiedad: string, valor?: string) =>
+        propiedad.includes('field-sizing') ? false : valor === undefined ? original(propiedad) : original(propiedad, valor)) as typeof CSS.supports;
+    });
+    await abrir(page, { expresion: { nodos: [{ tipo: 'texto', valor: 'Hola' }, { tipo: 'variable', nombre: 'titular', funciones: [] }, { tipo: 'texto', valor: '' }] } });
+    const ancho = (indice: number) => editor(page).locator(`[data-tramo="${indice}"]`).evaluate((a) => (a as HTMLElement).style.inlineSize);
+
+    await expect.poll(() => ancho(0)).toBe('5ch');
+    await expect.poll(() => ancho(2)).toBe('2ch');
+
+    await editor(page).locator('[data-tramo="2"]').click();
+    await page.keyboard.type('uno dos');
+    await expect.poll(() => ancho(2)).toBe('8ch');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('tres cuatro');
+    // La línea más larga manda: «tres cuatro» (11) más uno.
+    await expect.poll(() => ancho(2)).toBe('12ch');
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Backspace');
+    await expect.poll(() => ancho(2)).toBe('2ch');
+  });
+
+  test('con field-sizing el script no toca el ancho: lo deja al CSS', async ({ page }) => {
+    await abrir(page, { expresion: { nodos: [{ tipo: 'texto', valor: 'Hola' }] } });
+    const ancho = await editor(page).locator('[data-tramo="0"]').evaluate((a) => (a as HTMLElement).style.inlineSize);
+    expect(ancho).toBe('');
+  });
+});
+
+test.describe('el buscador alineado al cursor (§13.2)', () => {
+  const tramo = (page: Page, indice: number) => editor(page).locator(`[data-tramo="${indice}"]`);
+  const panel = (page: Page) => editor(page).getByRole('listbox', { name: 'Elegir una variable' }).locator('xpath=..');
+
+  test('a 1280 px abre bajo la línea, a la altura del cursor, sin pasar el borde de la línea', async ({ page }) => {
+    await abrir(page, { expresion: { nodos: [{ tipo: 'texto', valor: 'Estimado cliente, le escribimos para recordarle ' }] } });
+    await tramo(page, 0).click();
+    await page.keyboard.press('End');
+    await page.keyboard.type('[@');
+    await expect(panel(page)).toBeVisible();
+    // Con movimiento reducido el navegador anima cada propiedad en 0,01 ms: se espera a que el margen se asiente.
+    await expect.poll(() => panel(page).evaluate((e) => getComputedStyle(e).marginInlineStart)).not.toBe('0px');
+
+    const g = await page.evaluate(() => {
+      const linea = document.querySelector('#editor-prueba [data-linea]')!.getBoundingClientRect();
+      const area = document.querySelector('#editor-prueba [data-tramo="0"]')!.getBoundingClientRect();
+      const panel = document.querySelector('#editor-prueba .selector-variable')!.getBoundingClientRect();
+      return { lineaIzq: linea.left, lineaDer: linea.right, areaDer: area.right, panelIzq: panel.left, panelDer: panel.right, panelAncho: panel.width, lineaAncho: linea.width };
+    });
+    // Empieza donde empieza el «[@» (junto al final del texto), no en el borde izquierdo.
+    expect(g.panelIzq).toBeGreaterThan(g.lineaIzq + 100);
+    expect(Math.abs(g.panelIzq - (g.areaDer - 14))).toBeLessThanOrEqual(24);
+    expect(g.panelDer).toBeLessThanOrEqual(g.lineaDer + 1);
+    expect(g.panelAncho).toBeLessThan(g.lineaAncho);
+  });
+
+  test('con el cursor cerca del borde derecho, el buscador se recorre para no salirse', async ({ page }) => {
+    await abrir(page, { expresion: { nodos: [{ tipo: 'texto', valor: 'x'.repeat(10) }] } });
+    await tramo(page, 0).click();
+    await page.keyboard.press('End');
+    // Un texto largo en un renglón: el cursor queda lejos, a la derecha.
+    await tramo(page, 0).fill('Estimado cliente, le escribimos de parte de la caja para recordarle que su cuota de este mes vence muy pronto, ');
+    await page.keyboard.press('End');
+    await page.keyboard.type('[@');
+    await expect(panel(page)).toBeVisible();
+    await expect.poll(() => panel(page).evaluate((e) => getComputedStyle(e).marginInlineStart)).not.toBe('0px');
+    const g = await page.evaluate(() => {
+      const linea = document.querySelector('#editor-prueba [data-linea]')!.getBoundingClientRect();
+      const panel = document.querySelector('#editor-prueba .selector-variable')!.getBoundingClientRect();
+      return { dentro: panel.left >= linea.left - 1 && panel.right <= linea.right + 1, pagina: document.documentElement.scrollWidth, vista: window.innerWidth };
+    });
+    expect(g.dentro).toBe(true);
+    expect(g.pagina).toBeLessThanOrEqual(g.vista);
+  });
+
+  test('el buscador del botón no sigue al cursor: queda a la izquierda, del ancho de la línea', async ({ page }) => {
+    await abrir(page, { expresion: { nodos: [{ tipo: 'texto', valor: 'Estimado cliente, le escribimos para recordarle ' }] } });
+    await editor(page).getByRole('button', { name: 'Insertar variable', exact: true }).click();
+    const g = await page.evaluate(() => {
+      const linea = document.querySelector('#editor-prueba [data-linea]')!.getBoundingClientRect();
+      const panel = document.querySelector('#editor-prueba .selector-variable')!.getBoundingClientRect();
+      return { izquierda: panel.left - linea.left, ancho: panel.width, lineaAncho: linea.width };
+    });
+    expect(Math.abs(g.izquierda)).toBeLessThanOrEqual(1);
+    expect(g.ancho).toBeGreaterThan(g.lineaAncho - 2);
   });
 });
 

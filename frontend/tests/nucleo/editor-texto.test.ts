@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   agruparPorOrigen,
   agruparPorTema,
+  anchoDeTramo,
   aVariableDirecta,
   anclaDe,
   argumentosIniciales,
@@ -26,6 +27,7 @@ import {
   piezaDeAncla,
   resumenFunciones,
   textoArgumento,
+  tramoPegado,
 } from '../../src/lib/editor-texto';
 
 const VARIABLES = [
@@ -324,5 +326,61 @@ describe('lo que dice el error de un parámetro (§13.4)', () => {
     expect(errorDeParametro({ tipo: 'texto', obligatorio: false, minimo: null, maximo: null }, '')).toBeNull();
     expect(errorDeParametro({ tipo: 'texto', obligatorio: true, minimo: null, maximo: null }, 'algo')).toBeNull();
     expect(errorDeParametro(numero(1, 10), { variable: 'saldo_capital_pendiente' })).toBeNull();
+  });
+});
+
+describe('el tramo que queda pegado a la píldora de antes (§13.5)', () => {
+  it('uno vacío, o de solo blancos, queda pegado', () => {
+    expect(tramoPegado('')).toBe(true);
+    expect(tramoPegado(' ')).toBe(true);
+    expect(tramoPegado('  \t')).toBe(true);
+  });
+
+  it('uno de un solo signo de puntuación o símbolo queda pegado, con o sin blancos alrededor', () => {
+    for (const signo of ['.', ',', ';', ':', ')', '!', '?', '»', '-', '%', '$']) {
+      expect(tramoPegado(signo), signo).toBe(true);
+    }
+    expect(tramoPegado(' . ')).toBe(true);
+  });
+
+  it('uno con una letra o un número, aunque sea uno solo, no queda pegado: fluye por su cuenta', () => {
+    expect(tramoPegado('a')).toBe(false);
+    expect(tramoPegado('5')).toBe(false);
+    expect(tramoPegado('ñ')).toBe(false);
+    expect(tramoPegado(' y ')).toBe(false);
+  });
+
+  it('uno de más de un signo, o con un signo y texto, tampoco', () => {
+    expect(tramoPegado('..')).toBe(false);
+    expect(tramoPegado('...')).toBe(false);
+    expect(tramoPegado(', vence el ')).toBe(false);
+    expect(tramoPegado('.\n.')).toBe(false);
+  });
+});
+
+describe('el ancho de un tramo sin field-sizing, para Firefox (§13.5)', () => {
+  it('un tramo vacío o de un carácter mide lo mínimo: 2', () => {
+    expect(anchoDeTramo('')).toBe(2);
+    expect(anchoDeTramo('.')).toBe(2);
+  });
+
+  it('un texto de una línea mide sus caracteres más uno para el cursor', () => {
+    expect(anchoDeTramo('Hola')).toBe(5);
+    expect(anchoDeTramo(', vence el ')).toBe(12);
+  });
+
+  it('uno de varias líneas mide la más larga, no la suma', () => {
+    expect(anchoDeTramo('uno\ndos tres\ncuatro')).toBe(9);
+    expect(anchoDeTramo('a\n\nbc')).toBe(3);
+  });
+
+  it('un salto de línea final no suma ancho: la línea nueva está vacía', () => {
+    expect(anchoDeTramo('Hola\n')).toBe(5);
+  });
+
+  it('cuenta caracteres, no unidades UTF-16: un emoji cuenta uno', () => {
+    expect(anchoDeTramo('😀')).toBe(2);
+    expect(anchoDeTramo('a😀b')).toBe(4);
+    expect(anchoDeTramo('ñ')).toBe(2);
   });
 });

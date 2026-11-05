@@ -40,15 +40,31 @@
 
 /* ---- Line of pieces --------------------------------------------------------------- */
 
+/* The line is compact: pieces and runs flow in a row while they fit, and the line grows from three lines to about ten,
+   then scrolls (interface rules §13.5). */
 .editor-texto__linea {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  align-content: flex-start;
   gap: var(--space-1);
-  min-block-size: calc(var(--space-6) + var(--space-2));
+  min-block-size: calc(3lh + 2 * var(--space-2));
+  max-block-size: calc(10lh + 2 * var(--space-2));
+  overflow-y: auto;
   block-size: auto;
   padding: var(--space-2);
   cursor: text;
+}
+
+/* A pill and the run after it: apart they are items of the line; a short run (empty or one sign) stays glued to its pill. */
+.editor-texto__par {
+  display: contents;
+}
+.editor-texto__par--junto {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  max-inline-size: 100%;
 }
 .editor-texto__linea:focus-within {
   border-color: var(--color-text);
@@ -63,7 +79,8 @@
 /* A run reads as part of the sentence: no box of its own until it has focus. */
 .editor-texto__tramo {
   field-sizing: content;
-  min-inline-size: 2ch;
+  /* An empty run keeps a blank to click in: 24 px at least. */
+  min-inline-size: 1.5rem;
   max-inline-size: 100%;
   padding: 0;
   border: var(--color-border-hairline) dashed transparent;
@@ -100,12 +117,14 @@
   background-color: var(--color-accent-wash);
   box-shadow: inset 0 0 0 var(--color-border-hairline) transparent;
   color: var(--color-text);
-  font-family: var(--font-secondary);
+  /* A word of the sentence: the body's sans, not mono. */
+  font-family: var(--font-primary);
   font-size: var(--text-sm);
   line-height: var(--leading-data);
   cursor: pointer;
 }
 .editor-texto__piezaTexto {
+  max-inline-size: 24ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
