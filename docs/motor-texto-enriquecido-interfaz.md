@@ -701,3 +701,184 @@ En es y claro, salvo donde se indica:
 4. Supervisores con `?volver=`, a 360.
 5. Calendario laboral con `?volver=`, en inglés, a 1280.
 6. La configuración de WhatsMKT recién vuelta de Columnas, con la definición elegida y su anuncio, a 1280.
+
+## 13. Fase A: el editor común mejorado (2026-11-04)
+
+El usuario eligió la opción 2 del diagnóstico del motor, por fases. Esta es la fase A: mejorar el editor que ya comparten Columnas de carga y el speech de MOWA MES, para que sea cómodo, y dejarlo listo para que WhatsMKT lo use. La fase B (variables con función en el mensaje de WhatsMKT, que crean o reusan columnas, el tope de 5 macros y las columnas compartidas) tiene su propia especificación.
+
+Las reglas de §2 a §5 y §9 siguen valiendo; esta sección cambia solo lo que dice.
+
+### 13.1 Cortes
+
+| Corte | Qué | Dónde |
+|---|---|---|
+| **A1** | 13.2 a 13.5: el disparador, el buscador por tema, las funciones con su ejemplo y las píldoras | Solo el motor (`editor-texto.ts`, `selector-variable.ts` y su CSS). Columnas y MOWA lo heredan sin tocar sus páginas. Los temas son un dato nuevo de la variable en el catálogo (backend). |
+| **A2** | 13.6: contador y patrón de error únicos | El motor, más las páginas de MOWA (contador GSM-7) y WhatsMKT (lista de errores del mensaje). **Toca pantallas de MOWA y WhatsMKT.** |
+| **A3** | 13.7: WhatsMKT usa el editor común para su mensaje | La configuración y la campaña de WhatsMKT. **Toca pantallas de WhatsMKT.** Puede ir antes de la fase B. |
+
+A1 no depende de nada. A2 y A3 van después de A1.
+
+### 13.2 El disparador `[@` (A1)
+
+- **Gesto:** en un tramo de texto, escribir `[@` abre el buscador de variables **en el lugar del cursor**, como un desplegable bajo la línea, alineado al cursor. Lo que se escribe después de `[@` filtra la lista, igual que el campo de búsqueda.
+- **Teclado:**
+  - flechas arriba y abajo para moverse;
+  - Enter o Tab insertan la variable resaltada **en lugar** de `[@` y lo escrito después, y el cursor queda después de la píldora;
+  - Escape cierra el buscador y **deja el texto tal como se escribió** (`[@nom`), porque quien quería escribir `[@` literal no pierde nada;
+  - borrar el `@` también lo cierra;
+  - el foco no sale del tramo: el buscador se maneja con `aria-activedescendant` desde él.
+- **Sin coincidencias:** la lista dice «Ninguna variable coincide con «{texto}»» y Enter no hace nada.
+- **Lector de pantalla:**
+  - el tramo pasa a `role="combobox"`, con `aria-expanded`, `aria-controls` y `aria-autocomplete="list"`, mientras el buscador está abierto;
+  - al abrir, se anuncia en la región `polite` del editor: «Buscador de variables. Escribe para filtrar, Enter inserta y Escape cancela.»;
+  - al insertar: «Se insertó {variable}.».
+- **El botón sigue,** para quien usa el mouse: «Insertar variable» (`plus`), ahora **arriba** de la línea, al inicio de una barra propia, y no debajo. Abre el mismo buscador en el cursor (en el último tramo enfocado o, si no hubo ninguno, al final, y el anuncio lo dice: «Se insertará al final del texto.»).
+- **Pista visible,** bajo la línea, en `.field__hint`: «Escribe [@ para insertar una variable».
+- **En una columna de variable directa** (§5.3) no hay línea ni disparador: sigue el `select`.
+
+### 13.3 El buscador por tema, con un ejemplo (A1)
+
+- **Agrupado por tema,** no por origen. El tema es un dato de la variable en el catálogo, `tema`, que manda el backend: una sola fuente. Las del módulo entran en el tema que les corresponde, no en un grupo aparte.
+- **Temas, en este orden:**
+
+  | Clave | es | en |
+  |---|---|---|
+  | `persona` | Persona y contacto | Person and contact |
+  | `deuda` | Cuota y deuda | Instalment and debt |
+  | `fechas` | Fechas y atraso | Dates and days overdue |
+  | `credito` | Crédito | Loan |
+  | `gestion` | Gestión y asignación | Collection and assignment |
+  | `riesgo` | Riesgo y segmentos | Risk and segments |
+  | `adicionales` | Campos adicionales | Additional fields |
+  | `otros` | Otros | Other |
+
+- **En qué tema cae cada variable:**
+  - **persona:** `titular`, `documento_tipo`, `documento_numero`, `telefono` y `cliente_fallecido`; en MOWA, `titular` y `whatsapp_contacto`.
+  - **deuda:** `monto_cuota`, `cuotas_aprobadas`, `cuotas_pagadas`, `cuotas_pendientes`, `saldo_capital_pendiente`, `saldo_soles_corte`, `saldo_cierre_actual` y `valor_cierre_mes_anterior`.
+  - **fechas:** `fecha_vencimiento_cuota`, `vencimiento_operativo_aplica`, `vencimiento_operativo_fecha`, `dias_atraso`, `dias_atraso_entidad`, `mes_gestion`, `fecha_envio` y `dias_atraso_ajustados`; en MOWA, `vencimiento` y los días ajustados.
+  - **credito:** `pagare`, `tipo_producto`, `estado_credito`, `moneda`, `tipo_reprogramacion`, `descuento_planilla`, `cantidad_paralelos` y `cartera_tag`.
+  - **gestion:** `agencia`, `region`, `analista_actual`, `analista_asignacion`, `celular_analista`, `bpo` y `validador`.
+  - **riesgo:** `segmento_actual`, `segmento_atraso`, `segmento_financiero`, `segmento_saldo`, `tramo_actual`, `tramo_proyectado`, `tipo_basilea`, `cod_tipo_basilea`, `mora_impacto_actual`, `mora_impacto_proyectada`, `provision_actual` y `provision_proyectada`.
+  - **adicionales:** todo campo adicional (RF-63).
+  - **otros:** un campo base nuevo sin tema asignado. Así nunca se pierde, y la prueba del catálogo avisa que le falta tema.
+- **Cada fila:** el nombre visible en sans, el tipo como tag chico (texto, número, fecha, sí/no) y, a la derecha, en mono y muted, **el valor de ejemplo** del contexto (`contexto.ejemplo`), formateado como en la vista previa: «Titular · texto · TITULAR/SINTETICO,UNO». El nombre técnico ya no va en la fila: queda en `title` y se busca igual.
+- **Búsqueda:** por nombre visible, nombre técnico y alias, sin tildes ni mayúsculas. Con texto, los temas vacíos se ocultan.
+- **Lo que no está en un contexto:** al pie del buscador, una línea `.field__hint` con el alcance del contexto, que trae el catálogo (`clave_alcance`):
+  - en el speech de MOWA: «El speech solo usa las variables de la campaña y los campos adicionales.»;
+  - en Columnas: ninguna línea, porque están todas.
+  Así «no está» se lee como regla del lugar y no como falla del editor. Sumar campos de la cartera al speech es una decisión aparte, de datos, no de esta fase.
+
+### 13.4 Funciones, con su ejemplo antes de elegirla (A1)
+
+- **El `select` «+ Agregar función» se reemplaza** por un botón «Agregar función» (`plus`) que abre una lista en el panel: por familia, con las compatibles con el tipo de la pieza en ese punto de la cadena (§2.3). Cada fila tiene:
+  - el nombre de la función;
+  - debajo, en `.field__hint`, su descripción con el ejemplo del catálogo («Deja solo los primeros N caracteres. JUAN PEREZ con 8 → JUAN PER»);
+  - a la derecha, en mono, **el resultado con el valor de ejemplo de la pieza**, si la función no necesita parámetros (por ejemplo, «Mayúsculas → TITULAR/SINTETICO,UNO»). Si necesita, solo la descripción.
+  La lista se filtra escribiendo, como el buscador de variables.
+- **Al elegir,** la función se agrega al final de la cadena y el foco va a su primer parámetro, como hoy.
+- **El error de un parámetro dice su rango,** con el mínimo y el máximo del catálogo:
+  - «Escribe un número entre {min} y {max}.»;
+  - solo mínimo: «Escribe un número de {min} en adelante.»;
+  - solo máximo: «Escribe un número hasta {max}.»;
+  - un parámetro de texto vacío que se exige: «Escribe {parametro}.».
+  El texto genérico de hoy («…debe ser del tipo que se pide y estar dentro del rango») queda solo como respaldo.
+- **El panel nombra su pieza** en su encabezado, con la posición cuando la misma variable está más de una vez: «Titular (2.ª vez)». La píldora abierta queda marcada (`aria-expanded="true"` y borde de acento), y el panel hace `scrollIntoView` al abrir.
+
+### 13.5 Las píldoras y la línea (A1)
+
+- **La píldora se lee como palabra de la frase:**
+  - el nombre visible en sans, del cuerpo del texto, no en mono;
+  - con **una** función, su nombre corto: «Titular · mayúsculas»;
+  - con **dos o más**: «Titular · 3 funciones»;
+  - la cadena completa va en `title` y en el nombre accesible («Titular, con mayúsculas, primeros caracteres 8»);
+  - un ancho máximo de unas 24 letras, con puntos suspensivos; el nombre accesible no se corta.
+- **La línea es un párrafo:** crece con el texto (de 3 líneas mínimo a unas 10), los tramos se parten como texto y las píldoras quedan en línea con él. Sigue siendo `input` en su borde y su foco, pero no de una sola fila.
+- **El WhatsApp de contacto es una píldora** en los tres lugares, con el ícono `message-circle` y el nombre «Enlace de WhatsApp». En MOWA es la variable `whatsapp_contacto` con su función; en WhatsMKT (A3) se guarda como el marcador literal `[whatsapp]`. El usuario lo decidió así, y el editor no muestra la diferencia.
+- **El resumen de una columna compuesta** en la lista de Columnas y en la campaña de WhatsMKT marca la variable entre corchetes: «Texto: 51[Teléfono]» (`textoDeContenido`). Sin las funciones, que se ven en la fila abierta.
+
+### 13.6 Contador y errores, iguales en los tres sitios (A2)
+
+- **Contador,** bajo la vista previa, siempre con la misma forma:
+  - con tope: «{n} / {tope} caracteres»;
+  - si los datos pueden alargarlo, se suma «· hasta {maximo} con los datos más largos»;
+  - sin tope (Columnas): «{n} caracteres».
+  - Al llegar al umbral del contexto: el tag `tag--advertencia` «Cerca del tope». Al pasarlo: el contador en `.field__error` y el tag `tag--error` «Pasa el tope».
+  - Se anuncia solo al cruzar el umbral o el tope, no en cada tecla.
+  - MOWA conserva la medida en GSM-7 y WhatsMKT la de [whatsapp] como 26 caracteres. Cambia la forma, no la cuenta.
+- **Errores,** con un solo patrón:
+  - un resumen arriba del editor (`.notice--danger`, `tabindex="-1"`): «Hay {n} problemas en el texto.», con «Ir al problema» por cada uno;
+  - cada error también en su lugar: bajo el tramo, bajo el parámetro o en la píldora;
+  - al guardar con errores, el foco va al resumen.
+  WhatsMKT pasa a este patrón (hoy los muestra en fila bajo el textarea). La posición del emoji sigue llevando al carácter.
+- **Lo que no es un error de lo escrito** (un dato vacío en la muestra) va aparte, en la vista previa, como `.field__hint`: «Con este producto, {variable} viene vacía.». No en el resumen.
+
+### 13.7 WhatsMKT con el editor común (A3)
+
+- El mensaje de la configuración (§5.1 de [whatsmkt-interfaz.md](whatsmkt-interfaz.md)) y su vista previa en la campaña pasan del textarea al editor común, en contexto `whatsmkt.mensaje`.
+- **Hasta la fase B,** el buscador de ese contexto ofrece solo:
+  - las macros de la definición por defecto, como píldoras con su etiqueta («MACRO1 · Nombres del titular»), que se guardan como `[$MACROn$]`;
+  - el «Enlace de WhatsApp», que se guarda como `[whatsapp]`.
+  Sin funciones: el panel dice «En WhatsMKT las funciones van en la columna, en Columnas de carga.», con el enlace de ir y volver.
+- Lo demás sigue igual: el tope, los emojis, la macro que no existe y la vista previa con las filas de ejemplo.
+
+### 13.8 Fuera de la fase A
+
+Quedan fuera, como dijo el coordinador: pegar texto con marcadores, el producto real con fecha y pagaré, y el resaltado por píldora en la vista previa. Ninguno es imprescindible para la comodidad que pide el usuario: el disparador y el buscador resuelven lo que más cuesta. Si el usuario los pide, el primero a sumar es **pegar con marcadores**, porque hoy migrar un speech es pieza por pieza.
+
+### 13.9 Textos (es / en)
+
+| Clave | es | en |
+|---|---|---|
+| `editorTexto.variable.insertar` | Insertar variable | Insert variable |
+| `editorTexto.disparador.pista` | Escribe [@ para insertar una variable | Type [@ to insert a variable |
+| `editorTexto.disparador.abierto` | Buscador de variables. Escribe para filtrar, Enter inserta y Escape cancela. | Variable search. Type to filter, Enter inserts and Escape cancels. |
+| `editorTexto.disparador.insertada` | Se insertó {variable}. | {variable} was inserted. |
+| `editorTexto.disparador.alFinal` | Se insertará al final del texto. | It will be inserted at the end of the text. |
+| `editorTexto.disparador.ninguna` | Ninguna variable coincide con {textoCitado}. | No variable matches {textoCitado}. |
+| `editorTexto.tema.persona` | Persona y contacto | Person and contact |
+| `editorTexto.tema.deuda` | Cuota y deuda | Instalment and debt |
+| `editorTexto.tema.fechas` | Fechas y atraso | Dates and days overdue |
+| `editorTexto.tema.credito` | Crédito | Loan |
+| `editorTexto.tema.gestion` | Gestión y asignación | Collection and assignment |
+| `editorTexto.tema.riesgo` | Riesgo y segmentos | Risk and segments |
+| `editorTexto.tema.adicionales` | Campos adicionales | Additional fields |
+| `editorTexto.tema.otros` | Otros | Other |
+| `textoEnriquecido.alcance.mowa_mes.speech` | El speech solo usa las variables de la campaña y los campos adicionales. | The speech only uses the campaign variables and the additional fields. |
+| `textoEnriquecido.alcance.whatsmkt.mensaje` | Hasta que WhatsMKT tenga variables propias, el mensaje usa las macros de la definición por defecto y el enlace de WhatsApp. | Until WhatsMKT has its own variables, the message uses the macros of the default definition and the WhatsApp link. |
+| `editorTexto.funcion.agregar` | Agregar función | Add function |
+| `editorTexto.funcion.buscar` | Buscar función | Search function |
+| `editorTexto.funcion.ejemploResultado` | {funcion} → {resultado} | {funcion} → {resultado} |
+| `editorTexto.parametro.rango` | Escribe un número entre {min} y {max}. | Enter a number between {min} and {max}. |
+| `editorTexto.parametro.minimo` | Escribe un número de {min} en adelante. | Enter a number from {min} up. |
+| `editorTexto.parametro.maximo` | Escribe un número hasta {max}. | Enter a number up to {max}. |
+| `editorTexto.parametro.vacio` | Escribe {parametro}. | Enter {parametro}. |
+| `editorTexto.panel.vez` | {variable} ({n}.ª vez) | {variable} (occurrence {n}) |
+| `editorTexto.pildora.funciones` | {variable} · {n} funciones | {variable} · {n} functions |
+| `editorTexto.pildora.whatsapp` | Enlace de WhatsApp | WhatsApp link |
+| `editorTexto.largo.deTope` | {n} / {tope} caracteres | {n} / {tope} characters |
+| `editorTexto.largo.hasta` | · hasta {maximo} con los datos más largos | · up to {maximo} with the longest data |
+| `editorTexto.largo.cerca` | Cerca del tope | Near the limit |
+| `editorTexto.largo.pasa` | Pasa el tope | Over the limit |
+| `editorTexto.muestra.vacia` | Con este producto, {variable} viene vacía. | With this product, {variable} is empty. |
+| `editorTexto.whatsmkt.sinFunciones` | En WhatsMKT las funciones van en la columna, en Columnas de carga. | In WhatsMKT functions go in the column, in Load columns. |
+
+- `editorTexto.variable.agregar` («Variable») se reemplaza por `editorTexto.variable.insertar`.
+- `editorTexto.largo.nivel.*` y `editorTexto.largo.maximoDe` se van con A2, reemplazados por `largo.deTope`, `largo.hasta`, `largo.cerca` y `largo.pasa`.
+- `{textoCitado}` y los nombres van con las comillas del idioma (`camposAdicionales.nombreCitado`).
+
+### 13.10 Pruebas mínimas
+
+- **A1:**
+  - `[@` abre el buscador en el cursor; escribir filtra; Enter y Tab insertan en lugar de `[@…` con el cursor después; Escape deja el texto; borrar `@` cierra; sin coincidencias, Enter no inserta;
+  - los atributos de combobox del tramo y los dos anuncios;
+  - «Insertar variable» arriba de la línea, con el anuncio de «al final» si no hubo foco;
+  - el buscador por tema en el orden de 13.3, con el ejemplo formateado, el tag de tipo y la búsqueda por el nombre técnico; un campo sin tema cae en Otros;
+  - la línea de alcance en MOWA y su ausencia en Columnas;
+  - la lista de funciones con su descripción, el resultado de ejemplo en las sin parámetros y el filtro; los cuatro errores de parámetro con su rango;
+  - el panel que nombra la pieza repetida; la píldora con una y con varias funciones, el corte de nombre largo y su nombre accesible completo;
+  - la línea que crece; la píldora de WhatsApp en MOWA;
+  - el resumen «Texto: 51[Teléfono]».
+- **A2:** el contador con tope, con «hasta», sin tope, y sus dos tags y anuncios, en MOWA (GSM-7) y en WhatsMKT (26 por [whatsapp]); el resumen de errores con «Ir al problema» y el foco al guardar, también en WhatsMKT; el dato vacío de la muestra fuera del resumen.
+- **A3:** el mensaje de WhatsMKT en el editor común con macros y WhatsApp como píldoras que se guardan como `[$MACROn$]` y `[whatsapp]`; un texto guardado antes de A3 se abre igual; sin funciones, con su enlace.
+- **axe** en claro, oscuro y 360 px: el editor con el buscador abierto por `[@`, el panel de funciones abierto y el resumen de errores.
+- **Capturas para `designer`:** el buscador abierto por `[@` (1280 y 360), la lista de funciones, una línea con varias píldoras y el contador con «Cerca del tope», en es y en, claro y oscuro.
