@@ -2809,6 +2809,8 @@ export interface components {
             variable_dias: string;
             /** Segmentos */
             segmentos: components["schemas"]["RangoRespuesta"][];
+            /** Clave Alcance */
+            clave_alcance: string | null;
         };
         /** CreacionCampanaEntrada */
         CreacionCampanaEntrada: {
@@ -5381,6 +5383,14 @@ export interface components {
             documento: string;
         };
         /**
+         * TemaVariable
+         * @description El tema en que el buscador agrupa una variable (§13.3 del motor), en el orden en que se
+         *     muestran. `OTROS` es un campo base sin tema asignado: nunca se pierde, y la prueba del catalogo
+         *     avisa que le falta uno.
+         * @enum {string}
+         */
+        TemaVariable: "persona" | "deuda" | "fechas" | "credito" | "gestion" | "riesgo" | "adicionales" | "otros";
+        /**
          * TextoEntrada
          * @description Lo que no es texto o objeto llega al servicio tal cual y se informa como problema.
          */
@@ -5571,6 +5581,7 @@ export interface components {
             adicional: boolean;
             /** Archivado */
             archivado: boolean;
+            tema: components["schemas"]["TemaVariable"];
         };
         /** VarianteEntrada */
         VarianteEntrada: {

@@ -78,6 +78,7 @@ def test_el_catalogo_de_la_api_declara_las_marcas_de_cada_variable(cliente) -> N
         "etiqueta": "Zona comercial",
         "adicional": True,
         "archivado": False,
+        "tema": "adicionales",
     }
     assert variables["ad_antiguo"]["archivado"] is True
     assert variables["region"]["etiqueta"] is None and variables["region"]["adicional"] is False

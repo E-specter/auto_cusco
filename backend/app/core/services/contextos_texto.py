@@ -15,6 +15,7 @@ from app.core.entities.contexto_texto import (
     ORIGEN_CARTERA,
     ContextoDesconocido,
     ContextoTexto,
+    TemaVariable,
     VariableContexto,
 )
 from app.core.entities.segmentacion import TABLA_RANGOS_POR_DEFECTO, VARIABLE_DIAS_AJUSTADOS
@@ -51,6 +52,80 @@ _CLAVES_DE_ENVIO = {
     FECHA_ENVIO: "textoEnriquecido.variable.fecha_envio",
     DIAS_AJUSTADOS: "textoEnriquecido.variable.dias_atraso_ajustados",
 }
+# El tema de cada campo base en el buscador (§13.3 del motor). Una sola fuente: la manda el backend.
+# Un campo base que no este aqui cae en `OTROS`, y una prueba del catalogo lo avisa.
+_TEMAS: dict[TemaVariable, tuple[str, ...]] = {
+    TemaVariable.PERSONA: (
+        "titular",
+        "documento_tipo",
+        "documento_numero",
+        "telefono",
+        "cliente_fallecido",
+        "whatsapp_contacto",  # la variable de MOWA MES, no un campo de la cartera
+    ),
+    TemaVariable.DEUDA: (
+        "monto_cuota",
+        "cuotas_aprobadas",
+        "cuotas_pagadas",
+        "cuotas_pendientes",
+        "saldo_capital_pendiente",
+        "saldo_soles_corte",
+        "saldo_cierre_actual",
+        "valor_cierre_mes_anterior",
+    ),
+    TemaVariable.FECHAS: (
+        "fecha_vencimiento_cuota",
+        "vencimiento_operativo_aplica",
+        "vencimiento_operativo_fecha",
+        "dias_atraso",
+        "dias_atraso_entidad",
+        "mes_gestion",
+        FECHA_ENVIO,
+        DIAS_AJUSTADOS,
+    ),
+    TemaVariable.CREDITO: (
+        "pagare",
+        "tipo_producto",
+        "estado_credito",
+        "moneda",
+        "tipo_reprogramacion",
+        "descuento_planilla",
+        "cantidad_paralelos",
+        "cartera_tag",
+    ),
+    TemaVariable.GESTION: (
+        "agencia",
+        "region",
+        "analista_actual",
+        "analista_asignacion",
+        "celular_analista",
+        "bpo",
+    ),
+    TemaVariable.RIESGO: (
+        "segmento_actual",
+        "segmento_atraso",
+        "segmento_financiero",
+        "segmento_saldo",
+        "tramo_actual",
+        "tramo_proyectado",
+        "tipo_basilea",
+        "mora_impacto_actual",
+        "mora_impacto_proyectada",
+        "provision_actual",
+        "provision_proyectada",
+    ),
+}
+_TEMA_POR_CAMPO = {nombre: tema for tema, nombres in _TEMAS.items() for nombre in nombres}
+
+
+def tema_de(nombre: str, adicional: bool = False) -> TemaVariable:
+    """El tema de un campo: `ADICIONALES` si lo creo el usuario, el de la tabla si es base, y
+    `OTROS` si es un campo base sin tema asignado."""
+    if adicional:
+        return TemaVariable.ADICIONALES
+    return _TEMA_POR_CAMPO.get(nombre, TemaVariable.OTROS)
+
+
 _EJEMPLO_POR_TIPO: dict[TipoValor, Any] = {
     TipoValor.TEXTO: "EJEMPLO",
     TipoValor.NUMERO: 100,
@@ -74,10 +149,13 @@ def contexto_cartera(catalogo: CatalogoCartera) -> ContextoTexto:
             campo.etiqueta,
             campo.adicional,
             campo.archivado,
+            tema_de(nombre, campo.adicional),
         )
         for nombre, campo in catalogo.campos().items()
     ) + tuple(
-        VariableContexto(nombre, tipo, _CLAVES_DE_ENVIO[nombre], ORIGEN_CARTERA)
+        VariableContexto(
+            nombre, tipo, _CLAVES_DE_ENVIO[nombre], ORIGEN_CARTERA, tema=tema_de(nombre)
+        )
         for nombre, tipo in VARIABLES_DE_ENVIO.items()
     )
     ejemplo = {

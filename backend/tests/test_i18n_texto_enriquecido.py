@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from app.api.texto_enriquecido import registro_de_contextos
+from app.core.entities.contexto_texto import TemaVariable
 from app.core.entities.texto_enriquecido import CodigoTexto
 from app.core.services.seleccion_cartera.campos import CatalogoCartera
 from app.core.services.texto_enriquecido import catalogo
@@ -48,8 +49,12 @@ def _claves_esperadas() -> dict[str, str]:
         esperadas[marca.clave] = f"la marca de fecha {marca.marca!r}"
     for familia in catalogo.familias():
         esperadas[f"{PREFIJO}familia.{familia}"] = f"la familia {familia!r}"
+    for tema in TemaVariable:
+        esperadas[f"editorTexto.tema.{tema.value}"] = f"el tema {tema.value!r}"
     for contexto in registro_de_contextos(CatalogoCartera()).disponibles():
         esperadas[contexto.clave_nombre] = f"el contexto {contexto.nombre!r}"
+        if contexto.clave_alcance is not None:
+            esperadas[contexto.clave_alcance] = f"la linea de alcance de {contexto.nombre!r}"
         for variable in contexto.variables:
             if variable.clave_nombre is not None:
                 esperadas[variable.clave_nombre] = (

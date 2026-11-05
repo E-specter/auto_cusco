@@ -7,6 +7,7 @@ Las arma la composicion (`services/contextos_texto.py`).
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any
 
 from app.core.entities.segmentacion import RangoDias
@@ -14,6 +15,21 @@ from app.core.entities.texto_enriquecido import TipoValor
 
 # El contexto que aporta los campos de la cartera: el origen de casi todas las variables.
 ORIGEN_CARTERA = "cartera"
+
+
+class TemaVariable(StrEnum):
+    """El tema en que el buscador agrupa una variable (§13.3 del motor), en el orden en que se
+    muestran. `OTROS` es un campo base sin tema asignado: nunca se pierde, y la prueba del catalogo
+    avisa que le falta uno."""
+
+    PERSONA = "persona"
+    DEUDA = "deuda"
+    FECHAS = "fechas"
+    CREDITO = "credito"
+    GESTION = "gestion"
+    RIESGO = "riesgo"
+    ADICIONALES = "adicionales"
+    OTROS = "otros"
 
 
 def _sin_cambios(texto: str) -> str:
@@ -31,6 +47,9 @@ class VariableContexto:
     Un campo adicional (RF-64) trae su nombre legible en `etiqueta` y `adicional`; si esta
     `archivado` se sigue resolviendo (lo que ya lo usa compila), pero el editor no lo ofrece. En
     las demas, `etiqueta` es None y las marcas son falsas.
+
+    `tema` es la agrupacion del buscador (una sola fuente: la manda el backend). Un campo adicional
+    es de `ADICIONALES`; uno base sin tema asignado cae en `OTROS`.
     """
 
     nombre: str
@@ -40,6 +59,7 @@ class VariableContexto:
     etiqueta: str | None = None
     adicional: bool = False
     archivado: bool = False
+    tema: TemaVariable = TemaVariable.OTROS
 
 
 @dataclass(frozen=True)
@@ -53,6 +73,9 @@ class ContextoTexto:
     variable_dias: str
     tabla_rangos: tuple[RangoDias, ...]
     registro_de_producto: Callable[[Mapping[str, Any]], dict[str, Any]]
+    # La clave i18n de la linea de alcance que el buscador muestra al pie (§13.3): que NO ofrece
+    # este contexto, dicho como regla del lugar. None si ofrece todo (Columnas): sin linea.
+    clave_alcance: str | None = None
     # Comportamiento del canal, no datos del catalogo (por eso no entran en `repr`, en la
     # comparacion ni en el contrato). `medida` es la unidad del largo y de la cota (por defecto,
     # caracteres); `salida` es lo que se le hace al texto antes de enviarlo (por defecto, nada). El

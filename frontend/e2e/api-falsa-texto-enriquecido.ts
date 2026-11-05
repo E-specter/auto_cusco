@@ -107,9 +107,9 @@ const SEGMENTOS_SINTETICOS: Esquemas['RangoRespuesta'][] = [
  */
 export function variablesAdicionalesSinteticas(): Esquemas['VariableRespuesta'][] {
   return [
-    { nombre: 'ad_zona', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: 'Zona', adicional: true, archivado: false },
-    { nombre: 'ad_monto_mora', tipo: 'numero', clave_nombre: null, origen: 'cartera', etiqueta: 'Monto en mora', adicional: true, archivado: false },
-    { nombre: 'ad_region', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: 'Región', adicional: true, archivado: true },
+    { nombre: 'ad_zona', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: 'Zona', adicional: true, archivado: false, tema: 'adicionales' },
+    { nombre: 'ad_monto_mora', tipo: 'numero', clave_nombre: null, origen: 'cartera', etiqueta: 'Monto en mora', adicional: true, archivado: false, tema: 'adicionales' },
+    { nombre: 'ad_region', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: 'Región', adicional: true, archivado: true, tema: 'adicionales' },
   ];
 }
 
@@ -117,16 +117,16 @@ export function variablesAdicionalesSinteticas(): Esquemas['VariableRespuesta'][
 export function catalogoSintetico(contexto = 'mowa_mes.speech'): Catalogo {
   const esSpeech = contexto === 'mowa_mes.speech';
   const variables: Esquemas['VariableRespuesta'][] = [
-    { nombre: 'titular', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false },
-    { nombre: 'fecha_vencimiento_cuota', tipo: 'fecha', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false },
-    { nombre: 'saldo_capital_pendiente', tipo: 'numero', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false },
-    { nombre: 'telefono', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false },
-    { nombre: 'cliente_fallecido', tipo: 'booleano', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false },
+    { nombre: 'titular', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false, tema: 'persona' },
+    { nombre: 'fecha_vencimiento_cuota', tipo: 'fecha', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false, tema: 'fechas' },
+    { nombre: 'saldo_capital_pendiente', tipo: 'numero', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false, tema: 'deuda' },
+    { nombre: 'telefono', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false, tema: 'persona' },
+    { nombre: 'cliente_fallecido', tipo: 'booleano', clave_nombre: null, origen: 'cartera', etiqueta: null, adicional: false, archivado: false, tema: 'persona' },
   ];
   if (esSpeech) {
     variables.push(
-      { nombre: 'whatsapp_contacto', tipo: 'texto', clave_nombre: 'textoEnriquecido.variable.whatsapp_contacto', origen: contexto, etiqueta: null, adicional: false, archivado: false },
-      { nombre: 'dias_atraso_ajustados', tipo: 'numero', clave_nombre: 'textoEnriquecido.variable.dias_atraso_ajustados', origen: contexto, etiqueta: null, adicional: false, archivado: false },
+      { nombre: 'whatsapp_contacto', tipo: 'texto', clave_nombre: 'textoEnriquecido.variable.whatsapp_contacto', origen: contexto, etiqueta: null, adicional: false, archivado: false, tema: 'persona' },
+      { nombre: 'dias_atraso_ajustados', tipo: 'numero', clave_nombre: 'textoEnriquecido.variable.dias_atraso_ajustados', origen: contexto, etiqueta: null, adicional: false, archivado: false, tema: 'fechas' },
     );
   }
 
@@ -145,6 +145,7 @@ export function catalogoSintetico(contexto = 'mowa_mes.speech'): Catalogo {
       },
       limite_largo: esSpeech ? 160 : null,
       umbral_advertencia: esSpeech ? 150 : null,
+      clave_alcance: esSpeech ? 'textoEnriquecido.alcance.mowa_mes.speech' : null,
       // A new definition counts days adjusted to the send date (RF-55, B13), in every context.
       variable_dias: 'dias_atraso_ajustados',
       segmentos: SEGMENTOS_SINTETICOS,

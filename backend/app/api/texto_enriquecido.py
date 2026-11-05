@@ -31,7 +31,7 @@ from app.api.fecha_envio import DetalleErrorFechaEnvio, error_de_fecha_envio
 from app.api.respuestas import ModeloRespuesta
 from app.api.selecciones import obtener_servicio_selecciones
 from app.core.entities.cartera import ConsultaInvalida, SinVersionVigente
-from app.core.entities.contexto_texto import ContextoDesconocido, ContextoTexto
+from app.core.entities.contexto_texto import ContextoDesconocido, ContextoTexto, TemaVariable
 from app.core.entities.definiciones_columnas import (
     LARGO_MAXIMO_NOMBRE,
     MAXIMO_COLUMNAS,
@@ -350,6 +350,7 @@ class VariableRespuesta(ModeloRespuesta):
     etiqueta: str | None
     adicional: bool
     archivado: bool
+    tema: TemaVariable  # la agrupacion del buscador (§13.3); la manda el backend
 
 
 class RangoRespuesta(ModeloRespuesta):
@@ -368,6 +369,7 @@ class ContextoRespuesta(ModeloRespuesta):
     umbral_advertencia: int | None
     variable_dias: str
     segmentos: list[RangoRespuesta]
+    clave_alcance: str | None  # la linea de alcance al pie del buscador; None = sin linea
 
 
 class ContextoDisponibleRespuesta(ModeloRespuesta):
@@ -572,6 +574,7 @@ def _contexto(contexto: ContextoTexto) -> ContextoRespuesta:
                 etiqueta=v.etiqueta,
                 adicional=v.adicional,
                 archivado=v.archivado,
+                tema=v.tema,
             )
             for v in contexto.variables
         ],
@@ -580,6 +583,7 @@ def _contexto(contexto: ContextoTexto) -> ContextoRespuesta:
         umbral_advertencia=contexto.umbral_advertencia,
         variable_dias=contexto.variable_dias,
         segmentos=[_rango(r) for r in contexto.tabla_rangos],
+        clave_alcance=contexto.clave_alcance,
     )
 
 

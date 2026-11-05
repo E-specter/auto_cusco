@@ -8914,6 +8914,17 @@
             },
             "type": "array",
             "title": "Segmentos"
+          },
+          "clave_alcance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clave Alcance"
           }
         },
         "type": "object",
@@ -8925,7 +8936,8 @@
           "limite_largo",
           "umbral_advertencia",
           "variable_dias",
-          "segmentos"
+          "segmentos",
+          "clave_alcance"
         ],
         "title": "ContextoRespuesta"
       },
@@ -15357,6 +15369,21 @@
         ],
         "title": "SupervisorRespuesta"
       },
+      "TemaVariable": {
+        "type": "string",
+        "enum": [
+          "persona",
+          "deuda",
+          "fechas",
+          "credito",
+          "gestion",
+          "riesgo",
+          "adicionales",
+          "otros"
+        ],
+        "title": "TemaVariable",
+        "description": "El tema en que el buscador agrupa una variable (§13.3 del motor), en el orden en que se\nmuestran. `OTROS` es un campo base sin tema asignado: nunca se pierde, y la prueba del catalogo\navisa que le falta uno."
+      },
       "TextoEntrada": {
         "properties": {
           "contexto": {
@@ -15804,6 +15831,9 @@
           "archivado": {
             "type": "boolean",
             "title": "Archivado"
+          },
+          "tema": {
+            "$ref": "#/components/schemas/TemaVariable"
           }
         },
         "type": "object",
@@ -15814,7 +15844,8 @@
           "origen",
           "etiqueta",
           "adicional",
-          "archivado"
+          "archivado",
+          "tema"
         ],
         "title": "VariableRespuesta",
         "description": "`origen` es el contexto que aporta la variable: `cartera` para un campo de la cartera, o el\ndel modulo (`mowa_mes.speech`) para una variable suya. La interfaz las agrupa por origen.\nUna variable `adicional` (RF-64) es un campo que creo el usuario: su nombre legible es\n`etiqueta`, un texto literal. Si esta `archivado` se sigue resolviendo, pero no se ofrece."

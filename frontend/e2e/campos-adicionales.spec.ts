@@ -538,8 +538,8 @@ test.describe('el editor de texto', () => {
     const motor = apiTextoEnriquecidoVacia();
     for (const catalogo of Object.values(motor.catalogos)) {
       catalogo.contexto.variables.push(
-        { nombre: 'ad_zona', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: 'Zona de cobranza', adicional: true, archivado: false },
-        { nombre: 'ad_antiguo', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: 'Campo antiguo', adicional: true, archivado: true },
+        { nombre: 'ad_zona', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: 'Zona de cobranza', adicional: true, archivado: false, tema: 'adicionales' },
+        { nombre: 'ad_antiguo', tipo: 'texto', clave_nombre: null, origen: 'cartera', etiqueta: 'Campo antiguo', adicional: true, archivado: true, tema: 'adicionales' },
       );
     }
     const api = apiVacia();
@@ -582,6 +582,7 @@ test.describe('el constructor de columnas', () => {
     etiqueta,
     adicional: true,
     archivado,
+    tema: 'adicionales' as const,
   });
 
   /** A saved definition whose first column is `variable` (a direct variable), opened on /columnas. */
@@ -712,6 +713,7 @@ test.describe('generar carga', () => {
     etiqueta,
     adicional: true,
     archivado,
+    tema: 'adicionales' as const,
   });
 
   /** A saved definition whose first column is `variable`, chosen on /generar-carga. */
